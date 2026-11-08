@@ -229,8 +229,13 @@
       if (function_exists('billunit_terms_form_html')): ?>
 <div class="panel" id="billing"><h3 class="tab-sub" style="margin-top:0">Billing terms</h3>
   <?= billunit_terms_form_html('/contract-billing', ['contract_id' => (int)$c['id']], (string)($c['billing_triggers'] ?? ''), (string)(($c['billing_period'] ?? '') ?: 'MONTHLY'),
-        billunit_can_set_contract_terms(),
-        'Every ' . Tl('job') . ' under this contract follows these terms unless its work order or the ' . Tl('job') . ' sets its own. Nothing ticked: a deployment bills month by month, man-day work at closure.') ?>
+        billunit_can_set_contract_terms() && !(function_exists('contract_pending_amendment') && contract_pending_amendment((int)$c['id'])),
+        'Every ' . Tl('job') . ' under this contract follows these terms unless its work order or the ' . Tl('job') . ' sets its own. Nothing ticked: a deployment bills month by month, man-day work at closure.',
+        strtoupper((string)($c['open_status'] ?? '') ?: 'OPEN') === 'OPEN'
+          ? 'This contract is open (signed off). A change to its billing terms is an amendment: it needs a manager\'s endorsement and the branch manager\'s approval, and the current terms stay in force until then.' : '') ?>
+  <?php if (function_exists('contract_pending_amendment') && contract_pending_amendment((int)$c['id'])): ?>
+    <p class="muted" style="font-size:12.5px;margin:8px 0 0">An amendment is waiting for its signatures (<a href="#amendments">see it</a>) — the billing terms can be changed again once it is decided.</p>
+  <?php endif; ?>
 </div>
 <?php endif; ?>
 

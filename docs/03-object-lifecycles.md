@@ -357,6 +357,10 @@ stateDiagram-v2
 A change to the value, dates or quantity lines of an **OPEN** contract does not apply at once:
 it is recorded as an amendment, with its reason and the old and new figures, and takes the same
 two signatures as the opening. Title, business unit and notes are saved directly.
+From 8 Nov 2026 (owner, Option 1) a change of an OPEN contract's **billing terms** (triggers and
+billing period — when the client is invoiced) is the same kind of amendment: its old and new
+terms are kept on it, the current terms stay in force until it is approved, and approval also
+re-works out what is due on the contract's jobs. One amendment waits at a time. No new status.
 
 ```mermaid
 stateDiagram-v2

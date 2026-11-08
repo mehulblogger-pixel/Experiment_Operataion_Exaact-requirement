@@ -230,10 +230,45 @@ function contract_pending_amendment($contractId) {
 function contract_amendments($contractId) {
     return ops_all("SELECT * FROM contract_amendments WHERE contract_id=? ORDER BY id DESC", [(int)$contractId]) ?: [];
 }
+// Apply an approved amendment: the new figures (or, for a billing-terms
+// amendment, the new billing terms) replace the old in one transaction; the
+// old stay on the amendment. Returns '' or the reason it failed.
+function contract_amendment_apply(array $c, array $am, $me, $meId, $note) {
+    $pdo = db();
+    $n = json_decode((string)$am['new_values'], true) ?: [];
+    $isBilling = isset($n['billing']);
+    $pdo->beginTransaction();
+    try {
+        if ($isBilling) {
+            $pdo->prepare("UPDATE partner_contracts SET billing_triggers=?, billing_period=? WHERE id=?")
+                ->execute([(string)($n['billing']['triggers'] ?? ''), (string)($n['billing']['period'] ?? ''), (int)$c['id']]);
+        } else {
+            $pdo->prepare("UPDATE partner_contracts SET value=?, start_date=?, end_date=? WHERE id=?")
+                ->execute([$n['value'] ?? null, (string)($n['start_date'] ?? ''), (string)($n['end_date'] ?? ''), (int)$c['id']]);
+            contract_replace_lines((int)$c['id'], $n['lines'] ?? []);
+        }
+        $pdo->prepare("UPDATE contract_amendments SET status='APPROVED', decided_by=?, decided_by_id=?, decided_at=?, decision_note=? WHERE id=?")
+            ->execute([(string)$me, $meId, date('c'), mb_substr((string)$note, 0, 400), (int)$am['id']]);
+        $pdo->commit();
+    } catch (Throwable $e) { $pdo->rollBack(); return $e->getMessage(); }
+    // New billing terms: re-work out what is due on the contract's jobs.
+    if ($isBilling && function_exists('billunit_contract_terms_apply')) {
+        $fresh = ops_one("SELECT * FROM partner_contracts WHERE id=?", [(int)$c['id']]) ?: $c;
+        $old = json_decode((string)$am['old_values'], true) ?: [];
+        billunit_contract_terms_apply(['billing_triggers' => (string)($old['billing']['triggers'] ?? '')] + $fresh,
+            (string)$fresh['billing_triggers'], (string)$fresh['billing_period']);
+    }
+    return '';
+}
+
 // One line saying what an amendment changes, old → new.
 function contract_amendment_summary($am) {
     $o = json_decode((string)$am['old_values'], true) ?: []; $n = json_decode((string)$am['new_values'], true) ?: [];
     $out = [];
+    // An amendment of the billing terms (owner, 8 Nov 2026 — Option 1).
+    if (isset($n['billing']) && function_exists('billunit_terms_words'))
+        return 'billing terms ' . billunit_terms_words($o['billing']['triggers'] ?? '', $o['billing']['period'] ?? '')
+             . ' → ' . billunit_terms_words($n['billing']['triggers'] ?? '', $n['billing']['period'] ?? '');
     if (($o['value'] ?? null) != ($n['value'] ?? null)) $out[] = 'value ' . fmoney($o['value'] ?? 0) . ' → ' . fmoney($n['value'] ?? 0);
     if (($o['start_date'] ?? '') !== ($n['start_date'] ?? '')) $out[] = 'start ' . (fdate($o['start_date'] ?? '') ) . ' → ' . fdate($n['start_date'] ?? '');
     if (($o['end_date'] ?? '') !== ($n['end_date'] ?? '')) $out[] = 'end ' . fdate($o['end_date'] ?? '') . ' → ' . fdate($n['end_date'] ?? '');
@@ -940,16 +975,8 @@ function ops_contract_open($route, $method) {
             ops_require(can_approve_contract_open(), 'Only the branch manager can approve an amendment.');
             if (trim((string)$am['endorsed_at']) === '' && !is_master()) { flash('It needs a manager to endorse it first.', 'error'); redirect($to); }
             if (!is_master() && (int)$am['endorsed_by_id'] === $meId && $meId !== 0) { flash('The approval must come from someone other than the endorser.', 'error'); redirect($to); }
-            $n = json_decode((string)$am['new_values'], true) ?: [];
-            $pdo->beginTransaction();
-            try {
-                $pdo->prepare("UPDATE partner_contracts SET value=?, start_date=?, end_date=? WHERE id=?")
-                    ->execute([$n['value'] ?? null, (string)($n['start_date'] ?? ''), (string)($n['end_date'] ?? ''), (int)$c['id']]);
-                contract_replace_lines((int)$c['id'], $n['lines'] ?? []);
-                $pdo->prepare("UPDATE contract_amendments SET status='APPROVED', decided_by=?, decided_by_id=?, decided_at=?, decision_note=? WHERE id=?")
-                    ->execute([$me, $meId, date('c'), mb_substr($note, 0, 400), (int)$am['id']]);
-                $pdo->commit();
-            } catch (Throwable $e) { $pdo->rollBack(); flash('The amendment could not be applied: ' . $e->getMessage(), 'error'); redirect($to); }
+            $err = contract_amendment_apply($c, $am, $me, $meId, $note);
+            if ($err !== '') { flash('The amendment could not be applied: ' . $err, 'error'); redirect($to); }
             if ($qid) crm_log_change($qid, 'Contract ' . $c['contract_number'] . ' amendment APPROVED by ' . $me . ' — ' . contract_amendment_summary($am) . '.');
             flash('Amendment approved — the contract now carries the new figures; the old ones are kept on the amendment.'); redirect($to);
         }

@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '38c30de · 2026-11-08 07:14 UTC · 706 files';
+$RELEASE = '7d035f4 · 2026-11-08 07:18 UTC · 706 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -53,7 +53,7 @@ $EXPECT  = [
     'lib/billable.php' => ['s'=>31754,'h'=>'2dd93f8e6f584b47'],
     'lib/billing.php' => ['s'=>19524,'h'=>'fe0562c9d18c9446'],
     'lib/bills.php' => ['s'=>11324,'h'=>'498117c26906b1a3'],
-    'lib/billunits.php' => ['s'=>60628,'h'=>'832b0fe0750afa11'],
+    'lib/billunits.php' => ['s'=>65535,'h'=>'0593d6958edd01f0'],
     'lib/books.php' => ['s'=>72163,'h'=>'32e036eaddd6b34d'],
     'lib/booksbridge.php' => ['s'=>26219,'h'=>'b98194d999c7b90b'],
     'lib/booksui.php' => ['s'=>24743,'h'=>'167e036aaf00240e'],
@@ -112,7 +112,7 @@ $EXPECT  = [
     'lib/connect_taxonomy.php' => ['s'=>9836,'h'=>'3757c0d0d7daeb05'],
     'lib/connect_trust.php' => ['s'=>7228,'h'=>'27ac2d7be0dd9e28'],
     'lib/connect_verify.php' => ['s'=>18988,'h'=>'55e8aee1eccae351'],
-    'lib/contracts.php' => ['s'=>110135,'h'=>'18d5cc1669d770e7'],
+    'lib/contracts.php' => ['s'=>111748,'h'=>'b0b1e8b6ae5fa7e3'],
     'lib/controldocs.php' => ['s'=>15272,'h'=>'e99fcf054f6e6b1e'],
     'lib/costing.php' => ['s'=>60974,'h'=>'a8ecf706366db1cf'],
     'lib/costrecon.php' => ['s'=>11258,'h'=>'a6af5a16164f3458'],
@@ -424,7 +424,7 @@ $EXPECT  = [
     'views/ops/connect_taxonomy_admin.php' => ['s'=>11051,'h'=>'db0b340f99a00f89'],
     'views/ops/connect_verify.php' => ['s'=>4960,'h'=>'4645eaaf41e844ce'],
     'views/ops/consents.php' => ['s'=>3523,'h'=>'5dd8e9b08a104408'],
-    'views/ops/contract_detail.php' => ['s'=>24145,'h'=>'3d774ffc4f42337d'],
+    'views/ops/contract_detail.php' => ['s'=>24870,'h'=>'28720d3ce4dad018'],
     'views/ops/contract_openings.php' => ['s'=>5102,'h'=>'98769400b4ef5772'],
     'views/ops/contract_overrides.php' => ['s'=>8886,'h'=>'e22fdf59af73f743'],
     'views/ops/cost_reconciliation.php' => ['s'=>5547,'h'=>'3c2d6f2dcd59c0a8'],

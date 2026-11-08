@@ -875,18 +875,72 @@ function ops_billunits($route, $method) {
         $c = ops_one("SELECT * FROM partner_contracts WHERE id=?", [$id]);
         if (!$c) { http_response_code(404); view('notfound'); return true; }
         [$t, $p] = billunit_terms_from_post();
-        db()->prepare("UPDATE partner_contracts SET billing_triggers=?, billing_period=? WHERE id=?")->execute([$t, $p, $id]);
-        if (function_exists('act_log')) try { act_log('CONTRACT', $id, 'BILLING_TERMS', 'From "' . ($c['billing_triggers'] ?: 'default') . '" to "' . ($t ?: 'default') . '"' . ($p ? ' · ' . $p : '')); } catch (Throwable $e) {}
-        // Re-work out what is due on its jobs.
-        foreach (ops_all("SELECT j.id FROM jobs j LEFT JOIN calls c ON c.id=j.call_id WHERE COALESCE(NULLIF(j.contract_number,''), c.contract_number)=?", [(string)$c['contract_number']]) ?: [] as $r) billunit_on_job_changed((int)$r['id']);
-        flash('Billing terms saved for contract ' . $c['contract_number'] . '.');
-        redirect('/contract?id=' . $id . '#billing');
+        $r = billunit_contract_terms_request($c, $t, $p, (string)($_POST['amend_reason'] ?? ''));
+        flash($r['msg'], $r['level']);
+        redirect('/contract?id=' . $id . ($r['kind'] === 'amendment' ? '#amendments' : '#billing'));
     }
     redirect('/billable-events');
 }
 
+// A change of a contract's billing terms, decided. Returns
+// ['kind' => 'saved'|'amendment'|'none'|'error', 'msg', 'level'].
+// Owner, 8 Nov 2026 (Option 1): billing terms decide WHEN the client is
+// invoiced, so on an OPEN contract they change only as an amendment with the
+// same two signatures as its value and dates (D-25). Until both sign, the
+// current terms stay in force. A contract not yet open is changed directly.
+function billunit_contract_terms_request(array $c, $t, $p, $reason) {
+    $id = (int)$c['id'];
+    if ((string)($c['billing_triggers'] ?? '') === (string)$t && (string)($c['billing_period'] ?? '') === (string)$p)
+        return ['kind' => 'none', 'msg' => 'Nothing changed.', 'level' => 'warning'];
+    $os = strtoupper((string)($c['open_status'] ?? '') ?: 'OPEN');
+    if ($os === 'OPEN' && function_exists('contract_pending_amendment')) {
+        if (contract_pending_amendment($id))
+            return ['kind' => 'error', 'msg' => 'An amendment to this contract is already waiting for its signatures — decide it first.', 'level' => 'error'];
+        $reason = trim((string)$reason);
+        if ($reason === '')
+            return ['kind' => 'error', 'msg' => 'Changing the billing terms of an open contract is an amendment — say why, in "Reason for the change". Nothing was changed.', 'level' => 'error'];
+        $u = function_exists('current_user') ? current_user() : [];
+        db()->prepare("INSERT INTO contract_amendments (contract_id,status,old_values,new_values,reason,requested_by,requested_by_id,requested_at) VALUES (?, 'PENDING', ?,?,?,?,?,?)")
+            ->execute([$id, json_encode(['billing' => ['triggers' => (string)($c['billing_triggers'] ?? ''), 'period' => (string)($c['billing_period'] ?? '')]]),
+                       json_encode(['billing' => ['triggers' => (string)$t, 'period' => (string)$p]]), mb_substr($reason, 0, 400),
+                       function_exists('user_name') ? user_name($u) : '', (int)($u['id'] ?? 0) ?: null, date('c')]);
+        $am = contract_pending_amendment($id);
+        $qid = function_exists('contract_quote_id') ? contract_quote_id($c) : 0;
+        if ($qid && function_exists('crm_log_change')) crm_log_change($qid, 'Contract ' . $c['contract_number'] . ' amendment requested — ' . contract_amendment_summary($am) . ' — ' . $reason . '. Pending manager & branch-manager approval.');
+        return ['kind' => 'amendment', 'level' => 'warning',
+                'msg' => 'Amendment requested — ' . contract_amendment_summary($am) . '. It needs a manager\'s endorsement and the branch manager\'s approval; until then the current billing terms stay in force.'];
+    }
+    billunit_contract_terms_apply($c, $t, $p);
+    // A contract still awaiting its signatures: an endorsement given for other
+    // terms no longer stands (as for its value and dates).
+    $unendorsed = false;
+    if ($os === 'PENDING' && trim((string)($c['mgr_endorsed_at'] ?? '')) !== '') {
+        db()->prepare("UPDATE partner_contracts SET mgr_endorsed_by='', mgr_endorsed_by_id=NULL, mgr_endorsed_at='' WHERE id=?")->execute([$id]);
+        $unendorsed = true;
+    }
+    return ['kind' => 'saved', 'level' => 'success',
+            'msg' => 'Billing terms saved for contract ' . $c['contract_number'] . '.' . ($unendorsed ? ' The manager\'s endorsement was withdrawn — it was given for the earlier terms; it needs endorsing again.' : '')];
+}
+
+// Write a contract's billing terms and re-work out what is due on its jobs —
+// a direct save on a contract not yet open, or an approved amendment.
+function billunit_contract_terms_apply(array $c, $t, $p) {
+    $id = (int)$c['id'];
+    db()->prepare("UPDATE partner_contracts SET billing_triggers=?, billing_period=? WHERE id=?")->execute([$t, $p, $id]);
+    if (function_exists('act_log')) try { act_log('CONTRACT', $id, 'BILLING_TERMS', 'From "' . ((string)($c['billing_triggers'] ?? '') ?: 'default') . '" to "' . ($t ?: 'default') . '"' . ($p ? ' · ' . $p : '')); } catch (Throwable $e) {}
+    foreach (ops_all("SELECT j.id FROM jobs j LEFT JOIN calls c ON c.id=j.call_id WHERE COALESCE(NULLIF(j.contract_number,''), c.contract_number)=?", [(string)$c['contract_number']]) ?: [] as $r) billunit_on_job_changed((int)$r['id']);
+}
+// The terms in words, for an amendment's summary.
+function billunit_terms_words($csv, $period) {
+    $ts = billunit_parse_triggers((string)$csv);
+    $w = $ts ? implode(', ', array_map(fn($k) => BILLUNIT_TRIGGERS[$k] ?? $k, $ts)) : 'the default (deployments month by month, man-day work at closure)';
+    return $w . ((string)$period !== '' && in_array('PERIOD', $ts, true) ? ' — ' . (BILLUNIT_PERIODS[$period] ?? $period) : '');
+}
+
 // The billing-terms form (job or contract). $cur = ['triggers'=>csv, 'period'=>code].
-function billunit_terms_form_html($action, array $hidden, $curCsv, $curPeriod, $canEdit, $inheritNote) {
+// $amendNote (contract only): the contract is OPEN, so a change becomes an
+// amendment — a reason box is shown and the button says so.
+function billunit_terms_form_html($action, array $hidden, $curCsv, $curPeriod, $canEdit, $inheritNote, $amendNote = '') {
     $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
     $cur = array_flip(billunit_parse_triggers($curCsv));
     $h = '<form method="post" action="' . $e($action) . '" class="bu-terms" style="margin:0">';
@@ -901,7 +955,12 @@ function billunit_terms_form_html($action, array $hidden, $curCsv, $curPeriod, $
     foreach (BILLUNIT_PERIODS as $k => $label) $h .= '<option value="' . $e($k) . '"' . ($curPeriod === $k ? ' selected' : '') . '>' . $e($label) . '</option>';
     $h .= '</select></div>';
     if ($inheritNote !== '') $h .= '<p class="muted" style="margin:0 0 8px;font-size:12px">' . $e($inheritNote) . '</p>';
-    if ($canEdit) $h .= '<button class="btn small" type="submit">Save billing terms</button>';
+    if ($canEdit && $amendNote !== '') {
+        $h .= '<p class="muted" style="margin:0 0 6px;font-size:12.5px">' . $e($amendNote) . '</p>'
+            . '<div class="ff" style="margin:0 0 8px"><label for="bu-amend" style="font-size:12px;font-weight:600">Reason for the change</label>'
+            . '<input class="form-control" id="bu-amend" name="amend_reason" maxlength="400" required placeholder="For example: client asked to be billed monthly from December (letter of 5 Nov)"></div>'
+            . '<button class="btn small" type="submit">Request the change (needs two signatures)</button>';
+    } elseif ($canEdit) $h .= '<button class="btn small" type="submit">Save billing terms</button>';
     return $h . '</form>';
 }
 
