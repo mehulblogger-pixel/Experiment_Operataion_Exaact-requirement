@@ -103,12 +103,17 @@ if (function_exists('lk_state')) lk_state(true);
 $g = billing_grant();
 $lkBlock = function_exists('lk_seat_block') ? lk_seat_block() : '';
 $saasBlock = saas_seat_block();
+// Owner, 8 Nov: after paying on the old screen every module vanished — the
+// grant turned the licence state from "no key" into a key that lists no modules.
+licence_disabled(true);
+$opsOn = licence_enabled('operations'); $salesOn = licence_enabled('sales');
 setting_set('billing_seats', (string) $prevBs);
 saas_leave_tenant(); if (function_exists('db_reset')) db_reset();
 if (function_exists('lk_state')) lk_state(true);
 t_ok(empty($g['active']), 'inside a company the old per-person grant is not in force');
 t_eq($lkBlock, '', 'so it cannot stop a new login');
 t_eq($saasBlock, '', 'the plan (20 logins) is what decides');
+t_ok($opsOn && $salesOn, 'and the modules the company bought stay switched on (an old per-person payment had switched them all off)');
 
 // Clean up.
 saas_company_purge($key, 'test clean-up');
