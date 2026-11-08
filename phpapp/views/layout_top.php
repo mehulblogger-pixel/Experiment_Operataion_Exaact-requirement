@@ -67,7 +67,9 @@
 <div class="shell">
   <aside class="side" id="side">
     <div class="side-brand">
-      <a class="sb-logo" href="/"><?php $lg = logo_html(); echo $lg ?: '<span class="sb-mono">'.e(mb_substr(app_name(),0,1)).'</span><b>'.e(app_name()).'</b>'; ?></a>
+      <?php // The company's logo AND its name (owner, 8 Nov 2026: with a logo uploaded the
+            // name disappeared). Collapsed, only the logo / first letter shows. ?>
+      <a class="sb-logo" href="/" title="<?= e(app_name()) ?>"><?php $lg = logo_html(); echo ($lg ?: '<span class="sb-mono">'.e(mb_substr(app_name(),0,1)).'</span>') . '<b>'.e(app_name()).'</b>'; ?></a>
       <button class="side-close" aria-label="Close menu" onclick="document.getElementById('side').classList.remove('open');document.getElementById('scrim').classList.remove('on');">✕</button>
       <?php // Desktop only: shrink the rail to icons so a wide register gets the
             // screen. The choice is remembered per browser. ?>

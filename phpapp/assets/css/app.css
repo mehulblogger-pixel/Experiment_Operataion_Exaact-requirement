@@ -320,7 +320,8 @@ body.app{background:var(--bg)}
 
 :root.nav-collapsed .side{width:60px;flex-basis:60px}
 :root.nav-collapsed .side-brand{padding:14px 8px;justify-content:center}
-:root.nav-collapsed .sb-logo b, :root.nav-collapsed .sb-logo img{display:none}
+:root.nav-collapsed .sb-logo b{display:none}
+:root.nav-collapsed .sb-logo img{max-width:40px;max-height:30px;padding:1px!important}
 :root.nav-collapsed .side-nav{overflow-x:hidden}
 /* Hide the label, keep the icon. :not(.s-ic) so the icon span survives. */
 :root.nav-collapsed .s-item{justify-content:center;padding-left:0;padding-right:0;gap:0}
@@ -364,6 +365,7 @@ body.app{background:var(--bg)}
 .sb-logo{display:flex;align-items:center;gap:10px;color:var(--ink);font-weight:800;font-size:16px;text-decoration:none;min-width:0}
 .sb-logo:hover{text-decoration:none}
 .sb-logo b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-logo img{flex:0 0 auto;max-width:96px;object-fit:contain}
 .sb-mono{width:32px;height:32px;flex:0 0 32px;border-radius:9px;background:linear-gradient(135deg,var(--brand),var(--accent));
   color:#fff;display:grid;place-items:center;font-weight:800;font-size:15px}
 /*  D5 (Gate 6) — the navigation drawer's close control was an 18px glyph in a
