@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '124f70b · 2026-11-08 07:01 UTC · 706 files';
+$RELEASE = '2171f2d · 2026-11-08 07:13 UTC · 706 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -66,7 +66,7 @@ $EXPECT  = [
     'lib/chain.php' => ['s'=>27590,'h'=>'38344fcbe18d90b5'],
     'lib/commercial.php' => ['s'=>30223,'h'=>'e99c11b15d792501'],
     'lib/comp_config.php' => ['s'=>15360,'h'=>'5864ccfc2501116d'],
-    'lib/company.php' => ['s'=>7536,'h'=>'cf72adf65cfa6d50'],
+    'lib/company.php' => ['s'=>9049,'h'=>'56cc0caeba01da2a'],
     'lib/competence.php' => ['s'=>54296,'h'=>'0761c88493b8c827'],
     'lib/complaints.php' => ['s'=>35427,'h'=>'3946b876dd98817e'],
     'lib/compliance.php' => ['s'=>63934,'h'=>'1929c53295fa2343'],
@@ -243,7 +243,7 @@ $EXPECT  = [
     'lib/settingmeta.php' => ['s'=>13132,'h'=>'b6974b55eac391fe'],
     'lib/settlement.php' => ['s'=>5371,'h'=>'0b75fbf859930e58'],
     'lib/setup.php' => ['s'=>23072,'h'=>'7af387096568ab14'],
-    'lib/setup_cockpit.php' => ['s'=>31679,'h'=>'1e3496fd3f3881e5'],
+    'lib/setup_cockpit.php' => ['s'=>33742,'h'=>'1dcf641405a6fb71'],
     'lib/setupqa.php' => ['s'=>18966,'h'=>'a6785961911ec434'],
     'lib/stagegate.php' => ['s'=>23612,'h'=>'47e075112915aafc'],
     'lib/superadmin.php' => ['s'=>22099,'h'=>'f3e910a1caa81d54'],

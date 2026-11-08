@@ -167,6 +167,40 @@ function cockpit_apply_capability_modules($codes = null) {
     return array_keys($modOn);
 }
 
+// What a CHANGE of activities does to the modules (owner, 8 Nov 2026: "every time
+// we update the company profile all the features get disabled"). Only the
+// difference is applied: an activity added switches on the modules it needs
+// (within the plan); an activity removed switches off only the modules that no
+// remaining activity needs. Every other module stays exactly as the company set
+// it — including modules it turned on by hand under Features.
+// Pure: $currentOn = non-core modules on now; $entitled = fn($key) => bool.
+function cockpit_capability_change_plan(array $old, array $new, array $currentOn, callable $entitled) {
+    $wantOld = cockpit_capability_modules($old);
+    $wantNew = cockpit_capability_modules($new);
+    $add  = array_values(array_filter(array_diff($wantNew, $wantOld), $entitled));
+    $drop = array_values(array_diff($wantOld, $wantNew));
+    $on = array_values(array_unique(array_merge(array_diff($currentOn, $drop), $add)));
+    sort($on);
+    return ['on' => $on, 'added' => array_values(array_diff($add, $currentOn)), 'removed' => array_values(array_intersect($drop, $currentOn))];
+}
+// Apply that change inside a hosted workspace. Returns the plan, or null when
+// nothing was (or could be) changed.
+function cockpit_apply_capability_change(array $old, array $new) {
+    if (function_exists('current_tenant') && current_tenant() === '') return null;   // control install: never
+    if (!function_exists('licence_summary') || !function_exists('licence_save')) return null;
+    $sum = licence_summary();
+    $currentOn = [];
+    foreach ($sum as $k => $r) if (empty($r['core']) && !empty($r['on'])) $currentOn[] = $k;
+    $plan = cockpit_capability_change_plan($old, $new, $currentOn,
+        fn($k) => !function_exists('module_entitled') || module_entitled($k));
+    if (!$plan['added'] && !$plan['removed']) return null;
+    $modOn = [];
+    foreach ($plan['on'] as $k) $modOn[$k] = 1;
+    licence_save(['mod_on' => $modOn]);
+    if (function_exists('licence_disabled')) licence_disabled(true);
+    return $plan;
+}
+
 // ===========================================================================
 //  MODULES & FEATURES  — reads licence.php, never a second module engine (§13)
 // ===========================================================================

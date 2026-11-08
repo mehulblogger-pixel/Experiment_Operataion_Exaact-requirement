@@ -96,10 +96,30 @@ function ops_company_profile($route, $method) {
         // into this one company screen (previously a separate "Business profile").
         // Reuses the cockpit's capability store, so there is a single source.
         if (function_exists('cockpit_capabilities_set') && array_key_exists('caps', $_POST)) {
+            $capsBefore = function_exists('cockpit_capabilities') ? cockpit_capabilities() : [];
             $savedCaps = cockpit_capabilities_set(array_map('strval', (array) ($_POST['caps'] ?? [])));
-            // Auto-configure the workspace to match what the company does: switch the
-            // modules on/off so a recruitment-only company becomes a recruitment-only
-            // workspace (nav, masters and wording follow). Reversible under Features.
+            $a = $capsBefore; $b = (array) $savedCaps; sort($a); sort($b);
+            // Activities already chosen: saving the profile changes modules only
+            // when the activities change, and then only the difference (owner,
+            // 8 Nov 2026 — every save used to switch off what the company had
+            // turned on). The full set-up below runs once, the first time.
+            if ($a && function_exists('cockpit_apply_capability_change')) {
+                $ch = $a !== $b ? cockpit_apply_capability_change($capsBefore, (array) $savedCaps) : null;
+                if ($ch) {
+                    $lbl = function_exists('licence_summary') ? licence_summary() : [];
+                    $nm = fn($ks) => implode(', ', array_map(fn($k) => $lbl[$k]['label'] ?? $k, $ks));
+                    flash('Company profile saved.' . ($ch['added'] ? ' Switched on for your new activities: ' . $nm($ch['added']) . '.' : '')
+                        . ($ch['removed'] ? ' Switched off (no activity of yours needs it now): ' . $nm($ch['removed']) . '.' : '')
+                        . ' Everything else stays as you set it under Features.');
+                    redirect('/company-profile');
+                }
+                flash('Company profile saved — it now appears on your quotations, invoices and records.');
+                redirect('/company-profile');
+            }
+            // First time the activities are chosen: auto-configure the workspace to
+            // match what the company does, so a recruitment-only company becomes a
+            // recruitment-only workspace (nav, masters and wording follow).
+            // Reversible under Features.
             if (function_exists('cockpit_apply_capability_modules')) {
                 $left = cockpit_apply_capability_modules($savedCaps);
                 if (is_array($left)) {
