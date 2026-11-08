@@ -216,10 +216,22 @@ function ops_ai_topup($route, $method) {
         $size  = function_exists('ai_pack_size') ? ai_pack_size() : 0;
         $price = function_exists('ai_pack_price') ? ai_pack_price() : 0;
         if ($price <= 0) { flash('The AI top-up pack has no price set — please contact your provider.', 'error'); redirect('/ai-forms'); }
-        $ord = rzp_create_order($price * 100, 'aitop-' . date('ymdHis'), ['ai_actions' => $size]);
+        // GST, as on every other payment (lib/commercial.php), invoiced to the
+        // company's own profile.
+        $buyer = function_exists('saas_invoice_buyer') ? saas_invoice_buyer() : ['name' => '', 'address' => '', 'gstin' => '', 'state' => ''];
+        $tax = function_exists('commercial_tax') ? commercial_tax($price, $buyer['gstin'], $buyer['state'] ?? '') : ['on' => false, 'gross' => $price];
+        $charge = (int) ($tax['gross'] ?? $price);
+        $ord = rzp_create_order($charge * 100, 'aitop-' . date('ymdHis'), ['ai_actions' => $size, 'kind' => 'ai']);
         if (empty($ord['ok'])) { flash('Could not start the payment: ' . $ord['error'], 'error'); redirect('/ai-forms'); }
+        // The order is recorded here, so it is applied exactly once — by the page
+        // that comes back, Razorpay's notice or the payment check — and never
+        // twice for a repeated callback (it used to add the actions again).
+        if (function_exists('saas_order_create'))
+            saas_order_create((string) ($ord['id'] ?? ''), 'ai', [], $size, 'once', $charge, [],
+                $tax + ['buyer' => $buyer, 'supplier' => function_exists('commercial_gst_cfg') ? commercial_gst_cfg() : [],
+                        'lines' => [['label' => $size . ' AI actions', 'amount' => $price]], 'price' => $price]);
         $cur = (string) (billing_config()['currency'] ?? 'INR');
-        view('ops/ai_topup_pay', ['order' => $ord, 'cfg' => billing_config(), 'size' => $size, 'price' => $price, 'currency' => $cur]);
+        view('ops/ai_topup_pay', ['order' => $ord, 'cfg' => billing_config(), 'size' => $size, 'price' => $charge, 'currency' => $cur, 'tax' => $tax]);
         return true;
     }
 
@@ -229,16 +241,19 @@ function ops_ai_topup($route, $method) {
         $paymentId = (string) ($_POST['razorpay_payment_id'] ?? '');
         $sig       = (string) ($_POST['razorpay_signature'] ?? '');
         if (!rzp_verify_signature($orderId, $paymentId, $sig)) {
-            flash('That payment could not be verified. If money was taken it is refunded automatically — nothing was changed.', 'error');
+            $res = ($orderId !== '' && function_exists('saas_order_check')) ? saas_order_check($orderId, 'check') : 'none';
+            if ($res === 'applied') { flash('Payment received and confirmed with Razorpay — the AI actions are added.', 'success'); redirect('/ai-forms'); }
+            flash(function_exists('saas_payment_unconfirmed_msg') ? saas_payment_unconfirmed_msg($paymentId) : 'We could not confirm this payment.', 'error');
             redirect('/ai-forms');
         }
-        $size = function_exists('ai_pack_size') ? ai_pack_size() : 100;
-        if (function_exists('ai_topup_add')) ai_topup_add($size);
-        if (function_exists('billing_record_line'))
-            billing_record_line(0, 'once', $size . ' AI actions', $paymentId, $orderId, date('Y-m-d'));
-        if (function_exists('idems_log')) idems_log('setting', null, 'AI_TOPUP_PURCHASED', ['field' => 'ai_topup', 'new' => $size]);
-        flash('Payment received — ' . $size . ' more AI actions added for this month. You now have '
-            . (function_exists('ai_pool_remaining') ? ai_pool_remaining() : $size) . ' left.', 'success');
+        $o = function_exists('saas_order_claim') ? saas_order_claim($orderId, $paymentId) : null;
+        if (!$o) {
+            flash('That payment has already been applied, or its order is not known here. Nothing was added twice. '
+                . 'If you believe something is missing, contact your provider with payment reference ' . $paymentId . '.', 'warning');
+            redirect('/ai-forms');
+        }
+        $r = saas_order_fulfil($o, $paymentId, 'page');
+        flash($r['msg'], 'success');
         redirect('/ai-forms');
     }
     redirect('/ai-forms');

@@ -293,6 +293,7 @@ try {
     require __DIR__ . '/lib/backup.php';          // Per-workspace Backup & Restore — snapshots stored above the web root (upload-proof)
     require __DIR__ . '/lib/pwreset.php';         // Self-service forgot / reset password (e-mail one-time link)
     require __DIR__ . '/lib/pricing_admin.php';   // Super-Admin pricing & usage + customer AI top-up (reuses billing + saas_tenants + ai)
+    require __DIR__ . '/lib/saas_payments.php';   // Company payments: applied once, never lost (Razorpay check + webhook), refunds with GST credit notes
     require __DIR__ . '/lib/party.php';           // Phase 2 §23/24 — canonical person mapping layer
     require __DIR__ . '/lib/qualitycase.php';     // Phase 2 §39 — quality-case umbrella (read-only)
     require __DIR__ . '/lib/visibility.php';       // Phase 2 §72 — canonical visibility vocabulary + single-record gate
@@ -1033,6 +1034,13 @@ if ($route === 'verify-pdf') {
     if (function_exists('ops_verify_pdf')) ops_verify_pdf();
     else { http_response_code(404); echo 'Not available.'; }
     exit;
+}
+
+// Razorpay's payment notice (webhook). Public — Razorpay has no account here —
+// and checked by its signature; it only says which order to look at, and what
+// is applied is read back from Razorpay itself (lib/saas_payments.php).
+if ($route === 'razorpay-webhook' && $method === 'POST' && function_exists('rzp_webhook_route')) {
+    rzp_webhook_route();   // always exits
 }
 
 // Self-hosted self-service: a customer on their own server pays for users on

@@ -2,10 +2,12 @@
 // GST invoices — the platform owner's register of every tax invoice issued to
 // every company (lib/commercial.php). Data: $rows (this month), $month, $months, $sel.
 $e = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES);
-$sum = fn($k) => array_sum(array_map(fn($r) => (int) $r[$k], $rows));
+$isCn = fn($r) => ($r['doc'] ?? '') === 'credit_note';
+$sum = fn($k) => array_sum(array_map(fn($r) => ($isCn($r) ? -1 : 1) * (int) $r[$k], $rows));   // credit notes net off
+$cnCount = count(array_filter($rows, $isCn));
 $money = fn($n) => '₹' . number_format((int) $n);
 $st = fn($c) => (defined('GST_STATES') && isset(GST_STATES[$c])) ? GST_STATES[$c] : (string) $c;
-$b2b = count(array_filter($rows, fn($r) => $r['buyer']['gstin'] !== ''));
+$b2b = count(array_filter($rows, fn($r) => $r['buyer']['gstin'] !== '' && ($r['doc'] ?? '') !== 'credit_note'));
 $mLabel = fn($m) => date('F Y', strtotime($m . '-01'));
 ?>
 <style>
@@ -34,11 +36,11 @@ $mLabel = fn($m) => date('F Y', strtotime($m . '-01'));
 </form>
 
 <div class="gi-kpis">
-  <div class="gi-kpi"><b><?= count($rows) ?></b><span>invoices · <?= $b2b ?> to GST-registered buyers</span></div>
+  <div class="gi-kpi"><b><?= count($rows) - $cnCount ?></b><span>invoices · <?= $b2b ?> to GST-registered buyers<?= $cnCount ? ' · ' . $cnCount . ' credit note' . ($cnCount === 1 ? '' : 's') : '' ?></span></div>
   <div class="gi-kpi"><b><?= $money($sum('net')) ?></b><span>taxable value</span></div>
   <div class="gi-kpi"><b><?= $money($sum('igst')) ?></b><span>IGST</span></div>
   <div class="gi-kpi"><b><?= $money($sum('cgst') + $sum('sgst')) ?></b><span>CGST + SGST</span></div>
-  <div class="gi-kpi"><b><?= $money($sum('total')) ?></b><span>invoiced in total</span></div>
+  <div class="gi-kpi"><b><?= $money($sum('total')) ?></b><span>invoiced in total<?= $cnCount ? ', less credit notes' : '' ?></span></div>
 </div>
 
 <div class="panel" style="padding:0;overflow-x:auto">
@@ -46,19 +48,21 @@ $mLabel = fn($m) => date('F Y', strtotime($m . '-01'));
     <tr><th>Invoice</th><th>Date</th><th>Bill to</th><th>Place of supply</th><th class="gi-r">Taxable</th><th class="gi-r">GST</th><th class="gi-r">Total</th><th></th></tr>
     <?php if (!$rows): ?><tr><td colspan="8">No invoices in <?= $e($mLabel($month)) ?>.</td></tr><?php endif; ?>
     <?php foreach ($rows as $r): ?>
-      <tr><td><b><?= $e($r['invoice_no']) ?></b><?= $r['amendments'] ? ' <span class="gi-pill">corrected</span>' : '' ?></td>
+      <?php $cnRow = $isCn($r); $mn = $cnRow ? '− ' : ''; ?>
+      <tr><td><b><?= $e($r['invoice_no']) ?></b><?= $r['amendments'] ? ' <span class="gi-pill">corrected</span>' : '' ?>
+        <?php if ($cnRow): ?><br><span class="gi-pill" style="background:#fef3c7;color:#92400e">credit note</span> <span class="sub" style="font-size:12px">against <?= $e($r['against'] ?? '') ?></span><?php endif; ?></td>
         <td><?= $e(function_exists('fdate') ? fdate($r['date']) : $r['date']) ?></td>
         <td><?= $e($r['buyer']['name']) ?><br><span class="sub" style="font-size:12px"><?= $r['buyer']['gstin'] !== '' ? 'GSTIN ' . $e($r['buyer']['gstin']) : 'not registered' ?> · <?= $e($r['company_key']) ?></span></td>
         <td><?= $e($st($r['pos'])) ?></td>
-        <td class="gi-r"><?= $money($r['net']) ?></td><td class="gi-r"><?= $money($r['tax']) ?><br><span class="sub" style="font-size:11px"><?= (int) $r['igst'] > 0 ? 'IGST' : 'CGST+SGST' ?></span></td>
-        <td class="gi-r"><?= $money($r['total']) ?></td>
-        <td style="white-space:nowrap"><a href="/gst-invoices?no=<?= $e(rawurlencode($r['invoice_no'])) ?>&amp;print=1" target="_blank" rel="noopener">Open</a> ·
-          <a href="/gst-invoices?m=<?= $e($month) ?>&amp;no=<?= $e(rawurlencode($r['invoice_no'])) ?>#fix">Correct</a></td></tr>
+        <td class="gi-r"><?= $mn . $money($r['net']) ?></td><td class="gi-r"><?= $mn . $money($r['tax']) ?><br><span class="sub" style="font-size:11px"><?= (int) $r['igst'] > 0 ? 'IGST' : 'CGST+SGST' ?></span></td>
+        <td class="gi-r"><?= $mn . $money($r['total']) ?></td>
+        <td style="white-space:nowrap"><a href="/gst-invoices?no=<?= $e(rawurlencode($r['invoice_no'])) ?>&amp;print=1" target="_blank" rel="noopener">Open</a><?php if (!$cnRow): ?> ·
+          <a href="/gst-invoices?m=<?= $e($month) ?>&amp;no=<?= $e(rawurlencode($r['invoice_no'])) ?>#fix">Correct</a><?php endif; ?></td></tr>
     <?php endforeach; ?>
   </table>
 </div>
 
-<?php if ($sel): $b = $sel['buyer']; ?>
+<?php if ($sel && !$isCn($sel)): $b = $sel['buyer']; ?>
 <form method="post" class="panel" id="fix" style="margin-top:16px">
   <input type="hidden" name="do" value="amend"><input type="hidden" name="no" value="<?= $e($sel['invoice_no']) ?>">
   <h2 style="margin:0 0 4px;font-size:15px">Correct the buyer on <?= $e($sel['invoice_no']) ?></h2>

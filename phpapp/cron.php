@@ -449,6 +449,17 @@ if (function_exists('selfserve_sweep') && (!function_exists('current_tenant') ||
     } catch (Throwable $e) { echo "Self-serve companies: failed — " . $e->getMessage() . "\n"; }
 }
 
+// Payments that never came back from Razorpay (the customer closed the browser
+// after paying) are applied, and a second payment for the same order is listed
+// for a refund (lib/saas_payments.php). Control install only.
+if (function_exists('saas_payments_check_all') && (!function_exists('current_tenant') || current_tenant() === '')) {
+    try {
+        $pc = saas_payments_check_all();
+        echo "Payments checked with Razorpay: {$pc['companies']} companies, applied late: {$pc['applied']}, paid twice: {$pc['extra']}\n";
+        foreach ($pc['lines'] as $ln) echo "  " . $ln . "\n";
+    } catch (Throwable $e) { echo "Payments check: failed — " . $e->getMessage() . "\n"; }
+}
+
 // When this nightly job last ran — the Platform setup checklist shows it, so a
 // missing scheduled task is noticed instead of silently doing nothing.
 if (function_exists('setting_set')) { try { setting_set('cron_last_run', date('c')); } catch (Throwable $e) {} }

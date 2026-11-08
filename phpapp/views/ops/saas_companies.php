@@ -272,6 +272,8 @@ $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
     </div>
   </form>
 
+  <?php $pay = $payments ?? null; if (is_array($pay)) require __DIR__ . '/_company_payments.php'; ?>
+
   <?php // ---- Data storage & safety: move a file-backed workspace into MySQL ----
     $si = function_exists('saas_tenant_storage_info') ? saas_tenant_storage_info($sel['tenant_key']) : ['type'=>'unknown','at_risk'=>false];
     $fmtSize = function($b){ $b=(int)$b; if($b<1024) return $b.' B'; if($b<1048576) return round($b/1024).' KB'; return round($b/1048576,2).' MB'; };

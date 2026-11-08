@@ -89,6 +89,9 @@ function rzp_http($method, $url, $body, $user, $pass) {
 function rzp_create_order($paise, $receipt, array $notes = []) {
     $c = billing_config();
     if (!$c['enabled']) return ['ok' => false, 'error' => 'Payment is not set up yet — add your Razorpay keys first.'];
+    // Which company's records hold this order, so Razorpay's payment notice
+    // (lib/saas_payments.php) can find it if the customer never comes back.
+    if (function_exists('current_tenant') && current_tenant() !== '' && !isset($notes['ws'])) $notes['ws'] = (string) current_tenant();
     if ((int) $paise <= 0) return ['ok' => false, 'error' => 'The price per user is not set, so there is nothing to charge.'];
     // A test copy never takes real money: only Razorpay TEST keys work on it.
     if (function_exists('app_is_test_copy') && app_is_test_copy() && strncmp((string) $c['key_id'], 'rzp_test_', 9) !== 0)
@@ -268,7 +271,10 @@ function ops_billing($route, $method) {
         $seats     = (int) ($_POST['seats'] ?? 0);
         $period    = (string) ($_POST['period'] ?? 'month');
         if (!rzp_verify_signature($orderId, $paymentId, $sig)) {
-            flash('That payment could not be verified. If money was taken, it will be refunded automatically — nothing was activated.', 'error');
+            $res = ($orderId !== '' && function_exists('saas_order_check')) ? saas_order_check($orderId, 'check') : 'none';
+            if ($res === 'applied') { flash('Payment received and confirmed with Razorpay.', 'success'); redirect('/billing'); }
+            flash(function_exists('saas_payment_unconfirmed_msg') ? saas_payment_unconfirmed_msg($paymentId)
+                : 'We could not confirm this payment. If money left your account, quote payment reference ' . $paymentId . ' to us.', 'error');
             redirect('/billing');
         }
         if (function_exists('saas_order_claim')) {
@@ -278,6 +284,7 @@ function ops_billing($route, $method) {
                     . 'If you believe something is missing, contact support with payment reference ' . $paymentId . '.', 'warning');
                 redirect('/billing');
             }
+            if (function_exists('saas_order_fulfil')) { $r = saas_order_fulfil($o, $paymentId, 'page'); flash($r['msg'], 'success'); redirect('/billing'); }
             $seats = (int) $o['seats']; $period = (string) $o['period'];
         }
         $r = billing_apply($seats, $period, $paymentId, $orderId);

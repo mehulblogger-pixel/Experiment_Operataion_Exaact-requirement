@@ -11,7 +11,7 @@ $sym = $cur === 'INR' ? '₹' : ($cur . ' ');
 $payOn = !empty($cfg['enabled']);
 $onMods = $sub['modules'] ?? []; $addable = $sub['addable'] ?? [];
 $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
-$fmt = fn($n) => $sym . number_format((int) $n);
+$fmt = fn($n) => ((int) $n < 0 ? '− ' : '') . $sym . number_format(abs((int) $n));   // a refund is a minus line
 ?>
 <div class="master-head">
   <div><h1>Your subscription</h1>
@@ -141,6 +141,9 @@ $fmt = fn($n) => $sym . number_format((int) $n);
   </div>
 <?php endif; ?>
 
+<?php if (function_exists('saas_refund_policy_text')): ?>
+  <p class="muted" style="margin:14px 0 0;font-size:12.5px;max-width:860px"><b>Refunds:</b> <?= $e(saas_refund_policy_text()) ?></p>
+<?php endif; ?>
 <?php if ($history): ?>
   <div class="panel" style="margin-top:14px">
     <h2 style="margin:0 0 8px;font-size:15px">Payment history</h2>
@@ -159,7 +162,10 @@ $fmt = fn($n) => $sym . number_format((int) $n);
           <td style="padding:7px 8px;font-size:13px"><?= $e($h['note'] ?? (((int) ($h['seats'] ?? 0)) . ' seats')) ?></td>
           <td style="padding:7px 8px;font-size:13px;text-align:right"><?= $e($fmt($h['amount'] ?? 0)) ?></td>
           <td style="padding:7px 8px;font-size:13px"><?= $e(!empty($h['paid_until']) ? (function_exists('fdate') ? fdate($h['paid_until']) : $h['paid_until']) : '—') ?></td>
-          <td style="padding:7px 8px;font-size:13px"><?php $oid = (string) ($h['order_id'] ?? ''); if ($oid !== '' && array_key_exists($oid, $invoices)): ?>
+          <td style="padding:7px 8px;font-size:13px"><?php $oid = (string) ($h['order_id'] ?? '');
+            if (($h['period'] ?? '') === 'refund'): $cnNo = preg_match('/credit note ([A-Z0-9\/-]+)/', (string) ($h['note'] ?? ''), $cm) ? $cm[1] : ''; ?>
+            <?php if ($cnNo !== ''): ?><a href="/subscription-invoice?cn=<?= $e(rawurlencode($cnNo)) ?>" target="_blank" rel="noopener"><?= $e($cnNo) ?></a><?php else: ?>—<?php endif; ?>
+          <?php elseif ($oid !== '' && array_key_exists($oid, $invoices)): ?>
             <a href="/subscription-invoice?o=<?= $e(rawurlencode($oid)) ?>" target="_blank" rel="noopener"><?= $e($invoices[$oid] !== '' ? $invoices[$oid] : 'Receipt') ?></a><?php else: ?>—<?php endif; ?></td>
         </tr>
       <?php endforeach; ?>

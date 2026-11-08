@@ -11,6 +11,10 @@
   <a class="btn secondary" href="/ai-forms" style="margin-left:8px">Cancel</a>
   <p class="muted" style="margin-top:14px;font-size:12.5px">Your card details go straight to Razorpay — this application never sees them.
     The actions are added the instant the payment is confirmed.</p>
+  <?php $tx = $tax ?? null; if (is_array($tx) && !empty($tx['on'])): ?>
+  <p class="muted" style="font-size:12.5px">Includes GST (<?= e(rtrim(rtrim(number_format((float) $tx['rate'], 2), '0'), '.')) ?>%). The GST tax invoice is in Your subscription → Payment history once the payment is confirmed.</p><?php endif; ?>
+  <?php if (function_exists('saas_refund_policy_text') && function_exists('current_tenant') && current_tenant() !== ''): ?>
+  <p class="muted" style="font-size:12.5px;text-align:left"><b>Refunds:</b> <?= e(saas_refund_policy_text()) ?></p><?php endif; ?>
 </div>
 
 <form method="post" action="/ai-topup-verify" id="verifyform" style="display:none">

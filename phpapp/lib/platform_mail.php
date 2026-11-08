@@ -177,6 +177,8 @@ function platform_checklist() {
          'how' => 'Fill in "Account & password e-mails" below (for example accounts@your-domain), then test it.', 'link' => '#mail'],
         ['key' => 'pay', 'label' => 'Razorpay keys work', 'ok' => !empty($ch['payment']['ok']),
          'how' => !empty($ch['payment']) ? ('Last check ' . substr((string) $ch['payment']['at'], 0, 16) . ': ' . $ch['payment']['msg']) : 'Save your keys under Billing, then press "Check payment keys" below.', 'link' => '#pay'],
+        ['key' => 'webhook', 'label' => 'Razorpay tells the app about every payment (webhook)', 'ok' => (string) setting_get('rzp_webhook_secret', '') !== '',
+         'how' => 'Payment (Razorpay) → "Payment notices from Razorpay": add the webhook in Razorpay and save the same secret here.', 'link' => '#webhook'],
         ['key' => 'pay_live', 'label' => 'Razorpay is on LIVE keys (real payments)', 'ok' => ($ch['payment']['mode'] ?? '') === 'live',
          'how' => 'Use test keys (rzp_test_…) while trying it out; switch to live keys (rzp_live_…) to take real money.', 'link' => '#pay'],
         ['key' => 'prices', 'label' => 'Your prices are set (nothing is for sale until they are)', 'ok' => function_exists('commercial_prices_ready') ? commercial_prices_ready() : $priceSet,
@@ -274,6 +276,15 @@ function ops_platform_setup($method) {
                 ? ' — but these are LIVE keys, and a test copy refuses to take payments with them. Use TEST keys (rzp_test_…).'
                 : '. Press "Check payment keys" to confirm them.'), $live && function_exists('app_is_test_copy') && app_is_test_copy() ? 'error' : 'success');
             redirect('/platform-setup#pay');
+        }
+        if ($do === 'pay_webhook' && function_exists('billing_keys_refusal')) {
+            $why = billing_keys_refusal();
+            $sec = trim((string) ($_POST['rzp_webhook_secret'] ?? ''));
+            if ($why === '' && $sec !== '' && strlen($sec) < 12) $why = 'Use a longer secret — at least 12 letters and numbers.';
+            if ($why !== '') { flash($why, 'error'); redirect('/platform-setup#webhook'); }
+            if ($sec !== '') setting_set('rzp_webhook_secret', $sec);
+            flash($sec !== '' ? 'Webhook secret saved. Razorpay\'s payment notices are now accepted.' : 'Nothing was changed (the box was empty).', $sec !== '' ? 'success' : 'warning');
+            redirect('/platform-setup#webhook');
         }
         if ($do === 'pay_check') {
             $r = platform_payment_check();

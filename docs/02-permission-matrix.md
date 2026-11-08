@@ -1152,6 +1152,10 @@ existing gate.
 | Grant one company extra storage (a special arrangement) | the platform owner | the Companies console — Manage → "Extra storage granted (GB)" |
 | Buy extra storage packs | a self-serve company's owner / administrators | `billing_can_manage()` — part of "Choose / change your plan", same Q-L rules |
 | See the company's storage used, allowance and what uses the space | the company's owner / administrators | `/subscription` (`billing_can_manage()`); every user sees the line at 100% |
+| See a company's payments; refund a payment (full or part) or a second payment for the same order | the platform owner | Companies → Manage → Payments & refunds — `superadmin_can()` (the existing console gate). The owner's refund rules (8 Nov 2026) are in doc 03, Plan payment |
+| Save the Razorpay webhook secret | the platform owner, on the control install only | Platform setup — `billing_keys_refusal()`, the same gate as the payment keys |
+| Open a refund's GST credit note | the company's owner / administrators (their own company's only); the platform owner | `/subscription-invoice?cn=` (`billing_can_manage()`, and the credit note must belong to a refund in this company); `/gst-invoices` (`superadmin_can()`) |
+| Razorpay's payment notice | Razorpay (no account) | `/razorpay-webhook`, public, refused without a valid signature for the saved secret; it only names an order, and what is applied is read back from Razorpay with the platform's keys |
 
 **Storage allowance (owner, 22 Oct 2026 — "storage usage and limits on the paid users also").**
 Every company hosted on the platform — free trial, self-serve paid, or created by

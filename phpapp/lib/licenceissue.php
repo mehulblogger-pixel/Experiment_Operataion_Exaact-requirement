@@ -244,7 +244,7 @@ function buy_apply_payment($install, array $rec, $orderId, $payId, $sig) {
         return [false, 'Already applied', '<p>That payment has already been applied to your plan. Open <b>Licence → “Just paid? Check now”</b> in your app.</p>', 200];
     if (!rzp_verify_signature($orderId, $payId, $sig)) {
         db()->prepare("UPDATE billing_orders SET status='FAILED', payment_id=? WHERE id=? AND status='PENDING'")->execute([$payId, (int)$o['id']]);
-        return [false, 'Payment not verified', '<p>That payment could not be verified. If money was taken it is refunded automatically, and nothing changed.</p>', 400];
+        return [false, 'Payment not verified', '<p>That payment could not be confirmed, so nothing changed yet. If money left your account, send us the payment reference shown by Razorpay and we will apply it or refund it.</p>', 400];
     }
     // The figures the order was PRICED for, not the ones the form says now.
     $seats  = max(1, (int)$o['seats']);

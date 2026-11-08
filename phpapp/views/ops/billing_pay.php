@@ -52,6 +52,8 @@
   <a class="btn secondary" href="<?= e($back) ?>" style="margin-left:8px">Cancel</a>
   <p class="muted" style="margin-top:14px;font-size:12.5px">Your card details go straight to Razorpay — this application never sees them.
     Your plan activates the instant the payment is confirmed.</p>
+  <?php if (function_exists('saas_refund_policy_text') && function_exists('current_tenant') && current_tenant() !== ''): ?>
+  <p class="muted" style="margin-top:8px;font-size:12.5px;text-align:left"><b>Refunds:</b> <?= e(saas_refund_policy_text()) ?></p><?php endif; ?>
 </div>
 
 <?php // Filled in by the Razorpay callback, then submitted. CSRF is stamped in

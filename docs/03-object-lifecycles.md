@@ -1258,7 +1258,7 @@ Companies console is not affected.
 
 ### Plan payment (`saas_orders.status`)
 
-> **CREATED → PAID**
+> **CREATED → PAID** · **PAID → PART_REFUNDED** · **PAID / PART_REFUNDED → REFUNDED** (owner, 8 Nov 2026)
 
 - `CREATED` — the price was worked out and the payment window opened; what was
   ordered is recorded here.
@@ -1271,3 +1271,36 @@ Companies console is not affected.
   (append-only). A **correction** to the buyer is a new entry for the same number that keeps what it
   replaced; the latest entry is the invoice as it stands. There is no new status, and an invoice
   is never deleted or renumbered.
+- **Applied once, never lost (8 Nov 2026).** Every company payment — plan, add-ons and,
+  from now on, AI actions (`kind='ai'`, which used to have no order and could be added twice
+  by a repeated callback) — goes CREATED → PAID exactly once, by whichever comes first: the
+  page that returns from Razorpay, Razorpay's signed notice (`/razorpay-webhook`), or the
+  check that asks Razorpay about every order still CREATED (when the company opens Your
+  subscription, when a payment cannot be confirmed, and nightly for every company). Only a
+  captured payment of exactly the recorded amount is applied. What the company had just before
+  is kept with the order (`before_json`), so a refund can put it back.
+- `PART_REFUNDED` / `REFUNDED` — the platform owner refunded part / all of the payment
+  (Super Admin → Companies → Manage → Payments & refunds). The owner's rules:
+  - **No refunds as a rule** — every company has a free trial first.
+  - **Bought by mistake** (extra logins, a module, storage, the wrong period) or **paid twice**:
+    refunded only within **3 days** of paying (`saas_refund_days`, default 3).
+  - **Our own error** (a wrong price, or it could not be switched on): any time.
+  - **Full refund** ends what that payment bought, today: a renewal is cancelled (the plan ends
+    on its earlier date); an addition is taken off (back to exactly what the company had before);
+    the payment that started the paid plan leaves the company **VIEW-ONLY** (data only — the trial
+    is not given back). Refused while a later payment changed the plan (refund that one first).
+  - **Part refund** takes back exactly the chosen logins, modules or storage packs that payment
+    added, at once; the rest of the plan runs to its date. Logins can never go below the people
+    active — they are deactivated first.
+  - AI actions are refunded as a whole; this month's unused top-up is taken off.
+  - Money first: if Razorpay refuses, nothing changes. A refund is recorded once (`saas_refunds`,
+    STARTED → DONE / FAILED; a form sent twice is refused), shown as a minus line in the
+    company's Payment history, and e-mailed to the company's owner.
+  - **GST credit note.** A refund of a payment that had a tax invoice issues a credit note
+    (section 34 CGST Act) from its own series per financial year (`CN/2026-27/0001`), against
+    the invoice's number and date, with the reduced taxable value and tax. It is written to the
+    same register, nets off in the month's totals and the accountant's CSV, opens for printing,
+    and is never corrected (its invoice is).
+- **Paid twice for one order** (`saas_payment_extras.status`: **OPEN → REFUNDED**) — a second
+  captured payment found for an order already PAID. Nothing was given for it, so the platform
+  owner refunds it in full, at any time; nothing else changes.

@@ -245,6 +245,70 @@ function commercial_next_invoice_no($date = null) {
     return $prefix . '/' . $fy . '/' . str_pad((string) $n, 4, '0', STR_PAD_LEFT);   // ≤ 16 characters, as Rule 46 requires
 }
 
+// ---- GST credit notes (a refund against a tax invoice) ------------------------------
+// Section 34 CGST Act: a refund of a taxed payment is a CREDIT NOTE against the
+// original invoice — its own consecutive series per financial year (Rule 46
+// style, ≤ 16 characters: CN/2026-27/0001), the original invoice's number and
+// date, the reduced taxable value and tax, and the reason. It goes into the same
+// register, so the month's figures and the accountant's file net it off.
+function commercial_next_credit_note_no($date = null) {
+    $dir = function_exists('tenant_safe_data_dir') ? (string) tenant_safe_data_dir()[0] : sys_get_temp_dir();
+    $f = rtrim($dir, '/') . '/invoice-series.json';
+    $fy = commercial_fy($date);
+    $h = @fopen($f, 'c+');
+    if (!$h) return '';
+    try {
+        flock($h, LOCK_EX);
+        $d = json_decode((string) stream_get_contents($h), true); if (!is_array($d)) $d = [];
+        $n = (int) ($d['CN-' . $fy] ?? 0) + 1; $d['CN-' . $fy] = $n;
+        ftruncate($h, 0); rewind($h); fwrite($h, json_encode($d)); fflush($h);
+        flock($h, LOCK_UN);
+    } finally { fclose($h); }
+    @chmod($f, 0600);
+    return 'CN/' . $fy . '/' . str_pad((string) $n, 4, '0', STR_PAD_LEFT);
+}
+// Issue a credit note for $amount (what was refunded, GST included) against
+// invoice $inv (a register row). Returns the credit note number, or ''.
+function commercial_credit_note_issue_row(array $inv, $amount, $reason, $refundId, $companyKey = '') {
+    $amount = (int) $amount;
+    $total = max(1, (int) ($inv['total'] ?? 0));
+    if ($amount <= 0) return '';
+    $net = (int) round($amount * (int) ($inv['net'] ?? 0) / $total);
+    $tax = $amount - $net;
+    $igst = (int) ($inv['igst'] ?? 0) > 0 ? $tax : 0;
+    $cgst = $igst ? 0 : intdiv($tax, 2);
+    $sgst = $igst ? 0 : $tax - $cgst;
+    $no = commercial_next_credit_note_no();
+    if ($no === '') return '';
+    commercial_register_add([
+        'doc' => 'credit_note', 'invoice_no' => $no, 'date' => date('Y-m-d'),
+        'against' => (string) ($inv['invoice_no'] ?? ''), 'against_date' => (string) ($inv['date'] ?? ''),
+        'reason' => mb_substr((string) $reason, 0, 300), 'refund_id' => (string) $refundId,
+        'company_key' => (string) ($companyKey !== '' ? $companyKey : ($inv['company_key'] ?? '')),
+        'order_id' => (string) ($inv['order_id'] ?? ''), 'payment_id' => (string) ($inv['payment_id'] ?? ''),
+        'period' => (string) ($inv['period'] ?? ''),
+        'lines' => [['label' => 'Refund against tax invoice ' . ($inv['invoice_no'] ?? ''), 'amount' => $net]], 'credit' => 0,
+        'rate' => (float) ($inv['rate'] ?? 0), 'mode' => (string) ($inv['mode'] ?? 'exclusive'),
+        'net' => $net, 'tax' => $tax, 'cgst' => $cgst, 'sgst' => $sgst, 'igst' => $igst, 'total' => $amount,
+        'pos' => (string) ($inv['pos'] ?? ''), 'buyer' => (array) ($inv['buyer'] ?? []), 'supplier' => (array) ($inv['supplier'] ?? []),
+        'sac' => (string) ($inv['sac'] ?? ''), 'amendments' => [],
+    ]);
+    return $no;
+}
+// By invoice number (the register's row, or — for an invoice issued before the
+// register existed — the paid order it came from, in the current company).
+function commercial_credit_note_issue($invoiceNo, $amount, $reason, $refundId, $companyKey = '') {
+    $inv = commercial_register_get($invoiceNo);
+    if (!$inv) {
+        try { $o = ops_one("SELECT * FROM saas_orders WHERE invoice_no=?", [(string) $invoiceNo]); } catch (Throwable $e) { $o = null; }
+        if (!$o) return '';
+        $t = json_decode((string) ($o['tax_json'] ?? ''), true);
+        $inv = commercial_invoice_row($o, is_array($t) ? $t : [], $companyKey);
+    }
+    return commercial_credit_note_issue_row($inv, $amount, $reason, $refundId, $companyKey);
+}
+function commercial_is_credit_note(array $r) { return ($r['doc'] ?? '') === 'credit_note'; }
+
 // ---- The platform's GST invoice register ------------------------------------------
 // One register across every company, for the platform owner's GST return: each
 // tax invoice is written here when it is issued, in the protected data folder
@@ -303,6 +367,7 @@ function commercial_invoice_row(array $o, array $t, $companyKey = '') {
 function commercial_register_amend($no, array $buyer, $reason, $by) {
     $r = commercial_register_get($no);
     if (!$r) return 'That invoice is not in the register.';
+    if (commercial_is_credit_note($r)) return 'A credit note is not corrected — it follows its invoice. Correct the invoice instead.';
     $reason = trim((string) $reason);
     if ($reason === '') return 'Say why the invoice is being corrected (it is kept with the invoice).';
     $b = commercial_billto_clean($buyer);
@@ -357,7 +422,7 @@ function ops_gst_invoices($method) {
     if ($no !== '' && isset($_GET['print'])) {
         $inv = commercial_register_get($no);
         ops_require((bool) $inv, 'That invoice is not in the register.');
-        require __DIR__ . '/../views/ops/subscription_invoice.php';
+        require __DIR__ . '/../views/ops/' . (commercial_is_credit_note($inv) ? 'credit_note.php' : 'subscription_invoice.php');
         exit;
     }
     $month = preg_match('/^\d{4}-\d{2}$/', (string) ($_GET['m'] ?? '')) ? (string) $_GET['m'] : date('Y-m');
@@ -368,12 +433,14 @@ function ops_gst_invoices($method) {
         header('Content-Disposition: attachment; filename="gst-invoices-' . $month . '.csv"');
         $out = fopen('php://output', 'w');
         fputcsv($out, ['Invoice no', 'Date', 'Type', 'Buyer GSTIN', 'Buyer name', 'Place of supply', 'SAC', 'Taxable value', 'Rate %',
-                       'IGST', 'CGST', 'SGST', 'Invoice total', 'Workspace', 'Payment ref', 'Corrected']);
+                       'IGST', 'CGST', 'SGST', 'Invoice total', 'Workspace', 'Payment ref', 'Corrected', 'Document', 'Against invoice', 'Against date', 'Reason']);
         foreach ($rows as $r) {
             $pos = (string) $r['pos'];
+            $cn = commercial_is_credit_note($r); $s = $cn ? -1 : 1;   // a credit note reduces the month
             fputcsv($out, [$r['invoice_no'], $r['date'], $r['buyer']['gstin'] !== '' ? 'B2B' : 'B2C', $r['buyer']['gstin'], $r['buyer']['name'],
-                $pos . (defined('GST_STATES') && isset(GST_STATES[$pos]) ? '-' . GST_STATES[$pos] : ''), $r['sac'], $r['net'], $r['rate'],
-                $r['igst'], $r['cgst'], $r['sgst'], $r['total'], $r['company_key'], $r['payment_id'], $r['amendments'] ? 'yes' : '']);
+                $pos . (defined('GST_STATES') && isset(GST_STATES[$pos]) ? '-' . GST_STATES[$pos] : ''), $r['sac'], $s * (int) $r['net'], $r['rate'],
+                $s * (int) $r['igst'], $s * (int) $r['cgst'], $s * (int) $r['sgst'], $s * (int) $r['total'], $r['company_key'], $r['payment_id'], $r['amendments'] ? 'yes' : '',
+                $cn ? 'Credit note' : 'Tax invoice', $cn ? (string) ($r['against'] ?? '') : '', $cn ? (string) ($r['against_date'] ?? '') : '', $cn ? (string) ($r['reason'] ?? '') : '']);
         }
         fclose($out);
         exit;

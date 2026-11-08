@@ -112,6 +112,20 @@ $adm = (array) ($adm ?? []); $ah = (string) ($adm['host'] ?? '');
       <?php $pc = $ch['payment'] ?? null; if ($pc): ?><span class="<?= !empty($pc['ok']) ? 'ps-ok' : 'ps-bad' ?>"><?= !empty($pc['ok']) ? 'Working' : 'Not working' ?></span>
         <span class="ps-note" style="margin:0"><?= $e(substr((string) $pc['at'], 0, 16) . ' — ' . $pc['msg']) ?></span><?php endif; ?></form>
     <p class="ps-note">The check only asks Razorpay to confirm the keys; it creates nothing and moves no money.</p>
+
+    <h3 style="margin:16px 0 4px;font-size:14px" id="webhook">Payment notices from Razorpay (webhook)</h3>
+    <p class="ps-note" style="margin-top:0">If a customer pays and closes the browser before coming back, this notice still tells the app at once, and the purchase is switched on.
+      (Without it the app still finds such payments — when the company opens Your subscription, and every night — just not at once.)</p>
+    <ol class="ps-note" style="margin:4px 0 8px;padding-left:18px">
+      <li>Razorpay Dashboard → <b>Account &amp; Settings → Webhooks → Add New Webhook</b>.</li>
+      <li>Webhook URL: <code><?= $e(function_exists('rzp_webhook_url') ? rzp_webhook_url() : '/razorpay-webhook') ?></code></li>
+      <li>Secret: type a long password of your own (any letters and numbers) and paste the same one below.</li>
+      <li>Active events: tick <b>payment.captured</b> and <b>order.paid</b>. Save.</li>
+    </ol>
+    <form method="post" class="ps-row"><input type="hidden" name="do" value="pay_webhook">
+      <input name="rzp_webhook_secret" type="password" autocomplete="new-password" style="max-width:320px"
+             placeholder="<?= (string) (function_exists('setting_get') ? setting_get('rzp_webhook_secret', '') : '') !== '' ? 'saved — leave blank to keep' : 'paste the same secret' ?>">
+      <button class="btn">Save webhook secret</button></form>
   </div>
 </div>
 

@@ -1395,6 +1395,49 @@ function ops_saas_admin($route, $method) {
                 . ($ok ? '' : ' (Saved here; it reaches their workspace on the next sync.)'), $ok ? 'success' : 'warning');
             redirect($back);
         }
+        // ---- Refunds (lib/saas_payments.php) — the owner's rules of 8 Nov 2026.
+        // The money is returned with the PLATFORM's keys (read here, on the
+        // control install), and the change is made inside the company.
+        if (($do === 'company_refund' || $do === 'company_refund_extra') && $key !== '' && function_exists('saas_refund_execute')) {
+            $cfg = billing_config();
+            if (empty($cfg['enabled'])) { flash('The payment keys are not set (Platform setup → Payment), so nothing can be refunded.', 'error'); redirect($back . '#payments'); }
+            if ($do === 'company_refund' && empty($_POST['confirm'])) { flash('Tick the box to confirm the refund. Nothing was refunded.', 'error'); redirect($back . '#payments'); }
+            $u = function_exists('current_user') ? current_user() : [];
+            $by = function_exists('user_name') ? user_name($u) : 'platform owner';
+            $req = ['scope' => ($_POST['scope'] ?? '') === 'part' ? 'part' : 'full', 'reason' => (string) ($_POST['reason'] ?? ''),
+                    'note' => (string) ($_POST['note'] ?? ''), 'seats_remove' => (int) ($_POST['seats_remove'] ?? 0),
+                    'packs_remove' => (int) ($_POST['packs_remove'] ?? 0), 'mods_remove' => (array) ($_POST['mods_remove'] ?? [])];
+            if ($req['scope'] === 'part' && trim((string) ($_POST['amount'] ?? '')) !== '') $req['amount'] = (int) $_POST['amount'];
+            $res = ['ok' => false, 'msg' => 'That company\'s workspace could not be opened, so nothing was refunded.'];
+            $prev = $_SESSION['saas_tenant'] ?? null;
+            try {
+                if (saas_enter_tenant($key)) {
+                    $rt = []; try { db(); $rt = $GLOBALS['__tenant'] ?? []; } catch (Throwable $e) {}
+                    if (strtolower((string) ($rt['key'] ?? '')) === $key && ($rt['error'] ?? '') === '')
+                        $res = $do === 'company_refund'
+                            ? saas_refund_execute((string) ($_POST['order_id'] ?? ''), $req, $cfg, $by, (string) ($_POST['nonce'] ?? ''), $key)
+                            : saas_refund_extra((int) ($_POST['extra_id'] ?? 0), $cfg, $by);
+                }
+            } catch (Throwable $e) { $res = ['ok' => false, 'msg' => 'The refund stopped: ' . $e->getMessage()]; }
+            if ($prev === null) unset($_SESSION['saas_tenant']); else $_SESSION['saas_tenant'] = $prev;
+            if (function_exists('db_reset')) db_reset();
+            if (function_exists('licence_disabled')) licence_disabled(true);
+            if (!empty($res['ok'])) {
+                if (function_exists('idems_log')) idems_log('user', $u['id'] ?? null, 'COMPANY_PAYMENT_REFUNDED', ['field' => $key, 'new' => (string) ($res['amount'] ?? '')]);
+                // Tell the company, in writing.
+                $t = saas_tenant_get($key);
+                if ($t && (string) ($t['owner_email'] ?? '') !== '' && function_exists('ops_mail'))
+                    try { ops_mail((string) $t['owner_email'], 'Refund of ₹' . number_format((int) $res['amount']) . ' — ' . ($t['company'] ?: $key),
+                        '<p>Hello,</p><p>We have refunded <b>₹' . number_format((int) $res['amount']) . '</b> to the card / UPI your payment came from. '
+                        . 'Banks usually show it within 5–7 working days.</p>'
+                        . (!empty($res['effect']) ? '<p>' . htmlspecialchars((string) $res['effect']) . '</p>' : '')
+                        . (!empty($res['credit_note']) ? '<p>GST credit note <b>' . htmlspecialchars((string) $res['credit_note']) . '</b> is in Your subscription → Payment history.</p>' : '')
+                        . '<p>Your records are untouched.</p>', '', 'saas_refund'); } catch (Throwable $e) {}
+                if (function_exists('selfserve_sweep')) { try { selfserve_sweep(['dry' => true, 'only' => $key]); } catch (Throwable $e) {} }
+            }
+            flash((string) $res['msg'], !empty($res['ok']) ? 'success' : 'error');
+            redirect($back . '#payments');
+        }
         if ($do === 'company_seats' && $key !== '') {
             // Set an absolute purchased-seat count (over the plan base).
             $want = max(0, (int) ($_POST['extra_user_seats'] ?? 0));
@@ -1511,6 +1554,8 @@ function ops_saas_admin($route, $method) {
         'plans'     => saas_console_plans(),
         'modules'   => defined('PRODUCT_MODULES') ? PRODUCT_MODULES : [],
         'sel'       => $selRow,
+        // The company's payments and refunds, read from its own workspace.
+        'payments'  => ($selRow && function_exists('saas_company_payments')) ? saas_company_payments($sel) : null,
         'requests'  => function_exists('tenant_requests_list') ? tenant_requests_list() : [],
         'price_book' => saas_price_book(),
         'quote'     => $selRow ? saas_company_quote(saas_tenant_modules($sel), saas_tenant_seat_limit($sel), 'month') : null,
@@ -1601,8 +1646,18 @@ function ops_saas_subscription($route, $method) {
 
     // A tax invoice (GST on) or payment receipt for one of this company's own payments.
     if ($route === 'subscription-invoice') {
+        // A GST credit note for a refund to THIS company (never another's).
+        if (isset($_GET['cn'])) {
+            $cn = (string) $_GET['cn'];
+            $mine = false;
+            try { if (function_exists('saas_payments_migrate')) saas_payments_migrate(); $mine = (bool) ops_one("SELECT id FROM saas_refunds WHERE credit_note_no=? AND status='DONE'", [$cn]); } catch (Throwable $e) {}
+            $inv = ($mine && function_exists('commercial_register_get')) ? commercial_register_get($cn) : null;
+            ops_require((bool) $inv, 'That credit note is not known here.');
+            require __DIR__ . '/../views/ops/credit_note.php';
+            exit;
+        }
         $o = null;
-        try { $o = ops_one("SELECT * FROM saas_orders WHERE order_id=? AND status='PAID'", [(string) ($_GET['o'] ?? '')]); } catch (Throwable $e) {}
+        try { $o = ops_one("SELECT * FROM saas_orders WHERE order_id=? AND status IN ('PAID','PART_REFUNDED','REFUNDED')", [(string) ($_GET['o'] ?? '')]); } catch (Throwable $e) {}
         ops_require((bool) $o, 'That payment is not known here.');
         $t = json_decode((string) ($o['tax_json'] ?? ''), true);
         $inv = ((string) $o['invoice_no'] !== '' && function_exists('commercial_register_get')) ? commercial_register_get($o['invoice_no']) : null;
@@ -1617,7 +1672,11 @@ function ops_saas_subscription($route, $method) {
         $paymentId = (string) ($_POST['razorpay_payment_id'] ?? '');
         $sig       = (string) ($_POST['razorpay_signature'] ?? '');
         if (!rzp_verify_signature($orderId, $paymentId, $sig)) {
-            flash('That payment could not be verified. If money was taken it is refunded automatically — nothing was changed.', 'error');
+            // Not confirmed by this page — ask Razorpay directly, now. The money
+            // is captured at once, so it is never simply "refunded automatically".
+            $res = ($orderId !== '' && function_exists('saas_order_check')) ? saas_order_check($orderId, 'check') : 'none';
+            if ($res === 'applied') { flash('Payment received and confirmed with Razorpay. Your plan is updated below.', 'success'); redirect('/subscription'); }
+            flash(saas_payment_unconfirmed_msg($paymentId), 'error');
             redirect('/subscription');
         }
         $o = saas_order_claim($orderId, $paymentId);
@@ -1626,22 +1685,16 @@ function ops_saas_subscription($route, $method) {
                 . 'If you believe something is missing, contact your provider with payment reference ' . $paymentId . '.', 'warning');
             redirect('/subscription');
         }
-        if ($o['kind'] === 'plan') {
-            $q = json_decode((string) $o['quote_json'], true);
-            $q = saas_plan_change_apply(is_array($q) ? $q : [], $paymentId, $orderId);
-            flash('Payment received. ' . (!empty($q['converted']) ? 'Your free trial is now a paid plan. ' : '') . ($q['type'] === 'RENEW'
-                ? 'Your plan is renewed and now runs until ' . (function_exists('fdate') ? fdate($q['expires']) : $q['expires']) . '.'
-                : 'Your plan is active until ' . (function_exists('fdate') ? fdate($q['expires']) : $q['expires']) . '.'), 'success');
-            redirect('/subscription');
-        }
-        $mods = array_values(array_filter(array_map('trim', explode(',', (string) $o['modules']))));
-        $r = saas_selfservice_apply($mods, (int) $o['seats'], (string) $o['period'], $paymentId, $orderId);
-        $bits = [];
-        if ($r['added'])        $bits[] = count($r['added']) . ' module' . (count($r['added']) === 1 ? '' : 's');
-        if ($r['seat_add'] > 0) $bits[] = $r['seat_add'] . ' seat' . ($r['seat_add'] === 1 ? '' : 's');
-        flash('Payment received. Added ' . ($bits ? implode(' and ', $bits) : 'your purchase') . '. Your plan is active until '
-            . (function_exists('fdate') ? fdate($r['paid_until']) : $r['paid_until']) . '.', 'success');
+        $r = saas_order_fulfil($o, $paymentId, 'page');
+        flash($r['msg'], 'success');
         redirect('/subscription');
+    }
+
+    // A payment whose page never came back (the browser was closed after
+    // paying) is found here, with Razorpay, and switched on (lib/saas_payments.php).
+    if ($method === 'GET' && function_exists('saas_orders_check_recent')) {
+        try { $chk = saas_orders_check_recent('check'); if ($chk['applied'] > 0) flash('A payment you made earlier has now been confirmed with Razorpay and switched on.', 'success'); }
+        catch (Throwable $e) {}
     }
 
     view('ops/subscription', [
@@ -1662,7 +1715,7 @@ function ops_saas_subscription($route, $method) {
         'modules' => defined('PRODUCT_MODULES') ? PRODUCT_MODULES : [],
         'history' => function_exists('billing_history') ? billing_history() : [],
         'invoices' => (function () {
-            try { $r = ops_all("SELECT order_id, invoice_no FROM saas_orders WHERE status='PAID'"); } catch (Throwable $e) { $r = []; }
+            try { $r = ops_all("SELECT order_id, invoice_no FROM saas_orders WHERE status IN ('PAID','PART_REFUNDED','REFUNDED')"); } catch (Throwable $e) { $r = []; }
             $m = []; foreach ((array) $r as $x) $m[(string) $x['order_id']] = (string) $x['invoice_no']; return $m;
         })(),
     ]);

@@ -666,6 +666,8 @@ function saas_order_create($orderId, $kind, array $mods, $seats, $period, $amoun
                    VALUES (?,?,?,?,?,?,'CREATED',?,?,?,?)")
         ->execute([(string) $orderId, (string) $kind, implode(',', $mods), (int) $seats, $period === 'year' ? 'year' : 'month',
                    (int) $amount, $quote ? json_encode($quote) : '', $tax ? json_encode($tax) : '', (int) (current_user()['id'] ?? 0), date('c')]);
+    // ($period is month or year; an AI top-up is a one-off, recorded as 'once' below.)
+    if ($period === 'once') db()->prepare("UPDATE saas_orders SET period='once' WHERE order_id=?")->execute([(string) $orderId]);
 }
 // Claim a CREATED order for a verified payment. Returns the row or null (unknown
 // order, or already applied — a replayed callback changes nothing).

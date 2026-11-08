@@ -141,7 +141,7 @@ function mkt_pay_verify($orderId, $paymentId, $signature) {
     if (!$row) return [false, 'This payment was already processed, or the order is unknown.'];
     if (!function_exists('rzp_verify_signature') || !rzp_verify_signature($orderId, $paymentId, $signature)) {
         db()->prepare("UPDATE mkt_orders SET status='FAILED', payment_id=?, paid_at=? WHERE id=?")->execute([(string)$paymentId, date('c'), (int)$row['id']]);
-        return [false, 'The payment could not be verified. If money was deducted it will be refunded.'];
+        return [false, 'The payment could not be confirmed, so nothing changed yet. If money left your account, quote the payment reference shown by Razorpay to the platform and it will be applied or refunded.'];
     }
     // Mark PAID first so a double callback cannot activate twice.
     // Conditional, so exactly one caller turns PENDING into PAID: the SELECT
