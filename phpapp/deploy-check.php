@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '7d035f4 · 2026-11-08 07:18 UTC · 706 files';
+$RELEASE = 'ba0db4e · 2026-11-08 10:39 UTC · 706 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -180,7 +180,7 @@ $EXPECT  = [
     'lib/ops.php' => ['s'=>735603,'h'=>'be88a0fdc3ee41e1'],
     'lib/orgadmin.php' => ['s'=>78177,'h'=>'70dca6bf71230d17'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
-    'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],
+    'lib/owner_home.php' => ['s'=>3662,'h'=>'c849f6bf380507dc'],
     'lib/packs.php' => ['s'=>14404,'h'=>'2c631d79aea60e49'],
     'lib/partnerimport.php' => ['s'=>23742,'h'=>'bc507ebf2a770c8f'],
     'lib/party.php' => ['s'=>11622,'h'=>'55ad01fbf381e780'],
@@ -388,7 +388,7 @@ $EXPECT  = [
     'views/ops/client_holds.php' => ['s'=>2903,'h'=>'5687a162f310c58e'],
     'views/ops/cockpit_forms.php' => ['s'=>1956,'h'=>'c70846e6e910e1ba'],
     'views/ops/cockpit_home.php' => ['s'=>6795,'h'=>'4f8fac9a8e081de4'],
-    'views/ops/cockpit_modules.php' => ['s'=>5558,'h'=>'0dcd0925e264ba4b'],
+    'views/ops/cockpit_modules.php' => ['s'=>7192,'h'=>'21e173396101eac4'],
     'views/ops/cockpit_profile.php' => ['s'=>3536,'h'=>'2e86d3bf2bd4f402'],
     'views/ops/command_centre.php' => ['s'=>5165,'h'=>'ae264a9f22a82fd4'],
     'views/ops/comp_setup.php' => ['s'=>7385,'h'=>'7821208806df4fb8'],

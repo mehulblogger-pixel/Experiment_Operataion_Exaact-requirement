@@ -72,6 +72,25 @@ $confirmOff = (string) ($confirmOff ?? '');
         </div>
       </div>
       <div class="why"><?= $e($m['why']) ?></div>
+      <?php // The marketplace has a second, platform-wide switch (connect_enabled).
+            // With the module on but that switch off, nobody sees it — say so,
+            // and let the platform owner switch it on from here (owner, 8 Nov 2026).
+        if ($key === 'connect' && $m['on'] && function_exists('connect_enabled') && !connect_enabled()): ?>
+        <div style="margin-top:8px;padding:10px 12px;border:1px solid #fcd34d;background:#fffbeb;border-radius:10px;font-size:13px">
+          <b>Switched on here, but the Marketplace itself is switched off</b>, so it is not in the menu and the public marketplace page is closed.
+          <?php if (function_exists('superadmin_can') && superadmin_can()): ?>
+            <form method="post" action="/marketplace-toggle" style="display:inline-block;margin:6px 0 0">
+              <?php if (function_exists('csrf_field')) echo csrf_field(); ?>
+              <input type="hidden" name="on" value="1"><input type="hidden" name="back" value="modules">
+              <button class="btn" type="submit">Switch the Marketplace on</button></form>
+          <?php elseif (function_exists('is_master') && is_master() && (!function_exists('current_tenant') || current_tenant() === '')):
+                $saHost = function_exists('superadmin_host') ? superadmin_host() : ''; ?>
+            Switch it on in Super Admin → <a href="<?= $e(($saHost !== '' ? 'https://' . $saHost : '') . '/owner') ?>">Owner home</a> → Marketplace.
+          <?php else: ?>
+            Your provider has switched the marketplace off for now.
+          <?php endif; ?>
+        </div>
+      <?php endif; ?>
       <?php if ($m['features']): ?>
         <div class="feats"><?php foreach ($m['features'] as $f): ?><span class="feat"><?= $e($f) ?></span><?php endforeach; ?></div>
       <?php endif; ?>

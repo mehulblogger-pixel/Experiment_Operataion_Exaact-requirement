@@ -42,7 +42,8 @@ function ops_marketplace_toggle($method) {
         if (function_exists('licence_disabled')) licence_disabled(true);
         flash('Marketplace turned ' . ($on ? 'ON' : 'OFF') . '. Your left-hand menu updates on the next page.');
     }
-    redirect(($_POST['back'] ?? '') === 'owner' ? '/owner' : '/super-admin');
+    $back = (string)($_POST['back'] ?? '');
+    redirect($back === 'owner' ? '/owner' : ($back === 'modules' ? '/workspace/setup/modules' : '/super-admin'));
 }
 
 function ops_owner_home_render() {
