@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '4958e83 · 2026-11-08 06:17 UTC · 706 files';
+$RELEASE = 'c8e5c1e · 2026-11-08 06:49 UTC · 706 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -445,7 +445,7 @@ $EXPECT  = [
     'views/ops/crm_dashboard.php' => ['s'=>13276,'h'=>'6bdd49395543c605'],
     'views/ops/custom_fields.php' => ['s'=>4958,'h'=>'f2f969e3c56dfed4'],
     'views/ops/customer360.php' => ['s'=>29931,'h'=>'2197023e362e8e81'],
-    'views/ops/data_control.php' => ['s'=>19200,'h'=>'1c4864993b089764'],
+    'views/ops/data_control.php' => ['s'=>19266,'h'=>'8f0ae88fcb869398'],
     'views/ops/data_requests.php' => ['s'=>4866,'h'=>'840d2672933c1726'],
     'views/ops/dedupe.php' => ['s'=>7066,'h'=>'6ddfbed6d6b16b97'],
     'views/ops/department_admin.php' => ['s'=>12013,'h'=>'70b3d5969a1c2461'],

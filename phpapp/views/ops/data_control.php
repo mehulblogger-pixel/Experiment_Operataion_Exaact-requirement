@@ -211,7 +211,7 @@
                 // administrators see it.
                 if (trim((string)($f['detail'] ?? '')) !== '' && (is_master() || (function_exists('is_admin_level') && is_admin_level()))): ?>
             <details style="margin-top:4px"><summary class="muted" style="font-size:12px;cursor:pointer">Technical detail</summary>
-              <pre style="white-space:pre-wrap;font-size:11.5px;background:#f7f6f4;border:1px solid #e2ddd6;border-radius:6px;padding:8px;margin:4px 0 0;max-width:520px"><?= e($f['detail']) ?></pre></details>
+              <pre style="white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;font-size:11.5px;background:#f7f6f4;border:1px solid #e2ddd6;border-radius:6px;padding:8px;margin:4px 0 0;max-width:100%;box-sizing:border-box"><?= e($f['detail']) ?></pre></details>
           <?php endif; ?></td>
         <td><?= $f['data_affected'] === 'UNKNOWN' ? '<span class="pill p-bad">not answered</span>'
               : ($f['data_affected'] === 'YES' ? '<span class="pill p-bad">yes</span>' : '<span class="pill p-ok">no</span>') ?></td>
