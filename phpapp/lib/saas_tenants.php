@@ -948,6 +948,7 @@ function saas_tenant_data_missing($key) {
     $route = json_decode((string) ($t['route_json'] ?? ''), true);
     $path  = is_array($route) ? (string) ($route['sqlite'] ?? '') : '';
     if ($path === '') return '';                        // MySQL, or not wired up yet — not this check's business
+    clearstatcache(true, $path);   // PHP remembers a file's size within a run; this check must see the file as it is now
     if (is_file($path) && (int) @filesize($path) > 0) return '';   // healthy
 
     $everSetUp = trim((string) ($t['provisioned_at'] ?? '')) !== ''

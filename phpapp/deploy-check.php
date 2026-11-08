@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'e80aae5 · 2026-11-08 05:27 UTC · 706 files';
+$RELEASE = 'ef04bb4 · 2026-11-08 05:37 UTC · 706 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -220,7 +220,7 @@ $EXPECT  = [
     'lib/saas_payments.php' => ['s'=>43836,'h'=>'2c3625b3def14076'],
     'lib/saas_provision_cli.php' => ['s'=>4816,'h'=>'76f04fae8c24f082'],
     'lib/saas_sync_cli.php' => ['s'=>2939,'h'=>'5fb733d865f2f34b'],
-    'lib/saas_tenants.php' => ['s'=>106146,'h'=>'100dcbe6ffd62f3f'],
+    'lib/saas_tenants.php' => ['s'=>106268,'h'=>'5beabca42bb4c80f'],
     'lib/samples.php' => ['s'=>14677,'h'=>'fa38e5f628b43f6a'],
     'lib/satisfaction.php' => ['s'=>16437,'h'=>'4cb166c77b0e2650'],
     'lib/schedboard.php' => ['s'=>10397,'h'=>'0b2b9fe333604ef3'],
