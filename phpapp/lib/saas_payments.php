@@ -38,12 +38,19 @@ function saas_refund_days() {
     return $v === '' ? 3 : max(0, (int) $v);
 }
 
-// Why a payment is refunded. 'anytime' = not bound by the 3-day window.
+// The window for "paid twice" (owner, 8 Nov 2026: "within 15 days only").
+function saas_refund_dup_days() {
+    $v = function_exists('setting_get') ? trim((string) setting_get('saas_refund_dup_days', '')) : '';
+    return $v === '' ? 15 : max(0, (int) $v);
+}
+
+// Why a payment is refunded, and within how many days of paying.
+// 'anytime' = our own error: refunded whenever it is found and confirmed.
 function saas_refund_reasons() {
     return [
-        'mistake'  => ['label' => 'Bought by mistake — extra logins, a module, storage or the wrong period', 'anytime' => false],
-        'duplicate'=> ['label' => 'Paid twice for the same thing', 'anytime' => false],
-        'platform' => ['label' => 'Our error — a wrong price, or it could not be switched on', 'anytime' => true],
+        'mistake'  => ['label' => 'Bought by mistake — extra logins, a module, storage or the wrong period', 'anytime' => false, 'days' => saas_refund_days()],
+        'duplicate'=> ['label' => 'Paid twice for the same thing', 'anytime' => false, 'days' => saas_refund_dup_days()],
+        'platform' => ['label' => 'Our error — a wrong price, or it could not be switched on (once you confirm it was ours)', 'anytime' => true, 'days' => 0],
     ];
 }
 
@@ -376,9 +383,9 @@ function saas_refund_plan(array $o, array $req, $now = null) {
     if ($left <= 0) return ['error' => 'Nothing is left to refund on this payment.'] + $out;
     if (!isset($reasons[$reason])) return ['error' => 'Choose why the payment is refunded.'] + $out;
     $age = saas_order_age_days($o, $now);
-    if (!$reasons[$reason]['anytime'] && $age > saas_refund_days())
+    if (!$reasons[$reason]['anytime'] && $age > (int) $reasons[$reason]['days'])
         return ['error' => 'Paid ' . $age . ' days ago. A refund for "' . $reasons[$reason]['label'] . '" is only given within '
-                          . saas_refund_days() . ' days of paying (your rule: no refunds — every company has a free trial first).'] + $out;
+                          . (int) $reasons[$reason]['days'] . ' days of paying (your rule: no refunds — every company has a free trial first).'] + $out;
     $kind = (string) $o['kind'];
     $before = json_decode((string) ($o['before_json'] ?? ''), true);
     $q = json_decode((string) ($o['quote_json'] ?? ''), true); $q = is_array($q) ? $q : [];
@@ -576,12 +583,17 @@ function saas_refund_history_line($amount, $note, $refundId, $orderId, $byName) 
     } catch (Throwable $e) {}
 }
 
-// Refund a second payment for an order already paid — in full, at any time:
-// nothing was given for it.
-function saas_refund_extra($extraId, array $cfg, $byName) {
+// Refund a second payment for an order already paid — in full (nothing was
+// given for it), within the "paid twice" window; after that only when the
+// platform owner confirms it was our own error.
+function saas_refund_extra($extraId, array $cfg, $byName, $ourError = false, $now = null) {
     saas_payments_migrate();
     $x = ops_one("SELECT * FROM saas_payment_extras WHERE id=?", [(int) $extraId]);
     if (!$x || $x['status'] !== 'OPEN') return ['ok' => false, 'msg' => 'That payment has already been refunded.'];
+    $age = (int) floor((($now ?: time()) - (int) strtotime((string) $x['found_at'])) / 86400);
+    if ($age > saas_refund_dup_days() && !$ourError)
+        return ['ok' => false, 'msg' => 'This second payment is ' . $age . ' days old. "Paid twice" is refunded within ' . saas_refund_dup_days()
+                                      . ' days; after that only if you confirm it was our error (tick the box).'];
     $st = db()->prepare("UPDATE saas_payment_extras SET status='SENDING' WHERE id=? AND status='OPEN'");
     $st->execute([(int) $extraId]);
     if ($st->rowCount() !== 1) return ['ok' => false, 'msg' => 'That refund is already being sent.'];
@@ -639,8 +651,10 @@ function saas_company_payments($key) {
 // The policy, in the customer's words — shown before they pay.
 function saas_refund_policy_text() {
     $trial = function_exists('selfserve_cfg') ? (int) (selfserve_cfg()['trial_days'] ?? 30) : 30;
-    $d = saas_refund_days();
+    $d = saas_refund_days(); $dd = saas_refund_dup_days();
+    $n = fn($k) => $k . ' day' . ($k === 1 ? '' : 's');
     return 'Payments are not refunded — every company gets a ' . $trial . '-day free trial of everything first. '
-         . 'Bought something by mistake (extra logins, a module, storage or the wrong period) or paid twice? '
-         . 'Tell your provider within ' . $d . ' day' . ($d === 1 ? '' : 's') . ' of paying and that part is refunded; what is refunded stops at once.';
+         . 'Bought something by mistake (extra logins, a module, storage or the wrong period)? Tell your provider within ' . $n($d) . ' of paying. '
+         . 'Paid twice for the same thing? Within ' . $n($dd) . '. That part is refunded, and what is refunded stops at once. '
+         . 'If the mistake was ours, it is put right whenever it is found.';
 }

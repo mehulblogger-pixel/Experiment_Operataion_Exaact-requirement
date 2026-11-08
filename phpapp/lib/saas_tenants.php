@@ -1417,7 +1417,7 @@ function ops_saas_admin($route, $method) {
                     if (strtolower((string) ($rt['key'] ?? '')) === $key && ($rt['error'] ?? '') === '')
                         $res = $do === 'company_refund'
                             ? saas_refund_execute((string) ($_POST['order_id'] ?? ''), $req, $cfg, $by, (string) ($_POST['nonce'] ?? ''), $key)
-                            : saas_refund_extra((int) ($_POST['extra_id'] ?? 0), $cfg, $by);
+                            : saas_refund_extra((int) ($_POST['extra_id'] ?? 0), $cfg, $by, !empty($_POST['our_error']));
                 }
             } catch (Throwable $e) { $res = ['ok' => false, 'msg' => 'The refund stopped: ' . $e->getMessage()]; }
             if ($prev === null) unset($_SESSION['saas_tenant']); else $_SESSION['saas_tenant'] = $prev;

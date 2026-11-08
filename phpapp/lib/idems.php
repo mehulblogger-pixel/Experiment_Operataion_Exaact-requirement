@@ -77,6 +77,10 @@ function require_final_docs_on_close() {
 }
 function job_final_docs_missing($job) {
     if (!require_final_docs_on_close()) return [];
+    // A TERMINATED job never reaches its final inspection, so it has no Final
+    // Inspection Report or Release Note to give (owner, 8 Nov 2026: "Yes" — a
+    // terminated job may close without them). Recorded when it is closed.
+    if (strtoupper((string)($job['billing_stop_kind'] ?? '')) === 'TERMINATED') return [];
     if (($job['reporting_frequency'] ?? 'NOREPORT') === 'NOREPORT') return [];
     $jobId = (int)($job['id'] ?? 0); if (!$jobId) return [];
     $fir = 0; $rn = 0;

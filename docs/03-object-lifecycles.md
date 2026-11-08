@@ -79,6 +79,13 @@ stateDiagram-v2
   lock, bills on file, site check-in, open visit-days, final docs). Comment says
   "Inspector (or coordinator) closes" (`ops.php:5560`). **⚠ implicit — see gaps doc.**
 - Re-close is refused if already closed (`ops.php:5573`).
+- **A terminated job closes without its final documents** (owner, 8 Nov 2026). The close
+  gate that asks for the Final Inspection Report and Release Note (§WO-6,
+  `job_final_docs_missing()`) does not apply to a job whose early end is **TERMINATED**
+  (`jobs.billing_stop_kind`); closing it records `CLOSED_TERMINATED` in the job's activity.
+  Completed-early and demobilised jobs still need both. After any early end, visit days
+  dated after the end date no longer hold the job open (`job_visits_open_days()`); days up
+  to it still do. No new status.
 - `report_approval`: `'' → PENDING` at close; `PENDING → APPROVED/REJECTED` via
   `report-approve` (`workforce.php:701-704`), gated by `can_approve_report` (master, the
   inspector's reporting manager, `workforce.report.approve`, or `ops.job.close`+admin/coord).
@@ -1282,9 +1289,12 @@ Companies console is not affected.
 - `PART_REFUNDED` / `REFUNDED` — the platform owner refunded part / all of the payment
   (Super Admin → Companies → Manage → Payments & refunds). The owner's rules:
   - **No refunds as a rule** — every company has a free trial first.
-  - **Bought by mistake** (extra logins, a module, storage, the wrong period) or **paid twice**:
-    refunded only within **3 days** of paying (`saas_refund_days`, default 3).
-  - **Our own error** (a wrong price, or it could not be switched on): any time.
+  - **Bought by mistake** (extra logins, a module, storage, the wrong period): refunded only
+    within **3 days** of paying (`saas_refund_days`, default 3).
+  - **Paid twice for the same thing**: within **15 days** (`saas_refund_dup_days`, default 15 —
+    owner, 8 Nov 2026).
+  - **Our own error** (a wrong price, or it could not be switched on): any time, once the platform
+    owner confirms it was ours.
   - **Full refund** ends what that payment bought, today: a renewal is cancelled (the plan ends
     on its earlier date); an addition is taken off (back to exactly what the company had before);
     the payment that started the paid plan leaves the company **VIEW-ONLY** (data only — the trial
@@ -1303,4 +1313,5 @@ Companies console is not affected.
     and is never corrected (its invoice is).
 - **Paid twice for one order** (`saas_payment_extras.status`: **OPEN → REFUNDED**) — a second
   captured payment found for an order already PAID. Nothing was given for it, so the platform
-  owner refunds it in full, at any time; nothing else changes.
+  owner refunds it in full within 15 days of it arriving — after that only when the owner ticks
+  that it was our own error; nothing else changes.

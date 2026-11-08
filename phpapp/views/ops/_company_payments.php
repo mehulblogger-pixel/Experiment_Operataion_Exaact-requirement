@@ -8,6 +8,7 @@ $pay = is_array($pay ?? null) ? $pay : ['ok' => false];
 $money = fn($n) => '₹' . number_format((int) $n);
 $fd = fn($d) => function_exists('fdate') ? fdate(substr((string) $d, 0, 10)) : substr((string) $d, 0, 10);
 $days = function_exists('saas_refund_days') ? saas_refund_days() : 3;
+$dupDays = function_exists('saas_refund_dup_days') ? saas_refund_dup_days() : 15;
 $reasons = function_exists('saas_refund_reasons') ? saas_refund_reasons() : [];
 $modName = fn($k) => isset($modules[$k]) ? ($modules[$k][0] ?? $k) : $k;
 $stLabel = ['PAID' => ['Paid', '#047857', '#ecfdf5'], 'PART_REFUNDED' => ['Part refunded', '#92400e', '#fffbeb'], 'REFUNDED' => ['Refunded', '#6b7280', '#f3f4f6']];
@@ -15,8 +16,8 @@ $stLabel = ['PAID' => ['Paid', '#047857', '#ecfdf5'], 'PART_REFUNDED' => ['Part 
 <div id="payments" style="padding:16px;border-top:1px solid var(--line,#eef1f5);scroll-margin-top:70px">
   <label style="font-size:12px;font-weight:600">Payments &amp; refunds</label>
   <div class="sc-note" style="margin-top:4px">Your rule: <b>no refunds</b> — every company has a free trial first.
-    Exceptions: <b>bought by mistake</b> or <b>paid twice</b> — within <?= (int) $days ?> day<?= $days === 1 ? '' : 's' ?> of paying;
-    <b>our own error</b> (a wrong price, or it could not be switched on) — any time. A full refund ends what that payment bought
+    Exceptions: <b>bought by mistake</b> — within <?= (int) $days ?> day<?= $days === 1 ? '' : 's' ?> of paying;
+    <b>paid twice</b> — within <?= (int) $dupDays ?> days; <b>our own error</b> (a wrong price, or it could not be switched on) — whenever you confirm it was ours. A full refund ends what that payment bought
     (if it started the paid plan, the company keeps its data only, view-only); a part refund ends just the part refunded, at once.
     The money goes back through Razorpay to the card / UPI it came from, and a GST credit note is issued when the payment had a tax invoice.</div>
 
@@ -33,9 +34,11 @@ $stLabel = ['PAID' => ['Paid', '#047857', '#ecfdf5'], 'PART_REFUNDED' => ['Part 
   <?php foreach ((array) $pay['extras'] as $x): if ($x['status'] !== 'OPEN') continue; ?>
     <div style="margin:8px 0;padding:10px 12px;border:1px solid #fca5a5;background:#fef2f2;border-radius:10px;font-size:13.5px">
       <b>Paid twice:</b> a second payment of <?= $money($x['amount']) ?> (<?= $e($x['payment_id']) ?>) arrived on <?= $e($fd($x['found_at'])) ?> for an order that was already paid.
-      Nothing was given for it, so it is refunded in full — any time.
+      Nothing was given for it, so it is refunded in full<?php $xAge = (int) floor((time() - (int) strtotime((string) $x['found_at'])) / 86400); $xLate = $xAge > $dupDays; ?>
+      <?= $xLate ? ' — <b>but it is ' . $xAge . ' days old</b> (paid twice: within ' . (int) $dupDays . ' days), so only if it was our error.' : ' (within ' . (int) $dupDays . ' days of paying).' ?>
       <form method="post" style="display:inline-block;margin-left:6px" onsubmit="return confirm('Refund <?= $money($x['amount']) ?> to the customer now?')">
         <input type="hidden" name="do" value="company_refund_extra"><input type="hidden" name="key" value="<?= $sk ?>"><input type="hidden" name="extra_id" value="<?= (int) $x['id'] ?>">
+        <?php if ($xLate): ?><label style="font-size:12.5px;margin-right:6px"><input type="checkbox" name="our_error" value="1" required> We confirm it was our error</label><?php endif; ?>
         <button class="btn xs" style="background:#b91c1c">Refund <?= $money($x['amount']) ?></button></form>
     </div>
   <?php endforeach; ?>
@@ -46,7 +49,7 @@ $stLabel = ['PAID' => ['Paid', '#047857', '#ecfdf5'], 'PART_REFUNDED' => ['Part 
   <div style="overflow-x:auto"><table class="sc" style="min-width:640px;margin-top:6px">
     <tr><th>Paid</th><th>What</th><th style="text-align:right">Amount</th><th>Invoice</th><th>State</th><th></th></tr>
     <?php foreach ($pay['orders'] as $o): $st = $stLabel[$o['status']] ?? [$o['status'], '#374151', '#f3f4f6'];
-          $inWindow = (int) $o['age'] <= $days; $oid = $e($o['order_id']); ?>
+          $inWindow = (int) $o['age'] <= max($days, $dupDays); $oid = $e($o['order_id']); ?>
     <tr>
       <td><?= $e($fd($o['paid_at'])) ?><div class="sc-meta"><?= (int) $o['age'] === 0 ? 'today' : (int) $o['age'] . ' day' . ((int) $o['age'] === 1 ? '' : 's') . ' ago' ?></div></td>
       <td style="max-width:300px"><?= $e($o['label']) ?><div class="sc-key"><?= $e($o['payment_id']) ?></div></td>
@@ -60,12 +63,13 @@ $stLabel = ['PAID' => ['Paid', '#047857', '#ecfdf5'], 'PART_REFUNDED' => ['Part 
             <input type="hidden" name="do" value="company_refund"><input type="hidden" name="key" value="<?= $sk ?>">
             <input type="hidden" name="order_id" value="<?= $oid ?>"><input type="hidden" name="nonce" value="<?= $e(bin2hex(random_bytes(16))) ?>">
             <div class="sc-note" style="margin:0 0 8px"><?= $inWindow
-                ? 'Paid ' . (int) $o['age'] . ' day' . ((int) $o['age'] === 1 ? '' : 's') . ' ago — within the ' . (int) $days . '-day window.'
-                : '<b style="color:#b91c1c">Paid ' . (int) $o['age'] . ' days ago — outside the ' . (int) $days . '-day window.</b> Only "our own error" can be refunded now.' ?>
+                ? 'Paid ' . (int) $o['age'] . ' day' . ((int) $o['age'] === 1 ? '' : 's') . ' ago.'
+                : '<b style="color:#b91c1c">Paid ' . (int) $o['age'] . ' days ago — outside every window.</b> Only "our own error" can be refunded now.' ?>
               Left to refund: <b><?= $money($o['left']) ?></b>.</div>
             <div class="ff" style="margin-bottom:8px"><label style="font-size:12px;font-weight:600">Why</label>
-              <?php foreach ($reasons as $rk => $r): $allowed = $inWindow || !empty($r['anytime']); ?>
-                <label style="display:flex;gap:6px;font-size:13px;<?= $allowed ? '' : 'color:#9ca3af' ?>"><input type="radio" name="reason" value="<?= $e($rk) ?>" <?= $allowed ? '' : 'disabled' ?> required> <?= $e($r['label']) ?><?= !empty($r['anytime']) ? ' <span class="sc-key">(any time)</span>' : '' ?></label>
+              <?php foreach ($reasons as $rk => $r): $allowed = !empty($r['anytime']) || (int) $o['age'] <= (int) ($r['days'] ?? 0); ?>
+                <label style="display:flex;gap:6px;font-size:13px;<?= $allowed ? '' : 'color:#9ca3af' ?>"><input type="radio" name="reason" value="<?= $e($rk) ?>" <?= $allowed ? '' : 'disabled' ?> required> <?= $e($r['label']) ?>
+                  <span class="sc-key">(<?= !empty($r['anytime']) ? 'any time' : 'within ' . (int) $r['days'] . ' days' . ($allowed ? '' : ' — passed') ?>)</span></label>
               <?php endforeach; ?></div>
             <div class="ff" style="margin-bottom:8px"><label style="font-size:12px;font-weight:600">How much</label>
               <label style="display:flex;gap:6px;font-size:13px"><input type="radio" name="scope" value="full" checked onchange="this.form.querySelector('.rf-part').style.display='none'"> The whole payment (<?= $money($o['left']) ?>)<?= !empty($o['later']) && $o['kind'] !== 'ai' ? ' <span class="sc-key">— a later payment changed the plan; refund that first</span>' : '' ?></label>

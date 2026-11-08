@@ -638,8 +638,12 @@ function job_visits_open_days($job) {
     $visits = job_visits($jobId);
     if (count($visits) < 2) return [];                     // single-day handled by the normal close gate
     $open = [];
+    // After an early end (terminated, completed early, demobilised) the days
+    // past the end date are never worked — they cannot hold the job open.
+    $stop = substr((string)($job['billing_stop_on'] ?? ''), 0, 10);
     foreach ($visits as $v) {
         $d = substr((string)$v['visit_date'], 0, 10);
+        if ($stop !== '' && $d > $stop) continue;
         $working = function_exists('is_working_day') ? is_working_day($d, $job['executing_office_id'] ?? null) : true;
         if ($working && ($v['status'] ?? 'PLANNED') !== 'DONE') $open[] = $d;
     }

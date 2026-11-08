@@ -8588,7 +8588,8 @@ function ops_jobs($route, $method) {
                 }
             }
             // §WO-6 — the last day of an inspection needs the Final Inspection
-            // Report and the Release Note before the job is closed.
+            // Report and the Release Note before the job is closed. A terminated
+            // job is the exception (owner, 8 Nov 2026) — and the record says so.
             if (function_exists('job_final_docs_missing')) {
                 $fd = job_final_docs_missing($job);
                 if ($fd) {
@@ -8629,6 +8630,8 @@ function ops_jobs($route, $method) {
             $needsApproval = ($job['reporting_frequency'] !== 'NOREPORT' && $reportDate !== '') ? 'PENDING' : '';
             $pdo->prepare("UPDATE jobs SET closed_flag=1, closed_at=?, report_upload_date=?, report_link=?, tat_days=?, report_approval=? WHERE id=?")
                 ->execute([date('c'), $reportDate, $b['report_link'] ?? '', $tat, $needsApproval, $job['id']]);
+            if (strtoupper((string)($job['billing_stop_kind'] ?? '')) === 'TERMINATED' && function_exists('act_log'))
+                try { act_log('JOB', (int)$job['id'], 'CLOSED_TERMINATED', 'Closed as terminated (ended ' . ($job['billing_stop_on'] ?? '') . ') — no Final Inspection Report or Release Note needed.'); } catch (Throwable $e) {}
             // Phase 2 §30 — freeze this job's cost basis at close so its profit is reproducible.
             if (function_exists('job_cost_snapshot')) job_cost_snapshot((int)$job['id']);
             // Revamp P4b — queue this closed work as a billable candidate the moment

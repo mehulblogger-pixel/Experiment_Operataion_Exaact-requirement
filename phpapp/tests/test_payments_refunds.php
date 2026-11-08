@@ -93,6 +93,13 @@ t_eq(end($RZ['refunds'])['amount'], 450000, 'in full, through Razorpay');
 t_eq((string) ops_val("SELECT status FROM saas_payment_extras WHERE id=?", [(int) $x['id']]), 'REFUNDED', 'and marked refunded');
 t_eq((string) setting_get('billing_paid_until', ''), $untilBefore, 'nothing else about the plan changes');
 t_ok(!saas_refund_extra((int) $x['id'], $cfg, 'tester')['ok'], 'it cannot be refunded twice');
+// A second payment found more than 15 days ago: only as our own error.
+saas_payment_extra_add('order_A', 'pay_A3', 4500);
+db()->prepare("UPDATE saas_payment_extras SET found_at=? WHERE payment_id='pay_A3'")->execute([date('c', time() - 20 * 86400)]);
+$x3 = (int) ops_val("SELECT id FROM saas_payment_extras WHERE payment_id='pay_A3'");
+$rx = saas_refund_extra($x3, $cfg, 'tester');
+t_ok(!$rx['ok'] && strpos($rx['msg'], 'within 15') !== false, 'a second payment older than 15 days is not refunded as "paid twice"');
+t_ok(saas_refund_extra($x3, $cfg, 'tester', true)['ok'], 'but is when the platform owner confirms it was our error');
 
 // ---- 3) AI actions: an order on record, applied once ----------------------------
 $mkOrder('order_AI', 'ai', [], 100, 500);
@@ -128,7 +135,10 @@ $oA = ops_one("SELECT * FROM saas_orders WHERE order_id='order_A'");
 $p = saas_refund_plan($oA, ['scope' => 'full', 'reason' => 'mistake']);
 t_ok(!$p['ok'] && strpos($p['error'], 'within 3 days') !== false, 'a mistake reported after 3 days is not refunded (the owner\'s rule)');
 $p = saas_refund_plan($oA, ['scope' => 'full', 'reason' => 'duplicate']);
-t_ok(!$p['ok'], 'nor a "paid twice" reported after 3 days');
+t_ok($p['ok'], '"paid twice" is still refunded after 5 days (its window is 15 days — owner, 8 Nov)');
+$old = $oA; $old['paid_at'] = date('c', time() - 16 * 86400);
+$p = saas_refund_plan($old, ['scope' => 'full', 'reason' => 'duplicate']);
+t_ok(!$p['ok'] && strpos($p['error'], 'within 15 days') !== false, 'but not after 15 days');
 $p = saas_refund_plan($oA, ['scope' => 'full', 'reason' => 'platform']);
 t_ok($p['ok'], 'our own error can be refunded at any time');
 $p = saas_refund_plan($oA, ['scope' => 'part', 'reason' => 'platform', 'amount' => 200]);

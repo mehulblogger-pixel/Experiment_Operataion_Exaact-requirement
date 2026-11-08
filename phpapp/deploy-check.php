@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'c8e5c1e · 2026-11-08 06:49 UTC · 706 files';
+$RELEASE = '124f70b · 2026-11-08 07:01 UTC · 706 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -140,7 +140,7 @@ $EXPECT  = [
     'lib/helpers.php' => ['s'=>28344,'h'=>'cc8dd4f170d5e1b1'],
     'lib/hiringreq.php' => ['s'=>129366,'h'=>'b5896066637f54e9'],
     'lib/hwpoints.php' => ['s'=>16950,'h'=>'3b298a9d122d31a6'],
-    'lib/idems.php' => ['s'=>793648,'h'=>'5d90d13146279159'],
+    'lib/idems.php' => ['s'=>793974,'h'=>'95a7e4ee1140a140'],
     'lib/idems_autoform.php' => ['s'=>9923,'h'=>'d4520363260f9c48'],
     'lib/identity.php' => ['s'=>45233,'h'=>'4267d813af8001e8'],
     'lib/impartiality.php' => ['s'=>18224,'h'=>'70a0c7b051724178'],
@@ -177,7 +177,7 @@ $EXPECT  = [
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>4308,'h'=>'1c5b3e553b964601'],
     'lib/opportunities.php' => ['s'=>69459,'h'=>'1fabb6c2818818ac'],
-    'lib/ops.php' => ['s'=>735159,'h'=>'97f25fc340d3ab5f'],
+    'lib/ops.php' => ['s'=>735603,'h'=>'be88a0fdc3ee41e1'],
     'lib/orgadmin.php' => ['s'=>78177,'h'=>'70dca6bf71230d17'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3582,'h'=>'a0831edf5e9652a3'],
@@ -217,14 +217,14 @@ $EXPECT  = [
     'lib/retention.php' => ['s'=>6587,'h'=>'deb6a6d4a270fa36'],
     'lib/revrecon.php' => ['s'=>13441,'h'=>'eb8777d1398cdada'],
     'lib/risks.php' => ['s'=>10571,'h'=>'83a96e16878654a2'],
-    'lib/saas_payments.php' => ['s'=>44119,'h'=>'259727b16a733fae'],
+    'lib/saas_payments.php' => ['s'=>45293,'h'=>'64c4e411c16fcdfb'],
     'lib/saas_provision_cli.php' => ['s'=>4816,'h'=>'76f04fae8c24f082'],
     'lib/saas_sync_cli.php' => ['s'=>2939,'h'=>'5fb733d865f2f34b'],
-    'lib/saas_tenants.php' => ['s'=>106268,'h'=>'5beabca42bb4c80f'],
+    'lib/saas_tenants.php' => ['s'=>106297,'h'=>'aacd86f4b5f92d64'],
     'lib/samples.php' => ['s'=>14677,'h'=>'fa38e5f628b43f6a'],
     'lib/satisfaction.php' => ['s'=>16437,'h'=>'4cb166c77b0e2650'],
     'lib/schedboard.php' => ['s'=>10397,'h'=>'0b2b9fe333604ef3'],
-    'lib/schedule.php' => ['s'=>36311,'h'=>'64d1e1ca133835ae'],
+    'lib/schedule.php' => ['s'=>36584,'h'=>'b8598b7408987e4b'],
     'lib/search.php' => ['s'=>34494,'h'=>'bd412c0715939eba'],
     'lib/security.php' => ['s'=>41996,'h'=>'ece794937be3f12b'],
     'lib/seed_connect.php' => ['s'=>22943,'h'=>'06f835c70073b5b5'],
@@ -325,7 +325,7 @@ $EXPECT  = [
     'views/notfound.php' => ['s'=>212,'h'=>'0b4feab07b715eec'],
     'views/ops/_allocation_panel.php' => ['s'=>9018,'h'=>'76426e99a74cf039'],
     'views/ops/_billto.php' => ['s'=>3566,'h'=>'32adc002a4740d69'],
-    'views/ops/_company_payments.php' => ['s'=>9728,'h'=>'1c9b81a22aa6df41'],
+    'views/ops/_company_payments.php' => ['s'=>10431,'h'=>'0d7ae716158ca539'],
     'views/ops/_deputation_panel.php' => ['s'=>13672,'h'=>'46545d4243390803'],
     'views/ops/_glance_strip.php' => ['s'=>5257,'h'=>'ffa16f7b9f2ab7b2'],
     'views/ops/_issue_panel.php' => ['s'=>8621,'h'=>'8f7e08e2edf793d4'],
