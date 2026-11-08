@@ -24,14 +24,14 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '0cbbb86a · 2026-10-31 15:00 UTC · 703 files';
+$RELEASE = '82d539d · 2026-11-08 03:24 UTC · 703 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
     'cron.php' => ['s'=>25218,'h'=>'d31a80db09206902'],
     'cron_ads.php' => ['s'=>5306,'h'=>'4aad92eab174ea01'],
     'diagnose.php' => ['s'=>10005,'h'=>'791b255b31782ab7'],
-    'index.php' => ['s'=>132183,'h'=>'ecf916e0081a0e77'],
+    'index.php' => ['s'=>132269,'h'=>'2cbba4896739458a'],
     'lib/access.php' => ['s'=>131202,'h'=>'359ad3b528a4471c'],
     'lib/access_state.php' => ['s'=>10685,'h'=>'4c7da7d6d793745e'],
     'lib/activity.php' => ['s'=>45254,'h'=>'adc0ae347fc9f0b2'],
@@ -122,7 +122,7 @@ $EXPECT  = [
     'lib/customer360.php' => ['s'=>24402,'h'=>'f1d98328a475561b'],
     'lib/customforms.php' => ['s'=>12896,'h'=>'a60a82554280a959'],
     'lib/cvp.php' => ['s'=>63763,'h'=>'f330370e06946d93'],
-    'lib/datacontrol.php' => ['s'=>37390,'h'=>'99c250a27e427409'],
+    'lib/datacontrol.php' => ['s'=>37664,'h'=>'1206a5a742cd1266'],
     'lib/datatable.php' => ['s'=>15699,'h'=>'dfea30bbc69ccef3'],
     'lib/db.php' => ['s'=>58882,'h'=>'ed3fdda0bb89cc1d'],
     'lib/decisionrules.php' => ['s'=>12116,'h'=>'7f7d5a9cd6e144ef'],
@@ -442,7 +442,7 @@ $EXPECT  = [
     'views/ops/crm_dashboard.php' => ['s'=>13276,'h'=>'6bdd49395543c605'],
     'views/ops/custom_fields.php' => ['s'=>4958,'h'=>'f2f969e3c56dfed4'],
     'views/ops/customer360.php' => ['s'=>29931,'h'=>'2197023e362e8e81'],
-    'views/ops/data_control.php' => ['s'=>18379,'h'=>'108fa751e31a4523'],
+    'views/ops/data_control.php' => ['s'=>19200,'h'=>'1c4864993b089764'],
     'views/ops/data_requests.php' => ['s'=>4866,'h'=>'840d2672933c1726'],
     'views/ops/dedupe.php' => ['s'=>7066,'h'=>'6ddfbed6d6b16b97'],
     'views/ops/department_admin.php' => ['s'=>12013,'h'=>'70b3d5969a1c2461'],

@@ -204,7 +204,15 @@
           <?php if ($f['source'] === 'AUTOMATIC'): ?><br><span class="pill">automatic</span><?php endif; ?></td>
         <td class="muted"><?= e(substr((string)$f['occurred_at'], 0, 16)) ?></td>
         <td style="max-width:300px"><?= e($f['summary']) ?>
-          <?php if ($f['data_note']): ?><div class="muted" style="font-size:12px"><?= e($f['data_note']) ?></div><?php endif; ?></td>
+          <?php if ($f['data_note']): ?><div class="muted" style="font-size:12px"><?= e($f['data_note']) ?></div><?php endif; ?>
+          <?php // The technical detail (error message, file, line) is what makes a fault
+                // fixable, so an administrator can read it here and screenshot it. It names
+                // files and SQL, so — exactly as on the error page itself — only
+                // administrators see it.
+                if (trim((string)($f['detail'] ?? '')) !== '' && (is_master() || (function_exists('is_admin_level') && is_admin_level()))): ?>
+            <details style="margin-top:4px"><summary class="muted" style="font-size:12px;cursor:pointer">Technical detail</summary>
+              <pre style="white-space:pre-wrap;font-size:11.5px;background:#f7f6f4;border:1px solid #e2ddd6;border-radius:6px;padding:8px;margin:4px 0 0;max-width:520px"><?= e($f['detail']) ?></pre></details>
+          <?php endif; ?></td>
         <td><?= $f['data_affected'] === 'UNKNOWN' ? '<span class="pill p-bad">not answered</span>'
               : ($f['data_affected'] === 'YES' ? '<span class="pill p-bad">yes</span>' : '<span class="pill p-ok">no</span>') ?></td>
         <td><?= $f['capa_ref'] ? e($f['capa_ref']) : '<span class="muted">—</span>' ?></td>

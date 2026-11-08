@@ -502,10 +502,13 @@ function failure_create($b, $source = 'REPORTED') {
 //
 // A failure log a person has to remember to write records only the failures
 // somebody was in the mood to admit to. This one writes itself.
-function failure_record_auto($summary, $detail = '') {
+function failure_record_auto($summary, $detail = '', $errorRef = '') {
     try {
         if (!function_exists('db')) return 0;
         $fp = substr(md5(preg_replace('/\d+/', 'N', (string)$summary . '|' . substr((string)$detail, 0, 200))), 0, 40);
+        // The reference the person saw on the error page ("Reference 47AEF95A —
+        // quote this") is kept with the entry, so the one they quote can be found.
+        if ($errorRef !== '') $summary = (string)$summary . ' — reference ' . $errorRef;
         // The same fault on every page load would otherwise flood the register
         // and bury the one entry somebody needs to read.
         $recent = ops_val("SELECT COUNT(*) FROM system_failures WHERE fingerprint=? AND occurred_at > ?",

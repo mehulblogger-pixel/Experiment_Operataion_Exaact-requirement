@@ -73,8 +73,9 @@ function ops_fatal($title, $hint, $detail = '', $showDetailToAnyone = false) {
     // failures they were in the mood to admit to, so this one writes itself —
     // wrapped, because the app is already broken by the time we get here and
     // the logging must never be what makes it worse.
+    $ref = strtoupper(substr(md5($detail . date('YmdH')), 0, 8));
     if (function_exists('failure_record_auto')) {
-        try { failure_record_auto($title, $detail); } catch (Throwable $ignored) {}
+        try { failure_record_auto($title, $detail, $ref); } catch (Throwable $ignored) {}
     }
     if (!headers_sent()) http_response_code(500);
     // MILESTONE 13 — the technical detail here is an exception message, a
@@ -90,7 +91,6 @@ function ops_fatal($title, $hint, $detail = '', $showDetailToAnyone = false) {
     $signedIn = !empty($_SESSION['uid'])
         && ((function_exists('is_master') && is_master())
             || (function_exists('is_admin_level') && is_admin_level()));
-    $ref = strtoupper(substr(md5($detail . date('YmdH')), 0, 8));
     echo '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
     echo '<div style="font-family:Segoe UI,Arial,sans-serif;max-width:660px;margin:50px auto;padding:26px;border:1px solid #e2ddd6;border-radius:12px">';
     echo '<h2 style="color:#b8480f;margin:0 0 10px">' . htmlspecialchars($title) . '</h2>';
@@ -99,7 +99,7 @@ function ops_fatal($title, $hint, $detail = '', $showDetailToAnyone = false) {
         echo '<pre style="background:#f7f6f4;border:1px solid #e2ddd6;padding:12px;border-radius:8px;overflow:auto;font-size:13px;white-space:pre-wrap">' . htmlspecialchars($detail) . '</pre>';
     elseif ($detail !== '')
         echo '<p style="color:#7a7a7a;font-size:13px">Reference <b>' . $ref . '</b> — quote this when reporting it. '
-           . 'Sign in and open the page again to see the technical detail.</p>';
+           . 'An administrator can read the technical detail under Quality &amp; Accreditation → Data &amp; information control → “When it broke”.</p>';
     echo '</div>';
     exit;
 }
