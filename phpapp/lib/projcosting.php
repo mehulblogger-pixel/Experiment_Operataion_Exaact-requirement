@@ -761,6 +761,94 @@ function pc_make_requisition($cid, $lineId) {
     } catch (Throwable $e) { return ['err' => $e->getMessage()]; }
 }
 
+// ---- Part 3 · the hired person's actual cost against the costing -------------
+// Owner, 9 Nov 2026: "the rates of the candidates who are hired shall meet the
+// margin as well as costing" — "Last candidate actual comparison. One at a time."
+//
+// A candidate recruited for a costed role (candidate → requisition → costing
+// role) is measured one at a time: their actual monthly CTC (the offer, else the
+// salary structure) takes the place of the costed salary + employer statutory
+// heads; the role's other costs and its loadings stay; and the margin is
+// worked out at the rate quoted to the client. The answer says whether the
+// target margin still holds, and the highest CTC that keeps it.
+function pc_cand_line(array $cand) {
+    $rq = (int)($cand['requisition_id'] ?? 0); if (!$rq) return null;
+    try { $lid = (int)ops_val("SELECT costing_line_id FROM requisitions WHERE id=?", [$rq]); } catch (Throwable $e) { return null; }
+    if (!$lid) return null;
+    $ln = ops_one("SELECT * FROM project_costing_lines WHERE id=?", [$lid]); if (!$ln) return null;
+    $h = pc_get((int)$ln['costing_id']); if (!$h) return null;
+    return [$ln, $h];
+}
+// The candidate's actual monthly CTC: the live offer's, else the salary
+// structure's. [amount, source] or [null, ''].
+function pc_cand_actual_ctc(array $cand) {
+    $cid = (int)($cand['id'] ?? 0);
+    if (function_exists('offer_current')) {
+        $o = offer_current($cid);
+        if ($o && !in_array((string)$o['status'], ['WITHDRAWN', 'DECLINED', 'EXPIRED'], true) && (float)$o['ctc'] > 0) return [(float)$o['ctc'], 'offer'];
+    }
+    if (function_exists('sal_current')) {
+        $s = sal_current($cid);
+        if ($s && (float)$s['gross_ctc'] > 0) return [(float)$s['gross_ctc'], 'salary structure'];
+    }
+    return [null, ''];
+}
+function pc_cand_check(array $cand, $ctcMonthly = null) {
+    $pair = pc_cand_line($cand); if (!$pair) return null;
+    [$ln, $h] = $pair;
+    $src = 'given';
+    if ($ctcMonthly === null) [$ctcMonthly, $src] = pc_cand_actual_ctc($cand);
+    $c = pc_line_calc($ln, $h);
+    $basis = (string)$h['basis'];
+    $ev = $c['eval'] ?? null;
+    $costedPS = $ev ? (float)$ev['by_grp']['PAY'] + (float)$ev['by_grp']['STAT']
+                    : (float)($c['heads']['PERSONNEL'] ?? 0) + (float)($c['heads']['STATUTORY'] ?? 0);
+    $dpm = $ev ? (float)$ev['dpm'] : (function_exists('ch_days_per_month') ? ch_days_per_month() : 26);
+    $perDay = function_exists('ch_unit_for_basis') && ch_unit_for_basis($basis) === 'DAY';
+    $L = (float)$h['overhead_pct'] + (float)$h['insurance_pct'] + (float)$h['baddebt_pct'] + (float)$h['contingency_pct'];
+    $onRate = strtoupper((string)($h['load_on'] ?? 'COST')) === 'RATE';
+    $R = (float)$c['proposed'];                       // what the client pays per unit
+    $loadOf = fn($direct) => $onRate ? $direct + (float)$c['rate'] * $L / 100 : $direct * (1 + $L / 100);
+    $marginOf = fn($loaded) => $R > 0 ? round(($R - $loaded) / $R * 100, 2) : 0.0;
+    $costedMargin = $marginOf((float)$c['loaded']);
+    $target = (float)$ln['target_margin'] > 0 ? (float)$ln['target_margin'] : $costedMargin;
+    $other = (float)$c['direct'] - $costedPS;         // the role's costs that are not pay
+    // The highest monthly CTC that keeps the target margin at the quoted rate.
+    $maxLoaded = $R * (1 - $target / 100);
+    $maxDirect = $onRate ? $maxLoaded - (float)$c['rate'] * $L / 100 : $maxLoaded / (1 + $L / 100);
+    $maxUnit = $maxDirect - $other;
+    $out = ['line' => $ln, 'costing' => $h, 'unit' => $perDay ? 'day' : 'month', 'dpm' => $dpm,
+            'costed_pay' => round($perDay ? $costedPS * $dpm : $costedPS, 2), 'rate' => round($R, 2),
+            'costed_margin' => $costedMargin, 'target' => round($target, 2),
+            'max_ctc' => round(max(0, $perDay ? $maxUnit * $dpm : $maxUnit), 2),
+            'ctc' => $ctcMonthly === null ? null : round((float)$ctcMonthly, 2), 'source' => $src,
+            'margin' => null, 'verdict' => 'NONE'];
+    if ($ctcMonthly === null) return $out;
+    $actualUnit = $perDay ? (float)$ctcMonthly / max(1, $dpm) : (float)$ctcMonthly;
+    $out['margin'] = $marginOf($loadOf($other + $actualUnit));
+    $out['verdict'] = $out['margin'] <= 0 ? 'LOSS' : ($out['margin'] + 0.005 < $out['target'] ? 'LOW' : 'OK');
+    return $out;
+}
+// The last candidate (most recent) recruited for a costing role who has an offer
+// or a salary structure — "one at a time".
+function pc_line_last_candidate($lineId) {
+    try {
+        $rows = ops_all("SELECT c.* FROM candidates c JOIN requisitions r ON r.id=c.requisition_id
+                         WHERE r.costing_line_id=? ORDER BY c.id DESC LIMIT 20", [(int)$lineId]) ?: [];
+    } catch (Throwable $e) { return null; }
+    foreach ($rows as $cand) { [$ctc] = pc_cand_actual_ctc($cand); if ($ctc !== null) return $cand; }
+    return null;
+}
+// One sentence for the verdict.
+function pc_cand_verdict_text(array $k, $showPay = true) {
+    $money = fn($v) => (function_exists('cur_sym') ? cur_sym() : '₹') . number_format((float)$v, 0);
+    $pct = fn($v) => rtrim(rtrim(number_format((float)$v, 1), '0'), '.') . '%';
+    if ($k['verdict'] === 'NONE') return 'No offer or salary structure yet' . ($showPay ? ' — pay up to ' . $money($k['max_ctc']) . ' a month keeps the ' . $pct($k['target']) . ' target margin.' : '.');
+    $head = $k['verdict'] === 'OK' ? 'Within the costing' : ($k['verdict'] === 'LOW' ? 'Below the target margin' : 'Loss at the quoted rate');
+    return $head . ': margin ' . $pct($k['margin']) . ' against the target ' . $pct($k['target'])
+         . ($showPay ? ' (CTC ' . $money($k['ctc']) . ' a month; costed ' . $money($k['costed_pay']) . '; up to ' . $money($k['max_ctc']) . ' keeps the target).' : '.');
+}
+
 // ---- A role from the heads editor -------------------------------------------
 // The role editor posts its heads as JSON (items_json) plus the role's own
 // fields. Cleaned here for both the live preview and the save, so the figure

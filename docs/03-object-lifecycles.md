@@ -1052,6 +1052,11 @@ DRAFT ─▶ PENDING_APPROVAL ─▶ APPROVED ─▶ ISSUED ─▶ VIEWED ─▶
   (`recruit_offer.php`). `offer_issue()` refuses unless the offer is `APPROVED`,
   generates the letter (`offer-letter` printable view) and coarse-syncs the
   candidate's legacy stage to `OFFERED`.
+- **Against the costing (Part 3, owner, 9 Nov 2026).** When the candidate's
+  requirement came from a costing role, DRAFT → PENDING_APPROVAL checks the offer's
+  monthly CTC against that role at the quoted rate (`pc_cand_check()`): below the
+  role's target margin, the submit needs a written reason (`job_offers.margin_note`),
+  shown to the approver and logged. No new status or transition.
 - **Salary structure** (`salary_structures`, versioned — a revision is a new row)
   and **HR discussion** (`hr_discussions`) are additive; salary figures are shown
   only to `can_see_salary()` (`data.salary`). Adds **no new permission**.

@@ -158,7 +158,7 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
     <p class="sub" style="margin:0 0 8px">Quotation <b><?= $e($accQ['quote_no'] ?? '') ?></b> was accepted by the client. Raise a hiring request for each role — it goes through your hiring-request approvals, and its requisition takes this costing's rate and margin as its budget.</p>
   <?php endif; ?>
   <div class="scroll"><table class="grid" style="font-size:12.5px">
-    <thead><tr><th>Role</th><th class="num">People</th><th class="num">Rate<?= $e($rateLabel) ?></th><th class="num">Loaded/mo</th><th>Raised</th><th></th></tr></thead>
+    <thead><tr><th>Role</th><th class="num">People</th><th class="num">Rate<?= $e($rateLabel) ?></th><th class="num">Loaded/mo</th><th>Raised</th><th>Last candidate vs costing</th><th></th></tr></thead>
     <tbody>
     <?php foreach ($lines as $ln): $c = pc_line_calc($ln, $h);
           $ppl = function_exists('pc_line_people') ? pc_line_people($ln) : 1;
@@ -172,6 +172,13 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
         <td><?php foreach ($lk['hreq'] as $x): ?><a href="/hiring-request?id=<?= (int)$x['id'] ?>"><?= $e($x['req_no']) ?></a> <span class="muted">(<?= (int)$x['quantity'] ?> · <?= $e(strtolower(str_replace('_', ' ', (string)$x['status']))) ?>)</span><br><?php endforeach; ?>
             <?php foreach ($lk['req'] as $x): ?><a href="/requisition?id=<?= (int)$x['id'] ?>"><?= $e($x['req_code']) ?></a> <span class="muted">(<?= (int)$x['quantity'] ?> · <?= $e(strtolower((string)$x['status'])) ?>)</span><br><?php endforeach; ?>
             <?php if (!$lk['hreq'] && !$lk['req']): ?><span class="muted">—</span><?php endif; ?></td>
+        <?php // Part 3 — the most recent candidate for this role, measured against it. ?>
+        <td style="font-size:12px;max-width:260px"><?php $lc = function_exists('pc_line_last_candidate') ? pc_line_last_candidate((int)$ln['id']) : null;
+            if ($lc): $lk3 = pc_cand_check($lc); $vt = ['OK' => 'p-ok', 'LOW' => 'p-warn', 'LOSS' => 'p-bad', 'NONE' => 'p-mut'][$lk3['verdict']] ?? 'p-mut'; ?>
+            <a href="/candidate?id=<?= (int)$lc['id'] ?>"><?= $e(trim(($lc['first_name'] ?? '') . ' ' . ($lc['last_name'] ?? ''))) ?></a>
+            <span class="pill <?= $vt ?>"><?= $e(rtrim(rtrim(number_format((float)$lk3['margin'], 1), '0'), '.')) ?>% vs <?= $e(rtrim(rtrim(number_format((float)$lk3['target'], 1), '0'), '.')) ?>%</span>
+            <?php if (function_exists('can_see_salary') && can_see_salary()): ?><br><span class="muted">up to <?= $e($sym . number_format($lk3['max_ctc'])) ?>/mo keeps the target</span><?php endif; ?>
+          <?php else: ?><span class="muted">no offer yet</span><?php endif; ?></td>
         <td class="num" style="white-space:nowrap"><?php if ($gate === '' && $done < $ppl): ?>
           <form method="post" action="/project-costing-to-hreq" style="display:inline"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="costing_id" value="<?= (int)$h['id'] ?>"><input type="hidden" name="line_id" value="<?= (int)$ln['id'] ?>"><button class="btn" style="padding:3px 10px" title="Raise a hiring request for the <?= (int)($ppl - $done) ?> people not yet asked for">→ Hiring request (<?= (int)($ppl - $done) ?>)</button></form>
           <?php if ($direct): ?><form method="post" action="/project-costing-to-req" style="display:inline"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="costing_id" value="<?= (int)$h['id'] ?>"><input type="hidden" name="line_id" value="<?= (int)$ln['id'] ?>"><button class="btn btn-ghost" style="padding:3px 10px" title="Your workspace allows starting recruitment without a hiring request">→ Requisition directly</button></form><?php endif; ?>

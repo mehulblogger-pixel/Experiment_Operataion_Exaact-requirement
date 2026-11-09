@@ -100,6 +100,9 @@ function recruit_offer_migrate() {
         )");
         // Phase 5.1A — computed totals + the component lines (configurable comp).
         ensure_column('salary_structures', 'net_pay', "DECIMAL(14,2) DEFAULT 0");
+        // Owner, 9 Nov 2026 — why an offer below the costing's target margin
+        // was still sent for approval (Part 3).
+        ensure_column('job_offers', 'margin_note', "VARCHAR(300) DEFAULT ''");
         ensure_column('salary_structures', 'total_deductions', "DECIMAL(14,2) DEFAULT 0");
         ensure_column('salary_structures', 'employer_cost', "DECIMAL(14,2) DEFAULT 0");
         ensure_column('salary_structures', 'lines_json', $lt);
@@ -300,10 +303,25 @@ function offer_appr_ctx($o) {
         '_cand'      => $cand,
     ];
 }
-function offer_submit($id) {
+function offer_submit($id, $marginNote = '') {
     $why = offer_guard_by_offer($id, 'OFFER');
     if ($why !== '') return [false, $why];
     $o = offer_get($id); if (!$o || $o['status'] !== 'DRAFT') return [false, 'Only a draft can be submitted for approval.'];
+    //  Owner, 9 Nov 2026 — "the rates of the candidates who are hired shall meet
+    //  the margin as well as costing". An offer whose CTC takes the role below the
+    //  costing's target margin is not sent for approval silently: it needs the
+    //  reason, which goes with it to the approver and stays on the offer.
+    $cand = ops_one("SELECT * FROM candidates WHERE id=?", [(int)$o['candidate_id']]);
+    $chk = ($cand && function_exists('pc_cand_check')) ? pc_cand_check($cand, (float)$o['ctc']) : null;
+    $marginNote = mb_substr(trim((string)$marginNote), 0, 300);
+    if ($chk && in_array($chk['verdict'], ['LOW', 'LOSS'], true)) {
+        if ($marginNote === '') return [false, 'This offer leaves a ' . rtrim(rtrim(number_format($chk['margin'], 1), '0'), '.') . '% margin on costing '
+            . $chk['costing']['code'] . ' (' . $chk['line']['role_label'] . '), below its ' . rtrim(rtrim(number_format($chk['target'], 1), '0'), '.') . '% target. '
+            . 'A CTC up to ' . _off_cur() . number_format($chk['max_ctc'], 0) . ' a month keeps the target. To submit it anyway, write why — the approver will see it.'];
+        db()->prepare("UPDATE job_offers SET margin_note=? WHERE id=?")->execute([$marginNote, (int)$id]);
+        if (function_exists('act_log')) try { act_log('CANDIDATE', (int)$o['candidate_id'], 'NOTE', 'Offer submitted below the costing target margin ('
+            . number_format($chk['margin'], 1) . '% vs ' . number_format($chk['target'], 1) . '%): ' . $marginNote); } catch (Throwable $e) {}
+    }
     db()->prepare("UPDATE job_offers SET status='PENDING_APPROVAL' WHERE id=?")->execute([(int)$id]);
     // Phase 6 — if a configurable approval rule matches, route the offer through
     // the chain (SLA + reminders + escalation). The manual admin approve coexists
@@ -545,7 +563,7 @@ function ops_candidate_offer($route, $method) {
                 flash($offWhy !== '' ? $offWhy : 'The offer could not be drafted.', 'error');
             }
         }
-        elseif ($do === 'submit') { [$ok, $m] = offer_submit((int)($_POST['offer_id'] ?? 0)); flash($m, $ok ? 'success' : 'error'); }
+        elseif ($do === 'submit') { [$ok, $m] = offer_submit((int)($_POST['offer_id'] ?? 0), (string)($_POST['margin_note'] ?? '')); flash($m, $ok ? 'success' : 'error'); }
         elseif ($do === 'approve') { ops_require(is_admin_level(), 'Only a manager can approve an offer.'); [$ok, $m] = offer_approve((int)($_POST['offer_id'] ?? 0)); flash($m, $ok ? 'success' : 'error'); }
         elseif ($do === 'issue') { [$ok, $m] = offer_issue((int)($_POST['offer_id'] ?? 0)); flash($m, $ok ? 'success' : 'error'); }
         elseif ($do === 'accept') { [$ok, $m] = offer_accept((int)($_POST['offer_id'] ?? 0)); flash($m, $ok ? 'success' : 'error'); }
@@ -688,6 +706,26 @@ function recruit_offer_panel($cand) {
       <?php endforeach; endif; ?>
     </div>
 
+    <?php // Part 3 (owner, 9 Nov 2026) — this person's cost against the costing of
+          // the role they are recruited for, one at a time.
+          $pcChk = function_exists('pc_cand_check') ? pc_cand_check($cand) : null;
+          if ($pcChk): $vTone = ['OK' => ['#047857', '#ecfdf5', '#a7f3d0'], 'LOW' => ['#92400e', '#fffbeb', '#fcd34d'], 'LOSS' => ['#b91c1c', '#fef2f2', '#fca5a5'], 'NONE' => ['#374151', 'var(--soft,#f8fafc)', 'var(--line,#e5e7eb)']][$pcChk['verdict']]; ?>
+    <div class="panel" style="border:1px solid <?= $vTone[2] ?>;background:<?= $vTone[1] ?>">
+      <h3 class="tab-sub" style="margin-top:0;color:<?= $vTone[0] ?>">Against the costing</h3>
+      <div style="font-size:13px">Costing <a href="/project-costing?id=<?= (int)$pcChk['costing']['id'] ?>"><b><?= $e($pcChk['costing']['code']) ?></b></a> · role <b><?= $e($pcChk['line']['role_label']) ?></b>
+        · billed at <?= $e($money($pcChk['rate'])) ?> per <?= $e($pcChk['unit'] === 'day' ? 'man-day' : 'man-month') ?></div>
+      <div style="font-size:13.5px;margin-top:6px;color:<?= $vTone[0] ?>"><b><?= $e(pc_cand_verdict_text($pcChk, $seeSal)) ?></b></div>
+      <?php if ($seeSal && $pcChk['verdict'] !== 'NONE'): ?>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px;font-size:12.5px">
+        <span>This person: <b><?= $e($money($pcChk['ctc'])) ?></b> a month <span class="muted">(from the <?= $e($pcChk['source']) ?>)</span></span>
+        <span>Costed salary + statutory: <b><?= $e($money($pcChk['costed_pay'])) ?></b></span>
+        <span>Keeps the target up to: <b><?= $e($money($pcChk['max_ctc'])) ?></b></span>
+        <span>Margin as costed: <b><?= $e(rtrim(rtrim(number_format($pcChk['costed_margin'], 1), '0'), '.')) ?>%</b></span>
+      </div>
+      <?php endif; ?>
+      <?php if ($offer && trim((string)($offer['margin_note'] ?? '')) !== ''): ?><div style="font-size:12.5px;margin-top:6px">Reason given for going below the target: <i><?= $e($offer['margin_note']) ?></i></div><?php endif; ?>
+    </div>
+    <?php endif; ?>
     <div class="panel">
       <h3 class="tab-sub">Offer</h3>
       <?php if ($offer): $st = $offer['status']; ?>
@@ -700,8 +738,15 @@ function recruit_offer_panel($cand) {
         <?php if ($offer['decline_reason']): ?><div class="p-bad" style="font-size:12.5px;margin-top:4px">Declined: <?= $e($offer['decline_reason']) ?></div><?php endif; ?>
         <?php if ($can): ?>
         <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:10px">
-          <?php if ($st === 'DRAFT'): ?>
-            <?php echo _offer_btn($act, 'submit', $offer['id'], 'Submit for approval', 'btn'); ?>
+          <?php if ($st === 'DRAFT'):
+                $offChk = function_exists('pc_cand_check') ? pc_cand_check($cand, (float)$offer['ctc']) : null; ?>
+            <?php if ($offChk && in_array($offChk['verdict'], ['LOW', 'LOSS'], true)): ?>
+              <form method="post" action="<?= $e($act) ?>" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;flex-basis:100%">
+                <input type="hidden" name="do" value="submit"><input type="hidden" name="offer_id" value="<?= (int)$offer['id'] ?>">
+                <input class="form-control" name="margin_note" maxlength="300" required placeholder="Why this offer goes below the costing's target margin" style="flex:1;min-width:240px">
+                <button class="btn" style="padding:6px 12px">Submit for approval</button>
+              </form>
+            <?php else: echo _offer_btn($act, 'submit', $offer['id'], 'Submit for approval', 'btn'); endif; ?>
             <?php if ($canApprove) echo _offer_btn($act, 'approve', $offer['id'], 'Approve', 'btn secondary'); ?>
           <?php elseif ($st === 'PENDING_APPROVAL'): ?>
             <?php echo $canApprove ? _offer_btn($act, 'approve', $offer['id'], 'Approve', 'btn') : '<span class="muted" style="font-size:12px">Awaiting a manager\'s approval.</span>'; ?>
@@ -727,7 +772,7 @@ function recruit_offer_panel($cand) {
         <p class="muted">No offer yet.</p>
         <form method="post" action="<?= $act ?>" style="border:1px solid var(--line,#e5e7eb);border-radius:10px;padding:11px 13px;max-width:520px"><input type="hidden" name="do" value="offer_create">
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-            <?php if ($seeSal): ?><div><label class="ff-l">Total CTC (blank = from structure <?= $sal ? $e($money($sal['gross_ctc'])) : '—' ?>)</label><input class="form-control" type="number" step="any" name="ctc"></div><?php endif; ?>
+            <?php if ($seeSal): ?><div><label class="ff-l">Total CTC <b>per month</b> (blank = from structure <?= $sal ? $e($money($sal['gross_ctc'])) : '—' ?>)</label><input class="form-control" type="number" step="any" name="ctc"></div><?php endif; ?>
             <div><label class="ff-l">Joining date</label><input class="form-control" type="date" name="joining_date"></div>
             <div><label class="ff-l">Offer valid till</label><input class="form-control" type="date" name="expiry_date"></div>
           </div>
