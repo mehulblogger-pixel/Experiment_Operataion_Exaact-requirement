@@ -1618,7 +1618,39 @@ function ops_saas_subscription($route, $method) {
         $period = ($_POST['period'] ?? 'month') === 'year' ? 'year' : 'month';
         if ($self && ($_POST['do'] ?? '') === 'plan') {
             // A self-serve company choosing (or changing, or renewing) its plan.
-            $q = saas_plan_change_quote((array) ($_POST['mods'] ?? []), (int) ($_POST['seats'] ?? 0), $period, null, (int) ($_POST['packs'] ?? 0));
+            // The paid-plan screen (owner, 9 Nov 2026) sends what to ADD, what
+            // to RENEW, or what to keep at renewal; each is turned into the
+            // whole selection here and priced by the same rules (Q-L).
+            $mode = (string) ($_POST['mode'] ?? '');
+            $selMods = (array) ($_POST['mods'] ?? []); $selSeats = (int) ($_POST['seats'] ?? 0); $selPacks = (int) ($_POST['packs'] ?? 0);
+            if (in_array($mode, ['add', 'renew', 'renewal'], true)) {
+                $cur = saas_plan_current();
+                if (!$cur['mods'] || $cur['until'] === '' || $cur['until'] < date('Y-m-d')) { flash('There is no running plan to add to — choose a plan below.', 'error'); redirect('/subscription'); }
+                $period = $cur['period'] === 'year' ? 'year' : 'month';
+                if ($mode === 'add') {
+                    $addM = array_values(array_diff(array_map('strtolower', (array) ($_POST['add_mods'] ?? [])), $cur['mods']));
+                    $addL = max(0, (int) ($_POST['add_logins'] ?? 0)); $addP = max(0, (int) ($_POST['add_packs'] ?? 0));
+                    if (!$addM && !$addL && !$addP) { flash('Tick a module, or type how many logins or storage packs to add.', 'error'); redirect('/subscription'); }
+                    $selMods = array_merge($cur['mods'], $addM); $selSeats = (int) $cur['seats'] + $addL; $selPacks = (int) $cur['packs'] + $addP;
+                } elseif ($mode === 'renew') {
+                    $nx = saas_plan_next();
+                    $r = $nx ?: ['mods' => $cur['mods'], 'seats' => $cur['seats'], 'packs' => $cur['packs'], 'period' => $period];
+                    $selMods = (array) $r['mods']; $selSeats = (int) $r['seats']; $selPacks = (int) ($r['packs'] ?? 0); $period = ($r['period'] ?? $period) === 'year' ? 'year' : 'month';
+                } else {   // renewal: keep only some of what the company has, from the renewal day
+                    $selMods = array_values(array_intersect(array_map('strtolower', (array) ($_POST['keep_mods'] ?? [])), $cur['mods']));
+                    $selSeats = max(1, min((int) $cur['seats'], (int) ($_POST['renew_logins'] ?? $cur['seats'])));
+                    $selPacks = max(0, min((int) $cur['packs'], (int) ($_POST['renew_packs'] ?? $cur['packs'])));
+                    if (!$selMods) { flash('Keep at least one module — or let the plan end on its date by doing nothing.', 'error'); redirect('/subscription'); }
+                    sort($selMods); $cm = $cur['mods']; sort($cm);
+                    if ($selMods === $cm && $selSeats === (int) $cur['seats'] && $selPacks === (int) $cur['packs']) {
+                        setting_set('saas_next_plan', '');   // back to renewing everything
+                        flash('Nothing is dropped — your whole plan renews on ' . (function_exists('fdate') ? fdate(date('Y-m-d', strtotime($cur['until'] . ' +1 day'))) : $cur['until']) . '.', 'success');
+                        redirect('/subscription');
+                    }
+                }
+            }
+            $q = saas_plan_change_quote($selMods, $selSeats, $period, null, $selPacks);
+            if ($mode === 'renewal' && !empty($q['ok']) && $q['type'] !== 'DOWNGRADE') { flash('That keeps more than you have now — use "Add to your plan" instead.', 'error'); redirect('/subscription'); }
             if (empty($q['ok'])) { flash($q['msg'], 'error'); redirect('/subscription'); }
             if ($q['type'] === 'DOWNGRADE') {
                 saas_plan_change_apply($q);

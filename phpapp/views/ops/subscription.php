@@ -82,9 +82,10 @@ $fmt = fn($n) => ((int) $n < 0 ? '− ' : '') . $sym . number_format(abs((int) $
     <div class="msg" style="margin-top:14px">Online payment is not switched on for your workspace yet. To choose a plan, please contact your provider.</div>
   <?php else: ?>
   <div class="panel" style="margin-top:14px">
-    <h2 style="margin:0 0 4px;font-size:15px"><?= ($access['mode'] ?? '') === 'paid' ? 'Change or renew your plan' : 'Choose your plan' ?></h2>
-    <p class="sub" style="margin:0 0 12px">You pay securely online and the plan starts the moment the payment clears.</p>
-    <?php include __DIR__ . '/_subscription_plan.php'; ?>
+    <h2 style="margin:0 0 4px;font-size:15px"><?= ($access['mode'] ?? '') === 'paid' ? 'Add to, renew or change your plan' : 'Choose your plan' ?></h2>
+    <p class="sub" style="margin:0 0 12px">You pay securely online and it starts the moment the payment clears.</p>
+    <?php if (($access['mode'] ?? '') === 'paid' && $current && !empty($current['mods'])) include __DIR__ . '/_subscription_paid.php';
+          else include __DIR__ . '/_subscription_plan.php'; ?>
   </div>
   <?php endif; ?>
 <?php elseif (!$metered): ?>

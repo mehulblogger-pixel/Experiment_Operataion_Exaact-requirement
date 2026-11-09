@@ -845,7 +845,15 @@ function saas_plan_review(array $q) {
     $when = ''; $rows = null;
     if ($type === 'UPGRADE' && !empty($q['coterm'])) {
         $when = 'What you add starts today. Your plan keeps its renewal date, ' . $fd($q['expires'])
-              . ' — everything ends on that day. You pay only the difference, for the ' . (int) $q['left_days'] . ' days left.';
+              . ' — everything ends on that day. You pay only for what you add, for the ' . (int) $q['left_days'] . ' days left.';
+        // Only what changes, item by item (owner, 9 Nov 2026: the full plan less
+        // the current plan read as being charged for everything again).
+        $delta = saas_plan_delta_lines((array) ($q['mods'] ?? []), (int) ($q['seats'] ?? 0), (int) ($q['packs'] ?? 0), $per);
+        if ($delta) {
+            $quote['lines'] = $delta;
+            $rows = [['Total for a full ' . $per, (int) $q['diff'], false],
+                     ['For the ' . (int) $q['left_days'] . ' of ' . (int) $q['total_days'] . ' days left', (int) $q['price'], true]];
+        } else
         $rows = [['Full price of the new plan', (int) $q['list'], false], ['Less: your current plan (already paid)', -(int) $q['cur_list'], false],
                  ['Difference for a full ' . $per, (int) $q['diff'], false],
                  ['For the ' . (int) $q['left_days'] . ' of ' . (int) $q['total_days'] . ' days left', (int) $q['price'], true]];
@@ -860,6 +868,24 @@ function saas_plan_review(array $q) {
         $when = 'Your plan starts today and runs until ' . $fd($q['expires']) . '.';
     return ['head' => $head, 'period' => $per, 'lines' => (array) ($quote['lines'] ?? []), 'list' => (int) ($q['list'] ?? 0),
             'credit' => (int) ($q['credit'] ?? 0), 'price' => (int) ($q['price'] ?? 0), 'when' => $when, 'type' => $type, 'rows' => $rows];
+}
+
+// What a new selection changes against the plan running now, as priced lines
+// for a full period: modules added (+) or dropped (−), more or fewer logins and
+// storage packs. They add up to the difference in list price.
+function saas_plan_delta_lines(array $mods, $seats, $packs, $period) {
+    $cur = saas_plan_current();
+    $pb = saas_price_book();
+    $per = $period === 'year' ? 'year' : 'month';
+    $lab = fn($k) => $pb['modules'][$k]['label'] ?? $k;
+    $out = [];
+    foreach (array_diff($mods, $cur['mods']) as $k) $out[] = ['label' => 'Add ' . $lab($k), 'amount' => (int) ($pb['modules'][$k][$per] ?? 0)];
+    foreach (array_diff($cur['mods'], $mods) as $k) $out[] = ['label' => 'Drop ' . $lab($k), 'amount' => -(int) ($pb['modules'][$k][$per] ?? 0)];
+    $ds = (int) $seats - (int) $cur['seats'];
+    if ($ds) $out[] = ['label' => abs($ds) . ' ' . ($ds > 0 ? 'more' : 'fewer') . ' login' . (abs($ds) === 1 ? '' : 's') . ' × ' . number_format((int) $pb['seat'][$per]), 'amount' => $ds * (int) $pb['seat'][$per]];
+    $dp = (int) $packs - (int) $cur['packs'];
+    if ($dp) $out[] = ['label' => abs($dp) . ' ' . ($dp > 0 ? 'more' : 'fewer') . ' storage pack' . (abs($dp) === 1 ? '' : 's'), 'amount' => $dp * (int) $pb['storage_pack'][$per]];
+    return $out;
 }
 
 // Switch exactly these modules and logins on now.

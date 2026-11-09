@@ -7,9 +7,11 @@
   $extra = $extra ?? [];                                   // extra hidden fields (e.g. modules)
   $amtMajor = isset($amt['major']) ? (int) $amt['major'] : (isset($amt['total']) ? (int) $amt['total'] : 0);
 ?>
+<?php $rvH = $review ?? null; ?>
 <div class="master-head"><div><h1>Complete your payment</h1>
-  <p class="sub" style="margin:2px 0 0"><?= (int)$amt['seats'] ?> <?= (int)$amt['seats']===1?'person':'people' ?>,
-    <?= e($amt['period']==='year'?'annual':'monthly') ?> — <strong><?= e($sym . number_format((int)$amt['major'])) ?></strong>.</p></div></div>
+  <p class="sub" style="margin:2px 0 0"><?php if (is_array($rvH)): ?><?= e($rvH['head']) ?> — <?= e($amt['period']==='year'?'yearly plan':'monthly plan') ?>
+    <?php else: ?><?= (int)$amt['seats'] ?> <?= (int)$amt['seats']===1?'person':'people' ?>, <?= e($amt['period']==='year'?'annual':'monthly') ?><?php endif; ?>
+    — to pay now <strong><?= e($sym . number_format((int)$amt['major'])) ?></strong>.</p></div></div>
 
 <?php $rv = $review ?? null; if (is_array($rv)): ?>
 <div class="panel" style="max-width:520px">
@@ -17,7 +19,7 @@
   <p style="font-size:13.5px;margin:0 0 10px"><?= e($rv['when']) ?></p>
   <table style="width:100%;font-size:14px;border-collapse:collapse">
     <?php foreach ($rv['lines'] as $ln): ?>
-      <tr><td style="padding:4px 0"><?= e($ln['label']) ?></td><td style="text-align:right"><?= e($sym . number_format((int) $ln['amount'])) ?> / <?= e($rv['period']) ?></td></tr>
+      <tr><td style="padding:4px 0"><?= e($ln['label']) ?></td><td style="text-align:right"><?= (int) $ln['amount'] < 0 ? '− ' : '' ?><?= e($sym . number_format(abs((int) $ln['amount']))) ?> / <?= e($rv['period']) ?></td></tr>
     <?php endforeach; ?>
     <?php if (!empty($rv['rows'])): $first = true; foreach ($rv['rows'] as [$lbl, $amt, $last]): if ($last) continue; ?>
       <tr<?= $first ? ' style="border-top:1px solid var(--line,#e5e7eb)"' : '' ?>><td style="padding:4px 0"><?= e($lbl) ?></td><td style="text-align:right"><?= $amt < 0 ? '− ' : '' ?><?= e($sym . number_format(abs((int) $amt))) ?></td></tr>

@@ -33,8 +33,11 @@ try {
 
     $r = saas_plan_review($q);
     t_eq($r['head'], 'Adding to your plan', 'the review says what this payment is');
-    t_eq(count(array_filter($r['lines'], fn($l) => strpos($l['label'], 'seat') === false)), 4, 'it lists each of the four modules');
-    t_ok($r['price'] === $q['price'] && count($r['rows']) === 4 && $r['rows'][1][1] === -40000, 'it shows the new plan, minus the current plan (already paid), the difference and the days left');
+    // Owner, 9 Nov 2026: only what is added is listed (the full plan less the
+    // current plan read as being charged for everything again).
+    t_eq(count($r['lines']), 1, 'it lists only what is added — the one new module');
+    t_ok(strpos($r['lines'][0]['label'], 'Add ') === 0 && (int) $r['lines'][0]['amount'] === 10000, 'with its yearly price (₹10,000)');
+    t_ok($r['price'] === $q['price'] && count($r['rows']) === 2 && $r['rows'][0][1] === 10000, 'then the total for a full year and the amount for the days left');
     t_ok(strpos($r['when'], 'keeps its renewal date') !== false && strpos($r['when'], 'everything ends on that day') !== false,
          'and says the renewal date stays and everything ends on that day');
     $q2y = saas_plan_change_quote($four, 2, 'month', $today);
