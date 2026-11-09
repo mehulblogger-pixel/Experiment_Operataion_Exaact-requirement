@@ -77,6 +77,28 @@ $basisName = defined('PC_BASES') ? (PC_BASES[$basis] ?? $basis) : $basis;
     <td><?= number_format($T['direct']) ?></td><td></td><td></td><td></td><td><?= number_format($T['revenue']) ?></td></tr></tfoot>
 </table>
 
+<?php // How each role's heads are worked out, with their remarks (owner, 9 Nov 2026).
+  $unitW = $basis === 'DAILY' ? 'per man-day' : ($basis === 'FIXED' ? 'per person' : 'per man-month');
+  foreach ($lines as $ln): if (trim((string)($ln['spec'] ?? '')) === '' || !function_exists('ch_spec_of')) continue;
+    $sp = ch_spec_of($ln, $basis); $ev = ch_evaluate($sp['items'], ch_unit_for_basis($basis), $sp['dpm']);
+    $lbl = array_column($sp['items'], 'label', 'code'); ?>
+  <div style="margin-top:14px;page-break-inside:avoid">
+    <b><?= $e(trim(((string)$ln['group_label'] !== '' ? $ln['group_label'] . ' / ' : '') . $ln['role_label'])) ?></b>
+    <span class="muted" style="font-size:10px">— <?= (int)($ln['headcount'] ?? 1) ?> people · <?= $e(rtrim(rtrim(number_format((float)$sp['dpm'], 1), '0'), '.')) ?> working days a month</span>
+    <table class="grid" style="margin-top:4px">
+      <thead><tr><th class="l">Head</th><th class="l">How it is worked out</th><th><?= $e($unitW) ?></th><th class="l">Remark</th></tr></thead>
+      <tbody><?php foreach ($sp['items'] as $it): $r = $ev['rows'][$it['code']] ?? ['unit' => 0, 'once' => 0, 'why' => ''];
+        if ($it['type'] === 'AMOUNT' && abs((float)$r['unit']) < 0.005 && abs((float)$r['once']) < 0.005) continue;   // an unused head ?>
+        <tr><td class="l"><?= $e($it['label']) ?></td><td class="l" style="font-size:10px"><?= $e($r['why'] !== '' ? $r['why'] : ch_item_summary($it, $lbl)) ?></td>
+          <td><?= $it['per'] === 'ONCE' ? number_format((float)$r['once']) . ' once' : number_format((float)$r['unit']) ?></td>
+          <td class="l" style="font-size:10px"><?= $e($it['note'] ?? '') ?></td></tr>
+      <?php endforeach; ?></tbody>
+      <tfoot><tr class="tot"><td class="l" colspan="2">Salary <?= number_format($ev['pay']) ?> · statutory <?= number_format($ev['by_grp']['STAT']) ?> · other <?= number_format($ev['by_grp']['COST']) ?></td>
+        <td><?= number_format($ev['direct']) ?></td><td class="l"><?= $ev['once'] > 0 ? '+ ' . number_format($ev['once']) . ' one time per person' : '' ?></td></tr></tfoot>
+    </table>
+  </div>
+<?php endforeach; ?>
+
 <?php if (!empty($h['inclusions'])): ?><div class="box"><b>Inclusions:</b> <?= nl2br($e($h['inclusions'])) ?></div><?php endif; ?>
 <?php if (!empty($h['exclusions'])): ?><div class="box"><b>Exclusions / not included:</b> <?= nl2br($e($h['exclusions'])) ?></div><?php endif; ?>
 <?php if (!empty($h['notes'])): ?><div class="box"><b>Notes:</b> <?= $e($h['notes']) ?></div><?php endif; ?>

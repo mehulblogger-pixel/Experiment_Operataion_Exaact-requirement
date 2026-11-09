@@ -229,6 +229,7 @@ try {
     require __DIR__ . '/lib/tapi_dash.php';
     require __DIR__ . '/lib/tapi_score.php';
     require __DIR__ . '/lib/tapi_gov.php';
+    require __DIR__ . '/lib/costing_heads.php';   // owner, 9 Nov 2026 — flexible cost heads
     require __DIR__ . '/lib/projcosting.php';
     require __DIR__ . '/lib/areas.php';
     require __DIR__ . '/lib/navindex.php';

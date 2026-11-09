@@ -25,6 +25,7 @@ $stTone = ['DRAFT'=>'p-mut','SUBMITTED'=>'p-warn','APPROVED'=>'p-ok','REJECTED'=
 // Only show head COLUMNS that are actually used by a role, so a full catalogue
 // (18 heads) does not make the table unreadably wide. The add-role form below
 // still offers every head.
+$heads = ($roll['labels'] ?? []) + $heads;   // a role's own names for its heads come first
 $shownHeads = array_filter($heads, fn($lbl, $hk) => isset($byHead[$hk]) && (float)$byHead[$hk] != 0, ARRAY_FILTER_USE_BOTH);
 if (!$shownHeads) $shownHeads = [];
 $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
@@ -79,11 +80,11 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
     <?php if (empty($lines)): ?>
       <b>The totals are ₹0 because no team roles have been added yet.</b>
       The revenue, cost and margin build up from the roles below — <b>saving the header alone does not produce a figure</b>.
-      <?php if ($canEdit): ?>Add a role under <a href="#add-role"><b>＋ Add a role</b></a>, enter at least one cost head (for example the monthly salary) and the BOQ quantity, and the numbers appear here.<?php endif; ?>
+      <?php if ($canEdit): ?>Add a role under <a href="#add-role"><b>＋ Add a role</b></a>, add its cost heads (start from a template, or pick heads from the library) and the BOQ quantity, and the numbers appear here.<?php endif; ?>
     <?php else: ?>
       <b>You have <?= count($lines) ?> role(s) but every figure is still ₹0.</b>
       A role only contributes once it has a <b>cost head</b> amount (e.g. the monthly salary) <i>and</i> a <b>BOQ quantity</b>.
-      <?php if ($canEdit): ?>Open a role below and fill its cost heads and quantity.<?php endif; ?>
+      <?php if ($canEdit): ?>Press ✎ Edit on a role and fill its cost heads and quantity.<?php endif; ?>
     <?php endif; ?>
   </div>
 <?php endif; ?>
@@ -108,7 +109,7 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
         <td class="num"><?= fmoney_short($c['revenue']) ?></td>
         <td class="num" style="color:var(--<?= $c['profit']>=0?'ok':'bad' ?>)"><?= fmoney_short($c['profit']) ?></td>
         <td class="num"><?= number_format($c['margin'],1) ?>%</td>
-        <?php if ($canEdit): ?><td class="num"><form method="post" action="/project-costing-line-delete" onsubmit="return confirm('Remove this role?')" style="display:inline"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="costing_id" value="<?= (int)$h['id'] ?>"><input type="hidden" name="line_id" value="<?= (int)$ln['id'] ?>"><button class="btn btn-ghost" style="padding:2px 8px" title="Remove">✕</button></form></td><?php endif; ?>
+        <?php if ($canEdit): ?><td class="num" style="white-space:nowrap"><a class="btn btn-ghost" style="padding:2px 8px" href="/project-costing?id=<?= (int)$h['id'] ?>&amp;edit=<?= (int)$ln['id'] ?>#add-role" title="Edit this role's heads">✎ Edit</a> <form method="post" action="/project-costing-line-delete" onsubmit="return confirm('Remove this role?')" style="display:inline"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="costing_id" value="<?= (int)$h['id'] ?>"><input type="hidden" name="line_id" value="<?= (int)$ln['id'] ?>"><button class="btn btn-ghost" style="padding:2px 8px" title="Remove">✕</button></form></td><?php endif; ?>
       </tr>
     <?php endforeach; ?>
     <?php if (empty($lines)): ?><tr><td colspan="<?= $nCols ?>" class="muted" style="padding:10px">No roles yet.<?= $canEdit ? ' Add the first below.' : '' ?></td></tr><?php endif; ?>
@@ -187,35 +188,254 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
 </div>
 <?php endif; ?>
 
-<?php if ($canEdit): ?>
-<!-- Add / edit a role -->
-<div class="panel" id="add-role">
-  <h3 class="tab-sub" style="margin-top:0">＋ Add a role</h3>
-  <form method="post" action="/project-costing-line-save" id="lineForm">
+<?php if ($canEdit):
+  // ---- The role editor: flexible cost heads (owner, 9 Nov 2026) ------------
+  //  Heads are drawn from the library (Set up → Costing heads) or typed fresh;
+  //  each one an amount (a calculator), a % of other heads, quantity × rate or a
+  //  formula; per month / day / year / one time; with a remark. The figures are
+  //  worked out by the server as you type (/project-costing-line-preview), so
+  //  what you see is exactly what is saved.
+  $chLib = $chLib ?? []; $chTpls = $chTpls ?? []; $chManage = !empty($chManage);
+  $draft = $_SESSION['pc_line_draft'][(int)$h['id']] ?? null; unset($_SESSION['pc_line_draft'][(int)$h['id']]);
+  $editId = $draft ? (int)$draft['line_id'] : (int)($_GET['edit'] ?? 0);
+  $editLn = null; foreach ($lines as $ln) if ((int)$ln['id'] === $editId) $editLn = $ln;
+  if (!$editLn) $editId = 0;
+  $dpmDefault = function_exists('ch_days_per_month') ? ch_days_per_month() : 26;
+  if ($draft) {
+    $f = $draft['post']; $initItems = json_decode((string)($f['items_json'] ?? '[]'), true) ?: [];
+  } elseif ($editLn) {
+    $sp = ch_spec_of($editLn, $basis); $initItems = $sp['items'];
+    $f = ['group_label' => $editLn['group_label'], 'role_label' => $editLn['role_label'], 'headcount' => $editLn['headcount'] ?? 1,
+          'boq_qty' => $editLn['boq_qty'], 'target_margin' => $editLn['target_margin'], 'rate_manual' => $editLn['rate_manual'], 'dpm' => $sp['dpm']];
+  } else {
+    $initItems = []; $f = ['headcount' => 1, 'boq_qty' => $basis === 'FIXED' ? 1 : '', 'dpm' => $dpmDefault];
+  }
+  $fv = fn($k) => $e($f[$k] ?? '');
+  $num0 = fn($k) => (float)($f[$k] ?? 0) == 0 ? '' : $e($f[$k]);
+  $libJs = []; foreach ($chLib as $code => $r) { $it = ch_library_item($code); if ($it) $libJs[] = $it + ['statutory' => (int)$r['statutory']]; }
+  $tplJs = []; foreach ($chTpls as $t) $tplJs[] = ['id' => (int)$t['id'], 'name' => $t['name'], 'note' => $t['note'], 'items' => ch_template_items((int)$t['id'])];
+  $unitWord = $basis === 'DAILY' ? 'per man-day' : ($basis === 'FIXED' ? 'per person' : 'per man-month');
+?>
+<style>
+  .che{margin-top:6px}
+  .che .ch-head{display:grid;grid-template-columns:28px minmax(150px,1.5fr) 120px 150px minmax(220px,2.4fr) 110px minmax(120px,1fr) 34px;gap:8px;align-items:start;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;padding:0 8px 4px}
+  .che .ch-row{display:grid;grid-template-columns:28px minmax(150px,1.5fr) 120px 150px minmax(220px,2.4fr) 110px minmax(120px,1fr) 34px;gap:8px;align-items:start;border:1px solid var(--line);border-radius:10px;padding:8px;margin-bottom:6px;background:var(--card)}
+  .che .ch-row.err{border-color:var(--red,#dc2626);background:#fef2f2}
+  .che input,.che select{width:100%;box-sizing:border-box;padding:7px 8px;border:1px solid var(--field-line,#cbd5e1);border-radius:7px;font-size:13px;background:var(--card)}
+  .che .mv{display:flex;flex-direction:column;gap:2px}
+  .che .mv button,.che .rm{border:1px solid var(--line);background:var(--soft);border-radius:6px;cursor:pointer;font-size:12px;line-height:1;padding:4px 0;min-height:22px}
+  .che .rm{padding:7px 0;color:var(--red,#b91c1c)}
+  .che .code{font-size:10.5px;color:var(--muted);margin-top:3px;font-family:ui-monospace,Menlo,monospace}
+  .che .val{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12.5px}
+  .che .val > *{flex:1 1 70px}
+  .che .val .w{flex:0 0 auto;color:var(--muted)}
+  .che .ofd{flex:1 1 calc(100% - 120px);font-size:12.5px;min-width:0}
+  .che .ofd summary{cursor:pointer;padding:7px 8px;border:1px solid var(--field-line,#cbd5e1);border-radius:7px;background:var(--card);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;list-style:none}
+  .che .ofd[open] summary{border-bottom-left-radius:0;border-bottom-right-radius:0}
+  .che .ofd .ofbox{border:1px solid var(--field-line,#cbd5e1);border-top:0;border-radius:0 0 7px 7px;padding:6px 8px}
+  .che .mini{flex:1 1 120px;display:flex;flex-direction:column;gap:2px;font-size:10.5px;color:var(--muted);font-weight:600}
+  .che .ofbox{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12px;padding:4px 0}
+  .che .ofbox label{display:inline-flex;gap:4px;align-items:center;white-space:nowrap}
+  .che .ofbox input{width:auto}
+  .che .res{text-align:right;font-variant-numeric:tabular-nums;font-weight:700;font-size:13.5px;padding-top:6px}
+  .che .why{display:block;font-weight:400;font-size:11px;color:var(--muted);margin-top:2px;text-align:left}
+  .che .ch-row.err .why{color:var(--red,#b91c1c)}
+  .che details.more{grid-column:2 / -2;font-size:12px}
+  .che details.more summary{cursor:pointer;color:var(--muted)}
+  .che details.more .mg{display:grid;grid-template-columns:120px 120px 1fr;gap:8px;margin-top:6px}
+  .che .note-chip{grid-column:2 / -2;font-size:12px;color:var(--muted);margin-top:-2px}
+  .che .addbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}
+  .che .addbar select{width:auto;min-width:240px;max-width:100%}
+  .che .totals{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:10px}
+  .che .totals div{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;font-weight:700}
+  .che .totals b{display:block;font-size:16px;color:var(--ink);text-transform:none;letter-spacing:0;font-variant-numeric:tabular-nums}
+  .che .errs{display:none;margin:8px 0}
+  .che .empty{border:1px dashed var(--line);border-radius:10px;padding:16px;text-align:center;color:var(--muted);font-size:13px}
+  @media(max-width:1100px){
+    .che .ch-head{display:none}
+    .che .ch-row{grid-template-columns:1fr 1fr;padding:10px}
+    .che .ch-row > .mv{grid-column:1;flex-direction:row;order:9}
+    .che .ch-row > .mv button{flex:1;padding:8px 0}
+    .che .ch-row > .nm,.che .ch-row > .vl{grid-column:1 / -1}
+    .che .ch-row > .res{grid-column:1 / -1;text-align:left;border-top:1px solid var(--line);padding-top:8px}
+    .che .ch-row > .rm{grid-column:2;order:10}
+    .che details.more,.che .note-chip{grid-column:1 / -1}
+    .che details.more .mg{grid-template-columns:1fr 1fr}
+    .che details.more .mg > :last-child{grid-column:1 / -1}
+  }
+</style>
+<div class="panel" id="add-role" style="scroll-margin-top:70px">
+  <h3 class="tab-sub" style="margin-top:0"><?= $editLn ? '✎ Edit role — ' . $e($editLn['role_label']) : '＋ Add a role' ?>
+    <?php if ($editLn): ?><a href="/project-costing?id=<?= (int)$h['id'] ?>#add-role" class="muted" style="font-size:12.5px;font-weight:400;margin-left:8px">Cancel — add a new role instead</a><?php endif; ?></h3>
+  <form method="post" action="/project-costing-line-save" id="lineForm" class="che">
     <input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="costing_id" value="<?= (int)$h['id'] ?>">
+    <input type="hidden" name="line_id" value="<?= (int)$editId ?>"><input type="hidden" name="items_json" id="ch_items_json" value="">
     <div class="form-grid">
-      <div class="ff"><label>Group <span class="muted">optional</span></label><input class="form-control" name="group_label" placeholder="e.g. Module / Cell"></div>
-      <div class="ff ff-wide"><label>Role</label><input class="form-control" name="role_label" required placeholder="e.g. Shift Engineer"></div>
-      <div class="ff"><label>People <span class="muted">how many for this role</span></label><input class="form-control" type="number" min="1" step="1" name="headcount" value="1"></div>
+      <div class="ff"><label for="ch_grp">Group <span class="muted">optional</span></label><input class="form-control" id="ch_grp" name="group_label" value="<?= $fv('group_label') ?>" placeholder="e.g. Module / Cell"></div>
+      <div class="ff ff-wide"><label for="ch_role">Role</label><input class="form-control" id="ch_role" name="role_label" required value="<?= $fv('role_label') ?>" placeholder="e.g. Shift Engineer"></div>
+      <div class="ff"><label for="ch_ppl">People <span class="muted">for this role</span></label><input class="form-control" id="ch_ppl" type="number" min="1" step="1" name="headcount" value="<?= $fv('headcount') ?: 1 ?>"></div>
+      <div class="ff"><label for="ch_dpm">Working days in a month</label><input class="form-control" id="ch_dpm" type="number" min="1" max="31" step="0.5" name="dpm" value="<?= $fv('dpm') ?: $e($dpmDefault) ?>" title="Turns per-day heads into a month, and monthly heads into a day rate"></div>
     </div>
-    <p class="sub" style="margin:12px 0 4px">Cost heads — <?= $sym ?> per person per month<?= $basis==='DAILY' ? ' (day rates are per man-day; enter the monthly-equivalent build-up)' : '' ?></p>
-    <div class="form-grid">
-      <?php foreach ($heads as $hk=>$hl): ?>
-        <div class="ff"><label><?= $e($hl) ?></label><input class="form-control pc-head" type="number" step="0.01" name="head[<?= $e($hk) ?>]" data-head="<?= $e($hk) ?>" value=""></div>
-      <?php endforeach; ?>
+
+    <p class="sub" style="margin:14px 0 6px">Cost heads — <b><?= $e($sym) ?> <?= $e($unitWord) ?></b>. Each head can be an amount, a % of other heads, quantity × rate or a formula, entered per month, per day, per year or one time. Names can be changed freely — a % keeps pointing at the right head.</p>
+    <div class="addbar">
+      <?php if ($tplJs): ?><select id="ch_tpl" aria-label="Start from a template"><option value="">Start from a template…</option><?php foreach ($tplJs as $t): ?><option value="<?= (int)$t['id'] ?>"><?= $e($t['name']) ?> (<?= count($t['items']) ?> heads)</option><?php endforeach; ?></select><?php endif; ?>
+      <select id="ch_lib" aria-label="Add a head from the library"><option value="">＋ Add a head from the library…</option>
+        <?php foreach (CH_GROUPS as $gk => $gl): $opts = array_filter($libJs, fn($x) => $x['grp'] === $gk); if (!$opts) continue; ?>
+          <optgroup label="<?= $e($gl) ?>"><?php foreach ($opts as $x): ?><option value="<?= $e($x['code']) ?>"><?= $e($x['label']) ?><?= $x['type'] === 'PCT' ? ' — ' . $e(rtrim(rtrim(number_format((float)$x['pct'], 3), '0'), '.')) . '%' : '' ?></option><?php endforeach; ?></optgroup>
+        <?php endforeach; ?></select>
+      <button type="button" class="btn secondary" id="ch_blank">＋ Blank head</button>
+      <?php if ($chManage): ?><a href="/project-costing-heads" class="muted" style="font-size:12.5px">Manage the library &amp; templates →</a><?php endif; ?>
     </div>
-    <div class="form-grid" style="margin-top:6px">
-      <div class="ff"><label><?= $e($qtyLabel) ?> (BOQ)</label><input class="form-control" type="number" step="0.01" id="pc_boq" name="boq_qty" value="<?= $basis==='FIXED'?'1':'' ?>"></div>
-      <div class="ff"><label>Target margin (%) <span class="muted">sets the rate</span></label><input class="form-control" type="number" step="0.1" id="pc_tm" name="target_margin" placeholder="e.g. 22"></div>
-      <div class="ff"><label>…or fixed rate<?= $e($rateLabel) ?> <span class="muted">override</span></label><input class="form-control" type="number" step="0.01" id="pc_rate" name="rate_manual" placeholder="overrides margin"></div>
-      <div class="ff"><label>One-time / person <span class="muted">mobilisation</span></label><input class="form-control" type="number" step="0.01" id="pc_oneoff" name="oneoff" value=""></div>
+    <div class="ch-head" aria-hidden="true"><span></span><span>Head</span><span>Group</span><span>How</span><span>Value</span><span>Entered</span><span style="text-align:right"><?= $e($unitWord) ?></span><span></span></div>
+    <div id="ch_rows"></div>
+    <div class="empty" id="ch_empty">No heads yet — <?= $tplJs ? 'start from a template, ' : '' ?>add heads from the library, or a blank head.</div>
+    <noscript><div class="msg msg-warning">The heads editor needs JavaScript switched on in your browser.</div></noscript>
+    <div class="msg msg-error errs" id="ch_errs" role="alert"></div>
+
+    <div class="form-grid" style="margin-top:12px">
+      <div class="ff"><label for="pc_boq"><?= $e($qtyLabel) ?> (BOQ) <span class="muted">all people together</span></label><input class="form-control" type="number" step="0.01" min="0" id="pc_boq" name="boq_qty" value="<?= $fv('boq_qty') ?>"></div>
+      <div class="ff"><label for="pc_tm">Target margin (%) <span class="muted">sets the rate</span></label><input class="form-control" type="number" step="0.1" min="0" max="99.9" id="pc_tm" name="target_margin" value="<?= $num0('target_margin') ?>" placeholder="e.g. 22"></div>
+      <div class="ff"><label for="pc_rate">…or fixed rate<?= $e($rateLabel) ?> <span class="muted">override</span></label><input class="form-control" type="number" step="0.01" min="0" id="pc_rate" name="rate_manual" value="<?= $num0('rate_manual') ?>" placeholder="overrides margin"></div>
     </div>
-    <div class="rq-calc" style="background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-top:10px;font-size:13px">
-      <span>Direct <b id="pv_direct">—</b></span> · <span>Loaded <b id="pv_loaded">—</b></span> · <span>Rate <b id="pv_rate">—</b></span> · <span>Revenue <b id="pv_rev">—</b></span> · <span>Margin <b id="pv_marg">—</b></span>
+    <div class="totals" aria-live="polite">
+      <div>Salary<b id="pv_pay">—</b></div><div>Direct cost<b id="pv_direct">—</b></div><div>Loaded cost<b id="pv_loaded">—</b></div>
+      <div>One-time / person<b id="pv_once">—</b></div><div>Rate<?= $e($rateLabel) ?><b id="pv_rate">—</b></div><div>Revenue<b id="pv_rev">—</b></div><div>Margin<b id="pv_marg">—</b></div>
     </div>
-    <div style="margin-top:10px"><button class="btn" type="submit">Add role</button></div>
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="btn" type="submit"><?= $editLn ? 'Save role' : 'Add role' ?></button>
+      <?php if ($editLn): ?><a class="btn btn-ghost" href="/project-costing?id=<?= (int)$h['id'] ?>">Cancel</a><?php endif; ?>
+    </div>
   </form>
+  <?php if ($chManage): ?>
+  <form method="post" action="/project-costing-heads" id="ch_tplform" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12.5px">
+    <input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="do" value="template_from_role"><input type="hidden" name="items_json" value="">
+    <input type="hidden" name="back" value="/project-costing?id=<?= (int)$h['id'] ?><?= $editId ? '&edit=' . (int)$editId : '' ?>#add-role">
+    <span class="muted">Use these heads again:</span>
+    <input name="name" maxlength="120" required placeholder="Template name, e.g. Security guard — monthly" style="padding:6px 8px;border:1px solid var(--field-line,#cbd5e1);border-radius:7px;min-width:260px">
+    <button class="btn btn-ghost" style="padding:5px 12px">Save as a template</button>
+  </form>
+  <?php endif; ?>
 </div>
+<script>(function(){
+  var f=document.getElementById('lineForm'); if(!f) return;
+  var SYM=<?= json_encode($sym) ?>, LIB=<?= json_encode(array_values($libJs), JSON_UNESCAPED_UNICODE) ?>, TPL=<?= json_encode($tplJs, JSON_UNESCAPED_UNICODE) ?>;
+  var GROUPS={PAY:'Salary',STAT:'Statutory',COST:'Other cost'}, TYPES=<?= json_encode(CH_TYPES, JSON_UNESCAPED_UNICODE) ?>, PER=<?= json_encode(CH_PER, JSON_UNESCAPED_UNICODE) ?>;
+  var FUNCS=<?= json_encode(CH_FUNCS) ?>;
+  var rowsEl=document.getElementById('ch_rows'), empty=document.getElementById('ch_empty'), errs=document.getElementById('ch_errs');
+  var rows=<?= json_encode(array_values($initItems), JSON_UNESCAPED_UNICODE) ?>;
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+  function money(v){ v=+v||0; return SYM+' '+v.toLocaleString('en-IN',{maximumFractionDigits:2}); }
+  function codeFrom(label,taken){
+    var c=String(label||'').toUpperCase().replace(/[^A-Z0-9]+/g,'_').replace(/^_+|_+$/g,'');
+    if(!c||/^[0-9]/.test(c)) c='H_'+c; c=c.slice(0,24); if(FUNCS.indexOf(c)>=0) c+='_H';
+    var base=c,k=2; while(taken.indexOf(c)>=0){ c=base.slice(0,21)+'_'+(k++); } return c;
+  }
+  function codes(except){ return rows.filter(function(r,i){return i!==except;}).map(function(r){return r.code;}); }
+  function opt(map,sel,only){ return Object.keys(map).filter(function(k){return !only||only.indexOf(k)>=0;}).map(function(k){return '<option value="'+k+'"'+(k===sel?' selected':'')+'>'+esc(map[k])+'</option>';}).join(''); }
+  function num(v){ return (v===undefined||v===null||v===0||v==='0')?'':esc(v); }
+  function render(){
+    rowsEl.innerHTML='';
+    empty.style.display=rows.length?'none':'block';
+    rows.forEach(function(r,i){
+      var t=r.type||'AMOUNT', pers=(t==='PCT'||t==='FORMULA')?['MONTH','ONCE']:null;
+      var d=document.createElement('div'); d.className='ch-row'; d.dataset.i=i; d.dataset.code=r.code;
+      var of=(r.of||[]);
+      var ofHtml=rows.map(function(o,j){ if(j===i) return ''; return '<label><input type="checkbox" class="f-of" value="'+esc(o.code)+'"'+(of.indexOf(o.code)>=0?' checked':'')+'> '+esc(o.label||o.code)+'</label>'; }).join('');
+      var val='';
+      if(t==='AMOUNT') val='<input class="f-calc" inputmode="decimal" value="'+esc(r.calc!=null?r.calc:(r.amount||''))+'" placeholder="e.g. 18000 or 1500*2+300" aria-label="Amount">';
+      if(t==='QTYRATE') val='<input class="f-qty" type="number" step="any" value="'+num(r.qty)+'" placeholder="Qty" aria-label="Quantity"><span class="w">×</span><input class="f-rate" type="number" step="any" value="'+num(r.rate)+'" placeholder="Rate" aria-label="Rate">';
+      if(t==='PCT') val='<input class="f-pct" type="number" step="any" value="'+num(r.pct)+'" placeholder="%" aria-label="Percent" style="flex:0 0 74px"><span class="w">% of</span>'
+        +'<details class="ofd"'+(of.length?'':' open')+'><summary>'+(of.length?esc(of.map(function(c){ var o=rows.filter(function(x){return x.code===c;})[0]; return o?(o.label||c):c; }).join(' + ')):'<span style="color:var(--red,#b91c1c)">choose the heads</span>')+' ▾</summary>'
+        +'<div class="ofbox">'+(ofHtml||'<span class="muted">add the heads it is a % of first</span>')+'</div></details>'
+        +'<label class="mini">Counted up to<input class="f-cap" type="number" step="any" min="0" value="'+num(r.cap)+'" placeholder="no limit" title="Only this much of the base counts — e.g. PF on wages up to 15,000"></label>'
+        +'<label class="mini">Applies only up to<input class="f-upto" type="number" step="any" min="0" value="'+num(r.upto)+'" placeholder="always" title="Not applied at all when the base is above this — e.g. ESIC up to 21,000"></label>';
+      if(t==='FORMULA') val='<input class="f-expr" value="'+esc(r.expr||'')+'" placeholder="e.g. MIN(BASIC,15000)*12%" aria-label="Formula" style="flex:1 1 100%"><span class="w" style="font-size:11px">Use the short names: '+esc(codes(i).join(', ')||'—')+' · MIN MAX ROUND IF</span>';
+      d.innerHTML='<div class="mv"><button type="button" class="up" title="Move up" aria-label="Move up">▲</button><button type="button" class="dn" title="Move down" aria-label="Move down">▼</button></div>'
+        +'<div class="nm"><input class="f-label" value="'+esc(r.label||'')+'" placeholder="Name of the head" aria-label="Head name"><div class="code">'+esc(r.code)+(r.lib_from?' · library value from '+esc(r.lib_from):'')+'</div></div>'
+        +'<div><select class="f-grp" aria-label="Group">'+opt(GROUPS,r.grp||'COST')+'</select></div>'
+        +'<div><select class="f-type" aria-label="How it is worked out">'+opt(TYPES,t)+'</select></div>'
+        +'<div class="val vl">'+val+'</div>'
+        +'<div><select class="f-per" aria-label="Entered per">'+opt(PER,r.per||'MONTH',pers)+'</select></div>'
+        +'<div class="res"><span class="r-val">—</span><span class="why r-why"></span></div>'
+        +'<button type="button" class="rm" title="Remove this head" aria-label="Remove this head">✕</button>'
+        +'<details class="more"'+((r.min!=null||r.max!=null)?' open':'')+'><summary>'+(r.note?'Remark, minimum / maximum':'＋ Remark, minimum / maximum')+'</summary><div class="mg">'
+        +'<input class="f-min" type="number" step="any" value="'+(r.min!=null?esc(r.min):'')+'" placeholder="Minimum"><input class="f-max" type="number" step="any" value="'+(r.max!=null?esc(r.max):'')+'" placeholder="Maximum">'
+        +'<input class="f-note" maxlength="300" value="'+esc(r.note||'')+'" placeholder="Remark — e.g. as per client tender clause 4.2"></div></details>'
+        +(r.note?'<div class="note-chip">💬 '+esc(r.note)+'</div>':'');
+      rowsEl.appendChild(d);
+    });
+    schedule();
+  }
+  function read(){
+    rowsEl.querySelectorAll('.ch-row').forEach(function(d){
+      var r=rows[+d.dataset.i]; if(!r) return; var q=function(c){var el=d.querySelector(c); return el?el.value:undefined;};
+      r.label=q('.f-label'); r.grp=q('.f-grp'); r.type=q('.f-type'); r.per=q('.f-per'); r.note=q('.f-note');
+      var mn=q('.f-min'), mx=q('.f-max'); r.min=mn===''?null:mn; r.max=mx===''?null:mx;
+      if(r.min===null) delete r.min; if(r.max===null) delete r.max;
+      if(d.querySelector('.f-calc')) r.calc=q('.f-calc');
+      if(d.querySelector('.f-qty')){ r.qty=q('.f-qty'); r.rate=q('.f-rate'); }
+      if(d.querySelector('.f-pct')){ r.pct=q('.f-pct'); r.cap=q('.f-cap'); r.upto=q('.f-upto'); r.of=[].map.call(d.querySelectorAll('.f-of:checked'),function(x){return x.value;}); }
+      if(d.querySelector('.f-expr')) r.expr=q('.f-expr');
+    });
+  }
+  function add(item){
+    read(); item=JSON.parse(JSON.stringify(item));
+    var taken=codes(-1);
+    if(item.code && taken.indexOf(item.code)>=0){ alert('"'+(item.label||item.code)+'" is already on this role.'); return; }
+    if(!item.code) item.code=codeFrom(item.label||'HEAD',taken);
+    if(item.amount!=null && item.calc==null) item.calc=item.amount?String(item.amount):'';
+    rows.push(item); render();
+    var last=rowsEl.lastElementChild; if(last){ var inp=last.querySelector('.f-calc,.f-pct,.f-qty,.f-expr,.f-label'); if(inp) inp.focus(); }
+  }
+  rowsEl.addEventListener('click',function(ev){
+    var d=ev.target.closest('.ch-row'); if(!d) return; var i=+d.dataset.i;
+    if(ev.target.classList.contains('rm')){
+      read(); var code=rows[i].code, users=rows.filter(function(r){ return (r.of||[]).indexOf(code)>=0 || (r.type==='FORMULA' && new RegExp('\\b'+code+'\\b','i').test(r.expr||'')); });
+      if(users.length && !confirm('"'+rows[i].label+'" is used by '+users.map(function(u){return u.label;}).join(', ')+'. Remove it anyway?')) return;
+      rows.splice(i,1); render(); }
+    if(ev.target.classList.contains('up') && i>0){ read(); rows.splice(i-1,0,rows.splice(i,1)[0]); render(); }
+    if(ev.target.classList.contains('dn') && i<rows.length-1){ read(); rows.splice(i+1,0,rows.splice(i,1)[0]); render(); }
+  });
+  rowsEl.addEventListener('change',function(ev){
+    if(ev.target.classList.contains('f-type')){ read(); var r=rows[+ev.target.closest('.ch-row').dataset.i]; if((r.type==='PCT'||r.type==='FORMULA')&&r.per!=='ONCE') r.per='MONTH'; render(); return; }
+    if(ev.target.classList.contains('f-label')){ read(); render(); return; }   // the % / formula pickers show the new name
+    read(); schedule();
+  });
+  rowsEl.addEventListener('input',function(ev){ if(!ev.target.classList.contains('f-label')){ read(); schedule(); } });
+  document.getElementById('ch_blank').addEventListener('click',function(){ add({label:'',type:'AMOUNT',per:'<?= $basis === 'DAILY' ? 'DAY' : 'MONTH' ?>',grp:'COST'}); });
+  document.getElementById('ch_lib').addEventListener('change',function(){ var c=this.value; this.value=''; if(!c) return; for(var k=0;k<LIB.length;k++) if(LIB[k].code===c){ add(LIB[k]); break; } });
+  var tpl=document.getElementById('ch_tpl'); if(tpl) tpl.addEventListener('change',function(){
+    var id=+this.value; this.value=''; if(!id) return; var t=TPL.filter(function(x){return x.id===id;})[0]; if(!t) return;
+    read(); if(rows.length && !confirm('Replace the heads on this role with the template "'+t.name+'"?')) return;
+    rows=JSON.parse(JSON.stringify(t.items)); rows.forEach(function(r){ if(r.amount!=null && r.calc==null) r.calc=r.amount?String(r.amount):''; }); render(); });
+  ['ch_dpm','pc_boq','pc_tm','pc_rate','ch_ppl'].forEach(function(id){ var el=document.getElementById(id); if(el) el.addEventListener('input',schedule); });
+  var timer=null, seq=0;
+  function schedule(){ clearTimeout(timer); timer=setTimeout(preview,280); }
+  function preview(){
+    read(); document.getElementById('ch_items_json').value=JSON.stringify(rows);
+    var fd=new FormData(f); fd.delete('_ft');   /* the form's one-shot ticket is for the real save */
+    var my=++seq; fd.set('role_label', fd.get('role_label')||'·');
+    fetch('/project-costing-line-preview',{method:'POST',body:fd,credentials:'same-origin'}).then(function(r){return r.json();}).then(function(j){
+      if(my!==seq) return;
+      rowsEl.querySelectorAll('.ch-row').forEach(function(d){
+        var r=(j.rows||{})[d.dataset.code]; var v=d.querySelector('.r-val'), w=d.querySelector('.r-why');
+        if(!r){ v.textContent='—'; w.textContent=''; d.classList.remove('err'); return; }
+        v.textContent=r.once?money(r.once)+' once':money(r.unit); w.textContent=r.why||''; d.classList.toggle('err',!!r.error);
+      });
+      var shown=(j.errors||[]).filter(function(m){ return m!=='Give the role a name.'; });
+      errs.style.display=shown.length?'block':'none'; errs.innerHTML=shown.map(esc).join('<br>');
+      var set=function(id,v){ document.getElementById(id).textContent=v; };
+      set('pv_pay',j.pay?money(j.pay):'—'); set('pv_direct',j.direct?money(j.direct):'—'); set('pv_loaded',j.loaded?money(j.loaded):'—');
+      set('pv_once',j.once?money(j.once):'—'); set('pv_rate',j.rate?money(j.rate):'—'); set('pv_rev',j.revenue?money(j.revenue):'—');
+      set('pv_marg',j.revenue?(+j.margin).toFixed(1)+'%':'—');
+    }).catch(function(){});
+  }
+  f.addEventListener('submit',function(){ read(); document.getElementById('ch_items_json').value=JSON.stringify(rows); });
+  var tf=document.getElementById('ch_tplform'); if(tf) tf.addEventListener('submit',function(ev){ read(); if(!rows.length){ ev.preventDefault(); alert('Add some heads first.'); return; } tf.querySelector('[name=items_json]').value=JSON.stringify(rows); });
+  render();
+  <?php if ($editLn || $draft): ?>document.getElementById('add-role').scrollIntoView();<?php endif; ?>
+})();</script>
 <?php endif; ?>
 
 <!-- Settings + notes + approval -->
@@ -289,39 +509,3 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
   </div>
 </div>
 </div>
-
-<?php if ($canEdit): ?>
-<script>(function(){
-  var f=document.getElementById('lineForm'); if(!f) return;
-  var sym='<?= $e($sym) ?>', basis='<?= $e($basis) ?>';
-  var OH=<?= (float)$h['overhead_pct'] ?>, INS=<?= (float)$h['insurance_pct'] ?>, BD=<?= (float)$h['baddebt_pct'] ?>, CN=<?= (float)$h['contingency_pct'] ?>, NEG=<?= (float)$h['negotiation_pct'] ?>;
-  var ONRATE=<?= strtoupper((string)$h['load_on'])==='RATE' ? 'true':'false' ?>, L=OH+INS+BD+CN;
-  function n(el){ return el?(parseFloat(el.value)||0):0; }
-  function fmt(v){ return sym+' '+Math.round(v).toLocaleString('en-IN'); }
-  function calc(){
-    var direct=0; f.querySelectorAll('.pc-head').forEach(function(el){ direct+=n(el); });
-    var tm=n(document.getElementById('pc_tm')), man=n(document.getElementById('pc_rate'));
-    var rate, loaded;
-    if(ONRATE){
-      if(man>0){ rate=man; } else { var d=1-tm/100-L/100; rate=(tm>0&&d>0)?direct/d:direct; }
-      loaded=direct+rate*L/100;
-    } else {
-      loaded=direct*(1+L/100);
-      rate=man>0?man:((tm>0&&tm<100)?loaded/(1-tm/100):loaded);
-    }
-    var proposed=rate*(1+NEG/100);
-    var boq=n(document.getElementById('pc_boq')), oneoff=n(document.getElementById('pc_oneoff'));
-    var rev, cost;
-    if(basis==='FIXED'){ rev=proposed; cost=loaded+oneoff; }
-    else { rev=proposed*boq; cost=loaded*boq+oneoff; }
-    var pf=rev-cost, mg=rev>0?pf/rev*100:0;
-    document.getElementById('pv_direct').textContent=direct?fmt(direct):'—';
-    document.getElementById('pv_loaded').textContent=loaded?fmt(loaded):'—';
-    document.getElementById('pv_rate').textContent=proposed?fmt(proposed):'—';
-    document.getElementById('pv_rev').textContent=rev?fmt(rev):'—';
-    document.getElementById('pv_marg').textContent=rev?mg.toFixed(1)+'%':'—';
-  }
-  f.querySelectorAll('input').forEach(function(el){ el.addEventListener('input',calc); });
-  calc();
-})();</script>
-<?php endif; ?>

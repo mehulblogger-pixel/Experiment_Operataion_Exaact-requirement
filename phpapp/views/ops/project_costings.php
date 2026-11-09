@@ -9,6 +9,7 @@ $stTone = ['DRAFT'=>'p-mut','SUBMITTED'=>'p-warn','APPROVED'=>'p-ok','REJECTED'=
 <div class="master-head">
   <div><h1>Project costing</h1>
     <p class="sub" style="margin:2px 0 0">Whole-project cost build-ups — team roles, cost heads, loadings and man-month / man-day / lump rates, rolled up to project revenue &amp; margin. Reusable from Sales and Recruitment.</p></div>
+  <?php if (function_exists('ch_can_manage') && ch_can_manage()): ?><div class="row-actions"><a class="btn secondary" href="/project-costing-heads">🧾 Costing heads &amp; templates</a></div><?php endif; ?>
 </div>
 
 <?php if ($canEdit): ?>

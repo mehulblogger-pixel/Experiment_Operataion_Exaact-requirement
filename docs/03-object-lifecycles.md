@@ -249,6 +249,16 @@ stateDiagram-v2
   who drafted it and carries the costing's enquiry, lead and business unit.
 - Reopening an APPROVED costing clears who approved it and when, and writes a line in its quotation's
   history; that quotation cannot move forward again until the costing is approved again.
+- **Flexible cost heads (owner, 9 Nov 2026):** a role's cost build-up is a list of heads
+  (`project_costing_lines.spec`, worked out by `lib/costing_heads.php`) — each an amount (the box is a
+  calculator), a % of other heads (with an optional "counted up to" cap on the base and an optional
+  "applies only up to" limit), quantity × rate, or a formula; entered per month, per day, per year or
+  one time; grouped as salary / statutory / other cost; with a remark. Figures are kept monthly and
+  shown in the sheet's unit, using the role's working days in a month; a one-time head counts once
+  per person. The **salary** heads are the requisition's wage. Heads are copied from the dated
+  library when added, so a later library change never alters a costing; a role saved before this keeps
+  its old amounts until it is edited. Edits follow the costing's own lock (DRAFT / REJECTED only).
+  No new status.
 - **Recruitment from a costing (owner, 9 Nov 2026):** offered only when the costing is **APPROVED**
   **and** a revision of its quotation is **ACCEPTED** by the client (`pc_hire_gate()`); before that the
   costing page shows why, and the buttons are not there. Each role carries its **number of people**

@@ -125,7 +125,11 @@ function pc_migrate() {
               ['project_costings','sbu',"VARCHAR(20) DEFAULT ''"],
               // Owner, 9 Nov 2026 — how many people each role needs, so a hiring
               // request raised from it asks for the right number.
-              ['project_costing_lines','headcount',"INT DEFAULT 1"]] as $c) {
+              ['project_costing_lines','headcount',"INT DEFAULT 1"],
+              // Owner, 9 Nov 2026 — the role's flexible list of cost heads
+              // (lib/costing_heads.php): amount / % / qty × rate / formula,
+              // per month / day / year / one time, with remarks.
+              ['project_costing_lines','spec',"TEXT"]] as $c) {
         if (function_exists('ensure_column')) ensure_column($c[0], $c[1], $c[2]);
     }
 }
@@ -403,9 +407,23 @@ function pc_unlinked($limit = 100) {
 // ---- The maths -------------------------------------------------------------
 // One line's numbers, given the header (for the loading %s and basis).
 function pc_line_calc($line, $header) {
-    $heads = json_decode((string)($line['heads'] ?? ''), true);
-    if (!is_array($heads)) $heads = [];
-    $direct = 0.0; foreach ($heads as $v) $direct += (float)$v;
+    $basis = (string)($header['basis'] ?? 'LONG');
+    $ev = null;
+    if (trim((string)($line['spec'] ?? '')) !== '' && function_exists('ch_evaluate')) {
+        // A role built from flexible heads: worked out by the heads engine, in
+        // the sheet's own unit (per man-month, or per man-day on a daily sheet).
+        $sp = ch_spec_of($line, $basis);
+        $ev = ch_evaluate($sp['items'], ch_unit_for_basis($basis), $sp['dpm']);
+        $heads = $ev['heads']; $direct = (float)$ev['direct']; $labels = $ev['labels'];
+        $pay = (float)$ev['pay']; $oneoffPer = (float)$ev['once'];
+    } else {
+        $heads = json_decode((string)($line['heads'] ?? ''), true);
+        if (!is_array($heads)) $heads = [];
+        $direct = 0.0; foreach ($heads as $v) $direct += (float)$v;
+        $names = pc_heads(); $labels = [];
+        foreach ($heads as $k => $v) $labels[$k] = $names[$k] ?? $k;
+        $pay = (float)($heads['PERSONNEL'] ?? 0); $oneoffPer = (float)($line['oneoff'] ?? 0);
+    }
 
     $load = (float)($header['overhead_pct'] ?? 0) + (float)($header['insurance_pct'] ?? 0)
           + (float)($header['baddebt_pct'] ?? 0) + (float)($header['contingency_pct'] ?? 0);
@@ -428,9 +446,10 @@ function pc_line_calc($line, $header) {
     $neg = (float)($header['negotiation_pct'] ?? 0);
     $proposed = $rate * (1 + $neg / 100);
 
-    $basis = (string)($header['basis'] ?? 'LONG');
     $boq = max(0, (float)($line['boq_qty'] ?? 0));
-    $oneoff = (float)($line['oneoff'] ?? 0);
+    // The one-time cost is per person (the form always said so): it counts once
+    // for each of the role's people.
+    $oneoff = $oneoffPer * max(1, (int)($line['headcount'] ?? 1));
     if ($basis === 'FIXED') { $qty = 1; $revenue = $proposed; $cost = $loaded + $oneoff; }
     else                    { $qty = $boq; $revenue = $proposed * $qty; $cost = $loaded * $qty + $oneoff; }
     $profit = $revenue - $cost;
@@ -438,9 +457,12 @@ function pc_line_calc($line, $header) {
 
     return ['direct' => round($direct, 2), 'loaded' => round($loaded, 2),
             'rate' => round($rate, 2), 'proposed' => round($proposed, 2),
-            'qty' => $qty, 'oneoff' => round($oneoff, 2),
+            'qty' => $qty, 'oneoff' => round($oneoffPer, 2), 'oneoff_total' => round($oneoff, 2),
             'revenue' => round($revenue, 2), 'cost' => round($cost, 2),
-            'profit' => round($profit, 2), 'margin' => round($margin, 2), 'heads' => $heads];
+            'profit' => round($profit, 2), 'margin' => round($margin, 2), 'heads' => $heads,
+            // What the person is paid (the salary heads) — the requisition's wage
+            // and, later, what a hired candidate's actual pay is compared with.
+            'pay' => round($pay, 2), 'labels' => $labels, 'eval' => $ev];
 }
 
 // Project rollup: totals + per-head totals across every line.
@@ -448,20 +470,31 @@ function pc_rollup($id) {
     $h = pc_get($id); if (!$h) return null;
     $lines = pc_lines($id);
     $tot = ['revenue' => 0, 'cost' => 0, 'profit' => 0, 'direct' => 0, 'oneoff' => 0, 'lines' => 0];
-    $byHead = [];
+    $byHead = []; $labels = [];
     foreach ($lines as $ln) {
         $c = pc_line_calc($ln, $h);
         $tot['revenue'] += $c['revenue']; $tot['cost'] += $c['cost']; $tot['profit'] += $c['profit'];
-        $tot['direct'] += $c['direct']; $tot['oneoff'] += $c['oneoff']; $tot['lines']++;
+        $tot['direct'] += $c['direct']; $tot['oneoff'] += $c['oneoff_total']; $tot['lines']++;
         foreach ($c['heads'] as $k => $v) $byHead[$k] = ($byHead[$k] ?? 0) + (float)$v;
+        foreach ($c['labels'] as $k => $l) if (!isset($labels[$k])) $labels[$k] = $l;
     }
     $tot['margin'] = $tot['revenue'] > 0 ? round($tot['profit'] / $tot['revenue'] * 100, 2) : 0;
-    return ['header' => $h, 'lines' => $lines, 'totals' => $tot, 'by_head' => $byHead];
+    // A head's column name: the role's own name for it, else the catalogue's.
+    $labels += pc_heads();
+    return ['header' => $h, 'lines' => $lines, 'totals' => $tot, 'by_head' => $byHead, 'labels' => $labels];
 }
 
 // Recompute and store the header's headline figures (for lists / links).
 function pc_restamp($id) {
     $r = pc_rollup($id); if (!$r) return;
+    // Keep each flexible role's stored amounts in step with its heads (a change
+    // of basis turns per-month figures into per-day ones), for older readers.
+    foreach ($r['lines'] as $ln) {
+        if (trim((string)($ln['spec'] ?? '')) === '') continue;
+        $c = pc_line_calc($ln, $r['header']);
+        try { db()->prepare("UPDATE project_costing_lines SET heads=?, oneoff=? WHERE id=?")
+                  ->execute([json_encode($c['heads'], JSON_UNESCAPED_UNICODE), $c['oneoff'], (int)$ln['id']]); } catch (Throwable $e) {}
+    }
     try {
         db()->prepare("UPDATE project_costings SET exp_revenue=?, exp_cost=?, exp_profit=?, updated_at=? WHERE id=?")
             ->execute([$r['totals']['revenue'], $r['totals']['cost'], $r['totals']['profit'], date('c'), (int)$id]);
@@ -610,8 +643,7 @@ function pc_raise_hiring_request($cid, $lineId) {
     $basis = (string)$h['basis'];
     $months = $basis === 'LONG' && (float)$ln['boq_qty'] > 0 ? round((float)$ln['boq_qty'] / pc_line_people($ln), 2) : null;
     $headsTxt = [];
-    $names = pc_heads();
-    foreach ((array)$c['heads'] as $k => $v) $headsTxt[] = ($names[$k] ?? $k) . ': ' . number_format((float)$v);
+    foreach ((array)$c['heads'] as $k => $v) $headsTxt[] = ($c['labels'][$k] ?? $k) . ': ' . number_format((float)$v);
     [$ok, $msg, $id] = hreq_save(0, [
         'job_title' => trim(((string)$ln['group_label'] !== '' ? $ln['group_label'] . ' / ' : '') . $ln['role_label']),
         'quantity' => $left,
@@ -626,7 +658,7 @@ function pc_raise_hiring_request($cid, $lineId) {
         'est_cost_per_person' => $c['loaded'],
         'est_cost_basis' => $basis === 'DAILY' ? 'MANDAY' : ($basis === 'FIXED' ? 'FIXED' : 'MONTHLY'),
         'est_duration_months' => $months,
-        'est_onetime_cost' => (float)$ln['oneoff'] > 0 ? (float)$ln['oneoff'] : null,
+        'est_onetime_cost' => (float)$c['oneoff'] > 0 ? (float)$c['oneoff'] : null,
     ]);
     if (!$ok) return [false, $msg, 0];
     hreq_link_costing((int)$id, (int)$cid, (int)$ln['id']);
@@ -643,7 +675,7 @@ function pc_requisition_from_hreq($rid, array $hr) {
     $h = pc_get((int)$ln['costing_id']); if (!$h) return;
     pc_link_migrate();
     $c = pc_line_calc($ln, $h);
-    $wage = (float)($c['heads']['PERSONNEL'] ?? 0);
+    $wage = (float)$c['pay'];          // the salary heads — what the person is paid
     $qty = (int)ops_val("SELECT quantity FROM requisitions WHERE id=?", [(int)$rid]) ?: 1;
     $b = ['quantity' => $qty, 'billing_rate' => $c['proposed'], 'budgeted_cost' => $c['loaded'], 'rate_basis' => pc_req_basis((string)$h['basis'])];
     $com = function_exists('req_commercials') ? req_commercials($b) : ['revenue' => 0, 'profit' => 0];
@@ -651,7 +683,7 @@ function pc_requisition_from_hreq($rid, array $hr) {
         db()->prepare("UPDATE requisitions SET costing_line_id=?, billing_rate=?, target_margin=?, budgeted_cost=?, rate_basis=?,
                        sourcing_model=?, cost_wage=?, cost_reimburse=?, cost_oneoff=?, expected_revenue=?, expected_profit=? WHERE id=?")
             ->execute([$lineId, $c['proposed'], (float)$ln['target_margin'], $c['loaded'], pc_req_basis((string)$h['basis']),
-                       'OWN_PAYROLL', $wage, max(0, $c['direct'] - $wage), (float)$ln['oneoff'],
+                       'OWN_PAYROLL', $wage, max(0, $c['direct'] - $wage), (float)$c['oneoff'],
                        (float)($com['revenue'] ?? 0), (float)($com['profit'] ?? 0), (int)$rid]);
     } catch (Throwable $e) {}
 }
@@ -679,9 +711,8 @@ function pc_make_requisition($cid, $lineId) {
     $people = pc_line_people($ln) - pc_line_raised((int)$ln['id']);
     if ($people <= 0) return ['err' => 'All ' . pc_line_people($ln) . ' people for "' . $ln['role_label'] . '" are already asked for.'];
     $c = pc_line_calc($ln, $h);
-    $heads = $c['heads'];
-    $wage = (float)($heads['PERSONNEL'] ?? 0);
-    $reimb = max(0, $c['direct'] - $wage);            // everything else monthly
+    $wage = (float)$c['pay'];                         // the salary heads
+    $reimb = max(0, $c['direct'] - $wage);            // everything else, recurring
     try {
         $code = ops_next_code('requisitions', 'req_code', 'REQ');
         $b = ['quantity' => $people, 'billing_rate' => $c['proposed'], 'budgeted_cost' => $c['loaded'],
@@ -696,7 +727,7 @@ function pc_make_requisition($cid, $lineId) {
             ->execute([$code, (int)$h['office_id'] ?: null, (int)$h['client_id'] ?: null,
                 (string)$ln['role_label'], (string)$h['site'],
                 $c['proposed'], pc_req_basis((string)$h['basis']), (float)$ln['target_margin'], $c['loaded'],
-                $wage, $reimb, (float)$ln['oneoff'],
+                $wage, $reimb, (float)$c['oneoff'],
                 $com['revenue'], $com['profit'],
                 'From costing ' . $h['code'] . ' · ' . trim(((string)$ln['group_label'] !== '' ? $ln['group_label'] . ' / ' : '') . $ln['role_label']),
                 user_name(current_user()), date('c')]);
@@ -704,6 +735,32 @@ function pc_make_requisition($cid, $lineId) {
         db()->prepare("UPDATE requisitions SET costing_line_id=? WHERE id=?")->execute([(int)$ln['id'], $rid]);
         return ['id' => $rid, 'code' => $code];
     } catch (Throwable $e) { return ['err' => $e->getMessage()]; }
+}
+
+// ---- A role from the heads editor -------------------------------------------
+// The role editor posts its heads as JSON (items_json) plus the role's own
+// fields. Cleaned here for both the live preview and the save, so the figure
+// the user watches while typing is the figure that is saved.
+// Returns [line (a project_costing_lines-shaped row), errors[], evaluation].
+function pc_line_from_post(array $p, array $h) {
+    $raw = json_decode((string)($p['items_json'] ?? '[]'), true);
+    if (!is_array($raw)) $raw = [];
+    [$items, $errs] = ch_items_clean($raw);
+    $dpm = (float)($p['dpm'] ?? 0); if ($dpm < 1 || $dpm > 31) $dpm = ch_days_per_month();
+    $num = fn($k) => is_numeric($p[$k] ?? null) ? (float)$p[$k] : 0.0;
+    $line = [
+        'group_label' => mb_substr(trim((string)($p['group_label'] ?? '')), 0, 120),
+        'role_label' => mb_substr(trim((string)($p['role_label'] ?? '')), 0, 160),
+        'boq_qty' => max(0, $num('boq_qty')), 'target_margin' => $num('target_margin'),
+        'rate_manual' => max(0, $num('rate_manual')), 'headcount' => max(1, (int)($p['headcount'] ?? 1)),
+        'heads' => '{}', 'oneoff' => 0,
+        'spec' => json_encode(['v' => 1, 'dpm' => $dpm, 'items' => $items], JSON_UNESCAPED_UNICODE),
+    ];
+    if ($line['role_label'] === '') $errs[] = 'Give the role a name.';
+    if ($line['target_margin'] < 0 || $line['target_margin'] >= 100) $errs[] = 'The target margin must be from 0 up to (not including) 100%.';
+    $ev = ch_evaluate($items, ch_unit_for_basis((string)$h['basis']), $dpm);
+    foreach ($ev['errors'] as $m) $errs[] = $m;
+    return [$line, array_values(array_unique($errs)), $ev];
 }
 
 // ---- Routing ---------------------------------------------------------------
@@ -786,7 +843,102 @@ function ops_projcosting($route, $method) {
         redirect('/project-costing?id=' . $id);
     }
 
+    // ---- Costing heads: the library and the templates (Masters-level setup) ----
+    // Owner, 9 Nov 2026 — "highly configurable as it changes with time". Who
+    // changes them: the people who change the Masters lists (docs/02 row 12).
+    // Template ids travel as tpl_id: pc_scope_gate() reads `id` as a costing.
+    if ($route === 'project-costing-heads') {
+        ch_migrate();
+        $me = user_name(current_user());
+        if ($method === 'POST') {
+            ops_require(ch_can_manage(), 'Only an administrator can change the costing heads.');
+            $do = (string)($_POST['do'] ?? '');
+            $back = '/project-costing-heads';
+            if ($do === 'head_save') {
+                $raw = $_POST; $raw['of'] = (array)($_POST['of'] ?? []);
+                $raw['calc'] = (string)($_POST['amount'] ?? '');
+                [$ok, $res] = ch_library_save($raw, (string)($_POST['from'] ?? ''), $me);
+                flash($ok ? 'Saved — new roles get this value from ' . fdate((string)$_POST['from']) . '. Costings already made keep the value they were priced with.' : $res, $ok ? 'success' : 'error');
+                redirect($back . ($ok ? '#h-' . $res : '#edit'));
+            }
+            if ($do === 'head_active') {
+                ch_library_set_active((string)($_POST['code'] ?? ''), !empty($_POST['on']), $me);
+                flash(!empty($_POST['on']) ? 'Brought back.' : 'Retired — it is no longer offered for new roles; costings that use it keep it.');
+                redirect($back);
+            }
+            if ($do === 'dpm') {
+                $v = (float)($_POST['dpm'] ?? 0);
+                if ($v < 1 || $v > 31) { flash('Working days in a month must be from 1 to 31.', 'error'); redirect($back); }
+                setting_set('costing_days_per_month', (string)$v);
+                if (function_exists('act_log')) try { act_log('COSTING_HEADS', 0, 'UPDATE', 'Working days in a month for costings set to ' . $v . ' by ' . $me, []); } catch (Throwable $e) {}
+                flash('Saved — new roles use ' . $v . ' working days in a month (each role can still change it).');
+                redirect($back);
+            }
+            if ($do === 'template_save' || $do === 'template_from_role') {
+                $items = json_decode((string)($_POST['items_json'] ?? '[]'), true);
+                [$ok, $res] = ch_template_save((int)($_POST['tpl_id'] ?? 0), (string)($_POST['name'] ?? ''), (string)($_POST['note'] ?? ''), is_array($items) ? $items : [], $me);
+                flash($ok ? 'Template saved — pick it under "Start from a template" on any role.' : $res, $ok ? 'success' : 'error');
+                $rb = (string)($_POST['back'] ?? '');
+                redirect($do === 'template_from_role' && strpos($rb, '/project-costing?') === 0 ? $rb : $back . '#templates');
+            }
+            if ($do === 'template_active') {
+                ch_template_set_active((int)($_POST['tpl_id'] ?? 0), !empty($_POST['on']), $me);
+                flash(!empty($_POST['on']) ? 'Template brought back.' : 'Template removed.');
+                redirect($back . '#templates');
+            }
+            redirect($back);
+        }
+        view('ops/costing_heads', ['lib' => ch_library('9999-12-31', true), 'today' => ch_library(null, true),
+            'templates' => ch_templates(true), 'dpm' => ch_days_per_month(), 'canManage' => ch_can_manage(),
+            'editCode' => strtoupper((string)($_GET['edit'] ?? ''))]);
+        return true;
+    }
+
+    // ---- Live figures while a role is being edited (nothing is saved) ----
+    if ($route === 'project-costing-line-preview' && $method === 'POST') {
+        $cid = (int)($_POST['costing_id'] ?? 0); $h = pc_get($cid);
+        header('Content-Type: application/json');
+        if (!$h) { echo json_encode(['ok' => false, 'errors' => ['Costing not found.']]); return true; }
+        [$line, $errs, $ev] = pc_line_from_post($_POST, $h);
+        $c = pc_line_calc($line, $h);
+        echo json_encode(['ok' => !$errs, 'errors' => $errs, 'rows' => $ev['rows'], 'by_grp' => $ev['by_grp'],
+            'direct' => $c['direct'], 'pay' => $c['pay'], 'once' => $c['oneoff'], 'loaded' => $c['loaded'], 'rate' => $c['proposed'],
+            'revenue' => $c['revenue'], 'cost' => $c['cost'], 'profit' => $c['profit'], 'margin' => $c['margin']], JSON_UNESCAPED_UNICODE);
+        return true;
+    }
+
     // ---- Add / edit a role line ----
+    if ($route === 'project-costing-line-save' && $method === 'POST' && isset($_POST['items_json'])) {
+        // The heads editor (owner, 9 Nov 2026).
+        $cid = (int)($_POST['costing_id'] ?? 0); $h = pc_get($cid);
+        if (!$h) { flash('Costing not found.', 'error'); redirect('/project-costings'); }
+        ops_require(pc_can_edit() && !pc_locked($h), 'This costing is locked.');
+        $lineId = (int)($_POST['line_id'] ?? 0);
+        if ($lineId && !ops_one("SELECT id FROM project_costing_lines WHERE id=? AND costing_id=?", [$lineId, $cid])) { flash('Role not found.', 'error'); redirect('/project-costing?id=' . $cid); }
+        [$line, $errs] = pc_line_from_post($_POST, $h);
+        if ($errs) {
+            // Keep what was typed, so nothing has to be entered twice.
+            $_SESSION['pc_line_draft'][$cid] = ['line_id' => $lineId, 'post' => array_intersect_key($_POST,
+                array_flip(['group_label', 'role_label', 'headcount', 'boq_qty', 'target_margin', 'rate_manual', 'dpm', 'items_json']))];
+            flash('Not saved yet — ' . implode(' ', array_slice($errs, 0, 4)), 'error');
+            redirect('/project-costing?id=' . $cid . ($lineId ? '&edit=' . $lineId : '') . '#add-role');
+        }
+        $c = pc_line_calc($line, $h);
+        $args = [$line['group_label'], $line['role_label'], json_encode($c['heads'], JSON_UNESCAPED_UNICODE), $line['boq_qty'],
+                 $line['target_margin'], $line['rate_manual'], $c['oneoff'], $line['headcount'], $line['spec']];
+        if ($lineId) {
+            $pdo->prepare("UPDATE project_costing_lines SET group_label=?, role_label=?, heads=?, boq_qty=?, target_margin=?, rate_manual=?, oneoff=?, headcount=?, spec=? WHERE id=? AND costing_id=?")
+                ->execute(array_merge($args, [$lineId, $cid]));
+        } else {
+            $seq = (int)ops_val("SELECT COALESCE(MAX(seq),0)+1 FROM project_costing_lines WHERE costing_id=?", [$cid]);
+            $pdo->prepare("INSERT INTO project_costing_lines (costing_id,seq,group_label,role_label,heads,boq_qty,target_margin,rate_manual,oneoff,headcount,spec,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
+                ->execute(array_merge([$cid, $seq], $args, [date('c')]));
+        }
+        unset($_SESSION['pc_line_draft'][$cid]);
+        pc_restamp($cid);
+        flash($lineId ? 'Role updated.' : 'Role added.');
+        redirect('/project-costing?id=' . $cid);
+    }
     if ($route === 'project-costing-line-save' && $method === 'POST') {
         $cid = (int)($_POST['costing_id'] ?? 0); $h = pc_get($cid);
         if (!$h) { flash('Costing not found.', 'error'); redirect('/project-costings'); }
@@ -943,7 +1095,7 @@ function ops_projcosting($route, $method) {
         if (!$roll) { http_response_code(404); view('notfound'); return true; }
         $client = null;
         if (!empty($roll['header']['client_id'])) $client = ops_one("SELECT * FROM business_partners WHERE id=?", [(int)$roll['header']['client_id']]);
-        $roll['client'] = $client; $roll['heads'] = pc_heads();
+        $roll['client'] = $client; $roll['heads'] = $roll['labels'];
         require __DIR__ . '/../views/ops/project_costing_print.php';
         return true;
     }
@@ -953,7 +1105,9 @@ function ops_projcosting($route, $method) {
         $id = (int)($_GET['id'] ?? 0); $roll = pc_rollup($id);
         if (!$roll) { http_response_code(404); view('notfound'); return true; }
         pc_link_migrate();
+        $chOn = function_exists('ch_library');
         view('ops/project_costing', ['roll' => $roll, 'heads' => pc_heads(),
+            'chLib' => $chOn ? ch_library() : [], 'chTpls' => $chOn ? ch_templates() : [], 'chManage' => $chOn && ch_can_manage(),
             'clients' => function_exists('clients_list') ? clients_list() : [],
             'offices' => function_exists('offices_list') ? offices_list() : []]);
         return true;

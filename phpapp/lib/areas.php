@@ -79,7 +79,7 @@ function ops_area_def($area) {
         case 'sales':
             $title = 'Sales'; $icon = '🎯';
             $sub = 'Leads, opportunities, ' . strtolower(THP('inquiry')) . ', ' . strtolower(THP('quote')) . ' and the pipeline.';
-            $routes = ['sales','leads','lead','opportunities','opportunity','inquiries','inquiry','quotes','quote','pipelines','pipeline','approvals','stage-gates','ads-roi','project-costings','project-costing','preorder-checklist','templates'];
+            $routes = ['sales','leads','lead','opportunities','opportunity','inquiries','inquiry','quotes','quote','pipelines','pipeline','approvals','stage-gates','ads-roi','project-costings','project-costing','project-costing-heads','preorder-checklist','templates'];
             $t($fx('leads_can_view') && leads_can_view(), '🎯', 'Leads', '/leads', 'A company worth pursuing — before any specific job.',
                 $num(fn() => $fx('leads_due_count') ? leads_due_count() : 0), 'amber');
             $t($fx('opp_can_view') && opp_can_view(), '💡', 'Opportunities', '/opportunities', 'A live deal you are working to win or lose.');
