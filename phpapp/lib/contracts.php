@@ -449,6 +449,38 @@ function po_migrate() {
     static $doneAt = -1; if ($doneAt === db_epoch()) return; $doneAt = db_epoch();
     ensure_column('partner_purchase_orders', 'quotation_id', 'INT NULL');
     ensure_column('partner_purchase_orders', 'lines_synced_at', "VARCHAR(30) DEFAULT ''");
+    po_lines_backfill();
+}
+
+// Owner, 9 Nov 2026 — lines copied from a quotation used to arrive with no GST,
+// base, tax or total, so the order showed ₹0 against every line and adding one
+// more line reset the order's value to that line alone. Give every such line the
+// figures it should have had: quantity × rate, at its quotation's GST rate.
+// Runs once per installation; touches only lines whose amounts were never set.
+function po_lines_backfill() {
+    try {
+        if (function_exists('setting_get') && setting_get('po_lines_backfill_v1', '') === 'done') return;
+        $rows = ops_all("SELECT l.id, l.quantity, l.rate, po.quotation_id FROM po_line_items l
+                         JOIN partner_purchase_orders po ON po.id=l.purchase_order_id
+                         WHERE COALESCE(l.total_amount,0)=0 AND COALESCE(l.base_amount,0)=0
+                           AND COALESCE(l.quantity,0)*COALESCE(l.rate,0) > 0 AND po.quotation_id IS NOT NULL") ?: [];
+        $upd = db()->prepare("UPDATE po_line_items SET gst_pct=?, base_amount=?, tax_amount=?, total_amount=? WHERE id=?");
+        $gstOf = [];
+        foreach ($rows as $r) {
+            $q = (int)$r['quotation_id'];
+            if (!isset($gstOf[$q])) $gstOf[$q] = (float)(ops_val("SELECT gst_pct FROM quotations WHERE id=?", [$q]) ?: 0);
+            [$base, $tax, $total] = po_line_amounts((float)$r['quantity'], (float)$r['rate'], $gstOf[$q]);
+            $upd->execute([$gstOf[$q], $base, $tax, $total, (int)$r['id']]);
+        }
+        if (function_exists('setting_set')) setting_set('po_lines_backfill_v1', 'done');
+    } catch (Throwable $e) {}
+}
+
+// One line's money: base = quantity × rate, tax = base × GST%, total = both.
+function po_line_amounts($qty, $rate, $gstPct) {
+    $base = round((float)$qty * (float)$rate, 2);
+    $tax = round($base * (float)$gstPct / 100, 2);
+    return [$base, $tax, round($base + $tax, 2)];
 }
 
 // Copy every line of a quotation onto an order. Replaces what is there, because
@@ -466,12 +498,16 @@ function po_pull_quote_lines($poId, $quoteId) {
     $lines = ops_all("SELECT * FROM quote_lines WHERE quote_id=? ORDER BY line_no, id", [$quoteId]);
     if (!$lines) return ['ok' => false, 'error' => 'That quotation has no line items to copy.'];
     db()->prepare("DELETE FROM po_line_items WHERE purchase_order_id=?")->execute([$poId]);
-    $ins = db()->prepare("INSERT INTO po_line_items (purchase_order_id,description,item_type,quantity,rate,consumed) VALUES (?,?,?,?,?,0)");
+    // Each line keeps the quotation's GST rate, and its base, tax and total, so
+    // the order's figures match the quotation the client accepted.
+    $gst = (float)(ops_val("SELECT gst_pct FROM quotations WHERE id=?", [$quoteId]) ?: 0);
+    $ins = db()->prepare("INSERT INTO po_line_items (purchase_order_id,description,item_type,site,quantity,rate,consumed,gst_pct,base_amount,tax_amount,total_amount) VALUES (?,?,?,?,?,?,0,?,?,?,?)");
     foreach ($lines as $l) {
         $desc = trim((string)($l['description'] ?? '')) ?: (trim((string)($l['service_type'] ?? '')) ?: 'Line ' . (int)$l['line_no']);
-        if (trim((string)($l['location'] ?? '')) !== '') $desc .= ' — ' . $l['location'];
-        $ins->execute([$poId, mb_substr($desc, 0, 200), (string)($l['unit'] ?? 'MANDAY'),
-                       (float)($l['qty'] ?? 0), ($l['rate'] === null || $l['rate'] === '') ? null : (float)$l['rate']]);
+        $rate = ($l['rate'] === null || $l['rate'] === '') ? null : (float)$l['rate'];
+        [$base, $tax, $total] = po_line_amounts((float)($l['qty'] ?? 0), (float)$rate, $gst);
+        $ins->execute([$poId, mb_substr($desc, 0, 200), (string)($l['unit'] ?? 'MANDAY'), mb_substr(trim((string)($l['location'] ?? '')), 0, 200),
+                       (float)($l['qty'] ?? 0), $rate, $gst, $base, $tax, $total]);
     }
     db()->prepare("UPDATE partner_purchase_orders SET quotation_id=?, lines_synced_at=? WHERE id=?")
         ->execute([$quoteId, date('c'), $poId]);

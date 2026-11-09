@@ -644,7 +644,8 @@ document.addEventListener('DOMContentLoaded', function () {
     o0.textContent = clientSel.value ? '— none / direct call —' : '— pick a client first —';
     qSel.appendChild(o0);
     if (!clientSel.value) { fillLines(null); return; }
-    fetch('/client-quotes?id=' + encodeURIComponent(clientSel.value))
+    // The quotation already on the call is always asked for, so it stays picked.
+    fetch('/client-quotes?id=' + encodeURIComponent(clientSel.value) + (want ? '&keep=' + encodeURIComponent(want) : ''))
       .then(function(r){ return r.json(); })
       .then(function(list){
         list.forEach(function(q){
@@ -655,7 +656,11 @@ document.addEventListener('DOMContentLoaded', function () {
         });
         if (qSel.value) loadQuote(true);
         else setContractMode(false);        // direct call — the box is the user's
-      }).catch(function(){});
+      }).catch(function(){
+        // The list could not load: keep the link the call already has, rather
+        // than letting a save clear it.
+        if (want) { var k=document.createElement('option'); k.value=want; k.textContent='The quotation already linked (list could not load)'; k.selected=true; qSel.appendChild(k); }
+      });
   }
   function fillLines(ctx){
     var want = lineSel.value || lineSel.dataset.cur || '';

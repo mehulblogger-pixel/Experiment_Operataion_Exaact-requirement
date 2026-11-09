@@ -43,18 +43,28 @@ $stTone = ['DRAFT'=>'p-mut','SUBMITTED'=>'p-warn','APPROVED'=>'p-ok','REJECTED'=
 </details>
 <?php endif; ?>
 
+<?php $filter = $filter ?? ['q' => '', 'link' => '']; $filtered = $filter['q'] !== '' || $filter['link'] !== ''; ?>
+<form method="get" action="/project-costings" class="panel" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+  <div class="ff" style="margin:0;flex:1;min-width:220px"><label for="pcq">Find a costing</label>
+    <input class="form-control" id="pcq" name="q" value="<?= $e($filter['q']) ?>" placeholder="Code, title, client or quotation number"></div>
+  <div class="ff" style="margin:0"><label for="pcl">Show</label>
+    <select class="form-control" id="pcl" name="link"><option value="">All costings</option><option value="none"<?= $filter['link'] === 'none' ? ' selected' : '' ?>>Not on a quotation (incl. unlinked)</option></select></div>
+  <button class="btn secondary" type="submit">Show</button>
+  <?php if ($filtered): ?><a class="btn btn-ghost" href="/project-costings">Clear</a><?php endif; ?>
+</form>
 <div class="panel">
   <?php if (empty($rows)): ?>
-    <p class="muted" style="padding:8px">No costings yet.<?= $canEdit ? ' Create one above.' : '' ?></p>
+    <p class="muted" style="padding:8px"><?= $filtered ? 'No costing matches.' : 'No costings yet.' . ($canEdit ? ' Create one above.' : '') ?></p>
   <?php else: ?>
   <div class="scroll"><table class="grid">
-    <thead><tr><th>Code</th><th>Title</th><th>Client</th><th>Basis</th><th style="text-align:right">Revenue</th><th style="text-align:right">Cost</th><th style="text-align:right">Profit</th><th style="text-align:right">Margin</th><th>Status</th></tr></thead>
+    <thead><tr><th>Code</th><th>Title</th><th>Client</th><th>Quotation</th><th>Basis</th><th style="text-align:right">Revenue</th><th style="text-align:right">Cost</th><th style="text-align:right">Profit</th><th style="text-align:right">Margin</th><th>Status</th></tr></thead>
     <tbody>
     <?php foreach ($rows as $r): $rev=(float)$r['exp_revenue']; $pf=(float)$r['exp_profit']; $mg=$rev>0?$pf/$rev*100:0; ?>
       <tr>
         <td><a href="/project-costing?id=<?= (int)$r['id'] ?>"><b><?= $e($r['code']) ?></b></a></td>
         <td><?= $e($r['title']) ?><?= !empty($r['site']) ? '<br><span class="muted" style="font-size:11px">'.$e($r['site']).'</span>' : '' ?></td>
         <td><?= $e($r['client_name'] ?? '—') ?></td>
+        <td><?php if (!empty($r['quote_id']) && !empty($r['quote_no'])): ?><a href="/quote?id=<?= (int)$r['quote_id'] ?>"><?= $e($r['quote_no']) ?><?= (int)($r['quote_rev'] ?? 0) ? ' R' . (int)$r['quote_rev'] : '' ?></a><?php else: ?><span class="muted">not on one</span><?php endif; ?></td>
         <td><span class="muted" style="font-size:12px"><?= $e(PC_BASES[$r['basis']] ?? $r['basis']) ?></span></td>
         <td style="text-align:right"><?= fmoney_short($rev) ?></td>
         <td style="text-align:right"><?= fmoney_short($r['exp_cost']) ?></td>

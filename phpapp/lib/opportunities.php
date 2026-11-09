@@ -962,7 +962,7 @@ function ops_opportunities($route, $method) {
             'timeline' => function_exists('act_for_entity') ? act_for_entity('OPPORTUNITY', (int)$o['id'], 40) : [],
             'lostReasons' => opp_lost_reasons(), 'canEdit' => $canEdit,
             'costing' => function_exists('pc_for_opportunity') ? pc_for_opportunity((int)$o['id']) : null,
-            'costingUnlinked' => function_exists('pc_unlinked') ? pc_unlinked() : [],
+            'costingUnlinked' => function_exists('pc_unlinked') ? pc_unlinked(100, 'opportunity', (int)($o['client_id'] ?? 0)) : [],
             'costingCan' => function_exists('pc_can') && pc_can(),
             // Who a deal can be allocated to, and which pipeline it can be put on.
             'users' => ops_all("SELECT id, first_name, last_name, username FROM users

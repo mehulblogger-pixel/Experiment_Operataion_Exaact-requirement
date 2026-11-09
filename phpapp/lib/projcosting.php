@@ -333,7 +333,7 @@ function pc_lines($id) {
     pc_migrate();
     return ops_all("SELECT * FROM project_costing_lines WHERE costing_id=? ORDER BY seq, id", [(int)$id]) ?: [];
 }
-function pc_all($limit = 200) {
+function pc_all($limit = 200, array $f = []) {
     pc_migrate();
     // M16 (product decision, Option B) — costings follow BRANCH SCOPE.
     //
@@ -345,13 +345,30 @@ function pc_all($limit = 200) {
     // office, with an UNASSIGNED costing still visible to everyone so that work
     // nobody has filed to a branch does not disappear.
     [$sw, $sa] = function_exists('scope_office_clause') ? scope_office_clause('c.office_id') : ['1=1', []];
-    return ops_all("SELECT c.*, COALESCE(p.display_name,p.legal_name) client_name
+    // MOD-REP (owner, 9 Nov 2026) — "if we unlink the costing from the quotation
+    // it is lost". It never was deleted; the register simply gave no way to find
+    // it. It can now be searched, and narrowed to the costings on no quotation.
+    $q = trim((string)($f['q'] ?? ''));
+    if ($q !== '') {
+        $sw .= " AND (c.code LIKE ? OR c.title LIKE ? OR COALESCE(p.display_name,p.legal_name,'') LIKE ? OR COALESCE(qq.quote_no,'') LIKE ?)";
+        $like = '%' . $q . '%'; array_push($sa, $like, $like, $like, $like);
+    }
+    if (($f['link'] ?? '') === 'none') $sw .= " AND COALESCE(c.quote_id,0)=0";
+    return ops_all("SELECT c.*, COALESCE(p.display_name,p.legal_name) client_name, qq.quote_no, qq.rev quote_rev
                     FROM project_costings c LEFT JOIN business_partners p ON p.id=c.client_id
+                    LEFT JOIN quotations qq ON qq.id=c.quote_id
                     WHERE $sw
                     ORDER BY c.id DESC LIMIT " . (int)$limit, $sa) ?: [];
 }
 // The costing linked to a given quotation / opportunity (or null).
-function pc_for_quote($qid) { pc_migrate(); return $qid ? (ops_one("SELECT * FROM project_costings WHERE quote_id=? ORDER BY id DESC LIMIT 1", [(int)$qid]) ?: null) : null; }
+// A quotation's costing is the one linked to ANY of its revisions: a revision is
+// the same quotation re-priced, so revising it must not make its costing vanish
+// from the panel (the approval check already looked across revisions).
+function pc_for_quote($qid) {
+    pc_migrate(); if (!$qid) return null;
+    $base = (int)(ops_val("SELECT COALESCE(NULLIF(parent_id,0), id) FROM quotations WHERE id=?", [(int)$qid]) ?: (int)$qid);
+    return ops_one("SELECT * FROM project_costings WHERE quote_id IN (SELECT id FROM quotations WHERE id=? OR parent_id=?) OR quote_id=? ORDER BY id DESC LIMIT 1", [$base, $base, (int)$qid]) ?: null;
+}
 function pc_for_opportunity($oid) { pc_migrate(); return $oid ? (ops_one("SELECT * FROM project_costings WHERE opportunity_id=? ORDER BY id DESC LIMIT 1", [(int)$oid]) ?: null) : null; }
 
 // Module 20 — the bid estimate behind a CONTRACT (a boss number). A boss number
@@ -397,11 +414,18 @@ function pc_estimate_vs_actual($bossId) {
     ];
 }
 // Costings not yet linked to any quote/opportunity — the "attach existing" list.
-function pc_unlinked($limit = 100) {
+// $for 'quote': every costing on no quotation (one still tagged to a deal may be
+// attached to that deal's quotation); 'opportunity': every costing on no deal.
+// The same client's costings come first; branch scope as the register.
+function pc_unlinked($limit = 100, $for = 'quote', $clientId = 0) {
     pc_migrate();
-    return ops_all("SELECT id, code, title, exp_revenue FROM project_costings
-                    WHERE COALESCE(quote_id,0)=0 AND COALESCE(opportunity_id,0)=0
-                    ORDER BY id DESC LIMIT " . (int)$limit) ?: [];
+    [$sw, $sa] = function_exists('scope_office_clause') ? scope_office_clause('c.office_id') : ['1=1', []];
+    $col = $for === 'opportunity' ? 'opportunity_id' : 'quote_id';
+    array_unshift($sa, (int)$clientId);
+    return ops_all("SELECT c.id, c.code, c.title, c.exp_revenue, c.status, COALESCE(p.display_name,p.legal_name) client_name
+                    FROM project_costings c LEFT JOIN business_partners p ON p.id=c.client_id
+                    WHERE COALESCE(c.$col,0)=0 AND $sw
+                    ORDER BY (COALESCE(c.client_id,0)=?) DESC, c.id DESC LIMIT " . (int)$limit, $sa) ?: [];
 }
 
 // ---- The maths -------------------------------------------------------------
@@ -1035,9 +1059,21 @@ function ops_projcosting($route, $method) {
         ops_require(pc_can_edit() || (function_exists('can') && (can('mod.quotes.edit') || can('mod.hiring.edit'))), 'You cannot link this costing.');
         $qid = isset($_POST['quote_id']) ? (int)$_POST['quote_id'] : null;
         $oid = isset($_POST['opportunity_id']) ? (int)$_POST['opportunity_id'] : null;
+        $was = (int)($h['quote_id'] ?? 0); $wasOpp = (int)($h['opportunity_id'] ?? 0);
         if ($qid !== null) $pdo->prepare("UPDATE project_costings SET quote_id=?, updated_at=? WHERE id=?")->execute([$qid ?: null, date('c'), $id]);
         if ($oid !== null) $pdo->prepare("UPDATE project_costings SET opportunity_id=?, updated_at=? WHERE id=?")->execute([$oid ?: null, date('c'), $id]);
-        flash(($qid || $oid) ? 'Costing linked.' : 'Costing unlinked.');
+        // Every link and unlink is written down — on the costing, and in the
+        // quotation's own history — so a costing unlinked by mistake can be traced
+        // and attached again (MOD-REP, owner, 9 Nov 2026).
+        $me = user_name(current_user());
+        $what = $qid !== null ? ($qid ? 'linked to quotation #' . $qid : 'unlinked from quotation #' . $was) : ($oid ? 'linked to deal #' . $oid : 'unlinked from deal #' . $wasOpp);
+        if (function_exists('act_log')) try { act_log('PROJECT_COSTING', $id, 'UPDATE', 'Costing ' . $h['code'] . ' ' . $what . ' by ' . $me, []); } catch (Throwable $e) {}
+        if ($qid !== null && function_exists('crm_log_change')) {
+            if ($was && !$qid) try { crm_log_change($was, 'Costing ' . $h['code'] . ' was unlinked by ' . $me . '. It is kept in Project costing (filter "Not on a quotation") and can be attached again from this quotation.'); } catch (Throwable $e) {}
+            if ($qid) try { crm_log_change($qid, 'Costing ' . $h['code'] . ' was linked by ' . $me . '.'); } catch (Throwable $e) {}
+        }
+        flash(($qid || $oid) ? 'Costing ' . $h['code'] . ' linked.'
+            : 'Costing ' . $h['code'] . ' unlinked — it is not deleted. Find it under Sales → Project costing ("Not on a quotation"), or attach it again with "attach existing…".');
         // Return to wherever the request came from.
         $back = (string)($_POST['back'] ?? '');
         redirect($back !== '' ? $back : '/project-costing?id=' . $id);
@@ -1119,7 +1155,8 @@ function ops_projcosting($route, $method) {
     $inqs = ops_all("SELECT i.id, i.inquiry_no, i.client_name, i.subject FROM crm_inquiries i
                      WHERE COALESCE(i.status,'OPEN') <> 'DROPPED' AND $ow ORDER BY i.id DESC LIMIT 300", $oa) ?: [];
     $leads = function_exists('leads_all') ? (leads_try(fn() => leads_all(['status' => 'OPEN'], ' LIMIT 300'), []) ?: []) : [];
-    view('ops/project_costings', ['rows' => pc_all(),
+    view('ops/project_costings', ['rows' => pc_all(200, ['q' => (string)($_GET['q'] ?? ''), 'link' => (string)($_GET['link'] ?? '')]),
+        'filter' => ['q' => (string)($_GET['q'] ?? ''), 'link' => (string)($_GET['link'] ?? '')],
         'clients' => function_exists('clients_list') ? clients_list() : [],
         'offices' => function_exists('offices_list') ? offices_list() : [],
         'inquiries' => $inqs, 'leads' => $leads,

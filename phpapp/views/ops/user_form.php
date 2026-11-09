@@ -271,6 +271,17 @@
       <input class="form-control" name="position_title_new" id="u_desig_new" style="display:none;margin-top:6px"
              placeholder="Type the new designation — it is added to the master">
       <small class="muted"><a href="/lookup?key=designation">Manage the designation master</a></small></div>
+    <?php // MOD-REP (owner, 9 Nov 2026) — "Inspector – Mechanical or Electrical". The
+          // discipline is the team member's trade (Masters → Trade / discipline), so
+          // job matching and the team register read the same value. ?>
+    <?php $discOpts = (function_exists('lk_type') && lk_type('trade') && function_exists('lk_root_values')) ? lk_root_values(lk_type('trade')['id']) : [];
+          $curDisc = $user && function_exists('user_discipline_id') ? user_discipline_id($user) : 0; ?>
+    <div class="ff"><label for="u_disc">Discipline <span class="muted">— e.g. Mechanical, Electrical</span></label>
+      <select class="form-control searchable" name="discipline_id" id="u_disc">
+        <option value="">— not set —</option>
+        <?php foreach ($discOpts as $dv): ?><option value="<?= (int)$dv['id'] ?>" <?= $curDisc === (int)$dv['id'] ? 'selected' : '' ?>><?= e($dv['label']) ?></option><?php endforeach; ?>
+      </select>
+      <small class="muted">Shown with the designation, e.g. “Inspector — Mechanical”. It is the team member's discipline too. <a href="/lookup?key=trade">Manage the discipline list</a></small></div>
 
     <?php // 5.5 days is five full days plus one half day. It was mislabelled
           // "alternate Sat off", which is a different arrangement altogether and

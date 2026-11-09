@@ -701,6 +701,7 @@ function run_schema($withSeeds = true) {
     if (function_exists('costing_migrate')) costing_migrate();       // salary + overhead allocation to Business Units
     if (function_exists('joblock_migrate')) joblock_migrate();       // close-on-time lock
     if (function_exists('po_migrate')) po_migrate();                 // an order remembers its quotation
+    if (function_exists('ch_migrate')) ch_migrate();                 // costing-head library and templates (owner, 9 Nov 2026)
     widen_file_columns();                                            // uploads need LONGTEXT, not MEDIUMTEXT
     if (function_exists('bills_migrate')) bills_migrate();             // chargeable expenses + their bills
     if (function_exists('billable_migrate')) billable_migrate();       // Revamp P4 — Billable Event ledger (operational→commercial bridge)

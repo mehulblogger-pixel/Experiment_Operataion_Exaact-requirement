@@ -433,7 +433,11 @@ function ch_unit_for_basis($basis) { return strtoupper((string) $basis) === 'DAI
 // ---- The library (Masters-level setup) --------------------------------------
 // Who changes the library and the templates: the people who change the Masters
 // lists, of which the "Costing head" list is one (docs/02 row 12, is_admin_level()).
+// It is also a project-costing screen, so it asks the costing question first:
+// no costing module (Sales or Recruitment) entitled, no costing setup — the same
+// answer the route itself gives (pc_can() runs before every costing route).
 function ch_can_manage() {
+    if (function_exists('pc_can') && !pc_can()) return false;
     return (function_exists('is_admin_level') && is_admin_level()) || (function_exists('is_master') && is_master());
 }
 

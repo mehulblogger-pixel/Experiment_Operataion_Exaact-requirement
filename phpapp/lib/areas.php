@@ -192,7 +192,7 @@ function ops_area_def($area) {
         case 'reporting':
             $title = 'Reporting'; $icon = '📑';
             $sub = 'Where inspection reports are written, endorsed, expedited and the formats that govern them.';
-            $routes = ['reporting','documents','document','endorsements','endorsement','vendors','vendor-profile','expediting','expediting-projects','writing-assistant','phrase-library','learning','compliance'];
+            $routes = ['reporting','documents','document','endorsements','endorsement','vendors','vendor-profile','expediting','expediting-projects','writing-assistant','phrase-library','learning'];
             if ((!function_exists('connect_cap_owner_shows') || connect_cap_owner_shows('reporting')) && can('mod.idems.view')) {
                 $sec('Reports');
                 $t(true, '📑', T_REG('report'), '/documents', 'The report register.',
@@ -212,8 +212,10 @@ function ops_area_def($area) {
                 // trail are set-once configuration — they now live under Admin so
                 // Reporting stays about writing reports.
 
-                $sec('Governance');
-                $t(is_master() || can('settings.manage'), '⚖️', 'Where we stand', '/compliance', 'Which obligations are met, measured live.');
+                // "Governance" (the data-protection and cyber-security checklist and
+                // the incident register) is not about inspection reports, which is why
+                // it confused the owner here (MOD-REP, 9 Nov 2026). It now sits in
+                // Admin → "Data protection & security", for the same people.
             }
             break;
 
@@ -293,7 +295,7 @@ function ops_area_def($area) {
         case 'admin':
             $title = 'Admin'; $icon = '⚙️';
             $sub = 'For administrators: masters, people, access, licensing and system configuration.';
-            $routes = ['admin','workspace/setup','workspace/setup/modules','masters','m/','lookups','custom-fields','cforms','cform','form-designer','ai-forms','users','user-new','user-edit','hierarchy','access','role-workspaces','adspro','sso','licence','product-package','pricing-usage','settings','terminology','service-scope','service-formats','company-profile','backup','ai-settings','books-bridge','approvals-setup','approver-map','approval-rules','idems-approval-rules','templates','report-templates','audit-log'];
+            $routes = ['admin','report-types','report-type-edit','irn-rules','compliance','incidents','incident','incident-new','incident-edit','consents','data-requests','workspace/setup','workspace/setup/modules','masters','m/','lookups','custom-fields','cforms','cform','form-designer','ai-forms','users','user-new','user-edit','hierarchy','access','role-workspaces','adspro','sso','licence','product-package','pricing-usage','settings','terminology','service-scope','service-formats','company-profile','backup','ai-settings','books-bridge','approvals-setup','approver-map','approval-rules','idems-approval-rules','templates','report-templates','audit-log'];
 
             // Phase 1 — the Company Setup Cockpit is the single front door to all
             // configuration below. Shown first so a non-technical admin starts here.
@@ -380,6 +382,23 @@ function ops_area_def($area) {
             // holding only that permission no longer forces a marketing manager into Admin.
             $t(licence_enabled('reporting') && (can('idems.type.manage') || is_master()), '📝', 'Report templates', '/templates?kind=report', 'The report template library.');   // M11 — explicit destination
             $t(licence_enabled('reporting') && (can('idems.audit.view') || is_master()), '🛡️', 'Report audit trail', '/audit-log', 'Who changed what, and when.');
+            // MOD-REP (owner, 9 Nov 2026) — "there is no direct access to report types
+            // from Admin", nor to the IRN rules or the phrase library: all three were
+            // reachable only through buttons on the report register. They are set-up
+            // screens, so they are here too, each for exactly the people its own
+            // handler already lets in (docs/02 row 18 — no permission changes).
+            $t(licence_enabled('reporting') && (is_master() || can('idems.type.manage') || can('master.manage')), '🧾', 'Report types', '/report-types', 'The kinds of inspection report, their forms — and the ready-made report.');
+            $t(licence_enabled('reporting') && (is_master() || can('idems.type.manage')), '🔢', 'IRN numbering rules', '/irn-rules', 'How report numbers (IRN) are built, per branch.');
+            $t(licence_enabled('reporting') && (is_master() || can('idems.type.manage') || can('master.manage')), '💬', 'Phrase library', '/phrase-library', 'Standard wording inspectors drop into reports.');
+
+            $sec('Data protection & security');
+            // Was the "Governance" tab under Reporting. India's IT Act, CERT-In
+            // directions and the DPDP Act: a live checklist of what is met, and the
+            // registers those laws ask for. Same gate as before (settings.manage).
+            $t(is_master() || can('settings.manage'), '⚖️', 'Where we stand', '/compliance', 'Data-protection and cyber-security obligations, checked live.');
+            $t(is_master() || can('settings.manage'), '🚨', 'Security incident register', '/incidents', 'Data breaches and cyber incidents — the 6-hour CERT-In clock.');
+            $t(is_master() || can('settings.manage'), '✋', 'Consent register', '/consents', 'Who agreed to what use of their personal data.');
+            $t(is_master() || can('settings.manage'), '📨', 'Personal-data requests', '/data-requests', 'People asking to see, correct or erase their data.');
 
             $sec('Super admin');
             $t($fx('superadmin_can') && superadmin_can(), '🛰️', 'Control panel', '/super-admin', 'Licence, seats, modules, subscription, tenants and system tools in one place.');

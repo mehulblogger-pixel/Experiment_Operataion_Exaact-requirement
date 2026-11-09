@@ -13,6 +13,10 @@ $id = (int)$p['id'];
 // an empty tab reads as "there is nothing here", which is a different and
 // misleading statement.
 $pBasic = ($viewLevel ?? 'FULL') !== 'FULL';
+// Who may register a contract here: the same gate as the handler (Sales & CRM
+// switched on, and the register-a-contract right).
+$canRegisterContract = (!function_exists('licence_module_live') || licence_module_live('quotes'))
+    && (is_master() || can('crm.contract.register'));
 $tabs = ['overview'=>'Overview','general'=>'General'];
 if (!$pBasic) $tabs += ['registration'=>'Registration','addresses'=>'Addresses','contacts'=>'Contacts'];
 if (!empty($p['is_client']) && !$pBasic) { $tabs['purchase_orders']='Purchase Orders'; $tabs['contracts']='Contract Numbers'; }
@@ -191,116 +195,17 @@ function addr_name($a) { return (lk_options_or('address_type', ADDRESS_TYPES)[$a
   <?php endif; ?>
 
   <h3 class="tab-sub">Add a contract</h3>
-  <p class="muted">Contracts are usually recorded after a purchase order is received. If the order came from a
-    <?= e(Tl('quote')) ?> we raised, name it — the number is written back onto that <?= e(Tl('quote')) ?>,
-    and the value and dates are offered from it.</p>
-  <?php // Warn — do not block. Adding another contract is legitimate for a separate
-        // agreement (a new project, a new year, a group company), so the client's live
-        // contracts are named here rather than the door refusing. Registering a won
-        // quotation, or a related group company, has its own door on the quotation.
-    $liveContracts = array_values(array_filter($contracts, function ($c) {
-        $os = strtoupper((string)($c['open_status'] ?? ''));
-        return $os === '' ? ((int)($c['is_active'] ?? 1) === 1) : in_array($os, ['OPEN', 'PENDING'], true);
-    }));
-    if ($liveContracts): $nlc = count($liveContracts); ?>
-  <div class="msg msg-warning" style="margin:0 0 12px">
-    This <?= e(Tl('client')) ?> already has <?= $nlc ?> live contract<?= $nlc > 1 ? 's' : '' ?>:
-    <?php $i = 0; foreach ($liveContracts as $lc): $i++;
-        $os = strtoupper((string)($lc['open_status'] ?? '')); ?>
-      <a href="/contract?id=<?= (int)$lc['id'] ?>"><b><?= e($lc['contract_number']) ?></b></a><?= $os !== '' ? ' (' . e(strtolower(CONTRACT_OPEN_STATES[$os] ?? $os)) . ')' : '' ?><?= $i < $nlc ? ',' : '' ?>
-    <?php endforeach; ?>.
-    Add another <b>only</b> if it is a genuinely separate agreement — a new project, a new year, or a group company.
-    To register the contract for a <b>won <?= e(Tl('quote')) ?></b>, do it from the <?= e(Tl('quote')) ?>; to add a related
-    <b>group-company</b> contract under one <?= e(Tl('quote')) ?>, use the <?= e(Tl('quote')) ?>’s group-contract action.
-  </div>
+  <?php // Owner, 9 Nov 2026 — a client sometimes sends a PO straight away, without our
+        // sales cycle. The contract is then added here, in a pop-up filled in from this
+        // client, with the next contract number offered; closing it brings you back to
+        // this list with the new contract on it. ?>
+  <?php if ($canRegisterContract): ?>
+    <p class="muted">For a <b>won <?= e(Tl('quote')) ?></b> the contract is normally registered from the <?= e(Tl('quote')) ?> itself.
+      Use this when the <?= e(Tl('client')) ?> sent a purchase order directly, or for a separate agreement. A new contract is checked by a manager and approved by the branch manager before it goes live.</p>
+    <a class="btn" href="/partner-contract-new?id=<?= $id ?>" data-embed="/partner-contract-new?id=<?= $id ?>" data-embed-title="New contract — <?= e(partner_name($p)) ?>">＋ Add a contract</a>
+  <?php else: ?>
+    <p class="muted">Contracts are registered by Accounts / back-office (the people who may register a contract). Ask them to add it — from the <?= e(Tl('quote')) ?>, or here if the order came directly.</p>
   <?php endif; ?>
-  <?php /* M11 — the authoritative path, stated before the form rather than only
-           after a partner already has live contracts. The form stays: it is a
-           legitimate secondary door for a contract recorded directly. */ ?>
-  <?php if (!$nlc): ?>
-  <div class="muted" style="margin:6px 0 10px">
-    A contract for a <b>won <?= e(Tl('quote')) ?></b> is normally registered from the <?= e(Tl('quote')) ?> itself,
-    which carries the value and the scope across for you. Use the form below when the contract was
-    agreed directly and there is no <?= e(Tl('quote')) ?> behind it.
-  </div>
-  <?php endif; ?>
-  <form method="post" action="/partner-add?id=<?= $id ?>&kind=contract" class="inline-add">
-    <div class="ff"><label>Contract number</label><input class="form-control" name="contract_number" required></div>
-    <div class="ff"><label>Against <?= e(Tl('quote')) ?> <span class="muted">— only those with no contract number</span></label>
-      <select class="form-control searchable" id="ct_quote" name="quotation_id">
-        <option value="">— none / recorded directly —</option>
-        <?php foreach ($awaiting as $aq): ?>
-          <option value="<?= (int)$aq['id'] ?>" data-value="<?= e((string)$aq['total_amount']) ?>" data-title="<?= e($aq['subject'] ?? '') ?>">
-            <?= e($aq['quote_no']) ?><?= (int)$aq['rev'] ? ' R' . (int)$aq['rev'] : '' ?>
-            · <?= e(cur_sym()) ?><?= number_format((float)$aq['total_amount'], 0) ?>
-            · <?= e(lk_options_or('quote_status', QUOTE_STATUS)[$aq['status']] ?? $aq['status']) ?>
-            <?= $aq['subject'] ? ' — ' . e(mb_strimwidth($aq['subject'], 0, 40, '…')) : '' ?>
-          </option>
-        <?php endforeach; ?>
-      </select>
-      <?php if (!$awaiting): ?><small class="muted">Every <?= e(Tl('quote')) ?> for this <?= e(Tl('client')) ?> already has a contract number.</small><?php endif; ?></div>
-    <div class="ff"><label>Title</label><input class="form-control" id="ct_title" name="title"></div>
-    <div class="ff"><label><?= e(T("sbu")) ?></label><select class="form-control searchable" name="sbu"><option value="">—</option><?php foreach (lk_options_or('sbu', OPS_SBUS) as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
-    <div class="ff"><label>Value</label><input class="form-control" type="number" step="0.01" id="ct_value" name="value"></div>
-    <div class="ff"><label>Start date</label><input class="form-control" type="date" name="start_date"></div>
-    <?php // Without an end date a contract never expires, and the expiry warnings
-          // and the scheduling gate have nothing to work from. It was missing here. ?>
-    <div class="ff"><label>End date <span class="muted">— when cover stops</span></label><input class="form-control" type="date" name="end_date"></div>
-    <?php // Field #3 — "Quantity sold" is a LIST: one line per item (man-days / man-months
-          //   / other). Name a quotation above and its line items are carried across on save;
-          //   otherwise type them here. All blank = untracked. qty_total becomes their sum. ?>
-    <div class="ff ff-wide"><label>Quantity sold <span class="muted">— one line per item (man-days / man-months / other); leave all blank for untracked. Naming a <?= e(Tl('quote')) ?> above carries its line items across.</span></label>
-      <table class="grid cl-table"><thead><tr><th>Description</th><th style="width:110px">Qty</th><th style="width:160px">Unit</th><th style="width:34px"></th></tr></thead>
-        <tbody data-cl-rows="add">
-          <tr class="cl-row">
-            <td><input class="form-control" name="cl_desc[]" placeholder="e.g. Third-party inspection"></td>
-            <td><input class="form-control" type="number" step="0.01" min="0" name="cl_qty[]"></td>
-            <td><select class="form-control" name="cl_unit[]"><?php foreach (lk_options_or('charge_unit', CHARGE_UNITS) as $k=>$v): ?><option value="<?= e($k) ?>"<?= $k==='MANDAY'?' selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></td>
-            <td><button type="button" class="btn small secondary cl-del" title="Remove line">✕</button></td>
-          </tr>
-        </tbody></table>
-      <button type="button" class="btn small secondary cl-add" data-cl-rows="add">+ Add line</button>
-    </div>
-    <button class="btn small" type="submit">Add Contract</button>
-  </form>
-  <script>
-  (function () {
-    // Field #3 — clone/remove quantity line rows (works for the add form and any edit form).
-    document.addEventListener('click', function (e) {
-      var add = e.target.closest && e.target.closest('.cl-add');
-      if (add) {
-        var key = add.getAttribute('data-cl-rows');
-        var body = document.querySelector('tbody[data-cl-rows="' + key + '"]');
-        if (!body) return;
-        var last = body.querySelector('.cl-row:last-child'); if (!last) return;
-        var row = last.cloneNode(true);
-        Array.prototype.forEach.call(row.querySelectorAll('input'), function (i) { i.value = ''; });
-        body.appendChild(row);
-        return;
-      }
-      var del = e.target.closest && e.target.closest('.cl-del');
-      if (del) {
-        var tb = del.closest('tbody');
-        if (tb && tb.querySelectorAll('.cl-row').length > 1) del.closest('.cl-row').remove();
-        else { var r = del.closest('.cl-row'); if (r) Array.prototype.forEach.call(r.querySelectorAll('input'), function (i) { i.value = ''; }); }
-      }
-    });
-  })();
-  </script>
-  <script>
-  (function () {
-    // Naming the quotation offers its value and subject, so the two records do
-    // not drift apart over a typo.
-    var q = document.getElementById('ct_quote');
-    if (!q) return;
-    q.addEventListener('change', function () {
-      var o = q.options[q.selectedIndex]; if (!o || !o.value) return;
-      var v = document.getElementById('ct_value'), t = document.getElementById('ct_title');
-      if (v && !v.value && o.dataset.value) v.value = o.dataset.value;
-      if (t && !t.value && o.dataset.title) t.value = o.dataset.title;
-    });
-  })();
-  </script>
 
 <?php elseif ($tab === 'purchase_orders'): ?>
   <?php $ctById = []; foreach ($contracts as $ct) $ctById[$ct['id']] = $ct; ?>
@@ -353,16 +258,30 @@ function addr_name($a) { return (lk_options_or('address_type', ADDRESS_TYPES)[$a
     <div class="ff"><label>Type</label><select class="form-control" name="po_type"><?php foreach (lk_options_or('po_type', PO_TYPES) as $k=>$v): ?><option value="<?= $k ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Against contract</label>
       <select class="form-control searchable" id="po_contract" name="contract_id"><option value="">— none —</option>
-        <?php foreach ($contracts as $ct): ?><option value="<?= (int)$ct['id'] ?>"><?= e($ct['contract_number'].' '.$ct['title']) ?></option><?php endforeach; ?>
-      </select></div>
+        <?php foreach ($contracts as $ct): ?><option value="<?= (int)$ct['id'] ?>" data-start="<?= e((string)($ct['start_date'] ?? '')) ?>" data-end="<?= e((string)($ct['end_date'] ?? '')) ?>"><?= e($ct['contract_number'].' '.$ct['title']) ?></option><?php endforeach; ?>
+      </select>
+      <?php if ($canRegisterContract ?? false): ?><a href="/partner-contract-new?id=<?= $id ?>&amp;back=purchase_orders" data-embed="/partner-contract-new?id=<?= $id ?>&amp;back=purchase_orders" data-embed-title="New contract" class="addlink">+ New contract</a><?php endif; ?></div>
     <div class="ff ff-wide"><label><?= e(TP('sbu')) ?> — revenue (tick one or more)</label>
       <div class="checkgrid"><?php foreach (lk_options_or('sbu', OPS_SBUS) as $k=>$v): ?><label class="chk"><input type="checkbox" class="po-sbu" name="po_sbu[]" value="<?= e($k) ?>"> <?= e($v) ?></label><?php endforeach; ?></div></div>
     <div class="ff"><label>Title</label><input class="form-control" id="po_title" name="title"></div>
     <div class="ff"><label>Value <span class="muted">— from the <?= e(Tl('quote')) ?> if one is named</span></label><input class="form-control" type="number" step="0.01" id="po_value" name="value"></div>
+    <?php // Owner, 9 Nov 2026 — the order's own dates and remarks were read on save
+          // but never asked for. Offered from the contract it is under. ?>
+    <div class="ff"><label>PO valid from</label><input class="form-control" type="date" id="po_start" name="start_date"></div>
+    <div class="ff"><label>PO valid to</label><input class="form-control" type="date" id="po_end" name="end_date"></div>
+    <div class="ff ff-wide"><label>Notes <span class="muted">optional</span></label><input class="form-control" name="notes" maxlength="400" placeholder="e.g. Rate contract — call-offs by e-mail"></div>
     <button class="btn small" type="submit">Add PO</button>
   </form>
   <script>
   (function () {
+    // The order's dates default to the contract's.
+    var pc = document.getElementById('po_contract');
+    if (pc) pc.addEventListener('change', function () {
+      var o = pc.options[pc.selectedIndex]; if (!o) return;
+      var s = document.getElementById('po_start'), en = document.getElementById('po_end');
+      if (s && !s.value && o.dataset.start) s.value = o.dataset.start;
+      if (en && !en.value && o.dataset.end) en.value = o.dataset.end;
+    });
     var q = document.getElementById('po_quote');
     if (!q) return;
     q.addEventListener('change', function () {

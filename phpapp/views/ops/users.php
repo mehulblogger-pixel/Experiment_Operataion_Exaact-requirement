@@ -79,6 +79,10 @@
       <?php // Someone whose access is their own, not their role's: the role's rules
             //  (and later changes to them) do not reach this person. Shown so it is
             //  a choice somebody made, not something nobody noticed. ?>
+      <?php // Designation and discipline — "Inspector — Mechanical" (MOD-REP, 9 Nov 2026).
+            if (function_exists('user_discipline_id') && (trim((string)($u['position_title'] ?? '')) !== '' || user_discipline_id($u))): ?>
+        <div class="muted" style="font-size:12px"><?= e(user_role_discipline_label($u)) ?></div>
+      <?php endif; ?>
       <?php if (function_exists('user_has_own_access') && user_has_own_access($u)): ?>
         <a class="pill p-warn" href="/user-edit?id=<?= (int)$u['id'] ?>" title="This person's permissions differ from their role's. Open them → Permissions to see how, or to put them back on the role.">own access</a>
       <?php endif; ?></td>

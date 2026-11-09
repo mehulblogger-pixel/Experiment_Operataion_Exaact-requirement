@@ -1,9 +1,22 @@
+<?php
+  // Owner, 9 Nov 2026 — this screen is reached from the client's record, so it
+  // leads straight back there, and to the contract it is under.
+  $poCt = !empty($po['contract_id']) ? ops_one("SELECT id, contract_number FROM partner_contracts WHERE id=?", [(int)$po['contract_id']]) : null;
+  $lastLn = $items ? end($items) : null; if ($items) reset($items);
+  $poGst = $lastLn ? (float)$lastLn['gst_pct'] : (!empty($po['quotation_id']) ? (float)(ops_val("SELECT gst_pct FROM quotations WHERE id=?", [(int)$po['quotation_id']]) ?: 18) : 18);
+?>
 <div class="master-head">
   <div><h1><?= e($po['po_number'] ?: 'Open order') ?></h1>
     <p class="sub"><?= e($po['pdn'] ?: $po['pn']) ?> · <?= e(lk_options_or('po_type', PO_TYPES)[$po['po_type']] ?? $po['po_type']) ?><?php if ($po['value']!==null): ?> · <strong><?= e(cur_sym()) ?><?= number_format((float)$po['value'],0) ?></strong> (from line items)<?php endif; ?>
       <?php $psb = array_filter(explode(',', $po['sbu'] ?? '')); if ($psb): ?> · <?= e(T("sbu")) ?>: <?= e(implode(', ', array_map(fn($s)=>lk_options_or('sbu',OPS_SBUS)[$s]??$s, $psb))) ?><?php endif; ?></p></div>
-  <a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a>
+  <div class="row-actions" style="display:flex;gap:6px;flex-wrap:wrap">
+    <a class="btn secondary" href="/partner?id=<?= (int)$po['partner_id'] ?>&amp;tab=purchase_orders">← Purchase orders — <?= e($po['pdn'] ?: $po['pn']) ?></a>
+    <?php if ($poCt): ?><a class="btn secondary" href="/contract?id=<?= (int)$poCt['id'] ?>">Contract <?= e($poCt['contract_number']) ?></a><?php endif; ?>
+  </div>
 </div>
+<?php if (!empty($po['start_date']) || !empty($po['end_date']) || trim((string)($po['notes'] ?? '')) !== ''): ?>
+  <p class="muted" style="margin:-6px 0 10px"><?= !empty($po['start_date']) ? 'Valid ' . e(fdate($po['start_date'])) : '' ?><?= !empty($po['end_date']) ? ' to ' . e(fdate($po['end_date'])) : '' ?><?= trim((string)($po['notes'] ?? '')) !== '' ? ' · ' . e($po['notes']) : '' ?></p>
+<?php endif; ?>
 
 <?php // An order raised against a quotation that has since been revised is the
       // quiet way two records drift apart: the customer is working off R02 and
@@ -92,11 +105,16 @@
 </table>
 </div>
 
-<h3 class="tab-sub">Add line item</h3>
-<form method="post" action="/po?id=<?= (int)$po['id'] ?>" class="panel">
+<?php // Owner, 9 Nov 2026 — "it shows the quote line items and then a new form". The
+      // lines above came from the quotation; this form is only for something the
+      // order adds that the quotation did not have, so it stays folded away until
+      // asked for — and opens by itself when the order has no lines at all. ?>
+<details class="panel" style="margin-top:12px"<?= $items ? '' : ' open' ?>>
+<summary style="cursor:pointer;font-weight:600"><?= $items ? '＋ Add a line that is not on the quotation' : '＋ Add line item' ?></summary>
+<form method="post" action="/po?id=<?= (int)$po['id'] ?>" style="margin-top:10px">
   <div class="form-grid">
     <div class="ff"><label>Description</label><input class="form-control" name="description" required></div>
-    <div class="ff"><label>Type</label><select class="form-control" name="item_type"><?php foreach (lk_options_or('charge_unit', PO_ITEM_TYPES) as $k=>$v): ?><option value="<?= $k ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
+    <div class="ff"><label>Type</label><select class="form-control" name="item_type"><?php foreach (lk_options_or('charge_unit', PO_ITEM_TYPES) as $k=>$v): ?><option value="<?= $k ?>"<?= $lastLn && (string)$lastLn['item_type'] === (string)$k ? ' selected' : '' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Trade</label>
       <select class="form-control searchable" id="trade_sel" name="trade_id"><option value="">—</option>
         <?php foreach ($trades as $t): ?><option value="<?= (int)$t['id'] ?>"><?= e($t['label']) ?></option><?php endforeach; ?></select></div>
@@ -106,14 +124,15 @@
     <div class="ff"><label>Activity (per PO's <?= e(Tl("sbu")) ?>)</label>
       <select class="form-control searchable" name="activity_id"><option value="">—</option>
         <?php foreach (($poActivities ?? []) as $a): ?><option value="<?= (int)$a['id'] ?>"><?= e($a['label']) ?></option><?php endforeach; ?></select></div>
-    <div class="ff"><label>Site of deployment</label><input class="form-control" name="site"></div>
+    <div class="ff"><label>Site of deployment</label><input class="form-control" name="site" value="<?= e($lastLn['site'] ?? '') ?>"></div>
     <div class="ff"><label>Manpower required</label><input class="form-control" type="number" name="manpower" value="0"></div>
     <div class="ff"><label>Quantity</label><input class="form-control" type="number" step="0.01" name="quantity"></div>
     <div class="ff"><label>Rate (<?= e(cur_sym()) ?>)</label><input class="form-control" type="number" step="0.01" name="rate"></div>
     <div class="ff"><label>Consumed</label><input class="form-control" type="number" step="0.01" name="consumed" value="0"></div>
-    <div class="ff"><label>GST %</label><input class="form-control" type="number" step="0.01" name="gst_pct" value="18"></div>
+    <div class="ff"><label>GST %</label><input class="form-control" type="number" step="0.01" name="gst_pct" value="<?= e(rtrim(rtrim(number_format($poGst, 2, '.', ''), '0'), '.')) ?>"></div>
   </div>
   <p class="muted" style="margin:4px 2px">Base = Qty × Rate; Tax = Base × GST%; the PO (and its contract) value updates to the sum of line totals.</p>
   <div style="margin-top:8px;"><button class="btn small" type="submit">Add line item</button></div>
 </form>
+</details>
 <script>window.SKILLS = <?= json_encode($skillsByTrade) ?>; window.SKILLS_SELECTED = [];</script>

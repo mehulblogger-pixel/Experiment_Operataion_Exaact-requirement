@@ -351,6 +351,10 @@ non-manager's quotation or work order.
 A deliberate two-signature model: **endorse** (a manager) then **approve** (the branch
 manager), with segregation enforced (approver ≠ endorser unless master).
 
+A contract added from the **client record** (Contract Numbers → "＋ Add a contract", a pop-up;
+owner, 9 Nov 2026) enters the same way: **PENDING**, with the company's next contract number when
+none is typed, the client's branch, and who asked for it recorded. No new status.
+
 ```mermaid
 stateDiagram-v2
   [*] --> PENDING : quote-contract registers a NEW number · crm.contract.register/master (crm.php:1866, guard 1830)

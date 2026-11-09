@@ -2287,7 +2287,7 @@ function ops_crm_quotes($route, $method) {
             'fileKinds' => QUOTE_FILE_KINDS,
             // Project costing linked to this quotation (attach / create from here).
             'costing' => function_exists('pc_for_quote') ? pc_for_quote($q['id']) : null,
-            'costingUnlinked' => function_exists('pc_unlinked') ? pc_unlinked() : [],
+            'costingUnlinked' => function_exists('pc_unlinked') ? pc_unlinked(100, 'quote', (int)($q['client_id'] ?? 0)) : [],
             'costingCan' => function_exists('pc_can') && pc_can(),
             'payTerms' => lk_options_or('payment_term', PAYMENT_TERMS),
             'offAll' => offices_list(),
@@ -3246,10 +3246,19 @@ function crm_quote_files($qid, $kind = null) {
 //  Operations link (§16 revenue, §21/§22 HOLD, §24 deliverables)
 // ---------------------------------------------------------------------------
 // Accepted / in-flight quotes a job can be booked against (client-scoped).
-function job_linkable_quotes($clientId) {
-    $clientId = (int)$clientId;
-    if ($clientId) return ops_all("SELECT id, quote_no, rev, contract_number, total_amount FROM quotations WHERE is_current=1 AND status IN ('ACCEPTED','APPROVED','SENT') AND client_id=? ORDER BY (status='ACCEPTED') DESC, id DESC", [$clientId]);
-    return ops_all("SELECT id, quote_no, rev, contract_number, total_amount FROM quotations WHERE is_current=1 AND status='ACCEPTED' ORDER BY id DESC LIMIT 50");
+// $keep: the quotation the job is already on — always offered, so saving the job
+// never clears a link just because that quotation was revised since.
+function job_linkable_quotes($clientId, $keep = 0) {
+    $clientId = (int)$clientId; $keep = (int)$keep;
+    $rows = $clientId
+        ? ops_all("SELECT id, quote_no, rev, contract_number, total_amount FROM quotations WHERE is_current=1 AND status IN ('ACCEPTED','APPROVED','SENT') AND client_id=? ORDER BY (status='ACCEPTED') DESC, id DESC", [$clientId])
+        : ops_all("SELECT id, quote_no, rev, contract_number, total_amount FROM quotations WHERE is_current=1 AND status='ACCEPTED' ORDER BY id DESC LIMIT 50");
+    $rows = $rows ?: [];
+    if ($keep && !in_array($keep, array_map(fn($r) => (int)$r['id'], $rows), true)) {
+        $k = ops_one("SELECT id, quote_no, rev, contract_number, total_amount FROM quotations WHERE id=?", [$keep]);
+        if ($k) array_unshift($rows, $k);
+    }
+    return $rows;
 }
 // Inherit the advance / report-vs-payment conditions (and blank deliverables) from
 // the linked quotation onto the job, so the inspector sees the right HOLD (§21,§22,§24).

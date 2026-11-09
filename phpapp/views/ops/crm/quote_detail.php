@@ -247,7 +247,7 @@
   <?php if ($pcRow): ?>
     <a class="btn small secondary" href="/project-costing?id=<?= (int)$pcRow['id'] ?>"><b><?= e($pcRow['code']) ?></b> — <?= e($pcRow['title']) ?></a>
     <span class="muted" style="font-size:12.5px">revenue <?= fmoney_short($pcRow['exp_revenue']) ?> · margin <?= (float)$pcRow['exp_revenue']>0 ? number_format((float)$pcRow['exp_profit']/(float)$pcRow['exp_revenue']*100,1) : '0' ?>%</span>
-    <form method="post" action="/project-costing-attach" style="display:inline;margin-left:auto" onsubmit="return confirm('Unlink this costing from the quotation?')">
+    <form method="post" action="/project-costing-attach" style="display:inline;margin-left:auto" onsubmit="return confirm('Unlink this costing from the quotation? It is not deleted — you can attach it again from here.')">
       <input type="hidden" name="costing_id" value="<?= (int)$pcRow['id'] ?>"><input type="hidden" name="quote_id" value="0"><input type="hidden" name="back" value="<?= e($back) ?>">
       <button class="btn small btn-ghost">Unlink</button>
     </form>
@@ -262,7 +262,7 @@
     <form method="post" action="/project-costing-attach" style="display:inline-flex;gap:6px;align-items:center">
       <input type="hidden" name="quote_id" value="<?= (int)$q['id'] ?>"><input type="hidden" name="back" value="<?= e($back) ?>">
       <select name="costing_id" class="form-control" style="padding:5px 8px;font-size:13px"><option value="">attach existing…</option>
-        <?php foreach ($costingUnlinked as $u): ?><option value="<?= (int)$u['id'] ?>"><?= e($u['code'].' — '.$u['title']) ?></option><?php endforeach; ?>
+        <?php foreach ($costingUnlinked as $u): ?><option value="<?= (int)$u['id'] ?>"><?= e($u['code'].' — '.$u['title'] . (!empty($u['client_name']) ? ' · ' . $u['client_name'] : '') . ' · ' . strtolower(PC_STATUS[$u['status']] ?? $u['status'])) ?></option><?php endforeach; ?>
       </select><button class="btn small secondary">Attach</button>
     </form>
     <?php endif; ?>

@@ -1562,6 +1562,33 @@ if ($route === 'partner-edit') {
         'nav_leaf' => 'Edit']);
 }
 
+// Owner, 9 Nov 2026 — "create a contract from the Client add form … prefilled
+// details from customer … a new pop-up screen, and when closed it takes back to
+// the contract list with the newly added contract showing". The form opens in the
+// app's pop-up (data-embed) and posts to the /partner-add door below, so the same
+// module, permission, office and duplicate rules apply to it.
+if ($route === 'partner-contract-new') {
+    $p = find_partner((int)($_GET['id'] ?? 0));
+    if (!$p) { http_response_code(404); return view('notfound'); }
+    ops_require(is_master() || can('mod.clients.edit') || can('mod.vendors.edit')
+        || (function_exists('is_coordinator_level') && is_coordinator_level()),
+        'You do not have permission to change ' . Tl('client') . ' records.');
+    ops_require(!function_exists('partner_can_write') || partner_can_write($p),
+        function_exists('partner_write_denied_msg') ? partner_write_denied_msg($p) : 'That record belongs to another office.');
+    ops_require(!function_exists('licence_module_live') || licence_module_live('quotes'),
+        'Registering a contract is part of the Sales & CRM module, which is not switched on for this installation.');
+    ops_require(can('crm.contract.register') || is_master(), 'Only Accounts / back-office can register a contract.');
+    $branchId = (int)($p['home_branch_id'] ?? 0) ?: null;
+    $back = in_array((string)($_GET['back'] ?? ''), ['purchase_orders', 'contracts'], true) ? (string)$_GET['back'] : '';
+    if (function_exists('nav_under')) nav_under('partner-contract-new', 'clients', ['label' => partner_name($p), 'url' => '/partner?id=' . (int)$p['id'] . '&tab=contracts']);
+    return view('partner_contract_new', ['nav_leaf' => 'New contract', 'p' => $p,
+        'contracts' => children('partner_contracts', $p['id']),
+        'awaiting' => function_exists('quotations_awaiting_contract') ? quotations_awaiting_contract($p['id']) : [],
+        'branches' => function_exists('offices_list') ? offices_list() : [], 'branchId' => $branchId,
+        'nextNo' => function_exists('gen_contract_number') ? gen_contract_number($branchId) : '',
+        'preTitle' => partner_name($p) . ' — contract', 'back' => $back]);
+}
+
 if ($route === 'partner-add' && $method === 'POST') {
     $p = find_partner((int)($_GET['id'] ?? 0));
     if (!$p) { http_response_code(404); return view('notfound'); }
@@ -1633,24 +1660,31 @@ if ($route === 'partner-add' && $method === 'POST') {
         if ($qid) $pdo->prepare("UPDATE partner_purchase_orders SET lines_synced_at=? WHERE id=?")->execute([date('c'), $poId]);
 
         // Every line of the quotation becomes a line of the order, with the
-        // quantity and the rate it was quoted at. Consumption is tracked against
+        // quantity, rate and GST it was quoted at. Consumption is tracked against
         // these, so getting them from the quotation rather than from memory is
-        // what makes "how much of this order is left" a real number.
+        // what makes "how much of this order is left" a real number. One copier
+        // for this and for "take the lines across" (po_pull_quote_lines()).
         $n = 0;
-        if ($qLines) {
-            $ins = $pdo->prepare("INSERT INTO po_line_items (purchase_order_id,description,item_type,quantity,rate,consumed) VALUES (?,?,?,?,?,0)");
-            foreach ($qLines as $l) {
-                $desc = trim((string)($l['description'] ?? ''));
-                if ($desc === '') $desc = trim((string)($l['service_type'] ?? '')) ?: 'Line ' . (int)$l['line_no'];
-                if (trim((string)($l['location'] ?? '')) !== '') $desc .= ' — ' . $l['location'];
-                $ins->execute([$poId, mb_substr($desc, 0, 200), (string)($l['unit'] ?? 'MANDAY'),
-                               (float)($l['qty'] ?? 0), ($l['rate'] === null || $l['rate'] === '') ? null : (float)$l['rate']]);
-                $n++;
+        if ($qLines && function_exists('po_pull_quote_lines')) {
+            $res = po_pull_quote_lines($poId, $qid);
+            $n = !empty($res['ok']) ? (int)$res['count'] : 0;
+            if ($n && ($b['value'] ?? '') === '') {
+                $sum = (float)ops_val("SELECT COALESCE(SUM(total_amount),0) FROM po_line_items WHERE purchase_order_id=?", [$poId]);
+                if ($sum > 0) $pdo->prepare("UPDATE partner_purchase_orders SET value=? WHERE id=?")->execute([$sum, $poId]);
             }
         }
-        flash('Purchase order added.' . ($quote ? ' Taken from ' . $quote['quote_no']
-            . ((int)$quote['rev'] ? ' R' . (int)$quote['rev'] : '')
-            . ($n ? ' with ' . $n . ' line item(s)' : '') . '.' : ''));
+        if (function_exists('act_log')) try { act_log('PURCHASE_ORDER', $poId, 'CREATE', 'Purchase order ' . ($b['po_number'] ?? '') . ' recorded for ' . partner_name($p) . ($quote ? ' from ' . $quote['quote_no'] : '') . ($n ? ' with ' . $n . ' line(s)' : ''), []); } catch (Throwable $e) {}
+        // Owner, 9 Nov 2026 — stay in the client's record. An order that came
+        // with its lines needs nothing more, so the list it was added to is where
+        // the person goes back to; one with no lines opens, so they can be added
+        // (and that screen leads back here).
+        $poNo = trim((string)($b['po_number'] ?? '')) ?: 'The order';
+        if ($n) {
+            flash($poNo . ' added, with ' . $n . ' line item(s), GST and totals taken from ' . $quote['quote_no']
+                . ((int)$quote['rev'] ? ' R' . (int)$quote['rev'] : '') . '. Open it from the list below to see the lines.');
+            redirect("/partner?id={$p['id']}&tab=purchase_orders");
+        }
+        flash($poNo . ' added. It has no line items yet — add them here, then use "← Purchase orders" to go back to ' . partner_name($p) . '.');
         redirect('/po?id=' . $poId);
     }
     if (isset($map[$kind])) {
@@ -1660,6 +1694,16 @@ if ($route === 'partner-add' && $method === 'POST') {
         // this same client is a rate contract being extended; under a different
         // client it is a duplicate, and every expiry and quantity check
         // downstream would then be reading somebody else's contract.
+        // Owner, 9 Nov 2026 — a contract added here gets the company's next
+        // contract number when none is typed, from the branch chosen (or the
+        // client's own branch): BRANCH / C / FY / 00001, the same as the CRM path.
+        $ctBranch = null;
+        if ($kind === 'contract') {
+            $ctBranch = (int)($b['branch_id'] ?? 0) ?: ((int)($p['home_branch_id'] ?? 0) ?: null);
+            if (trim((string)($b['contract_number'] ?? '')) === '' && function_exists('gen_contract_number'))
+                $b['contract_number'] = gen_contract_number($ctBranch);
+        }
+        $ctTab = in_array((string)($b['back_tab'] ?? ''), ['purchase_orders'], true) ? (string)$b['back_tab'] : 'contracts';
         if ($kind === 'contract' && function_exists('contract_no_clash')) {
             $cn = trim((string)($b['contract_number'] ?? ''));
             $clash = contract_no_clash($cn, $p['id']);
@@ -1705,6 +1749,11 @@ if ($route === 'partner-add' && $method === 'POST') {
         // person can put a live contract on the books unchecked.
         if ($kind === 'contract') {
             try { $pdo->prepare("UPDATE partner_contracts SET open_status='PENDING', is_active=0 WHERE id=?")->execute([$newId]); } catch (Throwable $e) {}
+            // Who asked for it and which branch it belongs to — the endorser and the
+            // branch manager who approve it are found from these, as on the CRM path.
+            try { $pdo->prepare("UPDATE partner_contracts SET branch_id=?, requested_by=?, requested_by_id=?, requested_at=? WHERE id=?")
+                      ->execute([$ctBranch, user_name(current_user()), (int)(current_user()['id'] ?? 0) ?: null, date('c'), $newId]); } catch (Throwable $e) {}
+            if (function_exists('act_log')) try { act_log('CONTRACT', $newId, 'CREATE', 'Contract ' . $b['contract_number'] . ' recorded for ' . partner_name($p) . ' from the client record — awaiting endorsement', []); } catch (Throwable $e) {}
         }
         // Field #1 — a registration may arrive with its scanned document. Store it
         // on the new row (base64 in-row, like a lead/quote file); over 8 MB is skipped
@@ -1741,11 +1790,12 @@ if ($route === 'partner-add' && $method === 'POST') {
             $qid = (int)($b['quotation_id'] ?? 0);
             if ($qid && contract_link_quotation($newId, $qid)) {
                 $qn = ops_val("SELECT quote_no FROM quotations WHERE id=?", [$qid]);
-                flash('Contract registered (awaiting endorsement), and ' . ($qn ?: Tl('quote')) . ' now carries this contract number.');
-                redirect("/partner?id={$p['id']}&tab=contracts");
+                flash('Contract ' . $b['contract_number'] . ' registered (awaiting endorsement), and ' . ($qn ?: Tl('quote')) . ' now carries this contract number.');
+                redirect("/partner?id={$p['id']}&tab=$ctTab");
             }
         }
-        flash($kind === 'contract' ? 'Contract registered — it is awaiting endorsement, then approval, before it goes live.' : 'Added.');
+        flash($kind === 'contract' ? 'Contract ' . $b['contract_number'] . ' registered — it is awaiting endorsement, then approval, before it goes live.' : 'Added.');
+        if ($kind === 'contract') $tab = $ctTab;
         if ($kind === 'contact' && function_exists('partner_contact_clash')) {
             $clash = partner_contact_clash(trim((string) ($b['mobile'] ?? '')) !== '' ? $b['mobile'] : ($b['phone'] ?? ''), $b['email'] ?? '', (int) $p['id']);
             if ($clash) flash(partner_contact_clash_msg($clash), 'warning');
@@ -1920,7 +1970,10 @@ if ($route === 'po') {
     $poActivities = [];
     foreach ($poSbus as $sc) foreach (($actBySbu[$sc] ?? []) as $a) $poActivities[] = $a;
     if (!$poActivities) foreach ($actBySbu as $list) foreach ($list as $a) $poActivities[] = $a; // fallback: all
-    return view('po_detail', ['po' => $po, 'items' => $li->fetchAll(), 'skillsByTrade' => skills_by_trade(),
+    // The trail reads Clients › <client> › <PO>, and Back goes to that client
+    // (owner, 9 Nov 2026: "we cannot go back to the customer screen").
+    if (function_exists('nav_under')) nav_under('po', 'clients', ['label' => (string)($po['pdn'] ?: $po['pn']), 'url' => '/partner?id=' . (int)$po['partner_id'] . '&tab=purchase_orders']);
+    return view('po_detail', ['nav_leaf' => (string)($po['po_number'] ?: 'Open order'), 'po' => $po, 'items' => $li->fetchAll(), 'skillsByTrade' => skills_by_trade(),
         'quoteState' => function_exists('po_quote_status') ? po_quote_status($po) : null,
         // Every quotation this client has open, so lines can be taken from one
         // even when the order was typed in without naming it.

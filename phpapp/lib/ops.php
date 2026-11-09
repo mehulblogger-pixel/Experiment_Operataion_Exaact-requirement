@@ -531,6 +531,11 @@ function ops_migrate() {
     ensure_column('users', 'reports_to_position', "VARCHAR(120) DEFAULT ''");
     ensure_column('users', 'reports_to_email', "VARCHAR(200) DEFAULT ''");
     ensure_column('users', 'position_title', "VARCHAR(120) DEFAULT ''");           // free-text designation for the hierarchy
+    // MOD-REP (owner, 9 Nov 2026) — "Inspector – Mechanical / Electrical": the
+    // discipline (Masters → Trade / discipline) beside role and designation. For
+    // a person on the team it is the team member's own trade; this column holds it
+    // only for a login with no team record (the Master-Admin owner account).
+    ensure_column('users', 'trade_id', 'INT NULL');
     ensure_column('users', 'weekly_working_days', "DECIMAL(3,1) DEFAULT 6");
     // Per-day availability override for an inspector (leave / training / office …).
     // "On job" is auto-derived from jobs; a row here is a manual status for that date.
@@ -904,13 +909,24 @@ function partner_missing_text($id, $role = 'client') {
 //  charged on. Re-typing is how a call ends up billed differently from what was
 //  quoted.
 // ---------------------------------------------------------------------------
-function call_quotes_for_client($clientId) {
-    $clientId = (int)$clientId;
+// $keep: the quotation the call is already linked to. It is always offered, even
+// when it has since been revised, expired or moved on — otherwise the picker did
+// not show it, fell back to "none", and saving the call cleared the link (MOD-REP,
+// owner, 9 Nov 2026: "quotation is already linked with the call but when I
+// submitted the call it said no quotation is attached").
+function call_quotes_for_client($clientId, $keep = 0) {
+    $clientId = (int)$clientId; $keep = (int)$keep;
     if (!$clientId) return [];
-    return ops_all("SELECT id, quote_no, rev, contract_number, total_amount, status, subject, payment_terms
+    $rows = ops_all("SELECT id, quote_no, rev, contract_number, total_amount, status, subject, payment_terms
                     FROM quotations
                     WHERE client_id=? AND is_current=1 AND status IN ('ACCEPTED','APPROVED','SENT')
-                    ORDER BY (status='ACCEPTED') DESC, id DESC", [$clientId]);
+                    ORDER BY (status='ACCEPTED') DESC, id DESC", [$clientId]) ?: [];
+    if ($keep && !in_array($keep, array_map(fn($r) => (int)$r['id'], $rows), true)) {
+        $k = ops_one("SELECT id, quote_no, rev, contract_number, total_amount, status, subject, payment_terms, is_current
+                      FROM quotations WHERE id=? AND (client_id=? OR client_id IS NULL)", [$keep, $clientId]);
+        if ($k) { $k['kept'] = 1; array_unshift($rows, $k); }
+    }
+    return $rows;
 }
 // The header + line items of a quote, shaped for the call form's pickers.
 function call_quote_context($quoteId) {
@@ -4626,10 +4642,11 @@ function ops_dispatch($route, $method) {
         case $route === 'client-quotes':
             header('Content-Type: application/json');
             $out = [];
-            foreach (call_quotes_for_client((int)($_GET['id'] ?? 0)) as $q) {
+            foreach (call_quotes_for_client((int)($_GET['id'] ?? 0), (int)($_GET['keep'] ?? 0)) as $q) {
                 $out[] = [
                     'id' => (int)$q['id'],
-                    'label' => $q['quote_no'] . ((int)$q['rev'] > 0 ? ' R' . (int)$q['rev'] : '')
+                    'label' => (!empty($q['kept']) ? 'Linked now: ' : '') . $q['quote_no'] . ((int)$q['rev'] > 0 ? ' R' . (int)$q['rev'] : '')
+                             . (!empty($q['kept']) && empty($q['is_current']) ? ' (an earlier revision)' : '')
                              . ' · ' . fmoney($q['total_amount'])
                              . ' · ' . (lk_options_or('quote_status', QUOTE_STATUS)[$q['status']] ?? $q['status'])
                              . ($q['subject'] ? ' — ' . mb_substr($q['subject'], 0, 40) : ''),
@@ -5362,6 +5379,35 @@ function skill_labels($csv) {
     return $out ? implode(', ', $out) : '—';
 }
 function trade_label($id) { $v = $id ? lk_value($id) : null; return $v ? $v['label'] : '—'; }
+
+// A login's discipline: its team member's trade, else its own. 0 when none.
+function user_discipline_id(array $u) {
+    $ins = (int)($u['inspector_id'] ?? 0);
+    if ($ins) { $t = (int)ops_val("SELECT trade_id FROM inspectors WHERE id=?", [$ins]); if ($t) return $t; }
+    return (int)($u['trade_id'] ?? 0);
+}
+// "Inspector — Mechanical": designation (or role) and discipline, in one label.
+function user_role_discipline_label(array $u) {
+    $what = trim((string)($u['position_title'] ?? ''));
+    if ($what === '') $what = defined('ORG_ROLES') ? (ORG_ROLES[$u['role'] ?? ''] ?? (string)($u['role'] ?? '')) : (string)($u['role'] ?? '');
+    $d = user_discipline_id($u);
+    return $d ? $what . ' — ' . trade_label($d) : $what;
+}
+// Save the discipline chosen on the login form: onto the team member it belongs
+// to (so job matching, the team register and the login all read one value), and
+// onto the login itself. A team member with no designation yet takes the login's.
+function user_discipline_save($userId, $insId, $raw, $posTitle) {
+    $tid = (int)$raw ?: null;
+    if ($tid && !lk_value($tid)) $tid = null;
+    try { db()->prepare("UPDATE users SET trade_id=? WHERE id=?")->execute([$tid, (int)$userId]); } catch (Throwable $e) {}
+    if ($insId) {
+        try {
+            db()->prepare("UPDATE inspectors SET trade_id=? WHERE id=?")->execute([$tid, (int)$insId]);
+            if (trim((string)$posTitle) !== '')
+                db()->prepare("UPDATE inspectors SET designation=? WHERE id=? AND COALESCE(designation,'')=''")->execute([trim((string)$posTitle), (int)$insId]);
+        } catch (Throwable $e) {}
+    }
+}
 
 // ---- Calls -----------------------------------------------------------------
 // Guided "raise a call" for coordinators: pick the client, then the contract the
@@ -8775,7 +8821,7 @@ function call_job_form_vars($job, $call) {
         'boss' => boss_for_client($call['client_id']),
         'clientInfo' => partner_full($call['client_id']),
         'vendorInfo' => partner_full($call['vendor_id']),
-        'quotes' => job_linkable_quotes($call['client_id']),
+        'quotes' => job_linkable_quotes($call['client_id'], (int)(($job['quotation_id'] ?? 0) ?: ($call['quotation_id'] ?? 0))),
         'cfvals' => $job ? custom_values_map('job', $job['id']) : [],
         'suggestions' => inspector_suggestions($call, $jobDates, (int)($job['id'] ?? 0), $reqTrade),
         'jobDates' => $jobDates,
@@ -10362,6 +10408,7 @@ function ops_users($route, $method) {
                 $pdo->prepare("UPDATE users SET username=?,first_name=?,last_name=?,email=?,role=?,is_superuser=?,is_active=?,inspector_id=?,home_office_id=?,scope_offices=?,scope_sbus=?,permissions=?,reports_to_id=?,reports_to_name=?,reports_to_position=?,reports_to_email=?,position_title=?,weekly_working_days=?,daily_hours=?,half_day_hours=? WHERE id=?")
                     ->execute([$b['username'], $b['first_name'] ?? '', $b['last_name'] ?? '', $b['email'] ?? '', $role, $isSuper, !empty($b['is_active'])?1:0, $insId, $homeOffice, $scopeOffices, $scopeSbus, $perms, $reportsTo, $rtName, $rtPos, $rtEmail, $posTitle, $uwwd, $dHours, $hHours, $user['id']]);
                 if (function_exists('custom_save')) custom_save('user', (int)$user['id'], $b);
+                if (array_key_exists('discipline_id', $b)) user_discipline_save((int)$user['id'], $insId, $b['discipline_id'], $posTitle);
                 // Module 02 (A) — record the access change on the sealed audit chain:
                 // who granted whom which permission / role / scope, and when. Only when
                 // something that affects authorization actually changed.
@@ -10413,6 +10460,7 @@ function ops_users($route, $method) {
                     VALUES (?,?,?,?,?,?,?,1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")->execute([$b['username'], $hash, $b['first_name'] ?? '', $b['last_name'] ?? '', $b['email'] ?? '', $role, $isSuper, $insId, $homeOffice, $scopeOffices, $scopeSbus, $perms, $reportsTo, $rtName, $rtPos, $rtEmail, $posTitle, $uwwd, $dHours, $hHours, date('c'), $newPw === '' ? 1 : $mustChange]);
                 $newId = (int)$pdo->lastInsertId();
                 if (function_exists('custom_save')) custom_save('user', $newId, $b);
+                if (array_key_exists('discipline_id', $b)) user_discipline_save($newId, $insId, $b['discipline_id'], $posTitle);
                 try { $pdo->prepare("UPDATE users SET department=? WHERE id=?")->execute([trim((string)($b['department'] ?? '')), $newId]); } catch (Throwable $e) {}
                 // Module 02 (A) — record the new login's initial access on the audit chain.
                 $adiff = function_exists('access_diff') ? access_diff(null,
