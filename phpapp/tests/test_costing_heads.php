@@ -162,6 +162,11 @@ t_eq(count(ch_template_items($tid)), 10, 'the template keeps every head');
 
 t_section('Costing heads — who may change the library');
 t_ok(ch_can_manage(), 'an administrator may change the library (the Masters gate, docs/02 row 12)');
-t_as_nobody();
+// A real signed-in inspector (t_as_nobody() would only put back whoever the
+// previous test left signed in, which in the full suite is an administrator).
+db()->prepare("INSERT INTO users (username, password_hash, first_name, role, is_active) VALUES (?, 'x', 'Probe', 'INSPECTOR', 1)")->execute([strtolower($tag) . '-ins']);
+$insUid = (int) db()->lastInsertId();
+$keepSess = $_SESSION; $_SESSION['uid'] = $insUid; current_user(true); ua(true);
 t_ok(!ch_can_manage(), 'someone without administrator rights may not');
-t_as_admin();
+$_SESSION = $keepSess; current_user(true); ua(true);
+db()->prepare("DELETE FROM users WHERE id=?")->execute([$insUid]);
