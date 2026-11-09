@@ -9,15 +9,17 @@ db()->prepare("INSERT INTO candidates (cand_code,first_name,stage,created_at) VA
 $cid = (int)db()->lastInsertId();
 
 // --- Interviews: multi-round ---
-$l1 = iv_schedule($cid, ['round' => 'L1', 'mode' => 'Video', 'panel' => 'A. Mehta', 'competencies' => 'SQL, Tally', 'scheduled_at' => '2026-09-20T10:00']);
-$l2 = iv_schedule($cid, ['round' => 'L2', 'mode' => 'In person', 'panel' => 'VP-HR']);
-t_eq(count(iv_list($cid)), 2, 'multiple interview rounds are stored per candidate');
+$l1 = iv_schedule($cid, ['round' => 'L1', 'mode' => 'Video', 'location' => 'https://meet.example/abc', 'panel' => 'A. Mehta', 'competencies' => 'SQL, Tally', 'scheduled_at' => '2026-09-20T10:00']);
 $iv = iv_get($l1);
 t_eq($iv['result'], 'SCHEDULED', 'a new interview starts SCHEDULED');
 t_eq($iv['round'], 'L1', 'the round is stored');
+//  Owner, 9 Nov 2026 — an interview needs a time and an interviewer.
+t_eq(iv_schedule($cid, ['round' => 'L2', 'mode' => 'In person', 'location' => 'HO', 'panel' => 'VP-HR']), 0, 'an interview with no date is refused');
 
 // Record a scorecard → PASS stamps done_at.
 iv_record($l1, ['result' => 'PASS', 'rating' => 4, 'recommendation' => 'Hire', 'comments' => 'Strong on fundamentals']);
+$l2 = iv_schedule($cid, ['round' => 'L2', 'mode' => 'In person', 'location' => 'HO', 'panel' => 'VP-HR', 'scheduled_at' => '2026-09-22T10:00']);
+t_eq(count(iv_list($cid)), 2, 'multiple interview rounds are stored per candidate');
 $iv = iv_get($l1);
 t_eq($iv['result'], 'PASS', 'the interview result is recorded');
 t_eq((int)$iv['rating'], 4, 'the rating is stored');

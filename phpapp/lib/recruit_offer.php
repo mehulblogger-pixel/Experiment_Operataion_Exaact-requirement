@@ -459,7 +459,7 @@ function offer_letter_html($offer, $cand, $sal) {
     $name = function_exists('candidate_name') && $cand ? candidate_name($cand) : ($cand['first_name'] ?? 'Candidate');
     $position = $cand['designation'] ?? '';
     if (function_exists('DESIGNATIONS') || defined('DESIGNATIONS')) $position = (defined('DESIGNATIONS') && isset(DESIGNATIONS[$position])) ? DESIGNATIONS[$position] : ($position ?: 'the role');
-    $company = function_exists('app_name') ? app_name() : (function_exists('setting_get') ? setting_get('app_name', 'the Company') : 'the Company');
+    $company = function_exists('doc_identity') ? (doc_identity()['name'] ?: 'the Company') : (function_exists('app_name') ? app_name() : 'the Company');
     $tokens = [
         '{name}'         => $name,
         '{position}'     => $position ?: 'the role',
@@ -510,7 +510,12 @@ function ops_candidate_offer($route, $method) {
         header('Content-Type: text/html; charset=UTF-8');
         echo '<!doctype html><meta charset="utf-8"><title>Offer letter</title><body style="padding:32px;background:#fff">';
         echo '<div style="max-width:760px;margin:auto"><button onclick="window.print()" style="float:right;padding:8px 14px;border:1px solid #ccc;border-radius:6px;cursor:pointer" class="no-print">Print / Save PDF</button>';
+        // On the company's letterhead (owner, 9 Nov 2026) — unless the stored
+        // letter already carries one.
+        $hasHead = strpos((string)$o['letter_html'], 'doc-letterhead') !== false;
+        if (!$hasHead && function_exists('doc_letterhead_html')) echo doc_letterhead_html();
         echo $o['letter_html'];
+        if (!$hasHead && function_exists('doc_footer_html')) echo doc_footer_html();
         echo '</div><style>@media print{.no-print{display:none}}</style></body>';
         return true;
     }

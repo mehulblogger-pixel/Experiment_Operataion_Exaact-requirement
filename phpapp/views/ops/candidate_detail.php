@@ -471,13 +471,30 @@ if (!empty($asgPacket) && $seeSal && !empty($asgPacket['checks'])): $P = $asgPac
         <input type="hidden" name="undo" value="1">
         <button class="btn btn-sm" type="submit">Not joined after all</button>
       </form>
-    <?php else: ?>
+    <?php else:
+          //  Owner, 9 Nov 2026 — "after onboarding what is date of joining". The
+          //  expected date from the offer is shown, and offered as the joining
+          //  date once it has come; a person who never starts is closed here too.
+          $expJoin = function_exists('offer_current') ? (string)((offer_current((int)$cand['id'])['joining_date'] ?? '') ?: '') : '';
+          $joinDefault = ($expJoin !== '' && $expJoin <= date('Y-m-d')) ? $expJoin : date('Y-m-d'); ?>
+      <?php if ($expJoin !== ''): ?><div style="font-size:13px;margin-bottom:8px">Expected date of joining: <b><?= e(function_exists('fdate') ? fdate($expJoin) : $expJoin) ?></b><?= $expJoin < date('Y-m-d') ? ' <span class="pill p-warn">passed — record whether they joined</span>' : '' ?></div><?php endif; ?>
       <form method="post" action="/candidate-joined?id=<?= (int)$cand['id'] ?>" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
         <div class="ff" style="margin:0"><label>Have they actually joined?
             <span class="muted">— hired is not the same as started</span></label>
-          <input class="form-control" type="date" name="joined_on" max="<?= e(date('Y-m-d')) ?>" value="<?= e(date('Y-m-d')) ?>"></div>
+          <input class="form-control" type="date" name="joined_on" max="<?= e(date('Y-m-d')) ?>" value="<?= e($joinDefault) ?>"></div>
         <button class="btn btn-sm btn-primary" type="submit">Mark as joined</button>
       </form>
+      <?php if (is_coordinator_level()): $rccDR = $rccDropReasons ?? (function_exists('rcc_drop_reasons') ? rcc_drop_reasons() : []); ?>
+      <details style="margin-top:10px"><summary style="cursor:pointer;font-size:13px">They did not join…</summary>
+        <form method="post" action="/candidate-stage?id=<?= (int)$cand['id'] ?>" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-top:8px"
+              onsubmit="return confirm('Close this hire as did not join? Their team record is closed and the seat goes back to the requirement.')">
+          <input type="hidden" name="to_stage" value="WITHDRAWN"><input type="hidden" name="drop_point" value="ACCEPTED_NO_JOIN">
+          <div class="ff" style="margin:0"><label>Why</label><select class="form-control" name="drop_reason" required><option value="">— choose —</option><?php foreach ($rccDR as $k => $v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
+          <div class="ff" style="margin:0;flex:1;min-width:200px"><label>Remark</label><input class="form-control" name="remark" maxlength="300" placeholder="e.g. took a counter-offer; informed on the joining day"></div>
+          <button class="btn btn-sm secondary" type="submit">Did not join</button>
+        </form>
+      </details>
+      <?php endif; ?>
     <?php endif; ?>
   </div>
 <?php endif; ?>
@@ -577,8 +594,8 @@ if (!empty($asgPacket) && $seeSal && !empty($asgPacket['checks'])): $P = $asgPac
       <div class="form-grid">
         <div class="ff"><label>Drop point <span class="muted">where in the pipeline</span></label>
           <select class="form-control" name="drop_point"><option value="">—</option><?php foreach ($rccDropPoints as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($cand['drop_point'] ?? '')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
-        <div class="ff"><label>Drop reason <span class="muted">why</span></label>
-          <select class="form-control" name="drop_reason"><option value="">—</option><?php foreach ($rccDropReasons as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($cand['drop_reason'] ?? '')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+        <div class="ff"><label>Drop reason <span class="muted">why — or write it in the remark</span></label>
+          <select class="form-control" name="drop_reason" id="cand_drop_reason"><option value="">—</option><?php foreach ($rccDropReasons as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($cand['drop_reason'] ?? '')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
       </div>
       <p class="muted" style="margin:2px 2px 0;font-size:12px">Recorded on the candidate and rolled up in the command centre’s “Where they drop off”.</p>
     </div>

@@ -56,7 +56,7 @@ t_eq(rasg_assign('REQ_RECRUITER', $rq, $uRecA, ['expect' => null])['code'], 'OK'
 $c1 = $mkCand($rq);
 t_eq(rexec_block_reason($rq, 'ADVANCE'), '', 'L1.5 · execution is permitted');
 t_eq(rexec_block_reason($rq, 'INTERVIEW'), '', 'L1.6 · an interview may be scheduled');
-t_ok(iv_schedule($c1, ['round' => 'L1', 'mode' => 'In person', 'scheduled_at' => date('c')]) > 0, 'L1.7 · …and is');
+t_ok(iv_schedule($c1, ['round' => 'L1', 'mode' => 'In person', 'scheduled_at' => date('c'), 'location' => 'Head office', 'panel' => 'Panel member']) > 0, 'L1.7 · …and is');
 t_eq($ivN($c1), 1, 'L1.8 · the interview exists');
 $o1 = offer_create($c1, ['ctc' => 600000, 'joining_date' => '2026-12-01']);
 t_eq($offN($c1), 1, 'L1.9 · an offer was drafted');
@@ -122,7 +122,7 @@ hreq_save($hB, $base(['job_title' => 'M6L Blocked', 'quantity' => 4, 'designatio
 t_ok(!hreq_is_executable(hreq_get($hB)), 'L3.1 · the request is blocked');
 foreach (['ADVANCE', 'INTERVIEW', 'OFFER', 'JOIN'] as $what)
     t_ok(rexec_block_reason($rqB, $what, $cB) !== '', "L3.2 · the gate refuses $what");
-t_eq(iv_schedule($cB, ['round' => 'L1', 'mode' => 'In person', 'scheduled_at' => date('c')]), 0,
+t_eq(iv_schedule($cB, ['round' => 'L1', 'mode' => 'In person', 'scheduled_at' => date('c'), 'location' => 'Head office', 'panel' => 'Panel member']), 0,
      'L3.3 · *** no interview can be scheduled ***');
 t_eq($ivN($cB), 0, 'L3.4 · …and none exists');
 t_eq(offer_create($cB, ['ctc' => 500000]), 0, 'L3.5 · *** no offer can be created ***');
@@ -174,7 +174,7 @@ foreach (['CANCELLED', 'CLOSED'] as $dead) {
     $cD = $mkCand($rqD);
     $pdo->prepare("UPDATE requisitions SET status=? WHERE id=?")->execute([$dead, $rqD]);
     t_ok(rexec_block_reason($rqD, 'ADVANCE', $cD) !== '', "L5 · $dead · the gate refuses");
-    t_eq(iv_schedule($cD, ['round' => 'L1', 'mode' => 'In person', 'scheduled_at' => date('c')]), 0,
+    t_eq(iv_schedule($cD, ['round' => 'L1', 'mode' => 'In person', 'scheduled_at' => date('c'), 'location' => 'Head office', 'panel' => 'Panel member']), 0,
          "L5 · $dead · *** no interview ***");
     t_eq(offer_create($cD, ['ctc' => 1]), 0, "L5 · $dead · *** no offer ***");
 }
@@ -188,7 +188,7 @@ t_section('L6 · a candidate with no requirement is not invented a refusal');
 $cFree = $mkCand(null);
 t_eq(rexec_cand_block_reason($cFree, 'OFFER'), '', 'L6.1 · no requirement means no approval to respect');
 t_ok(offer_create($cFree, ['ctc' => 400000]) > 0, 'L6.2 · …and the offer is allowed');
-t_ok(iv_schedule($cFree, ['round' => 'L1', 'mode' => 'In person', 'scheduled_at' => date('c')]) > 0,
+t_ok(iv_schedule($cFree, ['round' => 'L1', 'mode' => 'In person', 'scheduled_at' => date('c'), 'location' => 'Head office', 'panel' => 'Panel member']) > 0,
      'L6.3 · …as is the interview');
 t_eq(rexec_block_reason(0, 'JOIN'), '', 'L6.4 · and there is no seat ceiling to apply');
 
@@ -278,7 +278,7 @@ $cT = $mkCand($rqT);
 hreq_save($hT, $base(['job_title' => 'M6L Truth', 'quantity' => 2, 'designation' => 'SUPERVISOR']));
 t_ok(rexec_cand_block_reason($cT, 'INTERVIEW') !== '', 'L10.1 · the requirement is blocked');
 //  the functions refuse …
-t_eq(iv_schedule($cT, ['round' => 'L1', 'mode' => 'In person', 'scheduled_at' => date('c')]), 0, 'L10.2 · iv_schedule() returns nothing');
+t_eq(iv_schedule($cT, ['round' => 'L1', 'mode' => 'In person', 'scheduled_at' => date('c'), 'location' => 'Head office', 'panel' => 'Panel member']), 0, 'L10.2 · iv_schedule() returns nothing');
 t_eq(offer_create($cT, ['ctc' => 100]), 0, 'L10.3 · offer_create() returns nothing');
 //  … and the routes report the refusal rather than a success.
 $ivSrc = preg_replace('~^\s*//.*$~m', '', (string) file_get_contents(dirname(__DIR__) . '/lib/recruit_iv.php'));
@@ -298,7 +298,7 @@ t_ok(strpos($ofBlk, "rexec_cand_block_reason") !== false, 'L10.7 · …and repor
 //  and on a healthy requirement both still succeed, so the checks are not vacuous
 $hOk = $approve(['job_title' => 'M6L Truth OK']); [$okOk,, $rqOk] = hreq_to_requisition($hOk, 1);
 $cOk = $mkCand($rqOk);
-t_ok(iv_schedule($cOk, ['round' => 'L1', 'mode' => 'In person', 'scheduled_at' => date('c')]) > 0,
+t_ok(iv_schedule($cOk, ['round' => 'L1', 'mode' => 'In person', 'scheduled_at' => date('c'), 'location' => 'Head office', 'panel' => 'Panel member']) > 0,
      'L10.8 · an interview on a healthy requirement is still scheduled');
 t_ok(offer_create($cOk, ['ctc' => 100]) > 0, 'L10.9 · …and an offer is still drafted');
 

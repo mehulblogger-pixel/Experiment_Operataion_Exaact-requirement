@@ -414,6 +414,9 @@ function ops_migrate() {
     ensure_column('inspectors', 'sbus', "VARCHAR(200) DEFAULT ''");
     ensure_column('inspectors', 'skill_ids', "VARCHAR(600) DEFAULT ''");
     ensure_column('inspectors', 'designation', "VARCHAR(40) DEFAULT ''");
+    // Owner, 9 Nov 2026 — "if he joined on date of joining then he shall be shown
+    // at respective department": the department a recruited person joins.
+    ensure_column('inspectors', 'department', "VARCHAR(120) DEFAULT ''");
     ensure_column('inspectors', 'staff_kind', "VARCHAR(20) DEFAULT 'ASSET'"); // asset / freelancer / subcon
     // Where this team member sits for deputation: a FIELD inspector goes to site
     // and is ranked to the TOP of the allocate list; a COORDinator or OFFICE
@@ -5378,6 +5381,16 @@ function skill_labels($csv) {
     foreach (array_filter(explode(',', $csv)) as $id) { $v = lk_value((int)$id); if ($v) $out[] = $v['label']; }
     return $out ? implode(', ', $out) : '—';
 }
+// The department a recruited person joins: the candidate's own, else the
+// requirement's, else its position's (the same answer the interview panel uses).
+function candidate_join_department(array $cand) {
+    $d = function_exists('iv_candidate_department') ? iv_candidate_department($cand) : trim((string)($cand['department'] ?? ''));
+    if ($d === '' && !empty($cand['requisition_id']) && function_exists('dept_row_label')) {
+        $req = ops_one("SELECT * FROM requisitions WHERE id=?", [(int)$cand['requisition_id']]);
+        if ($req) $d = trim((string)dept_row_label($req));
+    }
+    return function_exists('dept_canon') ? dept_canon($d) : $d;
+}
 function trade_label($id) { $v = $id ? lk_value($id) : null; return $v ? $v['label'] : '—'; }
 
 // A login's discipline: its team member's trade, else its own. 0 when none.
@@ -6770,12 +6783,28 @@ function ops_candidates($route, $method) {
             redirect('/candidate?id=' . $id);
         }
         if (function_exists('reqf_sync') && !empty($cand['requisition_id'])) { try { reqf_sync((int)$cand['requisition_id']); } catch (Throwable $e) {} }
+        //  Owner, 9 Nov 2026 — joined, so they belong to their department from now
+        //  on: the department the candidate was recruited for (their own, or the
+        //  requirement's, or its position's) goes onto their team record, and onto
+        //  their login if they have one and it has none. A department already set
+        //  by hand is never overwritten.
+        $joinDept = '';
+        if ($activated || $isNew) {
+            $joinDept = function_exists('candidate_join_department') ? candidate_join_department($cand) : '';
+            if ($joinDept !== '') {
+                try {
+                    db()->prepare("UPDATE inspectors SET department=? WHERE id=? AND COALESCE(department,'')=''")->execute([$joinDept, (int)$cand['inspector_id']]);
+                    db()->prepare("UPDATE users SET department=? WHERE inspector_id=? AND COALESCE(department,'')=''")->execute([$joinDept, (int)$cand['inspector_id']]);
+                    if (function_exists('act_log')) act_log('CANDIDATE', $id, 'NOTE', 'Placed in the ' . $joinDept . ' department on joining');
+                } catch (Throwable $e) {}
+            }
+        }
         //  Say what actually happened. If the activation did NOT take effect the
         //  person will not appear for scheduling, and the one thing we must not do
         //  is report plain success and let somebody discover that next week.
         $nowSt = (string)ops_val("SELECT status FROM inspectors WHERE id=?", [(int)$cand['inspector_id']]);
         if ($activated) {
-            flash('Recorded as joined on ' . $when . '. They are now on the team and available for scheduling.');
+            flash('Recorded as joined on ' . $when . '. They are now on the team' . ($joinDept !== '' ? ', in the ' . $joinDept . ' department,' : '') . ' and available for scheduling.');
         } elseif (!function_exists('wf_is_active') || wf_is_active($nowSt)) {
             flash($isNew ? 'Recorded as joined on ' . $when . '.' : 'Joining date updated to ' . $when . '.');
         } else {
@@ -6824,6 +6853,24 @@ function ops_candidates($route, $method) {
             $lost = in_array($to, ['REJECTED','WITHDRAWN','OFFER_DECLINED','HOLD'], true);
             $dropPoint  = $lost ? substr(trim((string)($_POST['drop_point'] ?? '')), 0, 30) : '';
             $dropReason = $lost ? substr(trim((string)($_POST['drop_reason'] ?? '')), 0, 60) : '';
+            //  Owner, 9 Nov 2026 — "an option if candidate is dropped or has dropped
+            //  at any stage for whatsoever reason". Dropping is allowed from every
+            //  stage, and is never silent: it needs a reason — chosen from the list
+            //  or written in the remark. Where it happened is filled in when left blank.
+            $isDrop = in_array($to, ['REJECTED', 'WITHDRAWN', 'OFFER_DECLINED'], true);
+            $wasHired = function_exists('rpipe_cand_hired') ? rpipe_cand_hired($cand) : strtoupper((string)($cand['stage'] ?? '')) === 'ACCEPTED';
+            if ($isDrop && $dropReason === '' && $remark === '') {
+                flash('Say why this candidate is being dropped — choose a drop reason or write a remark. It is kept on the candidate and in the drop-off report.', 'error');
+                redirect('/candidate?id=' . $id);
+            }
+            if ($isDrop && $wasHired && trim((string)($cand['joined_at'] ?? '')) !== '') {
+                flash('This person has already joined, so they are no longer a candidate to drop. If they have left, record it on their team record.', 'error');
+                redirect('/candidate?id=' . $id);
+            }
+            if ($isDrop && $dropPoint === '') {
+                $fromSt = strtoupper((string)($cand['stage'] ?? ''));
+                $dropPoint = $wasHired ? 'ACCEPTED_NO_JOIN' : (in_array($fromSt, ['RECEIVED', 'SUBMITTED', ''], true) ? 'INITIAL' : 'IN_BETWEEN');
+            }
 
             //  GATE 1B — WHERE THIS MOVE IS ACTUALLY RECORDED.
             //
@@ -7077,6 +7124,13 @@ function ops_candidates($route, $method) {
             // standing is recomputed here rather than only on the hire path.
             // Accepting without creating a workforce record, and reversing a hire,
             // both change how many seats are filled.
+            //  A hired person who never started (owner, 9 Nov 2026): their team
+            //  record was waiting to join — it is closed, so they are never
+            //  scheduled or counted, and the seat goes back to the requirement.
+            if ($isDrop && $wasHired && (int)($cand['inspector_id'] ?? 0) > 0 && function_exists('wf_status_move')) {
+                try { wf_status_move((int)$cand['inspector_id'], WF_ST_JOINING, WF_ST_INACTIVE,
+                        'Did not join — ' . ($dropReason !== '' ? ((function_exists('rcc_drop_reasons') ? rcc_drop_reasons() : [])[$dropReason] ?? $dropReason) : $remark)); } catch (Throwable $e) {}
+            }
             if (!empty($cand['requisition_id']) && function_exists('reqf_sync')) reqf_sync((int)$cand['requisition_id']);
             //  Only NON-JOINING moves reach here. A joining returned above from
             //  the single transaction that performs it, so the conversion block
@@ -7933,7 +7987,7 @@ function ops_vouchers($route, $method) {
     }
 
     if ($route === 'voucher-print') {
-        $v = ops_one("SELECT v.*, i.name inspector_name, i.emp_code, i.sbu FROM vouchers v LEFT JOIN inspectors i ON i.id=v.inspector_id WHERE v.id=?", [(int)($_GET['id'] ?? 0)]);
+        $v = ops_one("SELECT v.*, i.name inspector_name, i.emp_code, i.sbu, o.name office_name, o.city office_city FROM vouchers v LEFT JOIN inspectors i ON i.id=v.inspector_id LEFT JOIN offices o ON o.id=i.home_office_id WHERE v.id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$v) { http_response_code(404); view('notfound'); return; }
         ops_require(can_view_voucher($v), 'You cannot view this voucher.');
         $entries = ops_all("SELECT * FROM voucher_entries WHERE voucher_id=? ORDER BY entry_date, id", [$v['id']]);

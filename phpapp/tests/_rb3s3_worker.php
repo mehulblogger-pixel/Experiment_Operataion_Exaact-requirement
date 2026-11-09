@@ -42,6 +42,9 @@ $_SERVER['REQUEST_METHOD'] = 'POST';
 $_SESSION['csrf'] = 'rb3s3'; $_POST['_csrf'] = 'rb3s3';
 $_GET['id'] = $cid; $_POST['id'] = $cid;
 $_POST['to_stage'] = ($op === 'move') ? $extra : 'ACCEPTED';
+//  Owner, 9 Nov 2026 — a candidate is never dropped without a reason, so the
+//  screen's move carries one, as every real drop now must.
+if ($op === 'move') $_POST['remark'] = 'race probe';
 if ($op === 'accept' || $op === 'acceptcold') $_POST['make_inspector'] = '1';
 //  Owner decision 2: which team is now an explicit part of every acceptance,
 //  exactly as the screen sends it. Never left to the database's FIELD default.

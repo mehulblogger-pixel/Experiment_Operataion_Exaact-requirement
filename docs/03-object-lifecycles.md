@@ -787,6 +787,21 @@ created_at)`; hire (`ACCEPTED`) may create an `inspectors` row via the identity
 ledger (candidate → employee, no duplicate person). Guards: create/edit and
 stage-move `is_coordinator_level()`. **This lifecycle is unchanged.**
 
+**Dropping, and not joining (owner, 9 Nov 2026 — "an option if candidate is dropped
+or has dropped at any stage, for whatsoever reason").** A move to REJECTED,
+WITHDRAWN or OFFER_DECLINED is allowed from any stage and **needs a reason** — a drop
+reason from the list, or a written remark; the drop point is filled in from where the
+candidate was when left blank. One move is added with the owner's instruction:
+**hired (ACCEPTED) → WITHDRAWN, "did not join"**, for a hired person who never
+started — offered on the joining panel, refused once they have joined (that is a
+leaver, recorded on the team record). Their team record, waiting to join
+(`PENDING_JOINING`), becomes `INACTIVE` and the requirement's seat is recomputed.
+**Joining** (`candidate-joined`): the expected date from the offer is shown and used
+as the default once it has come; on joining, the person's department (the
+candidate's, else the requirement's or its position's) is written onto their team
+record (`inspectors.department`) and their login if it has none, and the Department
+hub counts them.
+
 **Public entry point (Phase 7 — additive).** Besides staff creation, a candidate
 may now enter at the **same `RECEIVED` start** through the opt-in public careers
 page (`careers.php`): a self-application creates the row with `source=CAREERS`,
@@ -863,6 +878,23 @@ Managed by `is_coordinator_level()` (`recruit_iv.php`, route `candidate-doc`) �
 new permission. `EXPIRED` is a derived display status (`doc_effective_status`),
 not stored. Additive.
 
+
+**Owner's rules, 9 Nov 2026.** A booking needs a date and time, at least one
+interviewer (people ticked from the list — several allowed — or a named outsider)
+and, unless it is a phone call, a place or link; nobody (candidate or interviewer) is
+booked twice at the same start time. **Levels go in order:** L2 may be booked only
+once L1 has a result, L3 once L2 has; a lower level that ended Fail / No show / No
+hire, or a skipped lower level, needs a written reason. A **re-interview** of a held
+round needs the tick and a reason, and is a new attempt — the first result stays. A
+recorded result is never put back to SCHEDULED, contradicting pairs (Pass + No hire,
+Fail + Hire) are refused, and changing a recorded result needs a reason; every
+schedule, result and change is written to the candidate's activity log. A booking can
+be deleted only while it has no result and no scores. **One decision across levels**
+(`iv_overall()`): each round's latest attempt counts and the highest level with a
+result decides; a disagreement is shown as a conflict with three ways forward —
+reject, a tie-break interview at a higher level (with a reason), or a re-interview of
+the deciding level. The suggested move is offered once, never applied by itself. The
+same person may sit on two levels (the recruiter is warned). No new status.
 ---
 
 ## Fulfilment allocation (`requisition_allocations.status`) — recruitment (Phase 4)

@@ -95,6 +95,9 @@ function recruit_iv_migrate() {
         //  Attempt number within a round, so a re-interview is visible as one
         //  rather than looking like a duplicate booking.
         ensure_column('interviews', 'attempt', 'INT DEFAULT 1');
+        //  Owner, 9 Nov 2026 — why a re-interview, an out-of-order level or a
+        //  changed result was allowed: written down, never left to memory.
+        ensure_column('interviews', 'reason', "VARCHAR(300) DEFAULT ''");
         db()->exec("CREATE TABLE IF NOT EXISTS candidate_docs (
             id $pk,
             candidate_id INT,
@@ -260,13 +263,93 @@ function iv_schedule($candidateId, $post) {
         return 0;
     }
     $attempt = $state['attempts'] + 1;
+    $reason = mb_substr(trim((string)($post['reason'] ?? '')), 0, 300);
+    if ($state['done'] > 0 && $reason === '') {
+        iv_last_error('Say why ' . $round . ' is being held again (e.g. "panel could not judge — technical test needed") — the first result stays in the history and this note explains the second.');
+        return 0;
+    }
+    //  Owner, 9 Nov 2026 — "even when interview scheduling details like dates, who
+    //  will take it etc. are blank it gets saved". An interview is a meeting: it
+    //  needs a time, somebody to take it, and — unless it is a phone call — a place
+    //  or a link.
+    $when = str_replace('T', ' ', trim((string)($post['scheduled_at'] ?? '')));
+    if ($when === '' || !preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/', $when) || strtotime($when) === false) {
+        iv_last_error('Choose the date and time of the interview.'); return 0;
+    }
+    $when = substr($when, 0, 16);
+    $whenStored = str_replace(' ', 'T', $when);          // kept in the form's own format, as before
+    $panelIds = iv_panel_ids_from_post($post);
+    $panelTxt = iv_panel_from_post($post);
+    if ($panelIds === '' && trim($panelTxt) === '') {
+        iv_last_error('Choose who will take the interview — tick one or more people, or type the name of an interviewer from outside.'); return 0;
+    }
+    $where = trim((string)($post['location'] ?? ''));
+    if ($where === '' && $mode !== 'Phone') {
+        iv_last_error($mode === 'Video' ? 'Add the video-call link.' : 'Add where the interview takes place.'); return 0;
+    }
+    //  Levels in order (owner: "let L1 complete the interview then only L2 can be
+    //  scheduled"). L2 waits for L1's result, L3 for L2's. A level whose result
+    //  was Fail / No show needs a reason to go further.
+    $prevNeed = iv_level_gate((int)$candidateId, $round);
+    if ($prevNeed !== '' && $reason === '') { iv_last_error($prevNeed); return 0; }
+    if ($prevNeed !== '' && strpos($prevNeed, 'has no result yet') !== false) { iv_last_error($prevNeed); return 0; }
+    //  Nobody — candidate or interviewer — is booked twice at the same time.
+    foreach (ops_all("SELECT i.id, i.round, i.candidate_id, i.panel_user_ids FROM interviews i WHERE i.result='SCHEDULED' AND SUBSTR(REPLACE(i.scheduled_at,'T',' '),1,16)=?", [$when]) ?: [] as $o) {
+        if ((int)$o['candidate_id'] === (int)$candidateId) { iv_last_error('This candidate already has ' . $o['round'] . ' at that time.'); return 0; }
+        $clash = array_intersect(iv_panel_user_ids($o), array_map('intval', explode(',', $panelIds)));
+        if ($panelIds !== '' && $clash) {
+            $nm = iv_user_name((int)reset($clash));
+            iv_last_error(($nm ?: 'One of the interviewers') . ' is already taking another interview at that time. Pick another time or another interviewer.'); return 0;
+        }
+    }
 
-    db()->prepare("INSERT INTO interviews (candidate_id,round,attempt,mode,location,scheduled_at,panel,panel_user_ids,competencies,result,created_by,created_at)
-                   VALUES (?,?,?,?,?,?,?,?,?,'SCHEDULED',?,?)")
-        ->execute([(int)$candidateId, $round, $attempt, $mode, trim((string)($post['location'] ?? '')),
-            trim((string)($post['scheduled_at'] ?? '')), iv_panel_from_post($post), iv_panel_ids_from_post($post),
-            trim((string)($post['competencies'] ?? '')), _iv_actor(), _iv_now()]);
-    return (int)db()->lastInsertId();
+    db()->prepare("INSERT INTO interviews (candidate_id,round,attempt,mode,location,scheduled_at,panel,panel_user_ids,competencies,result,created_by,created_at,reason)
+                   VALUES (?,?,?,?,?,?,?,?,?,'SCHEDULED',?,?,?)")
+        ->execute([(int)$candidateId, $round, $attempt, $mode, $where,
+            $whenStored, $panelTxt, $panelIds,
+            trim((string)($post['competencies'] ?? '')), _iv_actor(), _iv_now(), $reason]);
+    $newId = (int)db()->lastInsertId();
+    if (function_exists('act_log')) try { act_log('CANDIDATE', (int)$candidateId, 'INTERVIEW',
+        $round . ($attempt > 1 ? ' re-interview ' . $attempt : '') . ' scheduled for ' . $when . ' — panel: ' . $panelTxt . ($reason !== '' ? ' — reason: ' . $reason : '')); } catch (Throwable $e) {}
+    //  The same person may sit on two levels (a small team often must), but the
+    //  recruiter is told, because a second level is meant to be a second opinion.
+    $same = [];
+    foreach (ops_all("SELECT round, panel_user_ids FROM interviews WHERE candidate_id=? AND id<>? AND round<>?", [(int)$candidateId, $newId, $round]) ?: [] as $o)
+        foreach (array_intersect(iv_panel_user_ids($o), array_map('intval', explode(',', $panelIds))) as $uid) $same[$uid][] = $o['round'];
+    if ($same) {
+        $names = [];
+        foreach ($same as $uid => $rs) $names[] = (iv_user_name((int)$uid) ?: 'Someone') . ' (also on ' . implode(', ', array_unique($rs)) . ')';
+        iv_last_notice('Note: ' . implode('; ', $names) . ' — a later level is meant to be a second opinion; use a different interviewer where you can.');
+    }
+    return $newId;
+}
+
+function iv_user_name($uid) {
+    $u = ops_one("SELECT first_name, last_name FROM users WHERE id=?", [(int)$uid]);
+    return $u ? trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')) : '';
+}
+//  A second message channel for a scheduling that succeeded but deserves a word.
+function iv_last_notice($set = null) {
+    static $msg = '';
+    if ($set !== null) $msg = (string) $set;
+    return $msg;
+}
+
+//  The numbered levels go in order: L2 after L1 has a result, L3 after L2.
+//  '' when this round may be booked; otherwise what is in the way. A previous
+//  level that failed returns a message that a written reason overrides; one
+//  still waiting for its result cannot be overridden.
+function iv_level_gate($candidateId, $round) {
+    $order = ['L1' => 1, 'L2' => 2, 'L3' => 3];
+    if (!isset($order[$round]) || $order[$round] === 1) return '';
+    $prev = array_search($order[$round] - 1, $order, true);
+    $last = ops_one("SELECT result, recommendation FROM interviews WHERE candidate_id=? AND round=? ORDER BY id DESC LIMIT 1", [(int)$candidateId, $prev]);
+    if (!$last) return $prev . ' has not been held yet. Hold ' . $prev . ' first — or, if this person is meant to skip ' . $prev . ', write the reason in "Reason".';
+    $r = (string)$last['result'];
+    if (in_array($r, ['SCHEDULED', 'RE_INTERVIEW'], true)) return $prev . ' has no result yet. Record ' . $prev . "'s result first; " . $round . ' can be booked once ' . $prev . ' is complete.';
+    if (in_array($r, ['FAIL', 'NO_SHOW', 'CANCELLED'], true) || (string)$last['recommendation'] === 'No hire')
+        return $prev . ' ended "' . (IV_RESULTS[$r] ?? $r) . '". To take this person to ' . $round . ' anyway, write the reason in "Reason".';
+    return '';
 }
 
 //  The panel as ids. Separate from iv_panel_from_post() because that one also
@@ -307,17 +390,93 @@ function iv_my_upcoming($userId, $days = 7) {
 }
 
 function iv_my_upcoming_count($userId, $days = 7) { return count(iv_my_upcoming($userId, $days)); }
+//  Returns [ok, message]. Owner, 9 Nov 2026 — "if the result has been recorded,
+//  still it allows ... what will be the record kept". A recorded result is no
+//  longer quietly overwritten: changing it needs a reason and is logged, it can
+//  never be put back to "Scheduled" (book a re-interview instead), and a result
+//  that contradicts its own recommendation is refused.
 function iv_record($id, $post) {
     recruit_iv_migrate();
+    $iv = ops_one("SELECT * FROM interviews WHERE id=?", [(int)$id]);
+    if (!$iv) return [false, 'Interview not found.'];
     $result = array_key_exists($post['result'] ?? '', IV_RESULTS) ? $post['result'] : 'SCHEDULED';
     $rec = in_array($post['recommendation'] ?? '', IV_RECOMMENDATIONS, true) ? $post['recommendation'] : '';
     $rating = max(0, min(5, (int)($post['rating'] ?? 0)));
-    $done = in_array($result, ['PASS','FAIL','HOLD','NO_SHOW','CANCELLED'], true) ? _iv_now() : '';
+    $old = (string)$iv['result'];
+    if ($old !== 'SCHEDULED' && $result === 'SCHEDULED')
+        return [false, 'This interview already has a result. To assess the person again, schedule a re-interview — the first result stays on record.'];
+    if ($result === 'PASS' && $rec === 'No hire') return [false, 'The result is Pass but the recommendation is "No hire". Correct one of them.'];
+    if ($result === 'FAIL' && in_array($rec, ['Strong hire', 'Hire'], true)) return [false, 'The result is Fail but the recommendation is "' . $rec . '". Correct one of them.'];
+    $why = mb_substr(trim((string)($post['change_reason'] ?? '')), 0, 300);
+    $changing = $old !== 'SCHEDULED' && ($old !== $result || (string)$iv['recommendation'] !== $rec);
+    if ($changing && $why === '') return [false, 'This interview\'s result was already recorded as ' . (IV_RESULTS[$old] ?? $old)
+        . ($iv['recommendation'] !== '' ? ' (' . $iv['recommendation'] . ')' : '') . '. Write why it is being changed — the change is kept in the history.'];
+    $done = in_array($result, ['PASS','FAIL','HOLD','NO_SHOW','CANCELLED'], true) ? ((string)$iv['done_at'] !== '' ? $iv['done_at'] : _iv_now()) : '';
     db()->prepare("UPDATE interviews SET result=?, rating=?, recommendation=?, competencies=?, questions=?, comments=?, done_at=? WHERE id=?")
         ->execute([$result, $rating, $rec, trim((string)($post['competencies'] ?? '')),
             trim((string)($post['questions'] ?? '')), trim((string)($post['comments'] ?? '')), $done, (int)$id]);
+    if (function_exists('act_log')) try { act_log('CANDIDATE', (int)$iv['candidate_id'], 'INTERVIEW',
+        $iv['round'] . ((int)$iv['attempt'] > 1 ? ' re-interview ' . (int)$iv['attempt'] : '') . ': '
+        . ($changing ? 'result changed from ' . (IV_RESULTS[$old] ?? $old) . ($iv['recommendation'] !== '' ? ' / ' . $iv['recommendation'] : '') . ' to ' : 'result ')
+        . (IV_RESULTS[$result] ?? $result) . ($rec !== '' ? ' / ' . $rec : '') . ($changing ? ' — reason: ' . $why : '')); } catch (Throwable $e) {}
+    return [true, $changing ? 'Result changed — the earlier one and your reason are in the history.' : 'Interview outcome saved.'];
 }
-function iv_delete($id) { recruit_iv_migrate(); db()->prepare("DELETE FROM interviews WHERE id=?")->execute([(int)$id]); }
+//  Only an interview with no result and no scores may be deleted (a booking made
+//  by mistake); one that took place is part of the record. Returns [ok, message].
+function iv_delete($id) {
+    recruit_iv_migrate();
+    $iv = ops_one("SELECT * FROM interviews WHERE id=?", [(int)$id]);
+    if (!$iv) return [false, 'Interview not found.'];
+    if (!in_array((string)$iv['result'], ['SCHEDULED', 'CANCELLED'], true) || iv_scores((int)$id))
+        return [false, 'This interview has a result or scores, so it stays on record. If it should not count, record its result as Cancelled with a note.'];
+    db()->prepare("DELETE FROM interviews WHERE id=?")->execute([(int)$id]);
+    if (function_exists('act_log')) try { act_log('CANDIDATE', (int)$iv['candidate_id'], 'INTERVIEW', $iv['round'] . ' booking for ' . $iv['scheduled_at'] . ' removed by ' . _iv_actor()); } catch (Throwable $e) {}
+    return [true, 'Interview removed.'];
+}
+
+//  ---- ONE DECISION ACROSS ALL LEVELS (owner, 9 Nov 2026) -------------------
+//    "Suppose L1 gives good score and recommends strong hire or hire while L2
+//     makes fail and no hire — what will happen ... What about such conflict."
+//  The rule: each level's LATEST attempt counts; the HIGHEST level that has a
+//  result decides (L3 over L2 over L1, then any other round in the order held);
+//  a disagreement between levels is shown as a conflict, with the three ways
+//  forward — reject, a tie-break interview at a higher level, or a re-interview
+//  of the deciding level with a reason. Nothing moves the candidate by itself.
+function iv_overall($candidateId) {
+    $rows = ops_all("SELECT * FROM interviews WHERE candidate_id=? ORDER BY id", [(int)$candidateId]) ?: [];
+    $latest = [];
+    foreach ($rows as $r) $latest[$r['round']] = $r;           // last attempt of each round
+    if (!$latest) return null;
+    $rank = fn($round) => ['L1' => 1, 'L2' => 2, 'L3' => 3][$round] ?? 0;
+    $pending = array_values(array_filter($latest, fn($r) => in_array((string)$r['result'], ['SCHEDULED', 'RE_INTERVIEW'], true)));
+    $decided = array_values(array_filter($latest, fn($r) => in_array((string)$r['result'], ['PASS', 'FAIL', 'HOLD', 'NO_SHOW'], true)));
+    $neg = fn($r) => in_array((string)$r['result'], ['FAIL', 'NO_SHOW'], true) || (string)$r['recommendation'] === 'No hire';
+    $pos = fn($r) => (string)$r['result'] === 'PASS' || in_array((string)$r['recommendation'], ['Strong hire', 'Hire'], true);
+    $deciding = null;
+    foreach ($decided as $r) {
+        if (!$deciding) { $deciding = $r; continue; }
+        $a = $rank($r['round']); $b = $rank($deciding['round']);
+        if ($a > $b || ($a === $b && (int)$r['id'] > (int)$deciding['id'])) $deciding = $r;
+    }
+    $conflict = $decided && array_filter($decided, $neg) && array_filter($decided, $pos);
+    $out = ['pending' => $pending, 'decided' => $decided, 'deciding' => $deciding, 'conflict' => (bool)$conflict, 'suggest' => null, 'why' => ''];
+    if ($pending) { $out['why'] = 'Waiting for ' . implode(', ', array_map(fn($r) => $r['round'], $pending)) . '.'; return $out; }
+    if (!$deciding) return $out;
+    $lbl = $deciding['round'] . ((int)$deciding['attempt'] > 1 ? ' (re-interview ' . (int)$deciding['attempt'] . ')' : '');
+    if ($neg($deciding)) {
+        $out['suggest'] = 'REJECTED';
+        $out['why'] = $lbl . ' — the highest level held — did not recommend this person.';
+    } elseif ((string)$deciding['result'] === 'HOLD') {
+        $out['suggest'] = 'HOLD';
+        $out['why'] = $lbl . ' put this person on hold.';
+    } elseif ($pos($deciding)) {
+        $out['suggest'] = 'OFFERED';
+        $out['why'] = $lbl . ' — the highest level held — recommends this person.';
+    }
+    if ($conflict) $out['why'] .= ' The levels disagree: ' . implode(' · ', array_map(fn($r) => $r['round'] . ' ' . (IV_RESULTS[$r['result']] ?? $r['result']) . ($r['recommendation'] !== '' ? ' / ' . $r['recommendation'] : ''), $decided))
+        . '. The higher level decides. If you are not sure, hold a tie-break interview at a higher level (e.g. L3 or Management), or re-interview ' . $deciding['round'] . ' with a reason.';
+    return $out;
+}
 
 // The people who can sit on an interview panel — active users, with their
 // department so the panel can default to the candidate's own department.
@@ -461,7 +620,7 @@ function ops_candidate_interview($route, $method) {
         //  person then acts on a meeting that does not exist.
         if ($do === 'schedule') {
             $ivNew = iv_schedule($id, $_POST);
-            if ((int) $ivNew > 0) flash('Interview scheduled.');
+            if ((int) $ivNew > 0) { flash('Interview scheduled.'); if (iv_last_notice() !== '') flash(iv_last_notice(), 'warning'); }
             else {
                 //  iv_schedule()'s own reason first — it is the specific one
                 //  ("L1 is already scheduled for ...") and the only one that
@@ -472,8 +631,8 @@ function ops_candidate_interview($route, $method) {
                 flash($ivWhy !== '' ? $ivWhy : 'The interview could not be scheduled.', 'error');
             }
         }
-        elseif ($do === 'record') { iv_record((int)($_POST['iv_id'] ?? 0), $_POST); flash('Interview outcome saved.'); }
-        elseif ($do === 'delete') { iv_delete((int)($_POST['iv_id'] ?? 0)); flash('Interview removed.'); }
+        elseif ($do === 'record') { [$ok, $m] = iv_record((int)($_POST['iv_id'] ?? 0), $_POST); flash($m, $ok ? 'success' : 'error'); }
+        elseif ($do === 'delete') { [$ok, $m] = iv_delete((int)($_POST['iv_id'] ?? 0)); flash($m, $ok ? 'success' : 'error'); }
         elseif ($do === 'score_save') { iv_score_save($_POST); flash('Panel member score saved.'); }
         elseif ($do === 'score_delete') { iv_score_delete((int)($_POST['score_id'] ?? 0)); flash('Score removed.'); }
     }
@@ -522,9 +681,9 @@ function recruit_iv_panel($cand) {
         <b style="font-size:12.5px">Schedule an interview</b>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:6px">
           <div><label class="ff-l">Round</label><select class="form-control" name="round"><?php foreach (IV_ROUNDS as $r): ?><option><?= $e($r) ?></option><?php endforeach; ?></select></div>
-          <div><label class="ff-l">When</label><input class="form-control" type="datetime-local" name="scheduled_at"></div>
+          <div><label class="ff-l">When *</label><input class="form-control" type="datetime-local" name="scheduled_at" required></div>
           <div><label class="ff-l">Mode</label><select class="form-control" name="mode"><?php foreach (IV_MODES as $m): ?><option><?= $e($m) ?></option><?php endforeach; ?></select></div>
-          <div><label class="ff-l">Location / link</label><input class="form-control" name="location"></div>
+          <div><label class="ff-l">Location / link <span class="muted" style="font-weight:400">— not needed for a phone call</span></label><input class="form-control" name="location"></div>
           <div style="grid-column:1/-1"><label class="ff-l">Competencies to assess</label><input class="form-control" name="competencies"></div>
         </div>
         <?php // Interview panel — pick one or more interviewers from your people.
@@ -602,10 +761,30 @@ function recruit_iv_panel($cand) {
           <input type="checkbox" name="reinterview" value="1">
           This is a <b>re-interview</b> — the same round has already been held and assessed
         </label>
+        <div style="margin-top:8px"><label class="ff-l">Reason <span class="muted" style="font-weight:400">— needed for a re-interview, or to book a level before the one below it is passed</span></label>
+          <input class="form-control" name="reason" maxlength="300" placeholder="e.g. L1 panel unsure on design skills — second technical opinion"></div>
+        <p class="muted" style="font-size:12px;margin:6px 0 0">Levels go in order: L2 can be booked once L1 has a result, L3 once L2 has. Everyone on the panel sees it in My interviews.</p>
         <div style="margin-top:10px"><button class="btn">Schedule</button></div>
       </form>
       <?php endif; ?>
       <?php if (!$ivs): ?><p class="muted">No interviews yet.</p><?php endif; ?>
+      <?php $ov = $ivs ? iv_overall((int)$cand['id']) : null;
+            $flowCls = function_exists('rpipe_current_state') ? (rpipe_current_state($cand)['class'] ?? 'ACTIVE') : 'ACTIVE';
+            $ivStNow = strtoupper((string)($cand['stage'] ?? ''));
+            if ($ov && ($ov['why'] !== '')): $ivStages = function_exists('lk_options_or') ? lk_options_or('candidate_stage', CAND_STAGES) : CAND_STAGES; ?>
+        <div style="border:1px solid <?= $ov['conflict'] ? '#fcd34d' : 'var(--line,#e5e7eb)' ?>;background:<?= $ov['conflict'] ? '#fffbeb' : 'var(--soft,#f8fafc)' ?>;border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:13px">
+          <b><?= $ov['conflict'] ? '⚖️ The interview levels disagree' : 'Where the interviews stand' ?></b><br><?= $e($ov['why']) ?>
+          <?php if ($can && $ov['suggest'] && $flowCls === 'ACTIVE' && $ivStNow !== $ov['suggest'] && !in_array($ivStNow, ['ACCEPTED', 'WITHDRAWN', 'REJECTED', 'OFFER_DECLINED'], true)): ?>
+          <form method="post" action="/candidate-stage?id=<?= (int)$cand['id'] ?>" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <input type="hidden" name="to_stage" value="<?= $e($ov['suggest']) ?>">
+            <input type="hidden" name="remark" value="<?= $e('Interviews: ' . implode(' · ', array_map(fn($r) => $r['round'] . ' ' . (IV_RESULTS[$r['result']] ?? $r['result']) . ($r['recommendation'] !== '' ? ' / ' . $r['recommendation'] : ''), $ov['decided']))) ?>">
+            <?php if ($ov['suggest'] === 'REJECTED'): ?><input type="hidden" name="drop_point" value="IN_BETWEEN"><input type="hidden" name="drop_reason" value="PROFILE_MISMATCH"><?php endif; ?>
+            <button class="btn small"><?= $e(['REJECTED' => 'Reject this candidate', 'HOLD' => 'Put on hold', 'OFFERED' => 'Move to offer'][$ov['suggest']] ?? ('Move to ' . ($ivStages[$ov['suggest']] ?? $ov['suggest']))) ?></button>
+            <span class="muted" style="font-size:11.5px">or leave them where they are and decide later</span>
+          </form>
+          <?php endif; ?>
+        </div>
+      <?php endif; ?>
       <?php foreach ($ivs as $iv): $st = (string)$iv['result'];
             $ivScores = iv_scores((int)$iv['id']); $ivSum = iv_score_summary((int)$iv['id']); $ivMembers = iv_panel_members($iv); ?>
         <div style="border:1px solid var(--line,#e5e7eb);border-radius:10px;padding:11px 13px;margin-bottom:10px">
@@ -615,6 +794,7 @@ function recruit_iv_panel($cand) {
           </div>
           <?php if ($iv['panel']): ?><div class="muted" style="font-size:12px">Panel: <?= $e($iv['panel']) ?><?= $iv['location'] ? ' · ' . $e($iv['location']) : '' ?></div><?php endif; ?>
           <?php if ($iv['competencies']): ?><div class="muted" style="font-size:12px">Competencies: <?= $e($iv['competencies']) ?></div><?php endif; ?>
+          <?php if (trim((string)($iv['reason'] ?? '')) !== ''): ?><div class="muted" style="font-size:12px">Why booked: <?= $e($iv['reason']) ?></div><?php endif; ?>
           <?php if ($iv['recommendation'] || $iv['comments']): ?><div style="font-size:12.5px;margin-top:4px"><?= $iv['recommendation'] ? '<b>' . $e($iv['recommendation']) . '</b> — ' : '' ?><?= $e($iv['comments']) ?></div><?php endif; ?>
           <?php // Individual panel-member scores, with the average across the panel. ?>
           <?php if ($ivScores): ?>
@@ -654,68 +834,17 @@ function recruit_iv_panel($cand) {
               <label class="ff-l" style="margin-top:8px">Competencies assessed</label><input class="form-control" name="competencies" value="<?= $e($iv['competencies']) ?>">
               <label class="ff-l" style="margin-top:8px">Questions asked</label><textarea class="form-control" name="questions" rows="2"><?= $e($iv['questions']) ?></textarea>
               <label class="ff-l" style="margin-top:8px">Comments</label><textarea class="form-control" name="comments" rows="2"><?= $e($iv['comments']) ?></textarea>
+              <?php if ($st !== 'SCHEDULED'): ?>
+              <label class="ff-l" style="margin-top:8px">Reason for changing the recorded result <span class="muted" style="font-weight:400">— needed only if you change it; kept in the history</span></label>
+              <input class="form-control" name="change_reason" maxlength="300">
+              <?php endif; ?>
               <div style="margin-top:8px;display:flex;gap:8px"><button class="btn">Save scorecard</button>
-                <button class="btn secondary" name="do" value="delete" onclick="return confirm('Remove this interview?')">Delete</button></div>
+                <?php if (in_array($st, ['SCHEDULED', 'CANCELLED'], true) && !$ivScores): ?><button class="btn secondary" name="do" value="delete" onclick="return confirm('Remove this booking? Use this only for a booking made by mistake.')">Delete booking</button><?php endif; ?></div>
             </form>
           </details>
           <?php endif; ?>
 
-          <?php //  ---- WHEN THE INTERVIEW DECIDES SOMETHING, OFFER THE MOVE ----
-                //                                            (UAT A16 / A8)
-                //
-                //    "It records as fail but there is no option of reject the
-                //     test candidate."
-                //    "Hiring Work flow shall automatically updated stage wise
-                //     when either Pipeline, Overview, Interviews, documents
-                //     etc. is updated. IF there is any duplicacy of the work
-                //     that must be unified."
-                //
-                //  Both true. Recording Fail / No hire left the candidate sitting
-                //  at "Interview scheduled", and the control that would move them
-                //  was a dropdown in another panel far down the page — so the
-                //  owner looked where the decision was made, found nothing, and
-                //  logged it as missing.
-                //
-                //  OFFERED, NOT AUTOMATIC, and the distinction is the whole
-                //  design. A failed L1 does not always mean rejected: the
-                //  recruiter may want an L2 with a different panel, or a hold
-                //  pending a client's view. Moving them automatically would make
-                //  a lifecycle decision on their behalf and be wrong often
-                //  enough to matter. So the screen states the consequence and
-                //  offers it in one click, pre-filled, where the decision was
-                //  taken.
-                //
-                //  It posts to /candidate-stage — the SAME endpoint the "Move
-                //  this candidate" panel uses. No second path, no second set of
-                //  guards, one audit trail. That is the "duplicacy ... must be
-                //  unified" half of the ask.
-                $ivMove = null;
-                $ivStageNow = strtoupper((string) ($cand['stage'] ?? ''));
-                if ($can && !in_array($ivStageNow, ['ACCEPTED', 'WITHDRAWN', 'REJECTED'], true)) {
-                    if (in_array($st, ['FAIL', 'NO_SHOW'], true))
-                        $ivMove = ['REJECTED', 'Reject this candidate',
-                                   $st === 'NO_SHOW' ? 'did not attend' : 'were not successful'];
-                    elseif ($st === 'HOLD')
-                        $ivMove = ['HOLD', 'Put this candidate on hold', 'were put on hold'];
-                    elseif ($st === 'PASS' && $ivStageNow !== 'OFFERED')
-                        $ivMove = ['OFFERED', 'Move to offer', 'passed'];
-                }
-                if ($ivMove): [$ivTo, $ivLabel, $ivWhy] = $ivMove;
-                      $ivStageName = (function_exists('lk_options_or') ? lk_options_or('candidate_stage', CAND_STAGES) : CAND_STAGES)[$ivTo] ?? $ivTo; ?>
-          <form method="post" action="/candidate-stage?id=<?= (int)$cand['id'] ?>"
-                style="margin-top:8px;padding:9px 11px;border:1px solid var(--line,#e5e7eb);border-radius:9px;background:var(--soft,#f8fafc)">
-            <div style="font-size:12.5px;margin-bottom:6px">
-              This person is still at <b><?= $e((function_exists('lk_options_or') ? lk_options_or('candidate_stage', CAND_STAGES) : CAND_STAGES)[$ivStageNow] ?? $ivStageNow) ?></b>.
-              They <?= $e($ivWhy) ?> at <?= $e($iv['round']) ?><?= ((int)($iv['attempt'] ?? 1) > 1 ? ' (re-interview ' . (int)$iv['attempt'] . ')' : '') ?> —
-              move them to <b><?= $e($ivStageName) ?></b>?
-            </div>
-            <input type="hidden" name="to_stage" value="<?= $e($ivTo) ?>">
-            <input type="hidden" name="remark" value="<?= $e($iv['round'] . ': ' . (IV_RESULTS[$st] ?? $st)
-                   . ((string)$iv['recommendation'] !== '' ? ' — ' . $iv['recommendation'] : '')) ?>">
-            <button class="btn small"><?= $e($ivLabel) ?></button>
-            <span class="muted" style="font-size:11.5px;margin-left:6px">or leave them where they are and decide later</span>
-          </form>
-          <?php endif; ?>
+          <?php // The move a result suggests is offered once, above the cards (iv_overall()). ?>
         </div>
       <?php endforeach; ?>
     </div>

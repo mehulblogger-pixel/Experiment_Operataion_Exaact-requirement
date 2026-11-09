@@ -116,7 +116,7 @@ function dept_canon($stored) {
 function dept_names() {
     $set = [];
     if (function_exists('lk_options_or')) foreach (lk_options_or('department', []) as $l) { $l = trim((string) $l); if ($l !== '') $set[$l] = true; }
-    foreach (['positions', 'users'] as $tbl) {
+    foreach (['positions', 'users', 'inspectors'] as $tbl) {
         try { foreach (ops_all("SELECT DISTINCT department d FROM $tbl WHERE COALESCE(department,'')<>''") as $r) { $d = dept_canon($r['d']); if ($d !== '') $set[$d] = true; } }
         catch (Throwable $e) {}
     }
@@ -143,6 +143,14 @@ function dept_hub() {
     $usrByDept = [];
     // Summed, not assigned: two spellings of one department must add up, not overwrite.
     try { foreach (ops_all("SELECT COALESCE(department,'') d, COUNT(*) n FROM users WHERE is_active=1 GROUP BY department") as $r) { $d = dept_canon($r['d']); $usrByDept[$d] = ($usrByDept[$d] ?? 0) + (int) $r['n']; } }
+    catch (Throwable $e) {}
+    //  Owner, 9 Nov 2026 — people who joined through recruitment belong to their
+    //  department even without a login. Counted once: a team member whose login
+    //  is already counted above is not counted again.
+    try { foreach (ops_all("SELECT COALESCE(i.department,'') d, COUNT(*) n FROM inspectors i
+                             WHERE COALESCE(i.department,'')<>'' AND COALESCE(NULLIF(i.status,''),'ACTIVE')='ACTIVE'
+                               AND NOT EXISTS (SELECT 1 FROM users u WHERE u.inspector_id=i.id AND u.is_active=1)
+                             GROUP BY i.department") as $r) { $d = dept_canon($r['d']); $usrByDept[$d] = ($usrByDept[$d] ?? 0) + (int) $r['n']; } }
     catch (Throwable $e) {}
     $rows = [];
     foreach (dept_names() as $d) {

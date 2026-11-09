@@ -53,6 +53,7 @@
   <?php if ($isDraft): ?><span class="draft">DRAFT — not yet issued</span><?php endif; ?>
 </div>
 
+<?= function_exists('doc_letterhead_html') ? doc_letterhead_html(['pan' => true]) : '' ?>
 <h1>TAX INVOICE</h1>
 <div class="sub"><?= e($company) ?><?= $office && $office['name'] ? ' · ' . e($office['name']) . ' branch' : '' ?></div>
 
@@ -158,4 +159,5 @@
   <div>Customer's acknowledgement</div>
   <div>For <?= e($company) ?></div>
 </div>
+<?= function_exists('doc_footer_html') ? doc_footer_html() : '' ?>
 </body></html>

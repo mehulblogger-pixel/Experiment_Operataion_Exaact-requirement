@@ -27,7 +27,9 @@
   .muted{color:#555}
 </style></head><body>
 <div class="noprint"><button onclick="window.print()">🖨 Print</button> <a href="/voucher?id=<?= (int)$v['id'] ?>">← back</a></div>
-<div class="loc">Location: <strong>AHMEDABAD</strong></div>
+<?= function_exists('doc_letterhead_html') ? doc_letterhead_html() : '' ?>
+<?php // Was hard-coded "AHMEDABAD": the person's own branch now. ?>
+<?php $vLoc = trim((string)($v['office_city'] ?? '')) ?: trim((string)($v['office_name'] ?? '')); if ($vLoc !== ''): ?><div class="loc">Location: <strong><?= e(strtoupper($vLoc)) ?></strong></div><?php endif; ?>
 <h1>STATEMENT OF TRAVELLING EXPENSES</h1>
 <table class="hdr">
   <tr><td>Name: <strong><?= e($v['inspector_name']) ?></strong></td><td>Employee code: <strong><?= e($v['emp_code'] ?: '—') ?></strong></td><td><?= e(T("sbu")) ?>: <strong><?= e(lk_options_or('sbu',OPS_SBUS)[$v['sbu']] ?? $v['sbu'] ?: '—') ?></strong></td></tr>

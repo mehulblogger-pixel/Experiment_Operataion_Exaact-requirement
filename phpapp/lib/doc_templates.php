@@ -72,13 +72,18 @@ function doc_tpl_seed_extra() {
         . "Shared by {company} on {date}. Confidential — for the client's evaluation only.");
 }
 
+// The letterhead first seeded here (name + address, no logo). Recognised so it
+// can give way to the company's full letterhead.
+function doc_default_letterhead() {
+    return "<div style=\"text-align:center;border-bottom:2px solid #333;padding-bottom:10px;margin-bottom:18px\"><div style=\"font-size:20px;font-weight:700\">{company}</div><div style=\"font-size:12px;color:#555\">{company_address}</div></div>";
+}
 function doc_tpl_seed() {
     try { if ((int)ops_one("SELECT COUNT(*) c FROM doc_templates")['c'] > 0) return; }
     catch (Throwable $e) { return; }
     $now = function_exists('now_iso') ? now_iso() : date('c');
     if (function_exists('setting_get')) {
         foreach ([
-            'doc_letterhead' => "<div style=\"text-align:center;border-bottom:2px solid #333;padding-bottom:10px;margin-bottom:18px\"><div style=\"font-size:20px;font-weight:700\">{company}</div><div style=\"font-size:12px;color:#555\">{company_address}</div></div>",
+            'doc_letterhead' => '{letterhead}',
             'doc_footer'     => "<div style=\"border-top:1px solid #ccc;margin-top:26px;padding-top:8px;font-size:11px;color:#777;text-align:center\">{company} · This is a system-generated document.</div>",
             'company_address'=> '',
         ] as $k => $v) if (trim((string)setting_get($k, '')) === '') setting_set($k, $v);
@@ -132,7 +137,9 @@ function doc_tokens_help() {
         'phone' => 'Phone / mobile', 'email' => 'Email', 'address' => 'Address', 'location' => 'Location',
         'ctc' => 'Total CTC', 'net_pay' => 'Net (in-hand) pay', 'salary_table' => 'The full salary-structure table',
         'joining_date' => 'Date of joining', 'offer_valid_till' => 'Offer validity date', 'terms' => 'Offer terms',
-        'company' => 'Company / workspace name', 'company_address' => 'Company address',
+        'company' => 'Company name', 'company_address' => 'Company address',
+        'company_logo' => 'Company logo (picture)', 'company_gstin' => 'Company GSTIN', 'company_contact' => 'Company e-mail · phone · website',
+        'letterhead' => 'The full company letterhead (logo, name, address, contact)',
         'date' => "Today's date", 'cand_code' => 'Candidate code',
         'experience' => 'Total experience', 'skills' => 'Key skills / keywords',
         'summary' => 'Recruiter summary / remarks', 'source' => 'Sourcing channel',
@@ -145,7 +152,8 @@ function doc_token_map($candidate) {
     $cur = function_exists('cur_sym') ? cur_sym() : (function_exists('setting_get') ? (setting_get('currency_symbol', '₹') ?: '₹') : '₹');
     $money = fn($v) => $cur . number_format((float)$v, 0);
     $g = fn($k) => isset($candidate[$k]) ? trim((string)$candidate[$k]) : '';
-    $company = function_exists('app_name') ? app_name() : (function_exists('setting_get') ? setting_get('app_name', '') : '');
+    $ident = function_exists('doc_identity') ? doc_identity() : null;
+    $company = $ident ? $ident['name'] : (function_exists('app_name') ? app_name() : '');
     $desig = $g('designation');
     $position = (defined('DESIGNATIONS') && isset(DESIGNATIONS[$desig])) ? DESIGNATIONS[$desig] : $desig;
 
@@ -182,7 +190,10 @@ function doc_token_map($candidate) {
         'salary_table' => $salTable,
         'joining_date' => $offer ? ($offer['joining_date'] ?? '') : '', 'offer_valid_till' => $offer ? ($offer['expiry_date'] ?? '') : '',
         'terms' => $offer ? (string)($offer['offer_terms'] ?? '') : '',
-        'company' => $company, 'company_address' => function_exists('setting_get') ? setting_get('company_address', '') : '',
+        'company' => $company, 'company_address' => $ident ? $ident['address'] : (function_exists('setting_get') ? setting_get('company_address', '') : ''),
+        'company_logo' => $ident && $ident['logo'] !== '' ? '<img src="' . htmlspecialchars($ident['logo'], ENT_QUOTES) . '" alt="" style="max-height:64px;max-width:180px">' : '',
+        'company_gstin' => $ident ? $ident['gstin'] : '', 'company_contact' => $ident ? $ident['contact'] : '',
+        'letterhead' => function_exists('doc_letterhead_html') ? doc_letterhead_html() : '',
         'date' => date('d M Y'), 'cand_code' => $g('cand_code'),
         // Candidate-profile tokens — used by the one-pager. Safe if a column is
         // absent ($g returns ''), so the letter highlights it rather than erroring.
@@ -203,7 +214,7 @@ function doc_token_map($candidate) {
 // Replace {tokens} in $text using $map. Empty/unknown tokens are HIGHLIGHTED and
 // collected into $missing. $salTable-style HTML tokens are inserted as-is.
 function doc_fill($text, $map, &$missing) {
-    $htmlTokens = ['salary_table'];
+    $htmlTokens = ['salary_table', 'company_logo', 'letterhead'];
     return preg_replace_callback('/\{([a-z_]+)\}/', function ($m) use ($map, &$missing, $htmlTokens) {
         $k = $m[1];
         if (!array_key_exists($k, $map)) { $missing[$k] = 'unknown'; return '<span style="background:#fde68a;color:#92400e;padding:0 3px;border-radius:3px">«' . htmlspecialchars($k) . '?»</span>'; }
@@ -222,12 +233,17 @@ function doc_render_template($tpl, $candidate) {
     $missing = [];
     $head = function_exists('setting_get') ? (string)setting_get('doc_letterhead', '') : '';
     $foot = function_exists('setting_get') ? (string)setting_get('doc_footer', '') : '';
+    // Owner, 9 Nov 2026 — letters carry the company letterhead with its logo. A
+    // letterhead left as it was first set up (name + address only, no logo) is
+    // replaced by the company's own; one the company designed itself is kept,
+    // and may use {company_logo} or {letterhead}.
+    if (trim($head) === '' || trim($head) === doc_default_letterhead()) $head = '{letterhead}';
     // Letterhead/footer are stored as HTML with {tokens} — fill tokens but keep HTML.
     $fillHtml = function ($raw) use ($map, &$missing) {
         return preg_replace_callback('/\{([a-z_]+)\}/', function ($m) use ($map, &$missing) {
             $k = $m[1]; $v = (string)($map[$k] ?? '');
-            if (trim($v) === '') { if ($k !== 'company_address') $missing[$k] = $missing[$k] ?? 'empty'; return ''; }
-            return htmlspecialchars($v, ENT_QUOTES);
+            if (trim($v) === '') { if (!in_array($k, ['company_address', 'company_logo', 'company_gstin', 'company_contact'], true)) $missing[$k] = $missing[$k] ?? 'empty'; return ''; }
+            return in_array($k, ['company_logo', 'letterhead'], true) ? $v : htmlspecialchars($v, ENT_QUOTES);
         }, $raw);
     };
     $bodyHtml = doc_fill((string)$tpl['body'], $map, $missing);
@@ -249,7 +265,9 @@ function ops_doc_templates($route, $method) {
         if ($do === 'letterhead' && function_exists('setting_set')) {
             setting_set('doc_letterhead', (string)($_POST['doc_letterhead'] ?? ''));
             setting_set('doc_footer', (string)($_POST['doc_footer'] ?? ''));
-            setting_set('company_address', trim((string)($_POST['company_address'] ?? '')));
+            // Only when typed: a blank box here used to wipe the address saved in
+            // Admin → Company profile, which every other document reads.
+            if (trim((string)($_POST['company_address'] ?? '')) !== '') setting_set('company_address', trim((string)$_POST['company_address']));
             flash('Letterhead saved.'); redirect('/doc-templates'); return true;
         }
     }

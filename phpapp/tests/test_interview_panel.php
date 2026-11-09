@@ -22,7 +22,7 @@ $ivCand = (int) db()->lastInsertId();
 t_ok($ivCand > 0, 'ARMING · a test candidate exists');
 
 // ---- (b) A ROUND CANNOT BE BOOKED TWICE WHILE ONE IS STILL OPEN -----------
-$p = ['round' => 'L1', 'mode' => 'In person', 'scheduled_at' => date('Y-m-d', strtotime('+2 days')) . 'T10:00'   /* always ahead: a fixed date went stale on 3 Nov 2026 */, 'panel_users' => [1]];
+$p = ['round' => 'L1', 'mode' => 'In person', 'location' => 'Head office', 'scheduled_at' => date('Y-m-d', strtotime('+2 days')) . 'T10:00'   /* always ahead: a fixed date went stale on 3 Nov 2026 */, 'panel_users' => [1]];
 $iv1 = iv_schedule($ivCand, $p);
 t_ok($iv1 > 0, 'the first L1 is scheduled');
 
@@ -40,8 +40,10 @@ t_eq($iv3, 0, '*** repeating an ASSESSED round is refused without the re-intervi
 t_ok(stripos(iv_last_error(), 're-interview') !== false,
     '*** and the refusal says what to tick, and why');
 
-$iv4 = iv_schedule($ivCand, $p + ['reinterview' => 1]);
-t_ok($iv4 > 0, '*** with the tick, the re-interview is allowed');
+//  Owner, 9 Nov 2026 — a re-interview also says WHY it is being held.
+t_eq(iv_schedule($ivCand, $p + ['reinterview' => 1]), 0, '*** the tick alone is not enough — a re-interview needs its reason');
+$iv4 = iv_schedule($ivCand, $p + ['reinterview' => 1, 'reason' => 'panel wants a second technical opinion']);
+t_ok($iv4 > 0, '*** with the tick and a reason, the re-interview is allowed');
 $r4 = iv_get($iv4);
 t_eq((int) $r4['attempt'], 2, '*** and is recorded as attempt 2, not as another identical L1');
 //  The first result must survive. Hiding a failed round is how a candidate gets
@@ -49,9 +51,14 @@ t_eq((int) $r4['attempt'], 2, '*** and is recorded as attempt 2, not as another 
 $r1 = iv_get($iv1);
 t_eq((string) $r1['result'], 'FAIL', '*** and the first outcome is still there, unchanged');
 
-//  A DIFFERENT round is never blocked by this.
-$l2 = iv_schedule($ivCand, ['round' => 'L2', 'scheduled_at' => date('Y-m-d', strtotime('+5 days')) . 'T10:00', 'panel_users' => [1]]);
-t_ok($l2 > 0, '*** a different round is unaffected — this is not a lock on scheduling');
+//  Owner, 9 Nov 2026 — "let L1 complete the interview then only L2 interview
+//  ... can be scheduled". L2 waits while L1 (here its re-interview) has no result.
+$l2p = ['round' => 'L2', 'mode' => 'In person', 'location' => 'Head office', 'scheduled_at' => date('Y-m-d', strtotime('+5 days')) . 'T10:00', 'panel_users' => [1]];
+t_eq(iv_schedule($ivCand, $l2p), 0, '*** L2 cannot be booked while L1 has no result');
+t_ok(strpos(iv_last_error(), 'L1 has no result yet') !== false, '*** and the refusal says L1 comes first');
+iv_record($iv4, ['result' => 'PASS', 'rating' => 4, 'recommendation' => 'Hire']);
+$l2 = iv_schedule($ivCand, $l2p);
+t_ok($l2 > 0, '*** once L1 has a result, L2 can be booked');
 
 // ---- (c) WHO IS ON THE PANEL IS STORED AS IDS ------------------------------
 //  The panel was a comma-joined string of NAMES and the ids were thrown away,
@@ -64,7 +71,7 @@ t_ok(function_exists('iv_my_upcoming'), 'and "which interviews am I on" is answe
 $mine   = iv_my_upcoming(1, 60);
 $theirs = iv_my_upcoming(99999, 60);
 $ids    = array_map(fn($r) => (int) $r['id'], $mine);
-t_ok(in_array($iv4, $ids, true), '*** an interviewer sees the interview they are on');
+t_ok(in_array($l2, $ids, true), '*** an interviewer sees the interview they are on (L2; L1 now has its result)');
 t_eq($theirs, [], '*** and somebody not on any panel sees nothing');
 
 //  Only ones still to happen: a finished interview is not a task.

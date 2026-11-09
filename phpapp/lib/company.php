@@ -34,6 +34,57 @@ function company_profile() {
     ];
 }
 
+// ---- One company identity for EVERY document -------------------------------
+// Owner, 9 Nov 2026: "Invoice does not carry forward the company name, logo etc
+// on the invoice copy, appointment letter and every document except quotation."
+// Each print page used to build its own header from a different setting (the
+// invoice from the company profile without a logo, the letters from the
+// workspace name, the costing sheet from the app name, the voucher from nothing).
+// Now they all ask here. Whichever of the two places the company was filled in —
+// Admin → Company profile, or Sales → Quote templates → Letterhead — is used, the
+// profile first.
+function doc_identity() {
+    $g = fn($k) => function_exists('setting_get') ? trim((string)setting_get($k, '')) : '';
+    $logo = '';
+    $raw = preg_replace('~\s+~', '', $g('quote_lh_logo'));
+    if ($raw !== '' && preg_match('~^[A-Za-z0-9+/=]+$~', $raw)) $logo = 'data:image/jpeg;base64,' . $raw;
+    elseif (preg_match('~^data:image/(png|jpe?g|gif|webp);base64,~i', $g('logo_data'))) $logo = $g('logo_data');
+    $contact = function_exists('company_contact_line') ? company_contact_line() : '';
+    return [
+        'name'    => $g('company_legal_name') ?: ($g('quote_lh_name') ?: ($g('company_name') ?: (function_exists('app_name') ? app_name() : ''))),
+        'logo'    => $logo,
+        'address' => $g('company_address') ?: $g('quote_lh_address'),
+        'contact' => $contact !== '' ? $contact : $g('quote_lh_contact'),
+        'gstin'   => $g('company_gstin'),
+        'pan'     => $g('company_pan'),
+        'footer'  => $g('quote_lh_footer'),
+        'color'   => preg_match('/^#[0-9a-fA-F]{6}$/', $g('report_brand_color')) ? $g('report_brand_color') : '#1E40AF',
+    ];
+}
+
+// The letterhead block for a printed HTML document: logo, name, address,
+// contact, GSTIN / PAN, over a line in the company colour. Self-contained
+// (inline styles), so it works on any print page and inside a stored letter.
+function doc_letterhead_html(array $opt = []) {
+    $d = doc_identity();
+    $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
+    $ids = array_filter([$d['gstin'] !== '' ? 'GSTIN: ' . $d['gstin'] : '', !empty($opt['pan']) && $d['pan'] !== '' ? 'PAN: ' . $d['pan'] : '']);
+    $h = '<div class="doc-letterhead" style="display:flex;gap:14px;align-items:center;border-bottom:3px solid ' . $e($d['color']) . ';padding-bottom:10px;margin-bottom:14px;font-family:Arial,Helvetica,sans-serif;color:#111">';
+    if ($d['logo'] !== '') $h .= '<img src="' . $e($d['logo']) . '" alt="" style="max-height:64px;max-width:180px;object-fit:contain">';
+    $h .= '<div style="flex:1;min-width:0"><div style="font-size:19px;font-weight:700;line-height:1.2">' . $e($d['name']) . '</div>';
+    if ($d['address'] !== '') $h .= '<div style="font-size:11.5px;color:#444;margin-top:2px">' . nl2br($e($d['address'])) . '</div>';
+    if ($d['contact'] !== '') $h .= '<div style="font-size:11.5px;color:#444">' . $e($d['contact']) . '</div>';
+    if ($ids) $h .= '<div style="font-size:11.5px;color:#444">' . $e(implode('  ·  ', $ids)) . '</div>';
+    return $h . '</div></div>';
+}
+// The footer line (Admin → Company profile → footer), if one is set.
+function doc_footer_html() {
+    $d = doc_identity();
+    if ($d['footer'] === '') return '';
+    return '<div class="doc-footer" style="border-top:1px solid #ccc;margin-top:24px;padding-top:6px;font-size:10.5px;color:#666;text-align:center;font-family:Arial,Helvetica,sans-serif">'
+         . htmlspecialchars($d['footer'], ENT_QUOTES) . '</div>';
+}
+
 // A one-line contact string for the letterhead, from whichever of e-mail / phone
 // / website are filled.
 function company_contact_line() {

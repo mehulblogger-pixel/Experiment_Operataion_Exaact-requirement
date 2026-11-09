@@ -9,7 +9,7 @@ $basis = (string)$h['basis'];
 $qtyLabel = $basis === 'DAILY' ? 'Man-days' : ($basis === 'FIXED' ? 'Units' : 'Man-months');
 $rateLabel = $basis === 'DAILY' ? 'Rate/man-day' : ($basis === 'FIXED' ? 'Lump' : 'Rate/man-month');
 $shown = array_filter($heads, fn($l, $k) => isset($byHead[$k]) && (float)$byHead[$k] != 0, ARRAY_FILTER_USE_BOTH);
-$company = function_exists('app_name') ? app_name() : 'Company';
+$company = function_exists('doc_identity') ? doc_identity()['name'] : (function_exists('app_name') ? app_name() : 'Company');
 $basisName = defined('PC_BASES') ? (PC_BASES[$basis] ?? $basis) : $basis;
 ?><!doctype html><html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -35,8 +35,9 @@ $basisName = defined('PC_BASES') ? (PC_BASES[$basis] ?? $basis) : $basis;
 </style></head><body>
 <div class="noprint"><button onclick="window.print()">🖨 Print / Save as PDF</button> <a href="/project-costing?id=<?= (int)$h['id'] ?>">← back</a></div>
 
+<?= function_exists('doc_letterhead_html') ? doc_letterhead_html() : '' ?>
 <div class="top">
-  <div><div class="co"><?= $e($company) ?></div><div class="muted">Project costing sheet</div></div>
+  <div><div class="muted">Project costing sheet</div></div>
   <div style="text-align:right"><div><b><?= $e($h['code']) ?></b></div><div class="muted"><?= $e(defined('PC_STATUS') && isset(PC_STATUS[$h['status']]) ? PC_STATUS[$h['status']] : ($h['status'] ?? '')) ?></div></div>
 </div>
 

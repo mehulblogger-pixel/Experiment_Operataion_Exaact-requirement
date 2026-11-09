@@ -4017,11 +4017,15 @@ function quote_letterhead() {
     $gstin = setting_get('company_gstin', '');
     // The company brand colour for the header band / accents (hex, e.g. #1E40AF).
     $band = brand_color_rgb(setting_get('report_brand_color', ''));
+    // Anything left blank here is taken from Admin → Company profile, so a
+    // company that filled in only its profile still gets a full letterhead on
+    // its PDFs (quotations, inspection reports, certificates).
+    $id = function_exists('doc_identity') ? doc_identity() : ['name' => app_name(), 'address' => '', 'contact' => ''];
     return [
         'logo' => $logo ? base64_decode($logo) : '',
-        'name' => setting_get('quote_lh_name', '') ?: app_name(),
-        'address' => setting_get('quote_lh_address', ''),
-        'contact' => setting_get('quote_lh_contact', ''),
+        'name' => setting_get('quote_lh_name', '') ?: ($id['name'] ?: app_name()),
+        'address' => setting_get('quote_lh_address', '') ?: $id['address'],
+        'contact' => setting_get('quote_lh_contact', '') ?: $id['contact'],
         'gstin' => $gstin ? ('GSTIN: ' . $gstin) : '',
         'footer' => setting_get('quote_lh_footer', ''),
         'band' => $band,   // [r,g,b] or null → renderer uses its default

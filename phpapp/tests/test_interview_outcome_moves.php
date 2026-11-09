@@ -23,12 +23,13 @@ t_section('A16 / A8 — the interview outcome offers the move');
 
 $iv = (string) file_get_contents(__DIR__ . '/../lib/recruit_iv.php');
 
-t_ok(strpos($iv, '$ivMove') !== false, 'the interview card works out what the outcome implies');
-t_ok(preg_match("/in_array\(\\\$st, \['FAIL', 'NO_SHOW'\], true\)[^;]*'REJECTED'/s", $iv) === 1,
-    '*** a failed or missed interview offers Rejected');
-t_ok(strpos($iv, "\$st === 'HOLD'") !== false && strpos($iv, "'HOLD', 'Put this candidate on hold'") !== false,
-    'a hold offers On hold');
-t_ok(strpos($iv, "\$st === 'PASS'") !== false && strpos($iv, "'OFFERED', 'Move to offer'") !== false,
+//  Owner, 9 Nov 2026 — the move is worked out ONCE across every level
+//  (iv_overall()), so an L1 "Pass" card can no longer offer an offer while L2
+//  said no. The same three outcomes, decided by the highest level held.
+t_ok(strpos($iv, 'function iv_overall(') !== false, 'the interviews are read together to work out what they imply');
+t_ok(strpos($iv, "\$out['suggest'] = 'REJECTED'") !== false, '*** a failed or missed deciding interview offers Rejected');
+t_ok(strpos($iv, "\$out['suggest'] = 'HOLD'") !== false && strpos($iv, "'HOLD' => 'Put on hold'") !== false, 'a hold offers On hold');
+t_ok(strpos($iv, "\$out['suggest'] = 'OFFERED'") !== false && strpos($iv, "'OFFERED' => 'Move to offer'") !== false,
     'and a pass offers the step forward, not only the step out');
 
 //  ONE STAGE-CHANGE PATH. The "duplicacy ... must be unified" half of the ask:
@@ -48,14 +49,15 @@ t_ok(strpos($iv, 'or leave them where they are and decide later') !== false,
 
 //  IT MUST NOT OFFER A MOVE THAT MAKES NO SENSE. Somebody already hired,
 //  withdrawn or rejected is not moved again from an old interview card.
-t_ok(strpos($iv, "!in_array(\$ivStageNow, ['ACCEPTED', 'WITHDRAWN', 'REJECTED'], true)") !== false,
-    '*** no prompt for a candidate already hired, withdrawn or rejected');
+t_ok(strpos($iv, "!in_array(\$ivStNow, ['ACCEPTED', 'WITHDRAWN', 'REJECTED', 'OFFER_DECLINED'], true)") !== false
+    && strpos($iv, "\$flowCls === 'ACTIVE'") !== false,
+    '*** no prompt for a candidate already hired, withdrawn, rejected or who declined the offer');
 //  And only somebody who may move a candidate is offered the button.
-t_ok(preg_match('/\$ivMove = null;\s*\$ivStageNow[^;]*;\s*if \(\$can /s', $iv) === 1,
+t_ok(strpos($iv, "if (\$can && \$ov['suggest']") !== false,
     '*** and only a coordinator-level user sees it, same as the Move panel');
 
 //  THE REASON IS CARRIED, so the stage history says why — the round, the
 //  outcome and the recommendation, not a bare "Rejected".
 t_ok(strpos($iv, 'name="remark"') !== false, 'the move carries a remark');
-t_ok(strpos($iv, "IV_RESULTS[\$st] ?? \$st") !== false,
+t_ok(strpos($iv, "IV_RESULTS[\$r['result']] ?? \$r['result']") !== false,
     '*** and the remark names the round and its outcome, so the history reads back');
