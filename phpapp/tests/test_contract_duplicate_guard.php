@@ -32,8 +32,10 @@ $insertC = strpos($idx, 'INSERT INTO $table');
 t_ok($guardC !== false && $insertC !== false && $guardC < $insertC, 'Door C guard runs before the contract INSERT');
 
 // The partner Add-contract form WARNS (does not block) when live contracts exist.
+// Since 9 Nov 2026 that form is the pop-up opened from the client record.
+$det = file_get_contents(__DIR__ . '/../views/partner_contract_new.php');
 t_ok(strpos($det, '$liveContracts = array_values(array_filter($contracts') !== false
-    && strpos($det, 'Add another <b>only</b> if it is a genuinely separate agreement') !== false,
+    && strpos($det, 'Add another <b>only</b> for a genuinely separate agreement') !== false,
     'the Add-contract form names the client\'s live contracts as a caution, and still allows the add');
 
 // Door D — the deliberate group-company path is untouched: it still creates an

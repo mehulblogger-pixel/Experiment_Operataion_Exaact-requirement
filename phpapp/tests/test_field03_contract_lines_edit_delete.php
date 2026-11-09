@@ -69,7 +69,8 @@ t_ok(strpos($dblk, "COUNT(*) FROM calls WHERE COALESCE(contract_number,'')=?") !
      'delete refuses a contract that has calls/jobs or POs under it');
 t_ok(strpos($dblk, "can('crm.contract.register') || is_master()") !== false, 'delete is gated to Accounts / back-office');
 
-$det = file_get_contents(__DIR__ . '/../views/detail.php');
+// The Add-contract form is the client record's pop-up since 9 Nov 2026.
+$det = file_get_contents(__DIR__ . '/../views/partner_contract_new.php');
 t_ok(strpos($det, 'name="cl_desc[]"') !== false && strpos($det, 'name="cl_qty[]"') !== false && strpos($det, 'name="cl_unit[]"') !== false,
      'the Add-contract form captures multi-line quantities');
 t_ok(strpos($det, 'class="btn small secondary cl-add"') !== false, 'the Add form can add more lines');

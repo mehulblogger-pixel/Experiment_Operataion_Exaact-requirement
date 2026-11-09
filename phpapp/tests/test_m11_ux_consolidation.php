@@ -181,8 +181,10 @@ t_ok(stripos("flash('SQLSTATE[23000] oh dear')", 'SQLSTATE') !== false,
 foreach (['ops_recruitment_home', 'ops_area_home', 'workspace_landing_for', 'cockpit_can',
           'ops_templates', 'ops_backup', 'ops_dedupe'] as $fn)
     t_ok(function_exists($fn), "H · '$fn' still exists — nothing was deleted");
-$detail = file_get_contents(__DIR__ . '/../views/detail.php');
-t_ok(strpos($detail, '/partner-add?id=<?= $id ?>&kind=contract') !== false,
+// Since 9 Nov 2026 the door is reached through the client record's pop-up
+// (views/partner_contract_new.php), still posting to /partner-add.
+$detail = file_get_contents(__DIR__ . '/../views/partner_contract_new.php') . file_get_contents(__DIR__ . '/../views/detail.php');
+t_ok(strpos($detail, '/partner-add?id=<?= $id ?>&amp;kind=contract') !== false && strpos($detail, '/partner-contract-new?id=') !== false,
      'H · the secondary contract door still works — it was clarified, not removed');
 t_ok(strpos($detail, 'is normally registered from the') !== false,
      'H · and the authoritative path is now stated before the form, not only after');

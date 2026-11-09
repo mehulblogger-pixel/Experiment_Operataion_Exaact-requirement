@@ -82,3 +82,14 @@ $u = ops_one("SELECT * FROM users WHERE id=?", [$uid]);
 t_eq(user_role_discipline_label($u), 'Inspector — ' . $mech['label'], 'shown together: "Inspector — Mechanical"');
 user_discipline_save($uid, $ins, '', 'Inspector');
 t_eq(user_role_discipline_label(ops_one("SELECT * FROM users WHERE id=?", [$uid])), 'Inspector', 'cleared, it shows the designation alone');
+
+// Leave nothing behind: later tests count quotations, POs and people by status.
+foreach ([["DELETE FROM po_line_items WHERE purchase_order_id=?", [$poId]],
+          ["DELETE FROM partner_purchase_orders WHERE id=?", [$poId]],
+          ["DELETE FROM quote_lines WHERE quote_id=?", [$qid]],
+          ["DELETE FROM quotations WHERE id IN (?,?)", [$qid, $q2]],
+          ["DELETE FROM project_costings WHERE id=?", [$cid]],
+          ["DELETE FROM users WHERE id=?", [$uid]],
+          ["DELETE FROM inspectors WHERE id=?", [$ins]],
+          ["DELETE FROM business_partners WHERE id=?", [$pid]]] as [$sql, $args])
+    try { db()->prepare($sql)->execute($args); } catch (Throwable $e) {}
