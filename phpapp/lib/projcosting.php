@@ -575,7 +575,7 @@ function pc_hire_gate($h) {
 // requisitions raised directly from the costing.
 function pc_line_raised($lineId) {
     $n = 0;
-    try { $n += (int)ops_val("SELECT COALESCE(SUM(quantity),0) FROM hiring_requests WHERE costing_line_id=? AND UPPER(COALESCE(status,'')) NOT IN ('REJECTED','CANCELLED')", [(int)$lineId]); } catch (Throwable $e) {}
+    if (function_exists('hreq_costing_line_qty')) $n += hreq_costing_line_qty((int)$lineId);
     try { $n += (int)ops_val("SELECT COALESCE(SUM(quantity),0) FROM requisitions WHERE costing_line_id=? AND COALESCE(hiring_request_id,0)=0 AND UPPER(COALESCE(status,'')) <> 'CANCELLED'", [(int)$lineId]); } catch (Throwable $e) {}
     return $n;
 }
@@ -583,16 +583,14 @@ function pc_line_people($ln) { return max(1, (int)($ln['headcount'] ?? 1)); }
 // What has been raised from a role, for the costing page.
 function pc_line_links($lineId) {
     $out = ['hreq' => [], 'req' => []];
-    try { $out['hreq'] = ops_all("SELECT id, req_no, status, quantity FROM hiring_requests WHERE costing_line_id=? ORDER BY id", [(int)$lineId]) ?: []; } catch (Throwable $e) {}
+    if (function_exists('hreq_for_costing_line')) $out['hreq'] = hreq_for_costing_line((int)$lineId);
     try { $out['req'] = ops_all("SELECT id, req_code, status, quantity FROM requisitions WHERE costing_line_id=? ORDER BY id", [(int)$lineId]) ?: []; } catch (Throwable $e) {}
     return $out;
 }
 function pc_link_migrate() {
-    if (function_exists('hreq_migrate')) hreq_migrate();
+    if (function_exists('hreq_costing_migrate')) hreq_costing_migrate();
     if (function_exists('req_migrate')) req_migrate();
-    if (!function_exists('ensure_column')) return;
-    foreach ([['hiring_requests', 'costing_id'], ['hiring_requests', 'costing_line_id'], ['requisitions', 'costing_line_id']] as [$t, $c])
-        try { ensure_column($t, $c, 'INT NULL'); } catch (Throwable $e) {}
+    if (function_exists('ensure_column')) try { ensure_column('requisitions', 'costing_line_id', 'INT NULL'); } catch (Throwable $e) {}
 }
 
 // Raise a hiring request for one role of a won costing. It is created as a
@@ -631,7 +629,7 @@ function pc_raise_hiring_request($cid, $lineId) {
         'est_onetime_cost' => (float)$ln['oneoff'] > 0 ? (float)$ln['oneoff'] : null,
     ]);
     if (!$ok) return [false, $msg, 0];
-    db()->prepare("UPDATE hiring_requests SET costing_id=?, costing_line_id=? WHERE id=?")->execute([(int)$cid, (int)$ln['id'], (int)$id]);
+    hreq_link_costing((int)$id, (int)$cid, (int)$ln['id']);
     if (function_exists('act_log')) try { act_log('HIRING_REQUEST', (int)$id, 'SYSTEM', 'Raised from costing ' . $h['code'] . ' (role "' . $ln['role_label'] . '"), quotation ' . ($q['quote_no'] ?? '') . ' accepted'); } catch (Throwable $e) {}
     return [true, 'Hiring request created for ' . $left . ' × ' . $ln['role_label'] . '.', (int)$id];
 }

@@ -1650,6 +1650,31 @@ function hreq_remaining_qty($id) {
 }
 
 // Create the execution record. Returns [ok, message, requisitionId].
+// ---- The link to a costing (owner, 9 Nov 2026) --------------------------------
+// The hiring_requests table is read and written only here (M4 layer rule); the
+// costing asks through these.
+function hreq_costing_migrate() {
+    hreq_migrate();
+    if (function_exists('ensure_column')) foreach (['costing_id', 'costing_line_id'] as $c)
+        try { ensure_column('hiring_requests', $c, 'INT NULL'); } catch (Throwable $e) {}
+}
+function hreq_link_costing($id, $costingId, $lineId) {
+    hreq_costing_migrate();
+    db()->prepare("UPDATE hiring_requests SET costing_id=?, costing_line_id=? WHERE id=?")->execute([(int) $costingId, (int) $lineId, (int) $id]);
+    act_log('HIRING_REQUEST', (int) $id, 'SYSTEM', 'Linked to project costing #' . (int) $costingId . ', role #' . (int) $lineId, ['auto' => 1]);
+}
+// People already asked for on a costing role (requests not rejected or cancelled).
+function hreq_costing_line_qty($lineId) {
+    hreq_costing_migrate();
+    try { return (int) ops_val("SELECT COALESCE(SUM(quantity),0) FROM hiring_requests WHERE costing_line_id=? AND UPPER(COALESCE(status,'')) NOT IN ('REJECTED','CANCELLED')", [(int) $lineId]); }
+    catch (Throwable $e) { return 0; }
+}
+function hreq_for_costing_line($lineId) {
+    hreq_costing_migrate();
+    try { return ops_all("SELECT id, req_no, status, quantity FROM hiring_requests WHERE costing_line_id=? ORDER BY id", [(int) $lineId]) ?: []; }
+    catch (Throwable $e) { return []; }
+}
+
 function hreq_to_requisition($id, $qty = 0) {
     if (!hreq_can_create())
         return [false, 'You do not have the right to raise a ' . (function_exists('Tl') ? Tl('requisition') : 'requisition') . ' from this request.', 0];

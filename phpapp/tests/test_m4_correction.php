@@ -376,15 +376,22 @@ if (preg_match_all('/(INSERT INTO|UPDATE |DELETE FROM)/', $src, $wm, PREG_OFFSET
 //                  mandatory reason; it deletes nothing, so the rejection and its
 //                  note stay readable. See docs/03-object-lifecycles.md, which
 //                  documents the transition.
+//
+//  The costing link (owner, 9 Nov 2026) added one more:
+//
+//    hreq_link_costing   records which project-costing role a request was raised
+//                        from, so the role's "people raised" count and the
+//                        requisition's budget can follow it. Audited.
 $AUDITED = ['hreq_migrate', 'hreq_save', 'hreq_submit', 'hreq_apply_decision', 'hreq_cancel',
             'hreq_to_requisition', 'hreq_require_reapproval', 'hreq_qty_enforce_after_write',
             'hreq_apply_approved_version', 'hreq_write_version_fields',
-            'hreq_write_approved_snapshot', 'hreq_set_reapproval', 'hreq_reopen'];
+            'hreq_write_approved_snapshot', 'hreq_set_reapproval', 'hreq_reopen', 'hreq_link_costing'];
 $unaudited = array_values(array_diff(array_keys($writes), $AUDITED));
 t_ok(!$unaudited, 'D0 · every database write in the layer lives in an audited function'
      . ($unaudited ? ' — audit these: ' . implode(', ', $unaudited) : ''));
-t_eq(count($writes), 11, 'D0 · and there are exactly eleven of them — M4 added the re-approval writer '
-     . 'and the headcount-ceiling compensator, and UAT A1 added hreq_reopen; all of them audit what they do');
+t_eq(count($writes), 12, 'D0 · and there are exactly twelve of them — M4 added the re-approval writer '
+     . 'and the headcount-ceiling compensator, UAT A1 added hreq_reopen, and the costing link (owner, 9 Nov 2026) '
+     . 'added hreq_link_costing; all of them audit what they do');
 
 // For each mutation path: the chain, in order, BEFORE the first write.
 //   entitlement+capability -> tenant/branch scope -> state / input validation -> mutation -> audit
