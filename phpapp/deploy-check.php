@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'e624a76 · 2026-11-09 08:45 UTC · 710 files';
+$RELEASE = '98e1278 · 2026-11-09 08:50 UTC · 710 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -655,7 +655,7 @@ $EXPECT  = [
     'views/ops/verify.php' => ['s'=>8818,'h'=>'985a249a4ed58388'],
     'views/ops/voucher_detail.php' => ['s'=>28554,'h'=>'f97b29dbdd1bb9e2'],
     'views/ops/voucher_list.php' => ['s'=>4388,'h'=>'e18c3d811b6157f3'],
-    'views/ops/voucher_print.php' => ['s'=>5774,'h'=>'13fec78acf53a52c'],
+    'views/ops/voucher_print.php' => ['s'=>5791,'h'=>'d5d64f383e170b3b'],
     'views/ops/welcome.php' => ['s'=>2992,'h'=>'9b2e2982b431759f'],
     'views/ops/work_norms.php' => ['s'=>3290,'h'=>'6de15d53b6631cee'],
     'views/partner_contract_new.php' => ['s'=>8797,'h'=>'11e0f48f37c41478'],

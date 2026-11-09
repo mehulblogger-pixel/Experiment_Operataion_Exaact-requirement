@@ -15,7 +15,8 @@ t_ok(stripos(iv_last_error(), 'date and time') !== false, '… "Choose the date 
 t_eq(iv_schedule($c, ['panel_users' => []] + $base), 0, 'nobody to take it → refused');
 t_ok(stripos(iv_last_error(), 'who will take') !== false, '… "Choose who will take the interview"');
 t_eq(iv_schedule($c, ['location' => ''] + $base), 0, 'in person with no place → refused');
-t_ok(iv_schedule($c, ['mode' => 'Phone', 'location' => '', 'round' => 'HR', 'scheduled_at' => $day(1)] + $base) > 0, 'a phone call needs no place');
+$hr = iv_schedule($c, ['mode' => 'Phone', 'location' => '', 'round' => 'HR', 'scheduled_at' => $day(1)] + $base);
+t_ok($hr > 0, 'a phone call needs no place');
 $l1 = iv_schedule($c, $base);
 t_ok($l1 > 0, 'a complete booking is saved, with several interviewers allowed');
 t_eq(iv_schedule($c, ['round' => 'Technical'] + $base), 0, 'the same interviewer cannot be booked twice at the same time');
@@ -43,6 +44,8 @@ t_section('Interviews — L1 says hire, L2 says no hire');
 $l2 = iv_schedule($c, $l2p);
 t_ok($l2 > 0, 'with L1 complete, L2 can be booked');
 iv_record($l2, ['result' => 'FAIL', 'rating' => 2, 'recommendation' => 'No hire']);
+t_ok(strpos(iv_overall($c)['why'], 'Waiting for HR') === 0, 'while any round is still open, the decision waits for it');
+iv_record($hr, ['result' => 'PASS', 'rating' => 3, 'recommendation' => 'Hire']);
 $ov = iv_overall($c);
 t_ok($ov['conflict'], 'the disagreement is recognised as a conflict');
 t_eq($ov['deciding']['round'] ?? '', 'L2', 'the higher level decides');

@@ -28,7 +28,7 @@
 </style></head><body>
 <div class="noprint"><button onclick="window.print()">🖨 Print</button> <a href="/voucher?id=<?= (int)$v['id'] ?>">← back</a></div>
 <?= function_exists('doc_letterhead_html') ? doc_letterhead_html() : '' ?>
-<?php // Was hard-coded "AHMEDABAD": the person's own branch now. ?>
+<?php // The person's own branch — this used to be one fixed city for everybody. ?>
 <?php $vLoc = trim((string)($v['office_city'] ?? '')) ?: trim((string)($v['office_name'] ?? '')); if ($vLoc !== ''): ?><div class="loc">Location: <strong><?= e(strtoupper($vLoc)) ?></strong></div><?php endif; ?>
 <h1>STATEMENT OF TRAVELLING EXPENSES</h1>
 <table class="hdr">
