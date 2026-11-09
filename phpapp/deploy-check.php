@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '9903dc7 · 2026-11-09 05:51 UTC · 707 files';
+$RELEASE = '7cf66e8 · 2026-11-09 06:03 UTC · 707 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -117,7 +117,7 @@ $EXPECT  = [
     'lib/costing.php' => ['s'=>60974,'h'=>'a8ecf706366db1cf'],
     'lib/costrecon.php' => ['s'=>11258,'h'=>'a6af5a16164f3458'],
     'lib/cpanel.php' => ['s'=>8181,'h'=>'9322634c72aed841'],
-    'lib/crm.php' => ['s'=>301977,'h'=>'9d3bdaab9196a43e'],
+    'lib/crm.php' => ['s'=>303561,'h'=>'722c0c449cc9490c'],
     'lib/crmdash.php' => ['s'=>14427,'h'=>'f124694bf443bc02'],
     'lib/customer360.php' => ['s'=>24402,'h'=>'f1d98328a475561b'],
     'lib/customforms.php' => ['s'=>12896,'h'=>'a60a82554280a959'],
@@ -442,7 +442,7 @@ $EXPECT  = [
     'views/ops/crm/quote_list.php' => ['s'=>8038,'h'=>'36be301c9d7ffe37'],
     'views/ops/crm/reports.php' => ['s'=>3263,'h'=>'f9d0840a7994e767'],
     'views/ops/crm/template_form.php' => ['s'=>3958,'h'=>'3671a20d6c01c474'],
-    'views/ops/crm/template_list.php' => ['s'=>5603,'h'=>'c6e94a7237796aa5'],
+    'views/ops/crm/template_list.php' => ['s'=>8793,'h'=>'9923952768e69153'],
     'views/ops/crm_dashboard.php' => ['s'=>13276,'h'=>'6bdd49395543c605'],
     'views/ops/custom_fields.php' => ['s'=>4958,'h'=>'f2f969e3c56dfed4'],
     'views/ops/customer360.php' => ['s'=>29931,'h'=>'2197023e362e8e81'],

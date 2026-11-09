@@ -5,28 +5,49 @@
 </div>
 <?= template_tabs('/templates?kind=quote') ?>
 
-<div class="panel">
+<?php // What is saved, shown as it prints (owner, 9 Nov 2026).
+  $savedLine = function ($v) { if ((string) $v === '') return ''; [$at, $by] = array_pad(explode('|', (string) $v, 2), 2, '');
+      return 'Saved ' . (function_exists('fdate') ? fdate(substr($at, 0, 10)) : substr($at, 0, 10)) . ' ' . substr($at, 11, 5) . ($by !== '' ? ' by ' . $by : ''); };
+  $img = fn($b64) => (string) $b64 !== '' ? 'data:image/jpeg;base64,' . preg_replace('~[^A-Za-z0-9+/=]~', '', (string) $b64) : '';
+  $prev = 'margin-top:14px;border:1px dashed var(--line,#d7dde5);border-radius:10px;padding:14px 16px;background:var(--card,#fff)';
+  $lhD = (array) ($_SESSION['crm_lh_draft'] ?? []); unset($_SESSION['crm_lh_draft']);
+  $lhF = ['name' => $lhD['name'] ?? ($lhName ?? ''), 'address' => $lhD['address'] ?? ($lhAddress ?? ''), 'contact' => $lhD['contact'] ?? ($lhContact ?? ''), 'footer' => $lhD['footer'] ?? ($lhFooter ?? '')]; ?>
+<div class="panel" id="letterhead" style="scroll-margin-top:70px">
   <h3 class="tab-sub" style="margin-top:0">Letterhead for client PDF <span class="muted">— per company</span></h3>
   <p class="sub">The <?= e(Tl('client')) ?> receives the <?= e(Tl('quote')) ?> as a PDF on this letterhead. Fully customisable to your company.</p>
-  <form method="post" action="/crm-letterhead" enctype="multipart/form-data">
+  <form method="post" action="/crm-letterhead" enctype="multipart/form-data" novalidate>
     <div class="form-grid">
       <div class="ff"><label>Company logo (PNG / JPG) <?= !empty($lhLogo)?'<span class="pill p-ok">on file</span>':'' ?></label><input class="form-control" type="file" name="logo" accept=".png,.jpg,.jpeg"></div>
-      <div class="ff"><label>Company name</label><input class="form-control" name="lh_name" value="<?= e($lhName ?? '') ?>" placeholder="e.g. Your Company Pvt Ltd"></div>
-      <div class="ff"><label>Contact line <span class="muted">(phone · email · web · GSTIN)</span></label><input class="form-control" name="lh_contact" value="<?= e($lhContact ?? '') ?>" placeholder="+91 … · sales@… · www… · GSTIN …"></div>
+      <div class="ff"><label>Company name *</label><input class="form-control" name="lh_name" value="<?= e($lhF['name']) ?>" placeholder="e.g. Your Company Pvt Ltd"></div>
+      <div class="ff"><label>Contact line <span class="muted">(phone · email · web · GSTIN)</span></label><input class="form-control" name="lh_contact" value="<?= e($lhF['contact']) ?>" placeholder="+91 … · sales@… · www… · GSTIN …"></div>
     </div>
-    <div class="ff ff-wide"><label>Address (one line each)</label><textarea class="form-control" name="lh_address" rows="2" placeholder="Building / street&#10;City, State – PIN"><?= e($lhAddress ?? '') ?></textarea></div>
-    <div class="ff ff-wide"><label>Footer note (optional)</label><input class="form-control" name="lh_footer" value="<?= e($lhFooter ?? '') ?>" placeholder="e.g. This is a computer-generated <?= e(Tl('quote')) ?>."></div>
+    <div class="ff ff-wide"><label>Address (one line each) *</label><textarea class="form-control" name="lh_address" rows="2" placeholder="Building / street&#10;City, State – PIN"><?= e($lhF['address']) ?></textarea></div>
+    <div class="ff ff-wide"><label>Footer note (optional)</label><input class="form-control" name="lh_footer" value="<?= e($lhF['footer']) ?>" placeholder="e.g. This is a computer-generated <?= e(Tl('quote')) ?>."></div>
     <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
       <button class="btn" type="submit">Save letterhead</button>
       <?php if (!empty($lhLogo)): ?><label class="chk"><input type="checkbox" name="clear_logo" value="1"> Remove current logo</label><?php endif; ?>
     </div>
   </form>
+  <div style="<?= $prev ?>">
+    <div class="muted" style="font-size:12px;margin-bottom:8px"><b>Saved — this is what prints</b><?= ($lhSaved ?? '') !== '' ? ' · ' . e($savedLine($lhSaved)) : '' ?></div>
+    <?php if (($lhName ?? '') === '' && ($lhAddress ?? '') === '' && empty($lhLogo)): ?>
+      <div class="muted" style="font-size:13px">Nothing saved yet — the PDF uses your company profile until you save a letterhead.</div>
+    <?php else: ?>
+      <div style="display:flex;gap:14px;align-items:flex-start;border-bottom:2px solid var(--ink,#111827);padding-bottom:10px">
+        <?php if (($u = $img($lhLogoData ?? '')) !== ''): ?><img src="<?= e($u) ?>" alt="Logo" style="max-height:56px;max-width:160px;object-fit:contain"><?php endif; ?>
+        <div><div style="font-weight:800;font-size:17px"><?= e($lhName ?? '') ?></div>
+          <div style="font-size:12.5px;white-space:pre-line"><?= e($lhAddress ?? '') ?></div>
+          <?php if (($lhContact ?? '') !== ''): ?><div class="muted" style="font-size:12px"><?= e($lhContact) ?></div><?php endif; ?></div>
+      </div>
+      <?php if (($lhFooter ?? '') !== ''): ?><div class="muted" style="font-size:11.5px;margin-top:6px">Footer: <?= e($lhFooter) ?></div><?php endif; ?>
+    <?php endif; ?>
+  </div>
 </div>
 
 <div class="panel">
   <h3 class="tab-sub" id="signature" style="margin-top:0">Signature for client PDFs</h3>
   <p class="sub">The <?= e(Tl('client')) ?> receives the <?= e(Tl('quote')) ?> as a <strong>PDF</strong>; this signature image + name are stamped on it.</p>
-  <form method="post" action="/crm-signature" enctype="multipart/form-data">
+  <form method="post" action="/crm-signature" enctype="multipart/form-data" novalidate>
     <?php $sd = (array) ($_SESSION['crm_sig_draft'] ?? []); unset($_SESSION['crm_sig_draft']);
           if (isset($sd['name'])) $sigName = $sd['name']; if (isset($sd['desig'])) $sigDesig = $sd['desig']; ?>
     <div class="form-grid">
@@ -39,6 +60,18 @@
       <?php if (!empty($sigSet)): ?><button class="btn ghost" type="submit" name="clear_sig" value="1" formnovalidate onclick="return confirm('Remove the company signature from quote PDFs?')">Remove the company signature</button><?php endif; ?>
     </div>
   </form>
+  <div style="<?= $prev ?>">
+    <div class="muted" style="font-size:12px;margin-bottom:8px"><b>Saved — this is what prints</b><?= ($sigSaved ?? '') !== '' ? ' · ' . e($savedLine($sigSaved)) : '' ?></div>
+    <?php if (empty($sigSet)): ?>
+      <div class="muted" style="font-size:13px">No company signature saved — each quote carries only the signature of the person who signs it.</div>
+    <?php else: ?>
+      <div style="display:inline-block;text-align:left">
+        <?php if (($u = $img($sigImgData ?? '')) !== ''): ?><img src="<?= e($u) ?>" alt="Signature" style="max-height:60px;max-width:220px;object-fit:contain;display:block"><?php endif; ?>
+        <div style="border-top:1px solid var(--ink,#111827);margin-top:4px;padding-top:4px;font-weight:700;font-size:14px"><?= e($sigName ?? '') ?></div>
+        <div class="muted" style="font-size:12.5px"><?= e($sigDesig ?? '') ?></div>
+      </div>
+    <?php endif; ?>
+  </div>
 </div>
 
 <div class="panel" style="padding:0;overflow:hidden">

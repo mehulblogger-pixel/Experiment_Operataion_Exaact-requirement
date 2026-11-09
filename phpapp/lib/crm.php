@@ -4265,29 +4265,47 @@ function ops_crm_templates($route, $method) {
         if ($newJpg !== null) setting_set('quote_sig_img', base64_encode($newJpg));
         setting_set('quote_sig_name', $name);
         setting_set('quote_sig_desig', $desig);
-        flash('Signature settings saved — they will appear on generated quote PDFs.');
-        redirect('/crm-templates');
+        setting_set('quote_sig_saved', date('c') . '|' . (function_exists('user_name') ? user_name(current_user()) : ''));
+        flash('Signature saved — see "Saved — this is what prints" below; it appears on every quote PDF.');
+        redirect('/crm-templates#signature');
     }
     if ($route === 'crm-letterhead' && $method === 'POST') {
+        $lh = ['name' => trim((string) ($_POST['lh_name'] ?? '')), 'address' => trim((string) ($_POST['lh_address'] ?? '')),
+               'contact' => trim((string) ($_POST['lh_contact'] ?? '')), 'footer' => trim((string) ($_POST['lh_footer'] ?? ''))];
+        // The company name and address head every quote PDF — an empty save used
+        // to wipe them (owner, 9 Nov 2026: "even when kept empty it is saving").
+        // Nothing is saved until both are there; what was typed stays.
+        $miss = [];
+        if ($lh['name'] === '') $miss[] = 'the company name';
+        if ($lh['address'] === '') $miss[] = 'the address';
+        if ($miss) {
+            $_SESSION['crm_lh_draft'] = $lh;
+            flash('Please add ' . implode(' and ', $miss) . ' — they head every ' . Tl('quote') . ' PDF. Nothing was saved.', 'error');
+            redirect('/crm-templates#letterhead');
+        }
         if (!empty($_FILES['logo']['tmp_name']) && (int)$_FILES['logo']['error'] === 0) {
             [$jpg, $err] = signature_to_jpeg(file_get_contents($_FILES['logo']['tmp_name']));
-            if ($err) { flash('Logo: ' . $err, 'error'); redirect('/crm-templates'); }
+            if ($err) { $_SESSION['crm_lh_draft'] = $lh; flash('Logo: ' . $err . ' Nothing was saved.', 'error'); redirect('/crm-templates#letterhead'); }
             setting_set('quote_lh_logo', base64_encode($jpg));
         }
         if (!empty($_POST['clear_logo'])) setting_set('quote_lh_logo', '');
-        setting_set('quote_lh_name', trim($_POST['lh_name'] ?? ''));
-        setting_set('quote_lh_address', trim($_POST['lh_address'] ?? ''));
-        setting_set('quote_lh_contact', trim($_POST['lh_contact'] ?? ''));
-        setting_set('quote_lh_footer', trim($_POST['lh_footer'] ?? ''));
-        flash('Letterhead saved — it appears on the client PDF.');
-        redirect('/crm-templates');
+        setting_set('quote_lh_name', $lh['name']);
+        setting_set('quote_lh_address', $lh['address']);
+        setting_set('quote_lh_contact', $lh['contact']);
+        setting_set('quote_lh_footer', $lh['footer']);
+        setting_set('quote_lh_saved', date('c') . '|' . (function_exists('user_name') ? user_name(current_user()) : ''));
+        flash('Letterhead saved — see "Saved — this is what prints" below; it heads every quote PDF.');
+        redirect('/crm-templates#letterhead');
     }
     if ($route === 'crm-templates') {
         $rows = ops_all("SELECT id, kind, name, document_number, format_number, doc_revision, issue_date, file_name, active, is_default FROM crm_templates ORDER BY kind, name");
         view('ops/crm/template_list', ['rows' => $rows,
             'sigSet' => setting_get('quote_sig_img', '') !== '', 'sigName' => setting_get('quote_sig_name', ''), 'sigDesig' => setting_get('quote_sig_desig', ''),
             'lhLogo' => setting_get('quote_lh_logo', '') !== '', 'lhName' => setting_get('quote_lh_name', ''), 'lhAddress' => setting_get('quote_lh_address', ''),
-            'lhContact' => setting_get('quote_lh_contact', ''), 'lhFooter' => setting_get('quote_lh_footer', '')]);
+            'lhContact' => setting_get('quote_lh_contact', ''), 'lhFooter' => setting_get('quote_lh_footer', ''),
+            // What is saved, to show as it prints (owner, 9 Nov 2026: "there is no list to verify").
+            'lhLogoData' => (string) setting_get('quote_lh_logo', ''), 'sigImgData' => (string) setting_get('quote_sig_img', ''),
+            'lhSaved' => (string) setting_get('quote_lh_saved', ''), 'sigSaved' => (string) setting_get('quote_sig_saved', '')]);
         return;
     }
     if ($route === 'crm-template-download') {
