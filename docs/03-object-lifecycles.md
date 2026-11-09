@@ -249,6 +249,18 @@ stateDiagram-v2
   who drafted it and carries the costing's enquiry, lead and business unit.
 - Reopening an APPROVED costing clears who approved it and when, and writes a line in its quotation's
   history; that quotation cannot move forward again until the costing is approved again.
+- **Recruitment from a costing (owner, 9 Nov 2026):** offered only when the costing is **APPROVED**
+  **and** a revision of its quotation is **ACCEPTED** by the client (`pc_hire_gate()`); before that the
+  costing page shows why, and the buttons are not there. Each role carries its **number of people**
+  (`project_costing_lines.headcount`). *Raise hiring request* (one role, or every role) creates a
+  **DRAFT** hiring request filled from the costing — role, people not yet asked for, client, branch,
+  site, quotation and costing numbers, and the budget (loaded cost per person, billing rate, margin,
+  duration, one-off) — linked by `hiring_requests.costing_line_id`; it then follows the hiring-request
+  lifecycle below unchanged. A role can never be asked for more people than were costed (live
+  requests plus requisitions raised directly). The requisition raised from such a request takes the
+  costing's rate, margin and cost build-up as its budget (`pc_requisition_from_hreq()`). Where the
+  workspace allows requisitions without a hiring request, *Requisition directly* is offered under the
+  same rule, for the people not yet asked for. No new status.
 
 ---
 

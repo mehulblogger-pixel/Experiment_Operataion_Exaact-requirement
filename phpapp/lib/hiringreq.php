@@ -1757,6 +1757,9 @@ function hreq_to_requisition($id, $qty = 0) {
         return [false, 'Another user took the last of the approved headcount while this was being raised.', 0];
     }
 
+    // Raised from a won costing: the requisition's budget is the costing's
+    // (rate, margin, cost build-up), so every hire is measured against it.
+    if (function_exists('pc_requisition_from_hreq')) pc_requisition_from_hreq($rid, $r);
     if (function_exists('reqf_sync')) reqf_sync($rid);
     if (function_exists('act_log'))
         act_log('HIRING_REQUEST', (int) $id, 'SYSTEM', 'Recruitment requisition ' . $code . ' raised for ' . $qty, ['auto' => 1]);

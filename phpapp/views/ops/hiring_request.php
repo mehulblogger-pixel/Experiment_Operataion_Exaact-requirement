@@ -67,6 +67,19 @@ $deptSel = function ($field, $cur) use ($depts, $e) {
       //  same gates the buttons below already use; it decides nothing and it
       //  offers no action this user is not already allowed. $remaining is the
       //  screen's own number, handed over rather than recomputed. ?>
+<?php // Raised from a won costing (owner, 9 Nov 2026): where it came from, and the
+      // budget the approver is asked to agree to.
+  if ($r && (int) ($r['costing_line_id'] ?? 0) && function_exists('pc_get')):
+    $pcLn = ops_one("SELECT * FROM project_costing_lines WHERE id=?", [(int) $r['costing_line_id']]);
+    $pcH = $pcLn ? pc_get((int) $pcLn['costing_id']) : null;
+    if ($pcLn && $pcH): $pcC = pc_line_calc($pcLn, $pcH); $pcQ = function_exists('pc_accepted_quote') ? pc_accepted_quote($pcH) : null; ?>
+  <div class="msg msg-info" style="margin:10px 0">
+    From costing <a href="/project-costing?id=<?= (int) $pcH['id'] ?>"><?= $e($pcH['code']) ?></a>, role <b><?= $e($pcLn['role_label']) ?></b>
+    <?= $pcQ ? '· quotation <a href="/quote?id=' . (int) $pcQ['id'] . '">' . $e($pcQ['quote_no']) . '</a> accepted by the client' : '' ?>.
+    Budget per person: cost <b><?= $e(number_format($pcC['loaded'])) ?></b>, billed at <b><?= $e(number_format($pcC['proposed'])) ?></b>
+    (<?= $e(number_format($pcC['margin'], 1)) ?>% margin) per <?= ($pcH['basis'] ?? '') === 'DAILY' ? 'day' : 'month' ?>.
+  </div>
+<?php endif; endif; ?>
 <?php if ($r && function_exists('na_html')) echo na_html('hiring_request', $r + ['__remaining' => (int) $remaining]); ?>
 <?php //  GATE 2 — the approved version, any proposed change, and the history.
       //  Rendered from ONE helper so this screen and the requirement screen cannot

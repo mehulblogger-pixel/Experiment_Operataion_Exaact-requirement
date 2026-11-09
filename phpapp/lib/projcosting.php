@@ -122,7 +122,10 @@ function pc_migrate() {
               // prices, and its business unit decides which SBU Head approves it.
               ['project_costings','inquiry_id','INT NULL'],
               ['project_costings','lead_id','INT NULL'],
-              ['project_costings','sbu',"VARCHAR(20) DEFAULT ''"]] as $c) {
+              ['project_costings','sbu',"VARCHAR(20) DEFAULT ''"],
+              // Owner, 9 Nov 2026 — how many people each role needs, so a hiring
+              // request raised from it asks for the right number.
+              ['project_costing_lines','headcount',"INT DEFAULT 1"]] as $c) {
         if (function_exists('ensure_column')) ensure_column($c[0], $c[1], $c[2]);
     }
 }
@@ -538,6 +541,123 @@ function pc_make_quote($roll) {
 // Create a recruitment requirement from one role line. Carries the per-person
 // economics (loaded cost, proposed rate, target margin); headcount/duration are
 // left for the recruiter to set. Returns ['id','code'].
+// ---------------------------------------------------------------------------
+//  FROM A WON COSTING TO RECRUITMENT (owner, 9 Nov 2026)
+//
+//  "if quote is won or accepted by client then only the hiring request or
+//  requisition button shall be shown" — and the request then goes through the
+//  existing hiring-request approvals. So recruitment can start from a costing
+//  only when (1) the costing is APPROVED and (2) a revision of its quotation is
+//  ACCEPTED by the client. Each role asks for its own number of people, never
+//  more than were costed, and carries the costing's budget into recruitment.
+// ---------------------------------------------------------------------------
+
+// The accepted revision of the costing's quotation, or null.
+function pc_accepted_quote($h) {
+    $qid = (int)($h['quote_id'] ?? 0); if (!$qid) return null;
+    $q = ops_one("SELECT id, parent_id FROM quotations WHERE id=?", [$qid]); if (!$q) return null;
+    $base = (int)($q['parent_id'] ?? 0) ?: (int)$q['id'];
+    return ops_one("SELECT * FROM quotations WHERE (id=? OR parent_id=?) AND status='ACCEPTED' ORDER BY id DESC LIMIT 1", [$base, $base]) ?: null;
+}
+// '' when recruitment may start from this costing, or the reason it may not yet.
+function pc_hire_gate($h) {
+    if (strtoupper((string)($h['status'] ?? '')) !== 'APPROVED')
+        return 'The costing must be approved first.';
+    if (!(int)($h['quote_id'] ?? 0))
+        return 'Create the quotation from this costing first — recruitment starts once the client accepts it.';
+    if (!pc_accepted_quote($h)) {
+        $q = ops_one("SELECT quote_no, status FROM quotations WHERE id=?", [(int)$h['quote_id']]);
+        return 'Recruitment starts once the client accepts the quotation' . ($q ? ' (' . $q['quote_no'] . ' is ' . strtolower(str_replace('_', ' ', (string)$q['status'])) . ')' : '') . '.';
+    }
+    return '';
+}
+// How many of a role's people are already asked for: live hiring requests plus
+// requisitions raised directly from the costing.
+function pc_line_raised($lineId) {
+    $n = 0;
+    try { $n += (int)ops_val("SELECT COALESCE(SUM(quantity),0) FROM hiring_requests WHERE costing_line_id=? AND UPPER(COALESCE(status,'')) NOT IN ('REJECTED','CANCELLED')", [(int)$lineId]); } catch (Throwable $e) {}
+    try { $n += (int)ops_val("SELECT COALESCE(SUM(quantity),0) FROM requisitions WHERE costing_line_id=? AND COALESCE(hiring_request_id,0)=0 AND UPPER(COALESCE(status,'')) <> 'CANCELLED'", [(int)$lineId]); } catch (Throwable $e) {}
+    return $n;
+}
+function pc_line_people($ln) { return max(1, (int)($ln['headcount'] ?? 1)); }
+// What has been raised from a role, for the costing page.
+function pc_line_links($lineId) {
+    $out = ['hreq' => [], 'req' => []];
+    try { $out['hreq'] = ops_all("SELECT id, req_no, status, quantity FROM hiring_requests WHERE costing_line_id=? ORDER BY id", [(int)$lineId]) ?: []; } catch (Throwable $e) {}
+    try { $out['req'] = ops_all("SELECT id, req_code, status, quantity FROM requisitions WHERE costing_line_id=? ORDER BY id", [(int)$lineId]) ?: []; } catch (Throwable $e) {}
+    return $out;
+}
+function pc_link_migrate() {
+    if (function_exists('hreq_migrate')) hreq_migrate();
+    if (function_exists('req_migrate')) req_migrate();
+    if (!function_exists('ensure_column')) return;
+    foreach ([['hiring_requests', 'costing_id'], ['hiring_requests', 'costing_line_id'], ['requisitions', 'costing_line_id']] as [$t, $c])
+        try { ensure_column($t, $c, 'INT NULL'); } catch (Throwable $e) {}
+}
+
+// Raise a hiring request for one role of a won costing. It is created as a
+// DRAFT, filled from the costing, for the people not yet asked for; the user
+// checks it and submits it into the existing approvals. Returns [ok, msg, id].
+function pc_raise_hiring_request($cid, $lineId) {
+    $h = pc_get($cid); if (!$h) return [false, 'Costing not found.', 0];
+    if (($why = pc_hire_gate($h)) !== '') return [false, $why, 0];
+    $ln = ops_one("SELECT * FROM project_costing_lines WHERE id=? AND costing_id=?", [(int)$lineId, (int)$cid]);
+    if (!$ln) return [false, 'Role not found.', 0];
+    if (!function_exists('hreq_save')) return [false, 'Hiring requests are not available here.', 0];
+    pc_link_migrate();
+    $left = pc_line_people($ln) - pc_line_raised((int)$ln['id']);
+    if ($left <= 0) return [false, 'All ' . pc_line_people($ln) . ' people for "' . $ln['role_label'] . '" are already asked for.', 0];
+    $c = pc_line_calc($ln, $h);
+    $q = pc_accepted_quote($h);
+    $basis = (string)$h['basis'];
+    $months = $basis === 'LONG' && (float)$ln['boq_qty'] > 0 ? round((float)$ln['boq_qty'] / pc_line_people($ln), 2) : null;
+    $headsTxt = [];
+    $names = pc_heads();
+    foreach ((array)$c['heads'] as $k => $v) $headsTxt[] = ($names[$k] ?? $k) . ': ' . number_format((float)$v);
+    [$ok, $msg, $id] = hreq_save(0, [
+        'job_title' => trim(((string)$ln['group_label'] !== '' ? $ln['group_label'] . ' / ' : '') . $ln['role_label']),
+        'quantity' => $left,
+        'office_id' => (int)($h['office_id'] ?? 0) ?: '',
+        'client_id' => (int)($h['client_id'] ?? 0) ?: '',
+        'work_location' => (string)($h['site'] ?? ''),
+        'project_ref' => trim(($q ? $q['quote_no'] . ' · ' : '') . $h['code']),
+        'reason' => 'Quotation ' . ($q['quote_no'] ?? '') . ' accepted by the client — costing ' . $h['code'] . ', role "' . $ln['role_label'] . '".',
+        'job_description' => 'Costed per person per ' . ($basis === 'DAILY' ? 'day' : 'month') . ': ' . implode(' · ', $headsTxt)
+                           . '. Loaded cost ' . number_format($c['loaded']) . ', billed at ' . number_format($c['proposed'])
+                           . ' (' . number_format($c['margin'], 1) . '% margin).',
+        'est_cost_per_person' => $c['loaded'],
+        'est_cost_basis' => $basis === 'DAILY' ? 'MANDAY' : ($basis === 'FIXED' ? 'FIXED' : 'MONTHLY'),
+        'est_duration_months' => $months,
+        'est_onetime_cost' => (float)$ln['oneoff'] > 0 ? (float)$ln['oneoff'] : null,
+    ]);
+    if (!$ok) return [false, $msg, 0];
+    db()->prepare("UPDATE hiring_requests SET costing_id=?, costing_line_id=? WHERE id=?")->execute([(int)$cid, (int)$ln['id'], (int)$id]);
+    if (function_exists('act_log')) try { act_log('HIRING_REQUEST', (int)$id, 'SYSTEM', 'Raised from costing ' . $h['code'] . ' (role "' . $ln['role_label'] . '"), quotation ' . ($q['quote_no'] ?? '') . ' accepted'); } catch (Throwable $e) {}
+    return [true, 'Hiring request created for ' . $left . ' × ' . $ln['role_label'] . '.', (int)$id];
+}
+
+// A requisition raised from a hiring request that came from a costing takes the
+// costing's figures as its budget: the billing rate, the target margin and the
+// cost build-up — so every hire is measured against what was priced to the client.
+function pc_requisition_from_hreq($rid, array $hr) {
+    $lineId = (int)($hr['costing_line_id'] ?? 0); if (!$lineId) return;
+    $ln = ops_one("SELECT * FROM project_costing_lines WHERE id=?", [$lineId]); if (!$ln) return;
+    $h = pc_get((int)$ln['costing_id']); if (!$h) return;
+    pc_link_migrate();
+    $c = pc_line_calc($ln, $h);
+    $wage = (float)($c['heads']['PERSONNEL'] ?? 0);
+    $qty = (int)ops_val("SELECT quantity FROM requisitions WHERE id=?", [(int)$rid]) ?: 1;
+    $b = ['quantity' => $qty, 'billing_rate' => $c['proposed'], 'budgeted_cost' => $c['loaded'], 'rate_basis' => pc_req_basis((string)$h['basis'])];
+    $com = function_exists('req_commercials') ? req_commercials($b) : ['revenue' => 0, 'profit' => 0];
+    try {
+        db()->prepare("UPDATE requisitions SET costing_line_id=?, billing_rate=?, target_margin=?, budgeted_cost=?, rate_basis=?,
+                       sourcing_model=?, cost_wage=?, cost_reimburse=?, cost_oneoff=?, expected_revenue=?, expected_profit=? WHERE id=?")
+            ->execute([$lineId, $c['proposed'], (float)$ln['target_margin'], $c['loaded'], pc_req_basis((string)$h['basis']),
+                       'OWN_PAYROLL', $wage, max(0, $c['direct'] - $wage), (float)$ln['oneoff'],
+                       (float)($com['revenue'] ?? 0), (float)($com['profit'] ?? 0), (int)$rid]);
+    } catch (Throwable $e) {}
+}
+
 function pc_make_requisition($cid, $lineId) {
     //  ADR-001 (decided) — a costing spawns a requisition on the DIRECT path, as
     //  the route's own comment says, so the workspace policy applies here too.
@@ -552,17 +672,21 @@ function pc_make_requisition($cid, $lineId) {
         return ['err' => $pcDirect];
     }
     $h = pc_get($cid); if (!$h) return ['err' => 'Costing not found.'];
+    if (($why = pc_hire_gate($h)) !== '') return ['err' => $why];
     $ln = ops_one("SELECT * FROM project_costing_lines WHERE id=? AND costing_id=?", [(int)$lineId, (int)$cid]);
     if (!$ln) return ['err' => 'Role not found.'];
     if (!function_exists('req_migrate')) return ['err' => 'Recruitment module is not available.'];
     req_migrate();
+    pc_link_migrate();
+    $people = pc_line_people($ln) - pc_line_raised((int)$ln['id']);
+    if ($people <= 0) return ['err' => 'All ' . pc_line_people($ln) . ' people for "' . $ln['role_label'] . '" are already asked for.'];
     $c = pc_line_calc($ln, $h);
     $heads = $c['heads'];
     $wage = (float)($heads['PERSONNEL'] ?? 0);
     $reimb = max(0, $c['direct'] - $wage);            // everything else monthly
     try {
         $code = ops_next_code('requisitions', 'req_code', 'REQ');
-        $b = ['quantity' => 1, 'billing_rate' => $c['proposed'], 'budgeted_cost' => $c['loaded'],
+        $b = ['quantity' => $people, 'billing_rate' => $c['proposed'], 'budgeted_cost' => $c['loaded'],
               'rate_basis' => pc_req_basis((string)$h['basis'])];
         $com = function_exists('req_commercials') ? req_commercials($b) : ['revenue' => 0, 'profit' => 0, 'months' => 0];
         db()->prepare("INSERT INTO requisitions
@@ -570,7 +694,7 @@ function pc_make_requisition($cid, $lineId) {
              billing_rate, rate_basis, target_margin, budgeted_cost,
              sourcing_model, cost_wage, cost_reimburse, cost_oneoff,
              expected_revenue, expected_profit, notes, created_by, created_at)
-            VALUES (?,?,?,?,?, 'NEW', 'OPEN', 1, ?,?,?,?, 'OWN_PAYROLL', ?,?,?, ?,?,?,?,?)")
+            VALUES (?,?,?,?,?, 'NEW', 'OPEN', " . (int)$people . ", ?,?,?,?, 'OWN_PAYROLL', ?,?,?, ?,?,?,?,?)")
             ->execute([$code, (int)$h['office_id'] ?: null, (int)$h['client_id'] ?: null,
                 (string)$ln['role_label'], (string)$h['site'],
                 $c['proposed'], pc_req_basis((string)$h['basis']), (float)$ln['target_margin'], $c['loaded'],
@@ -578,7 +702,9 @@ function pc_make_requisition($cid, $lineId) {
                 $com['revenue'], $com['profit'],
                 'From costing ' . $h['code'] . ' · ' . trim(((string)$ln['group_label'] !== '' ? $ln['group_label'] . ' / ' : '') . $ln['role_label']),
                 user_name(current_user()), date('c')]);
-        return ['id' => (int)db()->lastInsertId(), 'code' => $code];
+        $rid = (int)db()->lastInsertId();
+        db()->prepare("UPDATE requisitions SET costing_line_id=? WHERE id=?")->execute([(int)$ln['id'], $rid]);
+        return ['id' => $rid, 'code' => $code];
     } catch (Throwable $e) { return ['err' => $e->getMessage()]; }
 }
 
@@ -685,6 +811,8 @@ function ops_projcosting($route, $method) {
             $pdo->prepare("INSERT INTO project_costing_lines (costing_id,seq,group_label,role_label,heads,boq_qty,target_margin,rate_manual,oneoff,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)")
                 ->execute(array_merge([$cid, $seq], $args, [date('c')]));
         }
+        $lid = $lineId ?: (int)ops_val("SELECT MAX(id) FROM project_costing_lines WHERE costing_id=?", [$cid]);
+        $pdo->prepare("UPDATE project_costing_lines SET headcount=? WHERE id=? AND costing_id=?")->execute([max(1, (int)($_POST['headcount'] ?? 1)), $lid, $cid]);
         pc_restamp($cid);
         flash('Role saved.');
         redirect('/project-costing?id=' . $cid);
@@ -781,6 +909,23 @@ function ops_projcosting($route, $method) {
         flash($r['err'] ?? 'Could not create the quotation.', 'error'); redirect('/project-costing?id=' . $id);
     }
 
+    // ---- Raise a hiring request from a won costing (one role, or all) ----
+    if ($route === 'project-costing-to-hreq' && $method === 'POST') {
+        $cid = (int)($_POST['costing_id'] ?? 0);
+        $h = pc_get($cid); if (!$h) { flash('Costing not found.', 'error'); redirect('/project-costings'); }
+        ops_require(function_exists('hreq_can_create') ? hreq_can_create() : (function_exists('can') && can('mod.hiring.edit')), 'You cannot raise a hiring request.');
+        $ids = !empty($_POST['all']) ? array_map(fn($r) => (int)$r['id'], pc_lines($cid)) : [(int)($_POST['line_id'] ?? 0)];
+        $made = []; $msgs = [];
+        foreach ($ids as $lid) {
+            [$ok, $msg, $hid] = pc_raise_hiring_request($cid, $lid);
+            if ($ok) $made[] = $hid; elseif (count($ids) === 1 || strpos($msg, 'already asked for') === false) $msgs[] = $msg;
+        }
+        if (count($made) === 1 && count($ids) === 1) { flash($msgs ? implode(' ', $msgs) : 'Hiring request created from this costing — check it and press Submit to send it for approval.'); redirect('/hiring-request?id=' . $made[0]); }
+        if ($made) { flash(count($made) . ' hiring request(s) created — open each from this page, check it and press Submit to send it for approval.' . ($msgs ? ' ' . implode(' ', array_unique($msgs)) : '')); redirect('/project-costing?id=' . $cid . '#use'); }
+        flash($msgs ? implode(' ', array_unique($msgs)) : 'Every role is already asked for.', 'error');
+        redirect('/project-costing?id=' . $cid . '#use');
+    }
+
     // ---- Spawn a recruitment requirement from one role line ----
     if ($route === 'project-costing-to-req' && $method === 'POST') {
         $cid = (int)($_POST['costing_id'] ?? 0); $lineId = (int)($_POST['line_id'] ?? 0);
@@ -790,7 +935,7 @@ function ops_projcosting($route, $method) {
         $pcLbl = function_exists('hreq_label') ? hreq_label('requisition') : 'Recruitment Requisition';
         ops_require(function_exists('can') && can('mod.hiring.edit'), 'You cannot create a ' . mb_strtolower($pcLbl) . '.');
         $r = pc_make_requisition($cid, $lineId);
-        if (!empty($r['id'])) { flash($pcLbl . ' ' . $r['code'] . ' created from this role — set the headcount & duration.'); redirect('/requisition?id=' . $r['id']); }
+        if (!empty($r['id'])) { flash($pcLbl . ' ' . $r['code'] . ' created from this role, for the people not yet asked for — check the duration.'); redirect('/requisition?id=' . $r['id']); }
         flash($r['err'] ?? ('Could not create the ' . mb_strtolower($pcLbl) . '.'), 'error'); redirect('/project-costing?id=' . $cid);
     }
 
@@ -809,6 +954,7 @@ function ops_projcosting($route, $method) {
     if ($route === 'project-costing') {
         $id = (int)($_GET['id'] ?? 0); $roll = pc_rollup($id);
         if (!$roll) { http_response_code(404); view('notfound'); return true; }
+        pc_link_migrate();
         view('ops/project_costing', ['roll' => $roll, 'heads' => pc_heads(),
             'clients' => function_exists('clients_list') ? clients_list() : [],
             'offices' => function_exists('offices_list') ? offices_list() : []]);

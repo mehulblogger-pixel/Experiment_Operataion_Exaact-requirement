@@ -130,7 +130,7 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
   $canQuote = function_exists('can') && can('mod.quotes.edit');
   $canHire  = function_exists('can') && can('mod.hiring.edit');
   if (!empty($lines) && ($canQuote || $canHire)): ?>
-<div class="panel">
+<div class="panel" id="use" style="scroll-margin-top:70px">
   <h3 class="tab-sub" style="margin-top:0">Use this costing</h3>
   <div class="pc-actions" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:6px">
     <?php if ($canQuote): ?>
@@ -144,21 +144,45 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
     <?php endif; ?>
     <?php if (!empty($h['opportunity_id'])): ?><a class="btn secondary" href="/opportunity?id=<?= (int)$h['opportunity_id'] ?>">💡 Linked deal</a><?php endif; ?>
   </div>
-  <?php if ($canHire): ?>
+  <?php if ($canHire):
+    // Owner, 9 Nov 2026: recruitment starts only once the client has accepted
+    // the quotation — before that the buttons are not offered, and the reason is shown.
+    $gate = function_exists('pc_hire_gate') ? pc_hire_gate($h) : '';
+    $direct = !function_exists('hreq_direct_path_allowed') || hreq_direct_path_allowed();
+    $accQ = function_exists('pc_accepted_quote') ? pc_accepted_quote($h) : null; ?>
+  <h4 style="margin:14px 0 6px;font-size:14px">Recruitment for this costing</h4>
+  <?php if ($gate !== ''): ?>
+    <div class="msg msg-info" style="margin:0 0 8px">🔒 <?= $e($gate) ?></div>
+  <?php else: ?>
+    <p class="sub" style="margin:0 0 8px">Quotation <b><?= $e($accQ['quote_no'] ?? '') ?></b> was accepted by the client. Raise a hiring request for each role — it goes through your hiring-request approvals, and its requisition takes this costing's rate and margin as its budget.</p>
+  <?php endif; ?>
   <div class="scroll"><table class="grid" style="font-size:12.5px">
-    <thead><tr><th>Role</th><th class="num">Rate<?= $e($rateLabel) ?></th><th class="num">Loaded/mo</th><th></th></tr></thead>
+    <thead><tr><th>Role</th><th class="num">People</th><th class="num">Rate<?= $e($rateLabel) ?></th><th class="num">Loaded/mo</th><th>Raised</th><th></th></tr></thead>
     <tbody>
-    <?php foreach ($lines as $ln): $c = pc_line_calc($ln, $h); ?>
+    <?php foreach ($lines as $ln): $c = pc_line_calc($ln, $h);
+          $ppl = function_exists('pc_line_people') ? pc_line_people($ln) : 1;
+          $done = function_exists('pc_line_raised') ? pc_line_raised((int)$ln['id']) : 0;
+          $lk = function_exists('pc_line_links') ? pc_line_links((int)$ln['id']) : ['hreq' => [], 'req' => []]; ?>
       <tr>
         <td><?= !empty($ln['group_label']) ? '<span class="muted">'.$e($ln['group_label']).' / </span>' : '' ?><b><?= $e($ln['role_label']) ?></b></td>
+        <td class="num"><?= (int)$ppl ?></td>
         <td class="num"><?= number_format($c['proposed']) ?></td>
         <td class="num"><?= number_format($c['loaded']) ?></td>
-        <td class="num"><form method="post" action="/project-costing-to-req" style="display:inline"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="costing_id" value="<?= (int)$h['id'] ?>"><input type="hidden" name="line_id" value="<?= (int)$ln['id'] ?>"><button class="btn btn-ghost" style="padding:3px 10px" title="Create a recruitment requirement from this role">→ Requirement</button></form></td>
+        <td><?php foreach ($lk['hreq'] as $x): ?><a href="/hiring-request?id=<?= (int)$x['id'] ?>"><?= $e($x['req_no']) ?></a> <span class="muted">(<?= (int)$x['quantity'] ?> · <?= $e(strtolower(str_replace('_', ' ', (string)$x['status']))) ?>)</span><br><?php endforeach; ?>
+            <?php foreach ($lk['req'] as $x): ?><a href="/requisition?id=<?= (int)$x['id'] ?>"><?= $e($x['req_code']) ?></a> <span class="muted">(<?= (int)$x['quantity'] ?> · <?= $e(strtolower((string)$x['status'])) ?>)</span><br><?php endforeach; ?>
+            <?php if (!$lk['hreq'] && !$lk['req']): ?><span class="muted">—</span><?php endif; ?></td>
+        <td class="num" style="white-space:nowrap"><?php if ($gate === '' && $done < $ppl): ?>
+          <form method="post" action="/project-costing-to-hreq" style="display:inline"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="costing_id" value="<?= (int)$h['id'] ?>"><input type="hidden" name="line_id" value="<?= (int)$ln['id'] ?>"><button class="btn" style="padding:3px 10px" title="Raise a hiring request for the <?= (int)($ppl - $done) ?> people not yet asked for">→ Hiring request (<?= (int)($ppl - $done) ?>)</button></form>
+          <?php if ($direct): ?><form method="post" action="/project-costing-to-req" style="display:inline"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="costing_id" value="<?= (int)$h['id'] ?>"><input type="hidden" name="line_id" value="<?= (int)$ln['id'] ?>"><button class="btn btn-ghost" style="padding:3px 10px" title="Your workspace allows starting recruitment without a hiring request">→ Requisition directly</button></form><?php endif; ?>
+        <?php elseif ($gate === ''): ?><span class="muted">All asked for</span><?php endif; ?></td>
       </tr>
     <?php endforeach; ?>
     </tbody>
   </table></div>
-  <p class="sub" style="margin-top:6px">Each requirement carries this role's per-person economics (loaded cost, proposed rate, target margin); set the headcount &amp; duration on the requirement.</p>
+  <?php if ($gate === '' && count($lines) > 1): ?>
+    <form method="post" action="/project-costing-to-hreq" style="margin-top:8px"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="costing_id" value="<?= (int)$h['id'] ?>"><input type="hidden" name="all" value="1">
+      <button class="btn">→ Raise hiring requests for every role</button></form>
+  <?php endif; ?>
   <?php endif; ?>
 </div>
 <?php endif; ?>
@@ -172,6 +196,7 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
     <div class="form-grid">
       <div class="ff"><label>Group <span class="muted">optional</span></label><input class="form-control" name="group_label" placeholder="e.g. Module / Cell"></div>
       <div class="ff ff-wide"><label>Role</label><input class="form-control" name="role_label" required placeholder="e.g. Shift Engineer"></div>
+      <div class="ff"><label>People <span class="muted">how many for this role</span></label><input class="form-control" type="number" min="1" step="1" name="headcount" value="1"></div>
     </div>
     <p class="sub" style="margin:12px 0 4px">Cost heads — <?= $sym ?> per person per month<?= $basis==='DAILY' ? ' (day rates are per man-day; enter the monthly-equivalent build-up)' : '' ?></p>
     <div class="form-grid">
