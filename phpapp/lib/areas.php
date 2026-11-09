@@ -403,7 +403,11 @@ function ops_area_def($area) {
             // (owner, test book ONB-046).
             $t($fx('billing_can_manage') && billing_can_manage() && $fx('setting_get')
                 && ((int) setting_get('saas_seat_limit', 0) > 0 || ($fx('saas_is_selfserve') && saas_is_selfserve())),
-                '💳', 'Your subscription', '/subscription', 'Your plan, its modules and logins, until when it runs — and changing it or paying online.');
+                '💳', 'Your subscription', '/subscription', (function () {
+                    $c = function_exists('saas_login_counts') ? saas_login_counts() : null;
+                    return ($c && $c['limit'] > 0 ? 'Logins: ' . $c['limit'] . ' in your plan · ' . $c['used'] . ' created · ' . $c['left'] . ' left. ' : '')
+                        . 'Your plan, its modules and logins, until when it runs — and changing it or paying online.';
+                })());
             $t((can('settings.manage') || is_master()) && $fx('books_licensed') && books_licensed(), '📗', 'MGH Books', '/books-bridge', 'The accounts bridge.',
                 $num(fn() => $fx('books_outbox_counts') ? (books_outbox_counts()['stuck'] ?? 0) : 0), 'red');
 

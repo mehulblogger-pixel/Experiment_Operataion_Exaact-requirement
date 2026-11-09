@@ -10466,7 +10466,8 @@ function ops_users($route, $method) {
                        FROM users u LEFT JOIN offices o ON o.id = u.home_office_id
                       WHERE " . str_replace('home_office_id', 'u.home_office_id', $where) . "
                       ORDER BY u.is_active DESC, u.username");
-    $seats = getenv('SEAT_LIMIT') ?: '';
+    // The plan's login limit (inside a company), else the server's SEAT_LIMIT.
+    $seats = function_exists('saas_login_counts') ? ((($lc = saas_login_counts())['limit']) > 0 ? (string) $lc['limit'] : '') : (getenv('SEAT_LIMIT') ?: '');
     view('ops/users', ['rows'=>$rows,'seats'=>$seats,'active'=>(int)ops_val("SELECT COUNT(*) FROM users WHERE is_active=1"),
         'globalMgr'=>$globalMgr, 'defaults'=>accounts_on_default_password(), 'locked'=>accounts_locked_now(),
         'unlinked'=>function_exists('team_unlinked_logins') ? team_unlinked_logins() : []]);

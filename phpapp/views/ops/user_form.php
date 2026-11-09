@@ -48,6 +48,7 @@
       <p class="sub" style="margin:2px 0 0">One person: who they are, what they can see, where they sit and who they report to.</p></div>
   </div>
 </div>
+<?php if (!$user && function_exists('saas_login_strip_html')) echo saas_login_strip_html(); ?>
 <form method="post" action="<?= (!empty($user['id'])) ? '/user-edit?id=' . (int)$user['id'] : '/user-new' ?>" class="panel">
 <div data-tabs data-tabs-key="userform" class="form-tabs">
 <section class="fs-pane" data-tab="Who they are">

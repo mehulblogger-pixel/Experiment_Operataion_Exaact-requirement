@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '25d75d7 · 2026-11-09 05:46 UTC · 707 files';
+$RELEASE = '9903dc7 · 2026-11-09 05:51 UTC · 707 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -44,7 +44,7 @@ $EXPECT  = [
     'lib/ai_formgen.php' => ['s'=>11931,'h'=>'3193de5d4fc90414'],
     'lib/approvals_hub.php' => ['s'=>8916,'h'=>'920310fe3ad7ba19'],
     'lib/approvals_setup.php' => ['s'=>7111,'h'=>'5d77132c6a062451'],
-    'lib/areas.php' => ['s'=>43460,'h'=>'6cd0ce8b23150fb5'],
+    'lib/areas.php' => ['s'=>43775,'h'=>'f1d4c0c167ff8bc7'],
     'lib/assets.php' => ['s'=>14725,'h'=>'53927f92ca350c91'],
     'lib/attend.php' => ['s'=>13919,'h'=>'695a4eae1fd9e2a9'],
     'lib/attendreview.php' => ['s'=>7794,'h'=>'cfcd8f928e63efad'],
@@ -177,7 +177,7 @@ $EXPECT  = [
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>4308,'h'=>'1c5b3e553b964601'],
     'lib/opportunities.php' => ['s'=>69459,'h'=>'1fabb6c2818818ac'],
-    'lib/ops.php' => ['s'=>735603,'h'=>'be88a0fdc3ee41e1'],
+    'lib/ops.php' => ['s'=>735800,'h'=>'f07afd4f9d5fee79'],
     'lib/orgadmin.php' => ['s'=>78177,'h'=>'70dca6bf71230d17'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3662,'h'=>'c849f6bf380507dc'],
@@ -220,7 +220,7 @@ $EXPECT  = [
     'lib/saas_payments.php' => ['s'=>45293,'h'=>'64c4e411c16fcdfb'],
     'lib/saas_provision_cli.php' => ['s'=>4816,'h'=>'76f04fae8c24f082'],
     'lib/saas_sync_cli.php' => ['s'=>2939,'h'=>'5fb733d865f2f34b'],
-    'lib/saas_tenants.php' => ['s'=>109484,'h'=>'a3317be9955e35b8'],
+    'lib/saas_tenants.php' => ['s'=>111416,'h'=>'48dae3ad28ecb8d8'],
     'lib/samples.php' => ['s'=>14677,'h'=>'fa38e5f628b43f6a'],
     'lib/satisfaction.php' => ['s'=>16437,'h'=>'4cb166c77b0e2650'],
     'lib/schedboard.php' => ['s'=>10397,'h'=>'0b2b9fe333604ef3'],
@@ -646,8 +646,8 @@ $EXPECT  = [
     'views/ops/trace.php' => ['s'=>2731,'h'=>'a2ca35689d6fe75c'],
     'views/ops/trace_thread.php' => ['s'=>4595,'h'=>'77a12293e74ad0d7'],
     'views/ops/two_factor.php' => ['s'=>7474,'h'=>'82d9491898763fa0'],
-    'views/ops/user_form.php' => ['s'=>49483,'h'=>'fb55078c644a8499'],
-    'views/ops/users.php' => ['s'=>10452,'h'=>'7b2992eab05805a2'],
+    'views/ops/user_form.php' => ['s'=>49578,'h'=>'385c9c7b2c3ec048'],
+    'views/ops/users.php' => ['s'=>10530,'h'=>'3076d4a5e509a7d7'],
     'views/ops/vendor.php' => ['s'=>5070,'h'=>'bb8cb8c9dd7e8a3d'],
     'views/ops/vendor_users.php' => ['s'=>8866,'h'=>'a6d6c696ee0d48f8'],
     'views/ops/verify.php' => ['s'=>8818,'h'=>'985a249a4ed58388'],

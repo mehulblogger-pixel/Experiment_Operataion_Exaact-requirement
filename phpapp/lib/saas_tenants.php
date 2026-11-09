@@ -673,6 +673,34 @@ function saas_selfservice_apply(array $addModules, $addSeats, $period = 'month',
     return ['modules' => $target, 'added' => $addModules, 'seat_add' => $addSeats, 'paid_until' => $until];
 }
 
+// The company's logins in one place (owner, 9 Nov 2026: "this company has only
+// this many users, this many are created and this many are left" — shown in
+// company admin). 'limit' 0 = no limit. Counted the way saas_seat_block() counts.
+function saas_login_counts() {
+    $limit = function_exists('setting_get') ? max(0, (int) setting_get('saas_seat_limit', 0)) : 0;
+    if ($limit === 0 && getenv('SEAT_LIMIT')) $limit = max(0, (int) getenv('SEAT_LIMIT'));
+    $used = 0; try { $used = (int) ops_val("SELECT COUNT(*) FROM users WHERE is_active=1"); } catch (Throwable $e) {}
+    return ['limit' => $limit, 'used' => $used, 'left' => $limit > 0 ? max(0, $limit - $used) : null];
+}
+// The strip shown on Users and Add a person.
+function saas_login_strip_html() {
+    $c = saas_login_counts();
+    $e = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES);
+    $box = fn($lab, $val, $tone = '') => '<div class="kpi' . ($tone ? ' ' . $tone : '') . '"><span class="k-lab">' . $e($lab) . '</span><span class="k-val">' . $e($val) . '</span></div>';
+    $full = $c['limit'] > 0 && $c['left'] === 0;
+    $h = '<div class="kpi-row" style="margin:12px 0 8px">'
+       . $box('Logins in your plan', $c['limit'] > 0 ? $c['limit'] : 'No limit')
+       . $box('Created (active)', $c['used'])
+       . $box('Left', $c['limit'] > 0 ? $c['left'] : '—', $full ? 'tone-bad' : ($c['limit'] > 0 ? 'tone-ok' : ''))
+       . '</div>';
+    if ($full) {
+        $buy = function_exists('billing_can_manage') && billing_can_manage() && function_exists('current_tenant') && current_tenant() !== '';
+        $h .= '<div class="msg msg-warning" style="margin:0 0 10px">All ' . (int) $c['limit'] . ' logins are in use. '
+            . ($buy ? '<a href="/subscription#addform">Add logins to your plan</a>, or deactivate someone who has left.' : 'Ask your administrator to add logins, or deactivate someone who has left.') . '</div>';
+    }
+    return $h;
+}
+
 // Enforce the seat cap when a company adds a login. Reads the seat limit that
 // was pushed into THIS company's own database (setting saas_seat_limit); returns
 // a message to block, or '' to allow. Complements the licence seat check — a

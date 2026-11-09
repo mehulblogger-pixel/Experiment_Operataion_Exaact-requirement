@@ -4,7 +4,9 @@
       '/hierarchy?tab=people', 'Back',
       '<a class="btn secondary" href="/hierarchy?tab=import" title="Download the register, edit it in Excel, upload it back">Bulk (Excel)</a>'
       . '<a class="btn" href="/user-new">+ Add a person</a>') ?>
-<?php if ($seats!=='' && $active >= (int)$seats): ?>
+<?php if (function_exists('saas_login_strip_html')): ?>
+  <?= saas_login_strip_html() ?>
+<?php elseif ($seats!=='' && $active >= (int)$seats): ?>
   <div class="msg msg-error">You have reached your licensed seat limit (<?= e($seats) ?>). Deactivate a user before adding a new one.</div>
 <?php endif; ?>
 
@@ -148,4 +150,4 @@
   </tr>
   <?php endforeach; ?>
 </table>
-<p class="muted" style="margin-top:12px;">Roles: <strong>Master Admin</strong> sees salary &amp; profit; <strong>Admin</strong> runs scheduling &amp; recon; <strong>Coordinator</strong> creates calls/jobs; <strong>Inspector</strong> sees only their own jobs. The seat limit is set on the server with the <code>SEAT_LIMIT</code> setting.</p>
+<p class="muted" style="margin-top:12px;">Roles: <strong>Master Admin</strong> sees salary &amp; profit; <strong>Admin</strong> runs scheduling &amp; recon; <strong>Coordinator</strong> creates calls/jobs; <strong>Inspector</strong> sees only their own jobs. The number of logins comes from your plan (Your subscription).</p>
