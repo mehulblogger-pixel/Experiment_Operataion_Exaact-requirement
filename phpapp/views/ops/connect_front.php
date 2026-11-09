@@ -75,12 +75,33 @@ $freeLaunch = true; // platform is free during launch
     }
   }
   :focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+  /* Header "Sign in": a menu of the three ways in (owner, 9 Nov 2026 — it only
+     scrolled to the bottom of the page and looked as if it did nothing). */
+  .simenu{position:relative}
+  .simenu>summary{list-style:none;cursor:pointer}
+  .simenu>summary::-webkit-details-marker{display:none}
+  .simenu .menu{position:absolute;right:0;top:calc(100% + 6px);min-width:250px;background:var(--card);border:1px solid var(--line);
+    border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:6px;z-index:30}
+  .simenu .menu a{display:block;padding:11px 12px;border-radius:8px;color:var(--ink);font-size:14.5px;text-decoration:none}
+  .simenu .menu a:hover{background:var(--soft);text-decoration:none}
+  .simenu .menu a small{display:block;color:var(--muted);font-size:12.5px}
 </style></head><body>
 
 <header class="bar">
   <a class="brand" href="/connect"><span class="dot"></span><?= e($appName) ?> Connect</a>
-  <a class="si" href="#signin">Sign in</a>
+  <details class="simenu"><summary class="si" aria-haspopup="true">Sign in ▾</summary>
+    <nav class="menu" aria-label="Sign in">
+      <a href="/login">Staff — company workspace<small>You work at a company that uses this app</small></a>
+      <a href="/portal/login">Company or agency<small>You post requirements or supply people</small></a>
+      <a href="/pro/login">Professional<small>Your own profile and passport</small></a>
+    </nav></details>
 </header>
+<script>
+  // Close the menu on a click elsewhere or Escape.
+  (function(){var d=document.querySelector('.simenu'); if(!d) return;
+    document.addEventListener('click',function(e){ if(d.open && !d.contains(e.target)) d.open=false; });
+    document.addEventListener('keydown',function(e){ if(e.key==='Escape') d.open=false; });})();
+</script>
 
 <section class="hero">
   <?php if ($freeLaunch): ?><span class="ribbon">🎉 Free for everyone during launch</span><?php endif; ?>
