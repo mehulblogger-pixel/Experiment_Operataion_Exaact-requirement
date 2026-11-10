@@ -214,7 +214,7 @@ function connect_engage_save_for_requirement($requirementId, array $in) {
     connect_engage_migrate();
     $req = function_exists('cx_requirement_get') ? cx_requirement_get($requirementId) : null;
     if (!$req) return [false, 'Requirement not found.', 0];
-    if (strtoupper((string)$req['status']) !== 'AWARDED')
+    if (!in_array(strtoupper((string)$req['status']), ['AWARDED', 'CLOSED'], true))
         return [false, 'Record a booking only after the requirement is awarded.', 0];
     $subj = connect_engage_subject_for_award($req);
     if (!$subj) return [false, 'No awarded person to book.', 0];

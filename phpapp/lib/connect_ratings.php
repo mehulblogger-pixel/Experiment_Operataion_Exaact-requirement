@@ -27,6 +27,9 @@ function connect_ratings_migrate() {
         ensure_column('cx_ratings', 'payment_status', "VARCHAR(12) DEFAULT ''");   // ON_TIME|DELAYED|PARTIAL|UNPAID (PRO_TO_CLIENT)
         ensure_column('cx_ratings', 'hidden', 'INT DEFAULT 0');                     // set when a rating dispute is upheld → REMOVED
         ensure_column('cx_ratings', 'moderation_note', "VARCHAR(400) DEFAULT ''");  // a public annotation from an upheld dispute
+        // Owner, 10 Nov 2026 — a self-listed professional, kept apart from an
+        // internal inspector (ratee_inspector_id has carried both).
+        ensure_column('cx_ratings', 'ratee_professional_id', 'INT DEFAULT 0');
     }
 }
 
@@ -60,6 +63,26 @@ function cx_rating_add($requirementId, $direction, array $in) {
     if (!cx_rating_allowed($req)) return 0;
     if (cx_rating_exists($requirementId, $direction)) return 0;
 
+    //  WHO IS RATED. The screen sends only the stars and the comment, so ratings
+    //  were saved against nobody and never reached a profile, a reputation page or
+    //  the complaints desk. The people come from the award: the client is the one
+    //  who posted, the professional the one awarded.
+    $app = function_exists('cx_application_get') ? cx_application_get((int)($req['awarded_application_id'] ?? 0)) : null;
+    $client = (int)($req['poster_party_id'] ?? 0);
+    $proId = $app ? (int)($app['applicant_professional_id'] ?? 0) : 0;
+    $insId = $app ? (int)($app['inspector_id'] ?? 0) : 0;
+    if ($direction === 'CLIENT_TO_PRO') {
+        if (empty($in['application_id']) && $app) $in['application_id'] = (int)$app['id'];
+        if (empty($in['rater_party_id'])) $in['rater_party_id'] = $client;
+        //  ratee_inspector_id keeps its long-standing meaning for the readers that
+        //  use it (a professional's own id for a self-listed person); the new
+        //  ratee_professional_id says which kind of person it is.
+        if (empty($in['ratee_inspector_id'])) $in['ratee_inspector_id'] = $proId ?: $insId;
+        if (empty($in['ratee_professional_id'])) $in['ratee_professional_id'] = $proId;
+    } else {
+        if (empty($in['application_id']) && $app) $in['application_id'] = (int)$app['id'];
+        if (empty($in['ratee_party_id'])) $in['ratee_party_id'] = $client;
+    }
     $stars = max(1, min(5, (int)($in['stars'] ?? 0)));
     $clamp = fn($k) => max(0, min(5, (int)($in[$k] ?? 0)));
     // Payment behaviour is only meaningful when a professional rates a client.
@@ -74,7 +97,10 @@ function cx_rating_add($requirementId, $direction, array $in) {
                    $stars, $clamp('competency'), $clamp('communication'), $clamp('punctuality'), $clamp('professionalism'),
                    !empty($in['would_rehire']) ? 1 : 0, $pay, trim((string)($in['comment'] ?? '')),
                    function_exists('user_name') ? user_name(current_user()) : '', date('c')]);
-    return (int)db()->lastInsertId();
+    $newId = (int)db()->lastInsertId();
+    if ((int)($in['ratee_professional_id'] ?? 0) > 0)
+        db()->prepare("UPDATE cx_ratings SET ratee_professional_id=? WHERE id=?")->execute([(int)$in['ratee_professional_id'], $newId]);
+    return $newId;
 }
 
 function cx_ratings_for_requirement($requirementId) {

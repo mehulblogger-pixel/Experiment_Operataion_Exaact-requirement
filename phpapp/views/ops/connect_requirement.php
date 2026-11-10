@@ -70,7 +70,8 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
         <input type="hidden" name="id" value="<?= (int)$req['id'] ?>">
         <input type="hidden" name="action" value="req_transition">
         <input type="hidden" name="to" value="<?= e($to) ?>">
-        <button class="btn <?= in_array($to,['CANCELLED'],true)?'secondary':'' ?>" type="submit"><?= e($label[$to] ?? ucfirst(strtolower($to))) ?></button>
+        <?php $warnClose = $to === 'CLOSED' && strtoupper((string)$req['status']) === 'AWARDED' && empty($billable) && !(function_exists('connect_requirement_voucher_invoices') && connect_requirement_voucher_invoices((int)$req['id'])); ?>
+        <button class="btn <?= in_array($to,['CANCELLED'],true)?'secondary':'' ?>" type="submit"<?= $warnClose ? ' onclick="return confirm(\'Nothing has been billed for this job yet. Close it anyway? You can still bill it after closing.\')"' : '' ?>><?= e($label[$to] ?? ucfirst(strtolower($to))) ?></button>
       </form>
     <?php endforeach; ?>
   </div>
@@ -111,7 +112,11 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
   </details>
 </div>
 
-<?php if (strtoupper((string)$req['status']) === 'AWARDED'): ?>
+<?php //  Owner, 10 Nov 2026 — closing an awarded requirement used to remove its
+      //  billing for good. A finished, closed job is still billed.
+      $postAward = in_array(strtoupper((string)$req['status']), ['AWARDED', 'CLOSED'], true);
+      $vInv = function_exists('connect_requirement_voucher_invoices') ? connect_requirement_voucher_invoices((int)$req['id']) : 0;
+      if ($postAward): ?>
 <div class="panel" style="margin-top:12px">
   <h3 style="margin:0 0 6px">Billing</h3>
   <?php if ($billable): $bs = strtoupper((string)$billable['status']); ?>
@@ -121,8 +126,10 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
       <a href="/billable-events">Open the billable events board →</a>
     </p>
     <p class="cxmeta" style="margin:6px 0 0">Finance approves and attests the real invoice from there — the books ledger stays the single money truth.</p>
+  <?php elseif ($vInv > 0): ?>
+    <p class="cxmeta" style="margin:0">This job is billed through its approved vouchers — <?= (int)$vInv ?> invoice(s) drafted so far. "Send to billing" is not offered, so the same work is not charged twice.</p>
   <?php else: ?>
-    <p class="cxmeta" style="margin:0 0 10px">Turn this awarded engagement into a billable event — it flows into your existing invoicing chain (billable events → finance → invoice).</p>
+    <p class="cxmeta" style="margin:0 0 10px">Two ways to bill, use one: <b>send the whole booking to billing now</b> (below), or <b>approve the person's vouchers</b> as the work is done — each approved voucher drafts its own invoice. Whichever you use first is the one used.</p>
     <form method="post" action="/connect-requirement" class="inline">
       <input type="hidden" name="id" value="<?= (int)$req['id'] ?>">
       <input type="hidden" name="action" value="send_to_billing">
@@ -132,6 +139,7 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
 </div>
 
 <?php $deploy = $deploy ?? null; ?>
+<?php if (strtoupper((string)$req['status']) === 'AWARDED' || $deploy): ?>
 <div class="panel" style="margin-top:12px">
   <h3 style="margin:0 0 6px">Deployment</h3>
   <?php if ($deploy): $assigned = (int)($deploy['inspector_id'] ?? 0) > 0;
@@ -156,6 +164,7 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
     </form>
   <?php endif; ?>
 </div>
+<?php endif; ?>
 <?php endif; ?>
 
 <?php if ($matches): ?>
@@ -230,7 +239,7 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
   // K20 — Booking / engagement basis (man-days / months / deputation / continuous /
   // frequency). Shown once the requirement is awarded — the day is booked, on what basis?
   $engagement = $engagement ?? null; $engage_bases = $engage_bases ?? [];
-  $isAwarded = strtoupper((string)($req['status'] ?? '')) === 'AWARDED';
+  $isAwarded = in_array(strtoupper((string)($req['status'] ?? '')), ['AWARDED', 'CLOSED'], true);
   if ($isAwarded && $engage_bases):
     $eg = $engagement ?: [];
     $curBasis = strtoupper((string)($eg['basis'] ?? 'MAN_DAYS'));
@@ -489,10 +498,10 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
   <form method="post" action="/connect-requirement" style="margin-top:12px;border-top:1px solid var(--line,#eee);padding-top:12px">
     <input type="hidden" name="id" value="<?= (int)$req['id'] ?>">
     <input type="hidden" name="action" value="apply">
-    <label style="font-size:13px;font-weight:600">Record an application (from the professional pool)</label>
+    <label style="font-size:13px;font-weight:600">Put forward one of your own team</label>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
       <select name="inspector_id" style="flex:2;min-width:200px;padding:11px;border:1px solid var(--line,#dde3e2);border-radius:10px">
-        <option value="">— choose a professional —</option>
+        <option value="">— choose a team member —</option>
         <?php foreach ($inspectors as $i): ?><option value="<?= (int)$i['id'] ?>"><?= e($i['name']) ?></option><?php endforeach; ?>
       </select>
       <input type="number" name="proposed_rate" placeholder="Proposed ₹" style="flex:1;min-width:120px;padding:11px;border:1px solid var(--line,#dde3e2);border-radius:10px">

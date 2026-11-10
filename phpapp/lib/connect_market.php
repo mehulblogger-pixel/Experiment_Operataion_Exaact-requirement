@@ -318,14 +318,31 @@ function cx_application_transition($id, $to) {
 function cx_requirement_award($requirementId, $applicationId) {
     $r = cx_requirement_get($requirementId); $a = cx_application_get($applicationId);
     if (!$r || !$a || (int)$a['requirement_id'] !== (int)$r['id']) return false;
+    //  Owner, 10 Nov 2026 ("very very complex"): Award was hidden until a
+    //  separate "Start shortlisting" button had been pressed, and its error then
+    //  said "shortlist the application first". Awarding now walks the same legal
+    //  steps itself — an open requirement moves to shortlisting, an applicant to
+    //  shortlisted — so one press does what the person meant.
+    if (strtoupper((string)$r['status']) === 'OPEN') { cx_requirement_transition($requirementId, 'SHORTLISTING'); $r = cx_requirement_get($requirementId); }
     if (!cx_req_can_transition($r['status'], 'AWARDED')) return false;
     // Bring the chosen application to ACCEPTED via any legal path.
     $st = strtoupper((string)$a['status']);
+    if ($st === 'APPLIED') { cx_application_transition($applicationId, 'SHORTLISTED'); $st = 'SHORTLISTED'; }
     if ($st === 'SHORTLISTED') { cx_application_transition($applicationId, 'OFFERED'); $st = 'OFFERED'; }
     if ($st === 'OFFERED') cx_application_transition($applicationId, 'ACCEPTED');
     if (strtoupper((string)cx_application_get($applicationId)['status']) !== 'ACCEPTED') return false;
     db()->prepare("UPDATE cx_requirements SET status='AWARDED', awarded_application_id=?, updated_at=? WHERE id=?")
         ->execute([(int)$applicationId, date('c'), (int)$requirementId]);
+    //  The other applicants are told the place is filled, instead of waiting at
+    //  "Applied" for ever: each still-open application is closed as not selected.
+    foreach (cx_applications_for($requirementId) as $o) {
+        if ((int)$o['id'] === (int)$applicationId) continue;
+        if (in_array(strtoupper((string)$o['status']), ['APPLIED', 'SHORTLISTED', 'OFFERED'], true)) {
+            $to = strtoupper((string)$o['status']) === 'OFFERED' ? 'WITHDRAWN' : 'REJECTED';
+            cx_application_transition((int)$o['id'], $to);
+        }
+    }
+    if (function_exists('act_log')) try { act_log('CX_REQUIREMENT', (int)$requirementId, 'UPDATE', 'Awarded to ' . ($a['applicant_name'] ?? ('application #' . (int)$applicationId)) . '; other open applications closed as not selected'); } catch (Throwable $e) {}
     return true;
 }
 
@@ -481,9 +498,16 @@ function ops_connect_requirement($method) {
             $newId = cx_application_add($id, $_POST);
             flash($newId ? 'Application recorded.' : 'That professional has already applied to this requirement.', $newId ? 'success' : 'error');
         } elseif ($act === 'app_transition') {
-            cx_application_transition((int)($_POST['application_id'] ?? 0), $_POST['to'] ?? '') ? flash('Application updated.') : flash('That change is not allowed from the current status.', 'error');
+            $okT = cx_application_transition((int)($_POST['application_id'] ?? 0), $_POST['to'] ?? '');
+            //  Shortlisting someone means shortlisting has started — the
+            //  requirement follows, instead of needing its own button.
+            if ($okT && strtoupper((string)($_POST['to'] ?? '')) === 'SHORTLISTED' && strtoupper((string)(cx_requirement_get($id)['status'] ?? '')) === 'OPEN')
+                cx_requirement_transition($id, 'SHORTLISTING');
+            $okT ? flash('Application updated.') : flash('That change is not allowed from the current status.', 'error');
         } elseif ($act === 'award') {
-            cx_requirement_award($id, (int)($_POST['application_id'] ?? 0)) ? flash('Requirement awarded.') : flash('Could not award — shortlist the application first.', 'error');
+            cx_requirement_award($id, (int)($_POST['application_id'] ?? 0))
+                ? flash('Awarded. Next: record the booking below, then send it to billing or approve the vouchers.')
+                : flash('Could not award — this requirement is not open for awarding (it is ' . strtolower((string)(cx_requirement_get($id)['status'] ?? '')) . '), or that application was withdrawn or rejected.', 'error');
         } elseif ($act === 'rate' && function_exists('cx_rating_add')) {   // K9 — two-way rating
             $newId = cx_rating_add($id, (string)($_POST['direction'] ?? ''), $_POST);
             flash($newId ? 'Rating recorded.' : 'That rating could not be saved (already rated, or the engagement is not complete).', $newId ? 'success' : 'error');

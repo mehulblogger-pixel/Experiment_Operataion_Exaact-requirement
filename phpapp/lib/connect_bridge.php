@@ -42,7 +42,12 @@ function connect_bridge_unit($workType) {
 function connect_engagement_billable($requirementId) {
     if (!function_exists('billable_event_upsert') || !function_exists('cx_requirement_get')) return 0;
     $req = cx_requirement_get($requirementId);
-    if (!$req || strtoupper((string)$req['status']) !== 'AWARDED') return 0;
+    //  Owner, 10 Nov 2026 — closing an awarded requirement used to make billing
+    //  impossible. A finished job is billed after it is closed, too.
+    if (!$req || !in_array(strtoupper((string)$req['status']), ['AWARDED', 'CLOSED'], true)) return 0;
+    //  ONE way to bill a requirement. Once its vouchers have produced invoices,
+    //  "Send to billing" would charge the same work twice.
+    if (connect_requirement_voucher_invoices((int)$req['id']) > 0) return 0;
     // A CREW requirement (M10) bills the whole position manifest; a single-role
     // requirement bills the winning bid × positions.
     if (function_exists('cx_is_crew') && cx_is_crew((int)$req['id'])) {
@@ -61,8 +66,26 @@ function connect_engagement_billable($requirementId) {
     }
     $app = function_exists('cx_application_get') ? cx_application_get((int)($req['awarded_application_id'] ?? 0)) : null;
     $rate = connect_bridge_rate($req, $app ?: []);
-    if ($rate <= 0) return 0;
     $positions = max(1, (int)($req['positions'] ?? 1));
+    //  The booking says how much was bought (so many days or months at a rate);
+    //  billing used to charge one day per position whatever was booked.
+    $eng = function_exists('connect_engage_for_requirement') ? connect_engage_for_requirement((int)$req['id']) : null;
+    if ($eng && (float)$eng['quantity'] > 0 && strtoupper((string)$eng['status']) !== 'CANCELLED') {
+        $bRate = (float)$eng['rate'] > 0 ? (float)$eng['rate'] : $rate;
+        if ($bRate <= 0) return 0;
+        $qty = round((float)$eng['quantity'] * $positions, 2);
+        return billable_event_upsert('connect', 'MARKETPLACE_AWARD', (int)$req['id'], [
+            'party_id'        => (int)($req['poster_party_id'] ?? 0),
+            'contract_number' => (string)($req['ref_code'] ?? ''),
+            'service_type'    => trim((string)($req['title'] ?? 'Marketplace engagement')),
+            'qty'             => $qty,
+            'unit'            => (string)($eng['rate_unit'] ?: 'day'),
+            'rate'            => $bRate,
+            'amount'          => round($qty * $bRate, 2),
+            'calc_rule'       => 'Marketplace booking ' . (string)($req['ref_code'] ?? '') . ' — ' . rtrim(rtrim(number_format((float)$eng['quantity'], 2), '0'), '.') . ' ' . ($eng['rate_unit'] ?: 'day') . '(s) × ' . $positions . ' position(s) (finance attests the invoice)',
+        ]);
+    }
+    if ($rate <= 0) return 0;
     $amount = round($positions * $rate, 2);
     return billable_event_upsert('connect', 'MARKETPLACE_AWARD', (int)$req['id'], [
         'party_id'        => (int)($req['poster_party_id'] ?? 0),
@@ -76,6 +99,13 @@ function connect_engagement_billable($requirementId) {
     ]);
 }
 
+/** How many invoices this requirement's vouchers have already produced. */
+function connect_requirement_voucher_invoices($requirementId) {
+    try {
+        return (int)ops_val("SELECT COUNT(*) FROM invoices i JOIN cx_engagement_vouchers v ON v.id=i.voucher_id
+                              JOIN cx_engagements e ON e.id=v.engagement_id WHERE e.requirement_id=?", [(int)$requirementId]);
+    } catch (Throwable $e) { return 0; }
+}
 /** The billable-event row for a requirement's engagement, or null. */
 function connect_engagement_billable_row($requirementId) {
     try { return ops_one("SELECT * FROM billable_events WHERE source_module='connect' AND source_kind='MARKETPLACE_AWARD' AND source_id=?", [(int)$requirementId]) ?: null; }
@@ -107,6 +137,9 @@ function connect_voucher_invoice($voucherId) {
         $req = ($eng && function_exists('cx_requirement_get')) ? cx_requirement_get((int)($eng['requirement_id'] ?? 0)) : null;
         $party = (int)($eng['poster_party_id'] ?? ($req['poster_party_id'] ?? 0));
         if ($party <= 0) return 0;                       // no client to bill
+        //  ONE way to bill a requirement: once "Send to billing" has put the
+        //  engagement in front of finance, its vouchers do not draft a second invoice.
+        if ($req && connect_engagement_billable_row((int)$req['id'])) return 0;
 
         $fee   = round((float)($v['fee_total'] ?? 0), 2);
         $reimb = round((float)($v['reimb_total'] ?? 0), 2);

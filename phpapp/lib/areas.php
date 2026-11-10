@@ -46,34 +46,44 @@ function ops_area_def($area) {
             // viewer is coordinator/master (connect_market_can). One integrated
             // area, cleanly optional.
             $title = 'Marketplace'; $icon = '🧑‍🏭';
-            $sub = 'Post technical-manpower requirements, match and shortlist professionals, and their public passports.';
-            $routes = ['connect-requirements','connect-requirement','connect-concierge','connect-talent','connect-orgs','passport-share','connect-taxonomy','connect-qualifications','connect-verify','connect-messages','connect-channels','connect-bench','connect-analytics'];
+            //  Owner, 10 Nov 2026 — "Marketplace seems ... not understood and very
+            //  very complex". The fourteen tiles sat in one list, daily work mixed
+            //  with one-time setup and back-office desks. They are now grouped by
+            //  what the person is trying to do, and the page says how it works.
+            $sub = 'When you have no one free for a job: 1 · post what you need → 2 · people apply, or you invite them → 3 · shortlist and award → 4 · record the booking → 5 · they work, you approve their vouchers, bill the client and rate them.';
+            $routes = ['connect-requirements','connect-requirement','connect-concierge','connect-talent','connect-orgs','passport-share','connect-taxonomy','connect-taxonomy-admin','connect-qualifications','connect-verify','connect-messages','connect-channels','connect-bench','connect-analytics','rating-disputes','access-requests','connect-identity','connect-source','connect-capabilities'];
             $on = $fx('connect_market_can') && connect_market_can();
             if ($on) {
-                $sec('');
-                $t(true, '📋', 'Requirements', '/connect-requirements', 'Post a manpower requirement and manage who applies.',
+                $sec('Hire people');
+                $t(true, '📋', 'Marketplace requirements', '/connect-requirements', 'Post what you need and follow each one from open to awarded and billed.',
                     $num(fn() => $fx('cx_market_summary') ? (cx_market_summary()['open'] ?? 0) : 0), 'green');
-                $t(true, '💬', 'Guided post', '/connect-concierge', 'Build a requirement by answering a few questions.');
-                $t(true, '🔎', 'Talent search', '/connect-talent', 'Search the shared pool of self-listed professionals.',
+                $t(true, '💬', 'Guided post', '/connect-concierge', 'Not sure what to write? Answer five questions and it is posted for you.');
+                $t(true, '🔎', 'Find professionals', '/connect-talent', 'Search the people who listed themselves, and invite them to a requirement.',
                     $num(fn() => $fx('connect_pro_pool_count') ? connect_pro_pool_count() : 0));
-                $t(true, '🪪', 'Passports', '/passport-share', 'A professional\'s public, verifiable credential page.');
-                $t(true, '🏭', 'Industry taxonomy', '/connect-taxonomy', 'Sectors, equipment, materials, disciplines, standards, certifications.');
-                $t(true, '🎓', 'Qualification taxonomy', '/connect-qualifications', 'ITI → diploma → engineer → MBA ladder, job families, roles and certifications.');
-                $t(true, '✅', 'Verification desk', '/connect-verify', 'Confirm identity & credential checks; move professionals up the trust ladder.',
-                    $num(fn() => $fx('connect_verify_pending_count') ? connect_verify_pending_count() : 0), 'amber');
-                $t(true, '⚖️', 'Rating-integrity desk', '/rating-disputes', 'Investigate reported ratings; uphold, annotate or remove them from scores.',
-                    $num(fn() => $fx('cx_rating_disputes_open_count') ? cx_rating_disputes_open_count() : 0), 'amber');
-                $t(true, '💬', 'Messages', '/connect-messages', 'Two-way chat with applicants, tied to each requirement.',
+                $t(true, '✉️', 'Messages', '/connect-messages', 'Chat with applicants, one thread per requirement.',
                     $num(fn() => $fx('connect_msg_staff_unread') ? connect_msg_staff_unread() : 0));
-                $t(true, '📲', 'Channels', '/connect-channels', 'WhatsApp / SMS / email alerts, templates and delivery log.');
-                $t(true, '🏗️', 'Agency bench', '/connect-bench', 'An agency\'s own private roster — add people and allocate them to jobs.');
-                $t(true, '📊', 'Market analytics', '/connect-analytics', 'Supply vs demand, fill funnel, time-to-award, rate benchmarks, pool growth.');
-                $t(is_master(), '🏢', 'Organisations', '/connect-orgs', 'Register organisations and their module entitlements (TPIA / agency / company).',
-                    $num(fn() => $fx('connect_org_pending_count') ? connect_org_pending_count() : 0), 'amber');
-                //  Batch 3 · Q26 — a public sign-up for a company we already hold creates
-                //  nothing and tells the person nothing. It lands here instead, for a human.
-                $t(is_master(), '🔑', 'Access requests', '/access-requests', 'People who signed up for a company we already work with — decide, then invite them the usual way.',
+
+                $sec('Your people and partners');
+                $t(true, '🏗️', 'Agency bench', '/connect-bench', 'People an agency keeps ready for you — allocate them to a requirement.');
+                $t(true, '🪪', 'Team passports', '/passport-share', 'A shareable, verifiable credential page for each of your own team members.');
+
+                $sec('Checks and trust');
+                $t(true, '✅', 'Verification desk', '/connect-verify', 'Check the certificates and identity people upload, then verify or reject.',
+                    $num(fn() => $fx('connect_verify_pending_count') ? connect_verify_pending_count() : 0), 'amber');
+                $t(true, '⚖️', 'Rating complaints', '/rating-disputes', 'Ratings someone says are unfair — look into them and decide.',
+                    $num(fn() => $fx('cx_rating_disputes_open_count') ? cx_rating_disputes_open_count() : 0), 'amber');
+                $t(is_master(), '🔑', 'Access requests', '/access-requests', 'People who signed up for a company you already work with — decide, then invite them the usual way.',
                     $num(fn() => $fx('connect_access_requests_count') ? connect_access_requests_count() : 0), 'amber');
+
+                $sec('Set up (once)');
+                $t(true, '🏭', 'Industry lists', '/connect-taxonomy', 'Sectors, equipment, materials, disciplines, standards and certifications people choose from.');
+                $t(true, '🎓', 'Qualifications and roles', '/connect-qualifications', 'The ITI → diploma → engineer ladder, job families and roles.');
+                $t(true, '📲', 'Alerts (WhatsApp / SMS / e-mail)', '/connect-channels', 'What message goes out when, and the log of what was sent.');
+                $t(is_master(), '🏢', 'Organisations', '/connect-orgs', 'Companies and agencies on the marketplace, and what each may do.',
+                    $num(fn() => $fx('connect_org_pending_count') ? connect_org_pending_count() : 0), 'amber');
+
+                $sec('Insight');
+                $t(true, '📊', 'Market figures', '/connect-analytics', 'Requirements vs people, how fast jobs are filled, rates paid.');
             }
             break;
         case 'sales':
