@@ -1228,7 +1228,7 @@ function portal_route($route, $method) {
                     $src = function_exists('cx_requirement_get') ? cx_requirement_get((int)($_POST['id'] ?? 0)) : null;
                     if ($src && (int)$src['poster_party_id'] === (int)$party) {
                         $nid = connect_requirement_duplicate((int)$src['id'], $party); // new DRAFT
-                        portal_flash_set($nid ? 'Duplicated as a draft — edit and post it below.' : 'Could not duplicate.', $nid ? 'ok' : 'err');
+                        portal_flash_set($nid ? 'Duplicated as a draft with the same details — post it when it is right.' : 'Could not duplicate.', $nid ? 'ok' : 'err');
                     } else portal_flash_set('That requirement is not yours.', 'err');
                     redirect('/portal/hire');
                 } elseif ($act === 'save_template' && function_exists('connect_reqtemplate_save_from_requirement')) {

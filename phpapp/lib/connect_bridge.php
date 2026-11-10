@@ -26,6 +26,7 @@ function connect_bridge_rate($req, $awardedApp) {
 function connect_bridge_unit($workType) {
     switch (strtolower((string)$workType)) {
         case 'per_visit':   return 'visit';
+        case 'remote_review': return 'review';
         case 'day_rate':
         case 'manday':
         case 'shutdown':

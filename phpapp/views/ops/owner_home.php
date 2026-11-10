@@ -104,6 +104,7 @@ $app = function_exists('app_name') ? app_name() : 'your platform';
         <?php endif; ?>
       </div>
     <?php endforeach; ?>
+    <?php if (!isset($mods['connect'])): ?>
     <div class="oh-row">
       <span class="oh-txt"><b>🧑‍🏭 Marketplace</b><p>The technical-manpower marketplace — post requirements, search and match professionals. Turn this on to show it in your left-hand menu.</p></span>
       <label class="oh-sw">
@@ -111,6 +112,7 @@ $app = function_exists('app_name') ? app_name() : 'your platform';
         <span class="tr"></span>
       </label>
     </div>
+    <?php endif; ?>
     <div style="display:flex;align-items:center;gap:12px;margin-top:14px">
       <button class="btn" type="submit">Save changes</button>
       <span class="sub" style="font-size:12.5px">Turning something off just hides it from the menu — your data stays safe and comes back when you turn it on again.</span>

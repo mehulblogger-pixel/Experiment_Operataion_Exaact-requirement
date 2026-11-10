@@ -111,6 +111,10 @@ const ACT_ENTITIES = [
     // note with a dangling id, absent from every timeline. One registration
     // fixes the whole trail; no second audit engine is involved.
     'IDENTITY_LINK'     => ['Identity link',        '/connect-identity'],
+    // Owner, 10 Nov 2026 — the Marketplace's award, its corrections and the
+    // verification desk opening a person's document are put on the same spine.
+    'CX_REQUIREMENT'    => ['Marketplace requirement', '/connect-requirement?id='],
+    'CX_PROFESSIONAL'   => ['Marketplace professional', '/connect-verify'],
 ];
 
 // A constant cannot call T(), so the two entries that name a business noun are

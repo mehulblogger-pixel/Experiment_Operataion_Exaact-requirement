@@ -75,6 +75,10 @@
           <?php if (!empty($row['ref_masked'])): ?><div class="vq-ref"><?= e($row['ref_masked']) ?></div><?php endif; ?>
           <?php if (!empty($row['result_note'])): ?><div class="vq-sub"><?= e($row['result_note']) ?></div><?php endif; ?>
           <?php if (!empty($row['evidence'])): ?><div class="vq-sub">📎 <?= e($row['evidence']) ?></div><?php endif; ?>
+          <?php foreach ((array)($row['files'] ?? []) as $vf): ?>
+            <div class="vq-sub"><a href="/connect-verify?file=<?= (int)$vf['id'] ?>&amp;pro=<?= (int)$row['subject_id'] ?>" target="_blank" rel="noopener">📄 Open <?= e($vf['file_name']) ?></a> <span class="muted">(<?= e(strtolower((string)$vf['kind'])) ?>)</span></div>
+          <?php endforeach; ?>
+          <?php if (($row['subject_kind'] ?? '') === 'professional' && empty($row['files'])): ?><div class="vq-sub muted">No document uploaded — ask for one before verifying.</div><?php endif; ?>
         </div>
         <div class="vq-act">
           <form method="post" action="/connect-verify">

@@ -76,6 +76,9 @@ function ops_connect_concierge($method) {
         'rate_max' => (float)($_POST['rate_max'] ?? 0),
         'rate_unit' => (string)($_POST['rate_unit'] ?? ''),
         'description' => trim((string)($_POST['description'] ?? '')),
+        //  Owner, 10 Nov 2026 — a guided post had no client, so nothing it led
+        //  to could ever be invoiced. Who it is for is now asked on the first step.
+        'poster_party_id' => (int)($_POST['poster_party_id'] ?? 0),
     ];
 
     if ($method === 'POST') {
@@ -102,6 +105,7 @@ function ops_connect_concierge($method) {
         'disciplines' => function_exists('connect_tx_rows') ? connect_tx_rows('cx_disciplines') : [],
         'sectors'     => function_exists('connect_tx_rows') ? connect_tx_rows('cx_sectors') : [],
         'certs'       => connect_concierge_suggest_certs($data['discipline_code']),
+        'partners'    => ops_all("SELECT id, COALESCE(NULLIF(display_name,''), legal_name) AS nm FROM business_partners WHERE COALESCE(status,'ACTIVE')='ACTIVE' AND COALESCE(is_client,0)=1 ORDER BY nm") ?: [],
     ]);
     return true;
 }

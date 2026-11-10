@@ -305,7 +305,12 @@ function connect_verify_pending($limit = 100) {
         $st->execute();
         $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
     } catch (Throwable $e) { return []; }
-    foreach ($rows as &$r) $r['subject_name'] = connect_verify_subject_name($r['subject_kind'], (int)$r['subject_id']);
+    foreach ($rows as &$r) {
+        $r['subject_name'] = connect_verify_subject_name($r['subject_kind'], (int)$r['subject_id']);
+        //  The documents this person uploaded, so the checker can open them.
+        $r['files'] = ($r['subject_kind'] === 'professional' && function_exists('connect_pro_files'))
+            ? array_values(array_filter(connect_pro_files((int)$r['subject_id']), fn($f) => strtoupper((string)$f['kind']) !== 'AVATAR')) : [];
+    }
     return $rows;
 }
 function connect_verify_pending_count() {
@@ -328,6 +333,23 @@ function ops_connect_verify($method) {
     ops_require(connect_verify_can(),
         'The verification desk is available to coordinators, managers and admins.');
     connect_verify_migrate();
+
+    //  Owner, 10 Nov 2026 — the desk approved certificates it could not open.
+    //  A file a professional uploaded can be viewed here, by the same people who
+    //  decide on it, and only while that person has a check on the desk.
+    if ($method === 'GET' && !empty($_GET['file'])) {
+        $proId = (int)($_GET['pro'] ?? 0);
+        $onDesk = (int)ops_val("SELECT COUNT(*) FROM cx_verifications WHERE subject_kind='professional' AND subject_id=?", [$proId]) > 0;
+        $f = ($onDesk && function_exists('connect_pro_file_row')) ? connect_pro_file_row((int)$_GET['file'], $proId) : null;
+        if (!$f) { http_response_code(404); echo 'File not found.'; return true; }
+        if (function_exists('act_log')) try { act_log('CX_PROFESSIONAL', $proId, 'SYSTEM', 'Verification desk opened ' . $f['file_name']); } catch (Throwable $e) {}
+        $mime = preg_match('~^(application/pdf|image/(png|jpe?g|gif|webp))$~i', (string)$f['mime']) ? $f['mime'] : 'application/octet-stream';
+        header('Content-Type: ' . $mime);
+        header('Content-Disposition: ' . ($mime === 'application/octet-stream' ? 'attachment' : 'inline') . '; filename="' . preg_replace('/[^A-Za-z0-9._-]/', '_', (string)$f['file_name']) . '"');
+        header('X-Content-Type-Options: nosniff');
+        echo base64_decode((string)$f['file_data']);
+        return true;
+    }
 
     if ($method === 'POST') {
         $act = (string)($_POST['action'] ?? '');

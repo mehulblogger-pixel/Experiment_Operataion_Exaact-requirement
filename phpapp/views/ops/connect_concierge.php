@@ -39,6 +39,7 @@ foreach ($sectors as $s) if (($s['code'] ?? '') === $data['sector_code']) $secNa
 </style>
 
 <div class="cwrap">
+  <h1 style="margin:0 0 10px;font-size:22px">Post a requirement — guided</h1>
   <div class="cbar"><?php for ($i = 1; $i <= $total; $i++): ?><div class="<?= $i <= $step ? 'on' : '' ?>"></div><?php endfor; ?></div>
   <div class="csub">Step <?= (int)$step ?> of <?= (int)$total ?></div>
 
@@ -46,10 +47,14 @@ foreach ($sectors as $s) if (($s['code'] ?? '') === $data['sector_code']) $secNa
     <input type="hidden" name="step" value="<?= (int)$step ?>">
 
     <?php if ($step === 1): ?>
-      <?= $hidden(['title','discipline_code']) ?>
+      <?= $hidden(['title','discipline_code','poster_party_id']) ?>
       <p class="cq">What do you need?</p>
       <p class="csub">One line — like you'd text a colleague.</p>
       <input class="cfield" name="title" value="<?= e($data['title']) ?>" autofocus placeholder="e.g. Welding inspector for a pressure-vessel FAT at Dahej">
+      <p class="clab">Who is it for? <span style="font-weight:400;color:var(--muted,#777)">— the client you will bill; leave blank for your own work</span></p>
+      <select class="cfield" name="poster_party_id"><option value="0">— our own work —</option>
+        <?php foreach (($partners ?? []) as $pp): ?><option value="<?= (int)$pp['id'] ?>" <?= (int)$data['poster_party_id'] === (int)$pp['id'] ? 'selected' : '' ?>><?= e($pp['nm']) ?></option><?php endforeach; ?>
+      </select>
       <p class="clab">Discipline</p>
       <div class="cchips">
         <?php foreach ($disciplines as $d): $sel = ($d['code'] ?? '') === $data['discipline_code']; ?>
@@ -72,7 +77,7 @@ foreach ($sectors as $s) if (($s['code'] ?? '') === $data['sector_code']) $secNa
       </div>
       <p class="clab">Work type</p>
       <div class="cchips">
-        <?php foreach (['per_visit'=>'Per visit','day_rate'=>'Day rate','short_project'=>'Short project','long_deployment'=>'Long deployment','shutdown'=>'Shutdown'] as $k=>$v): $sel=$data['work_type']===$k; ?>
+        <?php foreach ((function_exists('cx_pro_work_types') ? cx_pro_work_types() : ['per_visit' => 'Per visit']) as $k=>$v): $sel=$data['work_type']===$k; ?>
           <label class="cchip <?= $sel?'sel':'' ?>"><input type="radio" name="work_type" value="<?= $k ?>" <?= $sel?'checked':'' ?>><?= e($v) ?></label>
         <?php endforeach; ?>
       </div>

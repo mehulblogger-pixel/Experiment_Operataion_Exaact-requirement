@@ -260,6 +260,40 @@ function cx_requirement_create(array $in, $post = false) {
 
 function cx_requirement_get($id) { return ops_one("SELECT * FROM cx_requirements WHERE id=?", [(int)$id]) ?: null; }
 
+//  Owner, 10 Nov 2026 — a posted requirement could not be corrected: a typo
+//  meant duplicating it and cancelling the original. Its details may now be
+//  changed while it is a draft, open or being shortlisted — before anybody has
+//  been awarded on the strength of them. Returns [ok, message].
+function cx_requirement_update($id, array $in) {
+    $r = cx_requirement_get($id);
+    if (!$r) return [false, 'Requirement not found.'];
+    if (!in_array(strtoupper((string)$r['status']), ['DRAFT', 'OPEN', 'SHORTLISTING'], true))
+        return [false, 'Only a requirement that is not yet awarded can be changed.'];
+    $title = trim((string)($in['title'] ?? ''));
+    if ($title === '') return [false, 'A requirement needs a title.'];
+    $f = [
+        'title' => mb_substr($title, 0, 200),
+        'poster_party_id' => (int)($in['poster_party_id'] ?? $r['poster_party_id']),
+        'location' => mb_substr(trim((string)($in['location'] ?? '')), 0, 160),
+        //  Only a kind of work from the one list (or the one it already had).
+        'work_type' => (function_exists('cx_pro_work_types') && isset(cx_pro_work_types()[(string)($in['work_type'] ?? '')]))
+            ? (string)$in['work_type'] : (string)$r['work_type'],
+        'start_date' => (string)($in['start_date'] ?? ''), 'end_date' => (string)($in['end_date'] ?? ''),
+        'positions' => max(1, (int)($in['positions'] ?? 1)),
+        'rate_min' => max(0, (float)($in['rate_min'] ?? 0)), 'rate_max' => max(0, (float)($in['rate_max'] ?? 0)),
+        'rate_unit' => (string)($in['rate_unit'] ?? $r['rate_unit']),
+        'description' => trim((string)($in['description'] ?? '')),
+    ];
+    if ($f['rate_max'] > 0 && $f['rate_min'] > $f['rate_max']) return [false, 'The lowest rate is above the highest.'];
+    if ($f['end_date'] !== '' && $f['start_date'] !== '' && $f['end_date'] < $f['start_date']) return [false, 'The end date is before the start.'];
+    $set = implode(', ', array_map(fn($k) => "$k=?", array_keys($f)));
+    db()->prepare("UPDATE cx_requirements SET $set, updated_at=? WHERE id=?")->execute(array_merge(array_values($f), [date('c'), (int)$id]));
+    $changed = [];
+    foreach ($f as $k => $v) if ((string)$v !== (string)($r[$k] ?? '')) $changed[] = $k;
+    if (function_exists('act_log') && $changed) try { act_log('CX_REQUIREMENT', (int)$id, 'SYSTEM', 'Details changed: ' . implode(', ', $changed)); } catch (Throwable $e) {}
+    return [true, $changed ? 'Requirement updated.' : 'Nothing was changed.'];
+}
+
 /** Move a requirement to a new status if the transition is legal. */
 function cx_requirement_transition($id, $to) {
     $r = cx_requirement_get($id); if (!$r) return false;
@@ -342,7 +376,7 @@ function cx_requirement_award($requirementId, $applicationId) {
             cx_application_transition((int)$o['id'], $to);
         }
     }
-    if (function_exists('act_log')) try { act_log('CX_REQUIREMENT', (int)$requirementId, 'UPDATE', 'Awarded to ' . ($a['applicant_name'] ?? ('application #' . (int)$applicationId)) . '; other open applications closed as not selected'); } catch (Throwable $e) {}
+    if (function_exists('act_log')) try { act_log('CX_REQUIREMENT', (int)$requirementId, 'SYSTEM', 'Awarded to ' . ($a['applicant_name'] ?? ('application #' . (int)$applicationId)) . '; other open applications closed as not selected'); } catch (Throwable $e) {}
     return true;
 }
 
@@ -492,7 +526,10 @@ function ops_connect_requirement($method) {
     $id = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
     if ($method === 'POST') {
         $act = (string)($_POST['action'] ?? '');
-        if ($act === 'req_transition') {
+        if ($act === 'req_edit') {
+            [$eok, $emsg] = cx_requirement_update($id, $_POST);
+            flash($eok ? $emsg . (cx_applications_for($id) ? ' People who already applied see the new details.' : '') : $emsg, $eok ? 'success' : 'error');
+        } elseif ($act === 'req_transition') {
             cx_requirement_transition($id, $_POST['to'] ?? '') ? flash('Requirement updated.') : flash('That change is not allowed from the current status.', 'error');
         } elseif ($act === 'apply') {
             $newId = cx_application_add($id, $_POST);

@@ -66,21 +66,21 @@ function connect_channels_migrate() {
 function connect_channels_default_templates() {
     return [
         // key, channel, title, body
-        ['new_message', 'whatsapp', 'New message', 'Hi {name}, the hiring desk sent you a message about "{job}". Open ITSN to reply: {link}'],
-        ['new_message', 'sms',      'New message', 'ITSN: new message about {job}. Reply in the app: {link}'],
-        ['new_message', 'email',    'New message', "Hi {name},\n\nYou have a new message about \"{job}\".\nReply here: {link}\n\n— ITSN"],
+        ['new_message', 'whatsapp', 'New message', 'Hi {name}, the hiring desk sent you a message about "{job}". Open {company} to reply: {link}'],
+        ['new_message', 'sms',      'New message', '{company}: new message about {job}. Reply in the app: {link}'],
+        ['new_message', 'email',    'New message', "Hi {name},\n\nYou have a new message about \"{job}\".\nReply here: {link}\n\n— {company}"],
 
         ['shortlisted', 'whatsapp', 'Shortlisted', 'Good news {name}! You have been shortlisted for "{job}" ({ref}). Details: {link}'],
-        ['shortlisted', 'sms',      'Shortlisted', 'ITSN: you are shortlisted for {job} ({ref}). {link}'],
-        ['shortlisted', 'email',    'Shortlisted', "Hi {name},\n\nYou have been shortlisted for \"{job}\" ({ref}).\n{link}\n\n— ITSN"],
+        ['shortlisted', 'sms',      'Shortlisted', '{company}: you are shortlisted for {job} ({ref}). {link}'],
+        ['shortlisted', 'email',    'Shortlisted', "Hi {name},\n\nYou have been shortlisted for \"{job}\" ({ref}).\n{link}\n\n— {company}"],
 
         ['awarded',     'whatsapp', 'You are hired', 'Congratulations {name}! You have been awarded "{job}" ({ref}) by {poster}. Next steps: {link}'],
-        ['awarded',     'sms',      'You are hired', 'ITSN: you are hired for {job} ({ref}). Open the app: {link}'],
-        ['awarded',     'email',    'You are hired', "Hi {name},\n\nYou have been awarded \"{job}\" ({ref}) by {poster}.\nNext steps: {link}\n\n— ITSN"],
+        ['awarded',     'sms',      'You are hired', '{company}: you are hired for {job} ({ref}). Open the app: {link}'],
+        ['awarded',     'email',    'You are hired', "Hi {name},\n\nYou have been awarded \"{job}\" ({ref}) by {poster}.\nNext steps: {link}\n\n— {company}"],
 
         ['job_match',   'whatsapp', 'New job for you', 'Hi {name}, a new job matches your skills: "{job}" in {location}. Apply: {link}'],
-        ['job_match',   'sms',      'New job for you', 'ITSN: new job {job} in {location}. Apply: {link}'],
-        ['job_match',   'email',    'New job for you', "Hi {name},\n\nA new job matches your skills: \"{job}\" in {location}.\nApply: {link}\n\n— ITSN"],
+        ['job_match',   'sms',      'New job for you', '{company}: new job {job} in {location}. Apply: {link}'],
+        ['job_match',   'email',    'New job for you', "Hi {name},\n\nA new job matches your skills: \"{job}\" in {location}.\nApply: {link}\n\n— {company}"],
     ];
 }
 
@@ -103,7 +103,12 @@ function connect_channel_template($tkey, $channel) {
 
 /** Render a template body with {placeholders} from $params. */
 function connect_channel_render($body, array $params) {
-    $out = (string)$body;
+    //  Owner, 10 Nov 2026 — the starting templates were signed with another
+    //  product's name ("ITSN"). Messages go out under the company's own name:
+    //  {company} in a template, and that old name in templates already saved.
+    $co = function_exists('doc_identity') ? (doc_identity()['name'] ?? '') : (function_exists('app_name') ? app_name() : '');
+    if (!isset($params['company'])) $params['company'] = $co;
+    $out = str_replace('ITSN', (string)$params['company'], (string)$body);
     foreach ($params as $k => $v) $out = str_replace('{' . $k . '}', (string)$v, $out);
     // Drop any placeholder left unfilled.
     $out = preg_replace('/\{[a-z0-9_]+\}/i', '', $out);

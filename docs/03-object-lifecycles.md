@@ -613,6 +613,23 @@ no existing object touched.
 - `AWARDED → CLOSED`
 - Terminal: `CLOSED`, `CANCELLED`, `EXPIRED`. Transitions are enforced by
   `cx_req_can_transition()`; an illegal move is refused, not applied.
+- *Owner, 10 Nov 2026 ("very very complex") — no status or transition added:*
+  **Award** on an `OPEN` requirement first takes the existing `OPEN → SHORTLISTING`
+  step itself, and shortlisting an applicant on an `OPEN` requirement does the same,
+  so the separate "Start shortlisting" press is no longer needed. On award, every
+  other application still `APPLIED` or `SHORTLISTED` is moved to `REJECTED` and
+  any `OFFERED` one to `WITHDRAWN` (existing transitions), and the award is written
+  to the activity timeline (`CX_REQUIREMENT`).
+- *Corrections:* the details (title, client, place, work type, dates, positions,
+  rates, description) may be changed while the requirement is `DRAFT`, `OPEN` or
+  `SHORTLISTING` (`cx_requirement_update`, logged); the status does not change.
+  Once `AWARDED` the details are fixed.
+- *Booking and billing after closing:* the booking (`cx_engagements`) may be
+  recorded, and "Send to billing" used, while the requirement is `AWARDED` **or**
+  `CLOSED`. Billing uses the booked quantity × positions at the booking rate when a
+  booking exists. A requirement is billed **one way only**: once its engagement
+  vouchers have produced invoices, "Send to billing" is refused, and a voucher does
+  not produce an invoice when the requirement already has a billable event.
 
 ## Connect Application (`cx_applications.status`) — marketplace (K2a)
 

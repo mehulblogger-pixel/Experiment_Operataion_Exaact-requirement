@@ -48,10 +48,13 @@
   <?php if ($canManage): ?>
     <form method="post" action="/connect-channels" style="display:inline">
       <input type="hidden" name="action" value="mode">
-      <?php foreach (['off' => 'Off (record only)', 'log' => 'Log (simulate)', 'live' => 'Live (provider)'] as $m => $lbl): ?>
-        <button class="ch-mode-btn <?= $mode === $m ? 'on' : '' ?>" name="mode" value="<?= e($m) ?>" type="submit"><?= e($lbl) ?></button>
+      <?php $anyProv = in_array('connected', array_values((array)$providers), true);
+            foreach (['off' => 'Off (record only)', 'log' => 'Log (simulate)', 'live' => 'Live (provider)'] as $m => $lbl):
+              $liveBlocked = $m === 'live' && !$anyProv && $mode !== 'live'; ?>
+        <button class="ch-mode-btn <?= $mode === $m ? 'on' : '' ?>" name="mode" value="<?= e($m) ?>" type="submit"<?= $liveBlocked ? ' disabled title="No WhatsApp / SMS provider is connected yet"' : '' ?>><?= e($lbl) ?></button>
       <?php endforeach; ?>
     </form>
+    <?php if (!$anyProv): ?><p class="cx-detail" style="margin:8px 0 0;color:#92400e">No WhatsApp or SMS provider is connected yet, so nothing can actually be sent — "Live" stays off until one is. Messages are still recorded here so you can see what would have gone out.</p><?php endif; ?>
   <?php else: ?><strong><?= e(strtoupper($mode)) ?></strong><?php endif; ?>
   <div style="margin-top:12px">
     <?php foreach ($channels as $ck => $cl): $ok = ($providers[$ck] ?? '') === 'connected'; ?>

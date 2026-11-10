@@ -14,12 +14,17 @@
 //  (talent search, A3) — but never another org's private employees.
 // ============================================================================
 
-/** M4 work-type vocabulary (blueprint M4 — how they want to work). */
+/** M4 work-type vocabulary (blueprint M4 — how they want to work).
+ *  Owner, 10 Nov 2026 — the ONE list: the desk, the guided post and the
+ *  professional's own profile all use it, so what a company asks for and what
+ *  a person offers are named the same way (they were four different lists, and
+ *  man-day deputation could not be chosen on a posting). */
 function cx_pro_work_types() {
     return [
         'per_visit'       => 'Per-visit inspection',
         'day_rate'        => 'Day-rate',
         'manday'          => 'Man-day / man-month deputation',
+        'short_project'   => 'Short project',
         'long_deployment' => 'Long deployment',
         'shutdown'        => 'Shutdown / turnaround crew',
         'remote_review'   => 'Remote document review',

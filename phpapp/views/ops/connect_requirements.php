@@ -66,13 +66,13 @@ $pill = function ($s) {
     <label>What do you need? *</label>
     <input type="text" name="title" placeholder="e.g. Welding inspector for a pressure-vessel FAT at Dahej" required>
     <div class="cxgrid">
-      <div><label>Posted for (company / agency)</label>
-        <select name="poster_party_id"><option value="0">— optional —</option>
+      <div><label>Client <span class="muted" style="font-weight:400">— needed to bill them; blank for your own work</span></label>
+        <select name="poster_party_id"><option value="0">— our own work —</option>
           <?php foreach ($partners as $p): ?><option value="<?= (int)$p['id'] ?>"><?= e($p['nm']) ?></option><?php endforeach; ?>
         </select></div>
       <div><label>Work type</label>
         <select name="work_type">
-          <?php foreach (['per_visit'=>'Per visit','day_rate'=>'Day rate','short_project'=>'Short project','long_deployment'=>'Long deployment','shutdown'=>'Shutdown / turnaround','remote_review'=>'Remote document review'] as $k=>$v): ?>
+          <?php foreach ((function_exists('cx_pro_work_types') ? cx_pro_work_types() : ['per_visit' => 'Per visit']) as $k=>$v): ?>
             <option value="<?= $k ?>"><?= e($v) ?></option>
           <?php endforeach; ?>
         </select></div>

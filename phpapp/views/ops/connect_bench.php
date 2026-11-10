@@ -54,8 +54,9 @@
 </form>
 
 <?php if (!$agencies): ?>
-  <div class="bn-card"><p style="margin:0;color:var(--muted,#777)">Register a staffing or recruitment agency under
-    <a href="/connect-orgs">Organisations</a> first — then its bench appears here.</p></div>
+  <div class="bn-card"><p style="margin:0;color:var(--muted,#777)">No agency is registered yet — its bench appears here once one is.
+    <?php if (function_exists('is_master') && is_master()): ?>Register it under <a href="/connect-orgs">Organisations</a>.
+    <?php else: ?>Ask your administrator to register the agency (Marketplace → Organisations — only they can open it).<?php endif; ?></p></div>
 <?php elseif ($orgId): ?>
 
   <!-- Utilisation -->

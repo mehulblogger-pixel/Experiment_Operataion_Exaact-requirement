@@ -62,6 +62,25 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
     <?php if (!empty($req['start_date'])): ?><?= e($req['start_date']) ?><?php if (!empty($req['end_date'])): ?> → <?= e($req['end_date']) ?><?php endif; endif; ?>
   </div>
   <?php if (!empty($req['description'])): ?><p style="margin:0;white-space:pre-line"><?= e($req['description']) ?></p><?php endif; ?>
+  <?php if (in_array(strtoupper((string)$req['status']), ['DRAFT', 'OPEN', 'SHORTLISTING'], true)):
+        $edPartners = ops_all("SELECT id, COALESCE(NULLIF(display_name,''), legal_name) AS nm FROM business_partners WHERE COALESCE(status,'ACTIVE')='ACTIVE' AND COALESCE(is_client,0)=1 ORDER BY nm") ?: []; ?>
+  <details style="margin-top:10px"><summary style="cursor:pointer;font-size:13px;color:var(--brand,#0f5f5c)">✎ Change the details</summary>
+    <form method="post" action="/connect-requirement" style="margin-top:8px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px">
+      <input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="action" value="req_edit">
+      <label style="grid-column:1/-1;font-size:12.5px">Title<input class="form-control" name="title" required maxlength="200" value="<?= e($req['title']) ?>"></label>
+      <label style="font-size:12.5px">Client<select class="form-control" name="poster_party_id"><option value="0">— our own work —</option><?php foreach ($edPartners as $pp): ?><option value="<?= (int)$pp['id'] ?>" <?= (int)$req['poster_party_id'] === (int)$pp['id'] ? 'selected' : '' ?>><?= e($pp['nm']) ?></option><?php endforeach; ?></select></label>
+      <label style="font-size:12.5px">Location<input class="form-control" name="location" maxlength="160" value="<?= e($req['location']) ?>"></label>
+      <label style="font-size:12.5px">Work type<select class="form-control" name="work_type"><?php $edWt = function_exists('cx_pro_work_types') ? cx_pro_work_types() : []; if (!isset($edWt[$req['work_type']]) && (string)$req['work_type'] !== '') $edWt[$req['work_type']] = ucwords(str_replace('_', ' ', (string)$req['work_type'])); foreach ($edWt as $wk => $wl): ?><option value="<?= e($wk) ?>" <?= (string)$req['work_type'] === (string)$wk ? 'selected' : '' ?>><?= e($wl) ?></option><?php endforeach; ?></select></label>
+      <label style="font-size:12.5px">People needed<input class="form-control" type="number" min="1" name="positions" value="<?= (int)$req['positions'] ?>"></label>
+      <label style="font-size:12.5px">Start<input class="form-control" type="date" name="start_date" value="<?= e($req['start_date']) ?>"></label>
+      <label style="font-size:12.5px">End<input class="form-control" type="date" name="end_date" value="<?= e($req['end_date']) ?>"></label>
+      <label style="font-size:12.5px">Rate from (₹)<input class="form-control" type="number" min="0" name="rate_min" value="<?= (float)$req['rate_min'] ? (int)$req['rate_min'] : '' ?>"></label>
+      <label style="font-size:12.5px">Rate to (₹)<input class="form-control" type="number" min="0" name="rate_max" value="<?= (float)$req['rate_max'] ? (int)$req['rate_max'] : '' ?>"></label>
+      <label style="grid-column:1/-1;font-size:12.5px">Description<textarea class="form-control" name="description" rows="3"><?= e($req['description']) ?></textarea></label>
+      <div style="grid-column:1/-1"><button class="btn" type="submit">Save changes</button></div>
+    </form>
+  </details>
+  <?php endif; ?>
 
   <?php if ($req_next): ?>
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
