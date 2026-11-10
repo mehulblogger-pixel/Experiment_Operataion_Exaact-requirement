@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'f616ed4 · 2026-11-09 13:07 UTC · 710 files';
+$RELEASE = 'dd784c7 · 2026-11-10 11:39 UTC · 710 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -44,7 +44,7 @@ $EXPECT  = [
     'lib/ai_formgen.php' => ['s'=>11931,'h'=>'3193de5d4fc90414'],
     'lib/approvals_hub.php' => ['s'=>8916,'h'=>'920310fe3ad7ba19'],
     'lib/approvals_setup.php' => ['s'=>7111,'h'=>'5d77132c6a062451'],
-    'lib/areas.php' => ['s'=>46082,'h'=>'40d7e376c0a30928'],
+    'lib/areas.php' => ['s'=>46033,'h'=>'ea0a906b60f04755'],
     'lib/assets.php' => ['s'=>14725,'h'=>'53927f92ca350c91'],
     'lib/attend.php' => ['s'=>13919,'h'=>'695a4eae1fd9e2a9'],
     'lib/attendreview.php' => ['s'=>7794,'h'=>'cfcd8f928e63efad'],
@@ -159,7 +159,7 @@ $EXPECT  = [
     'lib/lookups.php' => ['s'=>83604,'h'=>'d94f5b8948c09001'],
     'lib/methods.php' => ['s'=>13959,'h'=>'14969626618c15f8'],
     'lib/mghsso.php' => ['s'=>10002,'h'=>'80f043e73ff44d13'],
-    'lib/mis.php' => ['s'=>27303,'h'=>'f859e061e1d0af78'],
+    'lib/mis.php' => ['s'=>27960,'h'=>'dbec071cf2188988'],
     'lib/mkt_billing.php' => ['s'=>19564,'h'=>'c45dcdff4f9d3f65'],
     'lib/mkt_credits.php' => ['s'=>9969,'h'=>'3165d4af5817062e'],
     'lib/mkt_escrow.php' => ['s'=>12953,'h'=>'38961c0e1478671e'],
@@ -178,7 +178,7 @@ $EXPECT  = [
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>4308,'h'=>'1c5b3e553b964601'],
     'lib/opportunities.php' => ['s'=>69506,'h'=>'14d15c464f763094'],
-    'lib/ops.php' => ['s'=>743518,'h'=>'6f620412595b7906'],
+    'lib/ops.php' => ['s'=>743754,'h'=>'5803e740d44f964c'],
     'lib/orgadmin.php' => ['s'=>78177,'h'=>'70dca6bf71230d17'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>3662,'h'=>'c849f6bf380507dc'],
@@ -250,7 +250,7 @@ $EXPECT  = [
     'lib/superadmin.php' => ['s'=>22099,'h'=>'f3e910a1caa81d54'],
     'lib/tally.php' => ['s'=>44735,'h'=>'f910b38d13d7cee8'],
     'lib/tapi.php' => ['s'=>69455,'h'=>'a8d85d8e3a4bdd08'],
-    'lib/tapi_dash.php' => ['s'=>19795,'h'=>'f2c058c102885cfb'],
+    'lib/tapi_dash.php' => ['s'=>20955,'h'=>'274ca4690a0f813e'],
     'lib/tapi_gov.php' => ['s'=>17290,'h'=>'111e443d157ce2ce'],
     'lib/tapi_score.php' => ['s'=>14322,'h'=>'e2256ab85fab255c'],
     'lib/tasks.php' => ['s'=>11239,'h'=>'82c11af4ebccd03c'],
@@ -328,7 +328,7 @@ $EXPECT  = [
     'views/ops/_billto.php' => ['s'=>3566,'h'=>'32adc002a4740d69'],
     'views/ops/_company_payments.php' => ['s'=>10431,'h'=>'0d7ae716158ca539'],
     'views/ops/_deputation_panel.php' => ['s'=>13672,'h'=>'46545d4243390803'],
-    'views/ops/_glance_strip.php' => ['s'=>5257,'h'=>'ffa16f7b9f2ab7b2'],
+    'views/ops/_glance_strip.php' => ['s'=>5324,'h'=>'e38338dca5866940'],
     'views/ops/_issue_panel.php' => ['s'=>8621,'h'=>'8f7e08e2edf793d4'],
     'views/ops/_job_billing.php' => ['s'=>11308,'h'=>'d9114039c457706c'],
     'views/ops/_ops_registers.php' => ['s'=>6510,'h'=>'403bb12d7870ae8e'],

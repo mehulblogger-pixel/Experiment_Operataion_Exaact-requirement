@@ -415,9 +415,18 @@ function office_name($id) {
 // ---------------------------------------------------------------------------
 //  The screen
 // ---------------------------------------------------------------------------
+// The MIS puts operations and money side by side, so it is for people who may
+// see both (owner, 10 Nov 2026: a Finance login with only the Financial
+// dashboard ticked was shown it). Administrators and masters always.
+function mis_can() {
+    // It reads jobs and money: no Operations, nothing to show (and a master who
+    // has bought only core administration is not let in either).
+    if (function_exists('licence_enabled') && !licence_enabled('operations')) return false;
+    return (function_exists('is_admin_level') && is_admin_level()) || (function_exists('is_master') && is_master())
+        || (can('dash.operations') && can('dash.financial'));
+}
 function ops_mis($method) {
-    ops_require(can('dash.operations') || can('dash.financial') || is_admin_level(),
-                'You cannot see the management dashboard.');
+    ops_require(mis_can(), 'The management dashboard needs both the Operations and the Financial dashboard (Users → role → Insights).');
     $F = mis_filters();
     $S = mis_summary($F);
 

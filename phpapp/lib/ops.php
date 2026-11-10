@@ -9669,7 +9669,9 @@ function dashboard_glance() {
             'attention'    => count($attn),
             'attention_hi' => $hi,
             'outstanding'  => ($canFin && function_exists('financial_rollup')) ? (float)(financial_rollup([])['outstanding'] ?? 0) : null,
-            'health'       => function_exists('system_status_worst') ? system_status_worst() : 'ok',
+            //  The platform's health is for the people who can open it (the
+            //  system-status screen's own gate) — not a red light for everybody.
+            'health'       => (function_exists('notifications_can_view') && notifications_can_view() && function_exists('system_status_worst')) ? system_status_worst() : null,
         ];
     }
     return $out;

@@ -268,7 +268,7 @@ function ops_area_def($area) {
             $t($fx('tapi_can') && tapi_can(), '📈', 'Analytics & performance', '/analytics', 'KPI cards, trends and drill-down.');
             // Dashboards gathered here from Sales and Admin so there is one home for them.
             $t($fx('crmdash_can') && crmdash_can(), '📈', 'Sales dashboard', '/crm-dashboard', 'Win rates and value by stage.');
-            $t(licence_enabled('operations') && (can('mod.reports.view') || can('dash.operations') || can('dash.financial')), '📉', 'Management dashboard', '/mis', 'The MIS overview.');
+            $t(licence_enabled('operations') && $fx('mis_can') && mis_can(), '📉', 'Management dashboard', '/mis', 'The MIS overview.');
             break;
 
         case 'directory':

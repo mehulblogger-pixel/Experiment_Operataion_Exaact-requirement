@@ -166,8 +166,32 @@ function tapi_can() {
     // Its KPIs are operations, utilisation, people and money figures; with
     // neither Operations nor Money bought there is nothing to show (ONB-041).
     if (function_exists('licence_enabled') && !licence_enabled('operations') && !licence_enabled('money')) return false;
-    return (function_exists('is_master') && is_master())
-        || (function_exists('can') && (can('dash.operations') || can('dash.financial') || can('dash.utilization') || can('dash.people')));
+    // Owner, 10 Nov 2026 — a Finance login with only the Financial dashboard
+    // ticked saw this whole hub. It opens only when at least one of its views is
+    // the person's to see (tapi_dashboards_for_me()).
+    return (bool) tapi_dashboards_for_me();
+}
+
+// The analytics views this person may open. Each view is named for what it
+// shows, and asks the dashboard right that covers it ("Insights — what they can
+// do" on the role screen):
+//   Executive          — operations AND money figures: both dashboards
+//   Operations/Service — the Operations dashboard
+//   Quality            — the Operations or the People & compliance dashboard
+//   Vendor / Client    — the Operations dashboard
+function tapi_dashboards_for_me() {
+    $all = tapi_dashboards();
+    if (function_exists('is_master') && is_master()) return $all;
+    $c = fn($p) => function_exists('can') && can($p);
+    $need = [
+        'executive'  => $c('dash.operations') && $c('dash.financial'),
+        'operations' => $c('dash.operations'),
+        'quality'    => $c('dash.operations') || $c('dash.people'),
+        'service'    => $c('dash.operations'),
+        'vendor'     => $c('dash.operations'),
+        'client'     => $c('dash.operations'),
+    ];
+    return array_filter($all, fn($k) => !empty($need[$k]), ARRAY_FILTER_USE_KEY);
 }
 
 function ops_tapi($route, $method) {
@@ -175,12 +199,13 @@ function ops_tapi($route, $method) {
     $filters = tapi_filters();
 
     if ($route === 'analytics') {
-        $role = preg_replace('/[^a-z]/', '', strtolower((string)($_GET['view'] ?? 'executive')));
-        if (!isset(tapi_dashboards()[$role])) $role = 'executive';
+        $mine = tapi_dashboards_for_me();
+        $role = preg_replace('/[^a-z]/', '', strtolower((string)($_GET['view'] ?? '')));
+        if (!isset($mine[$role])) $role = (string) array_key_first($mine);
         $body = tapi_filter_bar($filters, ['show' => ['office','sbu','compare']])
               . tapi_freshness()
               . tapi_render_dashboard($role, $filters);
-        view('ops/tapi', ['tab' => 'dash', 'role' => $role, 'dashes' => tapi_dashboards(), 'body' => $body, 'filters' => $filters]);
+        view('ops/tapi', ['tab' => 'dash', 'role' => $role, 'dashes' => $mine, 'body' => $body, 'filters' => $filters]);
         return true;
     }
 

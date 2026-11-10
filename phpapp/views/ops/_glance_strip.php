@@ -45,8 +45,10 @@ $gsGlance = $glanceWantMgmt
         <a href="/command-centre" style="text-decoration:none;color:inherit"><div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em">Outstanding</div>
           <div style="font-weight:700;font-size:20px;font-variant-numeric:tabular-nums"><?= e(function_exists('fmoney_short') ? fmoney_short($gsM['outstanding']) : number_format($gsM['outstanding'])) ?></div></a>
       <?php endif; ?>
+      <?php if ($gsM['health'] !== null): ?>
       <a href="/system-status" style="text-decoration:none;color:inherit"><div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em">Platform</div>
         <div style="font-weight:700;font-size:15px;color:<?= $gsHc ?>">● <?= e($gsHl) ?></div></a>
+      <?php endif; ?>
       <a href="/command-centre" class="btn small secondary" style="margin-left:auto">Command Centre →</a>
     </div>
   <?php endif; ?>
