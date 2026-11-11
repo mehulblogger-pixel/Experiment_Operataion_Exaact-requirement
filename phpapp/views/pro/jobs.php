@@ -32,6 +32,8 @@
       · <?= (int)$r['positions'] ?> position<?= (int)$r['positions']===1?'':'s' ?>
       <?php if (!empty($r['discipline_code'])): ?> · <?= e($r['discipline_code']) ?><?php endif; ?>
       <?php if (!empty($r['work_type'])): ?> · <?= e(str_replace('_',' ',$r['work_type'])) ?><?php endif; ?>
+      <?php $cxL = function_exists('cx_req_days_left') ? cx_req_days_left($r) : null;
+            if ($cxL !== null && $cxL >= 0): ?> · <span style="<?= $cxL <= 3 ? 'color:#8a6d0b;font-weight:600' : '' ?>">apply by <?= e(function_exists('fdate') ? fdate($r['closes_on'], $r['closes_on']) : $r['closes_on']) ?></span><?php endif; ?>
     </div>
     <?php if (($r['rate_min'] ?? 0) || ($r['rate_max'] ?? 0)): ?><div style="font-weight:600">₹<?= (int)$r['rate_min'] ?>–<?= (int)$r['rate_max'] ?> <?= e($r['rate_unit']) ?></div><?php endif; ?>
     <?php // Client payer reputation — so you know how this client pays before you apply.

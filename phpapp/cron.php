@@ -127,6 +127,13 @@ if ($m8('quotes', 'Sales & CRM') && function_exists('crm_expire_quotes')) {
     $exq = crm_expire_quotes();
     echo "Quotations expired: $exq\n";
 }
+// Marketplace (owner, 11 Nov 2026) — requirements past their closing date with
+// nobody shortlisted close as EXPIRED; posters are reminded a few days before.
+if ($m8('connect', 'Marketplace & Connect') && function_exists('cx_req_expiry_sweep') && (!function_exists('connect_enabled') || connect_enabled())) {
+    $cxs = cx_req_expiry_sweep();
+    if (function_exists('setting_set')) setting_set('cx_req_sweep_at', (string) time());
+    echo "Marketplace requirements expired: {$cxs['expired']}, closing reminders: {$cxs['reminded']}, decision reminders: {$cxs['decide']}, dated: {$cxs['dated']}\n";
+}
 // D-11a — a quotation that has waited longer than the company allows at one
 // approval level is opened to the level above (Sales → Set up Sales).
 if ($m8('quotes', 'Sales & CRM') && function_exists('crm_escalate_quote_approvals')) {

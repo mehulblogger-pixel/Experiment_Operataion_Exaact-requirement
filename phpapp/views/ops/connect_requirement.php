@@ -62,6 +62,7 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
     <?php if (!empty($req['start_date'])): ?><?= e($req['start_date']) ?><?php if (!empty($req['end_date'])): ?> → <?= e($req['end_date']) ?><?php endif; endif; ?>
   </div>
   <?php if (!empty($req['description'])): ?><p style="margin:0;white-space:pre-line"><?= e($req['description']) ?></p><?php endif; ?>
+  <?php $cxPostTo = '/connect-requirement'; include __DIR__ . '/_cx_closing.php'; ?>
   <?php if (in_array(strtoupper((string)$req['status']), ['DRAFT', 'OPEN', 'SHORTLISTING'], true)):
         $edPartners = ops_all("SELECT id, COALESCE(NULLIF(display_name,''), legal_name) AS nm FROM business_partners WHERE COALESCE(status,'ACTIVE')='ACTIVE' AND COALESCE(is_client,0)=1 ORDER BY nm") ?: []; ?>
   <details style="margin-top:10px"><summary style="cursor:pointer;font-size:13px;color:var(--brand,#0f5f5c)">✎ Change the details</summary>

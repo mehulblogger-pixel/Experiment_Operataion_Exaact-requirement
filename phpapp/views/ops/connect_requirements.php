@@ -33,6 +33,18 @@ $pill = function ($s) {
   <div class="kpi"><span class="kic">🙋</span><div class="k">Applications</div><div class="v"><?= (int)($summary['apps'] ?? 0) ?></div></div>
 </div>
 
+<?php if (!empty($is_master) && function_exists('cx_req_open_days')): ?>
+<details class="panel" style="margin-top:12px">
+  <summary style="cursor:pointer;font-weight:600;font-size:14px">🗓 How long requirements stay open — <?= (int)cx_req_open_days() ?> days, reminder <?= (int)cx_req_remind_days() ?> days before</summary>
+  <p class="cxmeta" style="margin:8px 0">Applications close the day before the work starts, or after this many days if that is sooner. The poster is reminded before, and can extend it. A requirement with nobody shortlisted by then closes as expired and applicants are told; one being shortlisted never closes by itself.</p>
+  <form method="post" action="/connect-requirements" style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin:0">
+    <input type="hidden" name="action" value="set_closing_rules">
+    <label style="font-size:13px">Stay open for (days)<input class="form-control" type="number" name="open_days" min="1" max="365" value="<?= (int)cx_req_open_days() ?>" style="width:110px"></label>
+    <label style="font-size:13px">Remind (days before)<input class="form-control" type="number" name="remind_days" min="0" max="30" value="<?= (int)cx_req_remind_days() ?>" style="width:110px"></label>
+    <button class="btn secondary" type="submit">Save</button>
+  </form>
+</details>
+<?php endif; ?>
 <?php // K21 — platform commission: the matchmaker's revenue + the rate control ?>
 <?php $commission = $commission ?? null; $is_master = $is_master ?? false;
   if ($commission): $cinr = fn($n) => '₹' . number_format((int)round((float)$n));
@@ -114,7 +126,8 @@ $pill = function ($s) {
           <td><a href="/connect-requirement?id=<?= (int)$r['id'] ?>"><?= e($r['title']) ?></a></td>
           <td><?= e($r['location']) ?></td>
           <td><?= (int)$r['positions'] ?></td>
-          <td><?= $pill($r['status']) ?></td>
+          <td><?= $pill($r['status']) ?><?php $cxL = (in_array(strtoupper((string)$r['status']), ['OPEN','SHORTLISTING'], true) && function_exists('cx_req_days_left')) ? cx_req_days_left($r) : null;
+                if ($cxL !== null && $cxL <= 7): ?> <span class="muted" style="font-size:11.5px;white-space:nowrap"><?= $cxL < 0 ? 'applications closed' : ($cxL === 0 ? 'closes today' : 'closes in ' . $cxL . 'd') ?></span><?php endif; ?></td>
         </tr>
       <?php endforeach; ?>
       </tbody>

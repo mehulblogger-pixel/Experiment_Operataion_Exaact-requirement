@@ -1220,6 +1220,7 @@ function portal_route($route, $method) {
         case 'portal/hire':
             portal_need('market.post', 'posting manpower requirements');
             if (!function_exists('cx_requirement_create') || (function_exists('connect_enabled') && !connect_enabled())) { http_response_code(404); portal_view('notfound'); exit; }
+            if ($method === 'GET' && function_exists('cx_req_expiry_sweep_maybe')) cx_req_expiry_sweep_maybe();
             if ($method === 'POST') {
                 $party = portal_partner_id();
                 $act = (string)($_POST['action'] ?? '');
@@ -1430,6 +1431,12 @@ function portal_route($route, $method) {
                 } elseif ($act === 'award') {
                     $ap = cx_application_get((int)($_POST['application_id'] ?? 0));
                     if ($ap && (int)$ap['requirement_id'] === (int)$req['id']) cx_requirement_award((int)$req['id'], (int)$ap['id']);
+                } elseif ($act === 'req_extend' && function_exists('cx_requirement_extend')) {
+                    //  Owner, 11 Nov 2026 — keep it open longer.
+                    [, $xmsg] = ($_POST['closes_on'] ?? '') !== '' ? cx_requirement_set_closes_on((int)$req['id'], (string)$_POST['closes_on'], portal_client_name())
+                                                                  : cx_requirement_extend((int)$req['id'], (int)($_POST['days'] ?? 7), portal_client_name());
+                    $_SESSION['portal_flash'] = $xmsg;
+                    redirect('/portal/hire-req?id=' . (int)$req['id']);
                 } elseif ($act === 'replace_award' && function_exists('cx_requirement_replace')) {
                     //  Owner, 11 Nov 2026 — the awarded person cannot do the job.
                     [, $rmsg] = cx_requirement_replace((int)$req['id'], (int)($_POST['application_id'] ?? 0), $_POST, portal_client_name());

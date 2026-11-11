@@ -620,6 +620,21 @@ no existing object touched.
   other application still `APPLIED` or `SHORTLISTED` is moved to `REJECTED` and
   any `OFFERED` one to `WITHDRAWN` (existing transitions), and the award is written
   to the activity timeline (`CX_REQUIREMENT`).
+- *Closing date — owner, 11 Nov 2026* ("there shall be some mechanism, research
+  with respect to real world scenario") — no status or transition added; uses the
+  existing `OPEN → EXPIRED`. When posted, a requirement gets `closes_on`: the day
+  before the work starts, or after the open window (setting `cx_req_open_days`,
+  default **30** days) if that is sooner or there is no start date. The poster
+  (client portal) is reminded `cx_req_remind_days` before (default **3**), may
+  extend it (+7 / +15 / +30 days or a date, up to a year) while `OPEN` or
+  `SHORTLISTING`. The nightly run (`cron.php`, also at most hourly when the lists
+  are opened) moves an `OPEN` requirement past its date to `EXPIRED` and closes its
+  open applications (`APPLIED`/`SHORTLISTED` → `REJECTED`, `OFFERED` →
+  `WITHDRAWN`); the client is told. A requirement in `SHORTLISTING` is **never**
+  expired by the clock — the client is told a decision is due. Requirements posted
+  before this existed get a date with at least seven days' notice. Both numbers
+  are master-only settings on the Marketplace requirements page (defaults chosen
+  from common job-board practice; the owner may change them).
 - *Corrections:* the details (title, client, place, work type, dates, positions,
   rates, description) may be changed while the requirement is `DRAFT`, `OPEN` or
   `SHORTLISTING` (`cx_requirement_update`, logged); the status does not change.

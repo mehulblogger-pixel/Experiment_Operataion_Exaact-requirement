@@ -73,6 +73,8 @@ function connect_market_migrate() {
     //  client actually turned down may not. And when the awarded person is
     //  replaced, when it happened.
     if (function_exists('ensure_column')) {
+        //  Owner, 11 Nov 2026 — the date applications close (see cx_req_expiry_sweep).
+        ensure_column('cx_requirements', 'closes_on', "VARCHAR(10) DEFAULT ''");
         ensure_column('cx_applications', 'closed_by_award', 'INT DEFAULT 0');
         ensure_column('cx_applications', 'replaced_at', "VARCHAR(30) DEFAULT ''");
     }
@@ -260,6 +262,8 @@ function cx_requirement_create(array $in, $post = false) {
             function_exists('user_name') ? user_name(current_user()) : '', $now, $post ? $now : '', $now,
         ]);
     $id = (int)db()->lastInsertId();
+    //  Posted straight away: it gets its closing date now (owner, 11 Nov 2026).
+    if ($post) db()->prepare("UPDATE cx_requirements SET closes_on=? WHERE id=?")->execute([cx_req_closes_default(['posted_at' => $now, 'start_date' => (string)($in['start_date'] ?? '')]), $id]);
     // Deputation / rate terms, when the posting form supplied them.
     if (isset($in['deputation_basis']) || isset($in['rate_inclusive']) || isset($in['voucher_cadence']))
         cx_requirement_save_terms($id, $in);
@@ -302,6 +306,111 @@ function cx_requirement_update($id, array $in) {
     return [true, $changed ? 'Requirement updated.' : 'Nothing was changed.'];
 }
 
+// ============================================================================
+//  CLOSING DATE — owner, 11 Nov 2026: "Should an open requirement close by itself
+//  after some days with no award? … there shall be some mechanism, research with
+//  respect to real world scenario."
+//
+//  What the job boards do (Upwork, ArtStation, most job sites): a posting stays
+//  open for a fixed window (commonly 30 days), the poster is reminded shortly
+//  before it ends and may extend it, and an untouched posting then closes so the
+//  board does not fill with dead jobs and applicants are not left waiting.
+//  Here, from both sides:
+//    • the client / desk: applications close the day before the work starts, or
+//      after the open window (default 30 days) if that is sooner or there is no
+//      start date; a reminder comes a few days before (default 3) with a one-tap
+//      extend; it can be changed any time while open;
+//    • the professional: a job nobody has looked at closes as EXPIRED and every
+//      open application is closed, instead of waiting at "Applied" for ever;
+//    • a job where the client is already shortlisting is NEVER closed by the
+//      clock — they are choosing; they get a "decision due" reminder instead.
+//  Uses only the existing OPEN → EXPIRED transition.
+// ============================================================================
+function cx_req_open_days()   { return max(1, min(365, (int)(function_exists('setting_get') ? setting_get('cx_req_open_days', 30) : 30))); }
+function cx_req_remind_days() { return max(0, min(30, (int)(function_exists('setting_get') ? setting_get('cx_req_remind_days', 3) : 3))); }
+function cx_req_closes_default($req, $today = null, $fromPosting = false) {
+    $today = $today ?: date('Y-m-d');
+    $from = substr((string)(($req['posted_at'] ?? '') ?: $today), 0, 10);
+    if ($from < $today && !$fromPosting) $from = $today;
+    $close = date('Y-m-d', strtotime($from . ' +' . cx_req_open_days() . ' days'));
+    $start = substr(trim((string)($req['start_date'] ?? '')), 0, 10);
+    if ($start !== '') {
+        $dayBefore = date('Y-m-d', strtotime($start . ' -1 day'));
+        if (($dayBefore >= $today || $fromPosting) && $dayBefore < $close) $close = $dayBefore;
+    }
+    return $close;
+}
+/** Days until applications close (negative once past), or null when no date. */
+function cx_req_days_left($req, $today = null) {
+    $c = trim((string)($req['closes_on'] ?? ''));
+    if ($c === '') return null;
+    return (int) round((strtotime($c) - strtotime($today ?: date('Y-m-d'))) / 86400);
+}
+/** Move the closing date (while the job is open or being shortlisted). [ok,msg] */
+function cx_requirement_set_closes_on($id, $date, $who = '') {
+    $r = cx_requirement_get($id); if (!$r) return [false, 'Requirement not found.'];
+    if (!in_array(strtoupper((string)$r['status']), ['OPEN', 'SHORTLISTING'], true)) return [false, 'Only an open requirement has a closing date to change.'];
+    $d = substr(trim((string)$date), 0, 10);
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $d) || $d < date('Y-m-d')) return [false, 'Choose a closing date from today onwards.'];
+    if ($d > date('Y-m-d', strtotime('+365 days'))) return [false, 'A requirement can stay open for up to a year.'];
+    db()->prepare("UPDATE cx_requirements SET closes_on=?, updated_at=? WHERE id=?")->execute([$d, date('c'), (int)$id]);
+    if (function_exists('act_log')) try { act_log('CX_REQUIREMENT', (int)$id, 'SYSTEM', 'Applications now close on ' . $d . ($who !== '' ? ' (by ' . $who . ')' : '')); } catch (Throwable $e) {}
+    return [true, 'Applications now close on ' . (function_exists('fdate') ? fdate($d, $d) : $d) . '.'];
+}
+function cx_requirement_extend($id, $days, $who = '') {
+    $r = cx_requirement_get($id); if (!$r) return [false, 'Requirement not found.'];
+    $base = max(date('Y-m-d'), (string)($r['closes_on'] ?: date('Y-m-d')));
+    return cx_requirement_set_closes_on($id, date('Y-m-d', strtotime($base . ' +' . max(1, (int)$days) . ' days')), $who);
+}
+function cx_req_notify_client($req, $event, $title) {
+    if ((int)($req['poster_party_id'] ?? 0) <= 0 || !function_exists('cvp_notify_once')) return false;
+    try { if (function_exists('cvp_migrate')) cvp_migrate();
+          return (bool) cvp_notify_once('CLIENT', (int)$req['poster_party_id'], $event, 'cx_requirement', (int)$req['id'], $title, '/portal/hire-req?id=' . (int)$req['id']); }
+    catch (Throwable $e) { return false; }
+}
+/** The daily sweep. Returns ['dated'=>, 'reminded'=>, 'expired'=>, 'decide'=>]. */
+function cx_req_expiry_sweep($today = null) {
+    connect_market_migrate();
+    $today = $today ?: date('Y-m-d');
+    $out = ['dated' => 0, 'reminded' => 0, 'expired' => 0, 'decide' => 0];
+    $rows = ops_all("SELECT * FROM cx_requirements WHERE status IN ('OPEN','SHORTLISTING')") ?: [];
+    foreach ($rows as $r) {
+        //  A requirement posted before closing dates existed gets one now, with at
+        //  least a week's notice — nothing closes the day this arrives.
+        if (trim((string)$r['closes_on']) === '') {
+            $c = max(cx_req_closes_default($r, $today, true), date('Y-m-d', strtotime($today . ' +7 days')));
+            db()->prepare("UPDATE cx_requirements SET closes_on=? WHERE id=?")->execute([$c, (int)$r['id']]);
+            $out['dated']++; continue;
+        }
+        $left = cx_req_days_left($r, $today);
+        $st = strtoupper((string)$r['status']);
+        $ref = (string)($r['ref_code'] ?: ('#' . $r['id']));
+        if ($st === 'OPEN' && $left < 0) {
+            if (!cx_requirement_transition((int)$r['id'], 'EXPIRED')) continue;
+            foreach (cx_applications_for((int)$r['id']) as $a) {
+                $as = strtoupper((string)$a['status']);
+                if (in_array($as, ['APPLIED', 'SHORTLISTED', 'OFFERED'], true)) cx_application_transition((int)$a['id'], $as === 'OFFERED' ? 'WITHDRAWN' : 'REJECTED');
+            }
+            if (function_exists('act_log')) try { act_log('CX_REQUIREMENT', (int)$r['id'], 'SYSTEM', 'Closed as expired — applications closed on ' . $r['closes_on'] . ' with nobody shortlisted'); } catch (Throwable $e) {}
+            cx_req_notify_client($r, 'MKT_REQ_EXPIRED', $ref . ' "' . $r['title'] . '" closed — nobody was shortlisted by ' . $r['closes_on'] . '. Duplicate it to post again.');
+            $out['expired']++;
+        } elseif ($st === 'SHORTLISTING' && $left < 0) {
+            if (cx_req_notify_client($r, 'MKT_REQ_DECIDE', $ref . ' "' . $r['title'] . '" — applications have closed; award it, or extend the closing date.')) $out['decide']++;
+        } elseif ($left >= 0 && $left <= cx_req_remind_days()) {
+            if (cx_req_notify_client($r, 'MKT_REQ_CLOSING', $ref . ' "' . $r['title'] . '" — applications close ' . ($left === 0 ? 'today' : 'in ' . $left . ' day' . ($left === 1 ? '' : 's')) . '. Shortlist, or extend it.')) $out['reminded']++;
+        }
+    }
+    return $out;
+}
+/** The same sweep, at most once an hour, for installs whose scheduler is not set. */
+function cx_req_expiry_sweep_maybe() {
+    if (!function_exists('setting_get') || !function_exists('setting_set')) return;
+    $last = (int) setting_get('cx_req_sweep_at', 0);
+    if ($last > time() - 3600) return;
+    setting_set('cx_req_sweep_at', (string) time());
+    try { cx_req_expiry_sweep(); } catch (Throwable $e) {}
+}
+
 /** Move a requirement to a new status if the transition is legal. */
 function cx_requirement_transition($id, $to) {
     $r = cx_requirement_get($id); if (!$r) return false;
@@ -309,6 +418,7 @@ function cx_requirement_transition($id, $to) {
     if (!cx_req_can_transition($r['status'], $to)) return false;
     $extra = ''; $args = [$to, date('c')];
     if ($to === 'OPEN' && ($r['posted_at'] ?? '') === '') { $extra = ', posted_at=?'; $args[] = date('c'); }
+    if ($to === 'OPEN' && trim((string)($r['closes_on'] ?? '')) === '') { $extra .= ', closes_on=?'; $args[] = cx_req_closes_default($r); }
     if (in_array($to, ['CLOSED', 'CANCELLED', 'EXPIRED'], true)) { $extra = ', closed_at=?'; $args[] = date('c'); }
     $args[] = (int)$id;
     db()->prepare("UPDATE cx_requirements SET status=?, updated_at=?$extra WHERE id=?")->execute($args);
@@ -504,6 +614,7 @@ function cx_requirements_for_party($partyId) {
 }
 /** K2b — the open board a supplier browses to apply. */
 function cx_open_requirements($limit = 200) {
+    cx_req_expiry_sweep_maybe();   // a job past its closing date is not shown as open
     return ops_all("SELECT * FROM cx_requirements WHERE status IN ('OPEN','SHORTLISTING') ORDER BY id DESC LIMIT " . max(1, (int)$limit)) ?: [];
 }
 /** K2b — has an applying party already applied to this requirement? */
@@ -567,8 +678,19 @@ function connect_market_can() {
 function ops_connect_requirements($route, $method) {
     ops_require(connect_market_can(), 'The manpower marketplace desk is for coordinators, managers and admins.');
     connect_market_migrate();
+    if ($method === 'GET') cx_req_expiry_sweep_maybe();
     if ($method === 'POST') {
         $act = (string)($_POST['action'] ?? 'create');
+        if ($act === 'set_closing_rules') {   // Owner, 11 Nov 2026 — how long requirements stay open (master only)
+            if (function_exists('is_master') && is_master() && function_exists('setting_set')) {
+                $od = max(1, min(365, (int)($_POST['open_days'] ?? 30))); $rd = max(0, min(30, (int)($_POST['remind_days'] ?? 3)));
+                setting_set('cx_req_open_days', (string)$od); setting_set('cx_req_remind_days', (string)$rd);
+                flash('New requirements stay open for ' . $od . ' days; posters are reminded ' . $rd . ' day' . ($rd === 1 ? '' : 's') . ' before they close.');
+            } else {
+                flash('Only an administrator can change this.', 'error');
+            }
+            redirect('/connect-requirements');
+        }
         if ($act === 'set_commission') {   // K21 — the platform's commission rate (master only)
             if (function_exists('is_master') && is_master() && function_exists('setting_set')) {
                 $pct = (float)($_POST['commission_pct'] ?? 5);
@@ -642,6 +764,10 @@ function ops_connect_requirement($method) {
             flash($eok ? $emsg . (cx_applications_for($id) ? ' People who already applied see the new details.' : '') : $emsg, $eok ? 'success' : 'error');
         } elseif ($act === 'req_transition') {
             cx_requirement_transition($id, $_POST['to'] ?? '') ? flash('Requirement updated.') : flash('That change is not allowed from the current status.', 'error');
+        } elseif ($act === 'req_extend') {
+            $who = function_exists('user_name') ? user_name(current_user()) : '';
+            [$xok, $xmsg] = ($_POST['closes_on'] ?? '') !== '' ? cx_requirement_set_closes_on($id, (string)$_POST['closes_on'], $who) : cx_requirement_extend($id, (int)($_POST['days'] ?? 7), $who);
+            flash($xmsg, $xok ? 'success' : 'error');
         } elseif ($act === 'replace_award') {
             //  Owner, 11 Nov 2026 — the awarded person cannot do the job.
             [$rok, $rmsg] = cx_requirement_replace($id, (int)($_POST['application_id'] ?? 0), $_POST, function_exists('user_name') ? user_name(current_user()) : '');

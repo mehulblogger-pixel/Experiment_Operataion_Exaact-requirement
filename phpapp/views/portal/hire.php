@@ -272,7 +272,9 @@ $pill = function ($s) {
     <?php foreach ($rows as $r): ?>
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line,#eee)">
         <div><a href="/portal/hire-req?id=<?= (int)$r['id'] ?>"><strong><?= e($r['title']) ?></strong></a>
-          <div style="font-size:12.5px;color:var(--muted)"><?= e($r['ref_code']) ?><?php if (!empty($r['location'])): ?> · <?= e($r['location']) ?><?php endif; ?> · <?= function_exists('cx_applications_count') ? (int)cx_applications_count($r['id']) : 0 ?> applied</div>
+          <div style="font-size:12.5px;color:var(--muted)"><?= e($r['ref_code']) ?><?php if (!empty($r['location'])): ?> · <?= e($r['location']) ?><?php endif; ?> · <?= function_exists('cx_applications_count') ? (int)cx_applications_count($r['id']) : 0 ?> applied<?php
+              $cxL = (in_array(strtoupper((string)$r['status']), ['OPEN','SHORTLISTING'], true) && function_exists('cx_req_days_left')) ? cx_req_days_left($r) : null;
+              if ($cxL !== null): ?> · <span style="<?= $cxL <= 3 ? 'color:#8a6d0b;font-weight:600' : '' ?>"><?= $cxL < 0 ? 'applications closed' : ($cxL === 0 ? 'closes today' : 'closes in ' . $cxL . ' day' . ($cxL === 1 ? '' : 's')) ?></span><?php endif; ?></div>
           <?php
             $bits = [];
             if (!empty($r['deputation_basis']) && function_exists('connect_engage_basis_label')) $bits[] = connect_engage_basis_label($r['deputation_basis']);

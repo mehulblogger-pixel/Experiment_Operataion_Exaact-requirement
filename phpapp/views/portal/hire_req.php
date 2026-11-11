@@ -23,6 +23,8 @@ $reqLabel = ['OPEN'=>'Open for applications','SHORTLISTING'=>'Start shortlisting
 <h2 class="ptitle"><?= e($req['title']) ?> <?= $pill($req['status']) ?></h2>
 <p class="plead"><?= e($req['ref_code']) ?><?php if (!empty($req['location'])): ?> · <?= e($req['location']) ?><?php endif; ?> · <?= (int)$req['positions'] ?> position<?= (int)$req['positions']===1?'':'s' ?></p>
 
+<?php $cxPostTo = '/portal/hire-req'; include __DIR__ . '/../ops/_cx_closing.php'; ?>
+
 <?php
   // Terms & estimate — the deputation shape, rate model and (for a fee-only
   // posting) what is covered on top of the fee, with the client's own ceilings

@@ -750,6 +750,10 @@ const CVP_EVENTS = [
     'NCR_RAISED'     => 'A nonconformity needs your response',
     'NCR_DECIDED'    => 'We reviewed your response',
     'QUALIFICATION_EXPIRING' => 'Your approval is due for renewal',
+    // Marketplace — owner, 11 Nov 2026 (closing dates on requirements).
+    'MKT_REQ_CLOSING' => 'Your requirement closes soon',
+    'MKT_REQ_DECIDE'  => 'Applications have closed — time to decide',
+    'MKT_REQ_EXPIRED' => 'Your requirement closed with nobody shortlisted',
 ];
 
 // Insert a notification once. The natural key stops the sync duplicating it.
