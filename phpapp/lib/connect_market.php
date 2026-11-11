@@ -762,7 +762,10 @@ function ops_connect_requirements($route, $method) {
                 $pct = (float)($_POST['commission_pct'] ?? 5);
                 if ($pct < 0) $pct = 0; if ($pct > 100) $pct = 100;
                 setting_set('connect_commission_pct', $pct);
-                flash('Platform commission set to ' . rtrim(rtrim(number_format($pct, 2), '0'), '.') . '%.');
+                $share = isset($_POST['client_share']) ? max(0, min(100, (float)$_POST['client_share'])) : (function_exists('connect_commission_client_share') ? connect_commission_client_share() : 50);
+                setting_set('connect_commission_client_share', $share);
+                $nf = fn($n) => rtrim(rtrim(number_format((float)$n, 2), '0'), '.');
+                flash('Platform commission set to ' . $nf($pct) . '% of the professional\'s fee — the client pays ' . $nf($share) . '% of it, the professional ' . $nf(100 - $share) . '%. New vouchers use it.');
             } else {
                 flash('Only an administrator can change the platform commission.', 'error');
             }

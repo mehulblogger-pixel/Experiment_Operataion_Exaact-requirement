@@ -96,7 +96,7 @@
 <?php if (!empty($money) && ($money['commission'] ?? 0) > 0): ?>
 <div class="card">
   <h2>Your payout</h2>
-  <p class="muted" style="margin:0 0 10px;font-size:13px">The platform charges a <?= e(rtrim(rtrim(number_format((float)$money['commission_pct'],2),'0'),'.')) ?>% commission on the fee, split with the client. Your half is deducted from your payout; reimbursed expenses pass through in full.</p>
+  <p class="muted" style="margin:0 0 10px;font-size:13px">The platform charges a <?= e(rtrim(rtrim(number_format((float)$money['commission_pct'],2),'0'),'.')) ?>% commission on the fee, shared with the client. Your share is deducted from your payout; reimbursed expenses pass through in full.</p>
   <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:baseline">
     <div><div class="muted" style="font-size:12px">Voucher total</div><div style="font-size:18px;font-weight:700"><?= e($inr($money['grand'])) ?></div></div>
     <div><div class="muted" style="font-size:12px">− Your commission</div><div style="font-size:18px;font-weight:700">−<?= e($inr($money['commission_pro'])) ?></div></div>

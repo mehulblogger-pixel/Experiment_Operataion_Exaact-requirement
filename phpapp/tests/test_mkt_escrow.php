@@ -5,10 +5,10 @@
 t_section('marketplace escrow lifecycle');
 
 $own = !db()->inTransaction(); if ($own) db()->beginTransaction();
-$en0 = (int)setting_get('escrow_enabled', 0); $pct0 = (float)setting_get('escrow_commission_pct', 0);
+$en0 = (int)setting_get('escrow_enabled', 0); $pct0 = (float)setting_get('connect_commission_pct', 5);
 try {
     mkt_escrow_migrate();
-    setting_set('escrow_commission_pct', 10);   // 10% platform commission at release
+    setting_set('connect_commission_pct', 10);  // 10% — the one platform rate (owner, 11 Nov 2026: escrow no longer has its own)
 
     // Open a hold — commission derived from the %.
     [$ok, $msg, $id] = mkt_escrow_open(5001, 10000, ['client_name' => 'Acme', 'pro_name' => 'R. Singh']);
@@ -76,6 +76,6 @@ try {
     t_ok(($tot['REFUNDED'] ?? 0) >= 14000, 'refunded total sums the refunded holds');
 } finally {
     setting_set('escrow_enabled', $en0);
-    setting_set('escrow_commission_pct', $pct0);
+    setting_set('connect_commission_pct', $pct0);
     if ($own && db()->inTransaction()) db()->rollBack();
 }

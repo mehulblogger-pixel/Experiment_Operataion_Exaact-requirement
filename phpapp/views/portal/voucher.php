@@ -57,10 +57,10 @@ $canReview = $status === 'SUBMITTED';
 <div class="pcard" style="max-width:720px">
   <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:baseline">
     <div><div class="k" style="font-size:12px;color:var(--muted)">Voucher total</div><div style="font-size:18px;font-weight:700"><?= e($inr($money['grand'])) ?></div></div>
-    <div><div class="k" style="font-size:12px;color:var(--muted)">+ Platform fee (your half)</div><div style="font-size:18px;font-weight:700">+<?= e($inr($money['commission_client'])) ?></div></div>
+    <div><div class="k" style="font-size:12px;color:var(--muted)">+ Platform fee (your share)</div><div style="font-size:18px;font-weight:700">+<?= e($inr($money['commission_client'])) ?></div></div>
     <div><div class="k" style="font-size:12px;color:var(--muted)">You pay</div><div style="font-size:22px;font-weight:800;color:#0f7d5a"><?= e($inr($money['client_payable'])) ?></div></div>
   </div>
-  <p class="plead" style="margin:8px 0 0;font-size:12.5px">A <?= e(rtrim(rtrim(number_format((float)$money['commission_pct'],2),'0'),'.')) ?>% platform commission on the fee is split with the professional — you settle directly with them; the platform only makes the match.</p>
+  <p class="plead" style="margin:8px 0 0;font-size:12.5px">A <?= e(rtrim(rtrim(number_format((float)$money['commission_pct'],2),'0'),'.')) ?>% platform commission on the fee is shared with the professional — you settle directly with them; the platform only makes the match.</p>
 </div>
 <?php endif; ?>
 

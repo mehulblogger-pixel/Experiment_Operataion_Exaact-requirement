@@ -37,13 +37,8 @@
     </div>
     <div class="ff" style="display:flex;gap:8px;align-items:end"><button class="btn" type="submit">Save</button></div>
   </form>
-  <form method="post" action="/marketplace-escrow" class="form-grid" style="align-items:end;margin-top:8px">
-    <input type="hidden" name="action" value="settings">
-    <div class="ff"><label>Platform commission at release (%)</label>
-      <input class="form-control" name="escrow_commission_pct" type="number" min="0" max="100" step="0.1" value="<?= $commissionPct ?>">
-      <small class="muted">Taken from the hold when funds are released; the rest goes to the professional.</small></div>
-    <div class="ff" style="display:flex;gap:8px;align-items:end"><button class="btn secondary" type="submit">Save commission</button></div>
-  </form>
+  <p class="muted" style="margin:10px 0 0;font-size:13px">Platform commission: <strong><?= e(rtrim(rtrim(number_format($commissionPct, 2), '0'), '.')) ?>%</strong> — the one Marketplace rate, taken from a hold when funds are released.
+    <?php if (function_exists('is_master') && is_master()): ?><a href="/connect-requirements">Change it on Marketplace requirements</a><?php else: ?>Your administrator sets it.<?php endif; ?></p>
 </div>
 
 <?php // ---- Totals ---- ?>

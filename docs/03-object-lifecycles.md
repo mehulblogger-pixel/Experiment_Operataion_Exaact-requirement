@@ -751,7 +751,7 @@ Cadence (`PER_DAY | PER_DEPLOYMENT`) is inherited from the engagement.
   allowed to move them (client, via the `market.vouchers` portal permission, scoped
   to their own `poster_party_id`).
 - **Platform commission** (matchmaker model): the platform charges a nominal
-  commission on the **fee only** (never on reimbursed expenses), **split 50/50**
+  commission on the **fee only** (never on reimbursed expenses), **shared between the two sides** (client share set by a master, default 50/50)
   between client and professional. Rate is the admin setting `connect_commission_pct`
   (default 5%). `connect_engv_recompute()` stores `commission_total`,
   `commission_client`, `commission_pro`, `client_payable` (= grand + client half) and

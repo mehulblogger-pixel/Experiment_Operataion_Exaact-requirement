@@ -49,6 +49,22 @@ try {
     if (function_exists('setting_set')) setting_set('connect_commission_pct', 5);
     connect_engv_recompute($vid);
 
+    // ---- owner, 11 Nov 2026: ONE commission, the share each side pays is set --
+    t_eq(connect_commission_client_share(), 50.0, 'by default the client and the professional pay half each, as before');
+    setting_set('connect_commission_client_share', 0);
+    connect_engv_recompute($vid);
+    $m0 = connect_engv_money(connect_engv_get($vid));
+    t_eq([$m0['commission'], $m0['commission_client'], $m0['commission_pro'], $m0['client_payable'], $m0['pro_net']], [400.0, 0.0, 400.0, 11000.0, 10600.0],
+        'set to 0%: the whole commission comes out of the professional\'s fee; the client pays the voucher only');
+    setting_set('connect_commission_client_share', 25);
+    connect_engv_recompute($vid);
+    $m25 = connect_engv_money(connect_engv_get($vid));
+    t_eq([$m25['commission_client'], $m25['commission_pro']], [100.0, 300.0], 'set to 25%: client 100, professional 300 — always adding up to the commission');
+    setting_set('connect_commission_client_share', 50);
+    connect_engv_recompute($vid);
+    t_eq(mkt_escrow_commission_pct(), connect_commission_pct(), 'escrow uses the same one rate — it no longer has its own setting');
+    t_ok(strpos((string) file_get_contents(__DIR__ . '/../lib/mkt_escrow.php'), "setting_set('escrow_commission_pct'") === false, 'and nothing can set a separate escrow rate any more');
+
     // ---- settlement needs BOTH sides, only after approval ------------------
     [$c0] = connect_engv_confirm($vid, 'client');
     t_ok($c0 === false, 'payment cannot be confirmed before the voucher is approved');

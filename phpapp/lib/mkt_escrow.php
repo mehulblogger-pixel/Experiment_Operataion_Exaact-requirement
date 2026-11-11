@@ -43,7 +43,10 @@ function mkt_escrow_enabled() { return (int)setting_get('escrow_enabled', 0) ===
 function mkt_escrow_set_enabled($on) { setting_set('escrow_enabled', $on ? 1 : 0); return true; }
 
 /** Default platform commission % taken at release (Super-Admin owned, editable). */
-function mkt_escrow_commission_pct() { return max(0.0, (float)setting_get('escrow_commission_pct', 0)); }
+//  Owner, 11 Nov 2026 — one commission rate for the whole Marketplace. Escrow
+//  had its own (which any desk user could change); it now uses the platform rate
+//  set by the administrator on the Marketplace requirements page.
+function mkt_escrow_commission_pct() { return function_exists('connect_commission_pct') ? connect_commission_pct() : 0.0; }
 
 function mkt_escrow_statuses() { return ['HELD', 'DISPUTED', 'RELEASED', 'REFUNDED']; }
 
@@ -192,7 +195,6 @@ function ops_mkt_escrow($method) {
         $id  = (int)($_POST['id'] ?? 0);
         $by  = function_exists('user_name') && function_exists('current_user') ? (string)user_name(current_user()) : '';
         if ($act === 'toggle')       { mkt_escrow_set_enabled(!empty($_POST['escrow_enabled'])); flash('Escrow setting saved.'); }
-        elseif ($act === 'settings') { setting_set('escrow_commission_pct', max(0, (float)($_POST['escrow_commission_pct'] ?? 0))); flash('Escrow settings saved.'); }
         elseif ($act === 'release')  { [$ok, $m] = mkt_escrow_release($id, $by); flash($m, $ok ? 'success' : 'error'); }
         elseif ($act === 'refund')   { [$ok, $m] = mkt_escrow_refund($id, $by, (string)($_POST['reason'] ?? '')); flash($m, $ok ? 'success' : 'error'); }
         elseif ($act === 'dispute')  { [$ok, $m] = mkt_escrow_dispute($id, $by, (string)($_POST['reason'] ?? '')); flash($m, $ok ? 'success' : 'error'); }

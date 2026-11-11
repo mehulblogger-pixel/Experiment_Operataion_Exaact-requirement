@@ -97,6 +97,15 @@ function connect_commission_pct() {
     return $v;
 }
 
+/** Owner, 11 Nov 2026 — ONE commission, set in one place. How much of it the
+ *  client pays (the rest comes out of the professional's fee). Default 50 — the
+ *  even split this always used. Marketplaces differ (some charge only the
+ *  professional, some add a small client fee); the master decides. */
+function connect_commission_client_share() {
+    $v = function_exists('setting_get') ? (float) setting_get('connect_commission_client_share', 50) : 50.0;
+    return max(0.0, min(100.0, $v));
+}
+
 /** Reimbursable expense heads — claimable ONLY on an EXCLUSIVE engagement. */
 function connect_engv_expense_heads() {
     return [
@@ -311,13 +320,14 @@ function connect_engv_recompute($voucherId) {
     }
     $fee = round($fee, 2); $reimb = round($reimb, 2); $grand = round($fee + $reimb, 2);
 
-    // Platform commission — on the FEE only, split 50/50 between the two sides.
-    // The client pays (grand + its half); the professional nets (grand − its half);
+    // Platform commission — on the FEE only, shared between the two sides as set
+    // (connect_commission_client_share, default an even split).
+    // The client pays (grand + its share); the professional nets (grand − its share);
     // reimbursed expenses pass through untouched. The platform earns the whole
     // commission for making the match.
     $pct    = connect_commission_pct();
     $commTot = round($fee * $pct / 100, 2);
-    $commCl  = round($commTot / 2, 2);
+    $commCl  = round($commTot * connect_commission_client_share() / 100, 2);
     $commPro = round($commTot - $commCl, 2);           // keep the two halves summing exactly
     $clientPayable = round($grand + $commCl, 2);
     $proNet        = round($grand - $commPro, 2);

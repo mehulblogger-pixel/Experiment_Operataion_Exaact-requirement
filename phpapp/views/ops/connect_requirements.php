@@ -51,16 +51,19 @@ $pill = function ($s) {
   $crate = rtrim(rtrim(number_format((float)($commission['rate'] ?? 0), 2), '0'), '.'); ?>
 <div class="panel" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:18px 26px;align-items:center;justify-content:space-between">
   <div style="display:flex;flex-wrap:wrap;gap:18px 26px;align-items:baseline">
-    <div><div class="sub" style="font-size:12px">Commission rate</div><div style="font-size:22px;font-weight:800"><?= e($crate) ?>%</div><div class="sub" style="font-size:11px">on the fee, split 50/50</div></div>
+    <div><div class="sub" style="font-size:12px">Commission rate</div><div style="font-size:22px;font-weight:800"><?= e($crate) ?>%</div><?php $cshare = function_exists('connect_commission_client_share') ? connect_commission_client_share() : 50; $nf = fn($n) => rtrim(rtrim(number_format((float)$n, 2), '0'), '.'); ?><div class="sub" style="font-size:11px">on the fee · client <?= e($nf($cshare)) ?>% / professional <?= e($nf(100 - $cshare)) ?>%</div></div>
     <div><div class="sub" style="font-size:12px">Earned (accepted)</div><div style="font-size:22px;font-weight:800;color:#0f7d5a"><?= e($cinr($commission['earned'] ?? 0)) ?></div></div>
     <div><div class="sub" style="font-size:12px">Settled</div><div style="font-size:22px;font-weight:800"><?= e($cinr($commission['settled'] ?? 0)) ?></div></div>
     <div><div class="sub" style="font-size:12px">In review</div><div style="font-size:22px;font-weight:800;color:#8a6d0b"><?= e($cinr($commission['pipeline'] ?? 0)) ?></div></div>
   </div>
   <?php if ($is_master): ?>
-  <form method="post" action="/connect-requirements" style="display:flex;gap:8px;align-items:center;margin:0">
+  <form method="post" action="/connect-requirements" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0">
     <input type="hidden" name="action" value="set_commission">
     <label style="font-size:13px;color:var(--muted,#5b6b6a)">Set rate
       <input type="number" name="commission_pct" value="<?= e($crate) ?>" min="0" max="100" step="0.25" style="width:80px;padding:8px;border:1px solid var(--line,#dde3e2);border-radius:8px;margin-left:6px">%
+    </label>
+    <label style="font-size:13px;color:var(--muted,#5b6b6a)" title="The rest is taken from the professional's fee">Client pays
+      <input type="number" name="client_share" value="<?= e($nf($cshare)) ?>" min="0" max="100" step="5" style="width:70px;padding:8px;border:1px solid var(--line,#dde3e2);border-radius:8px;margin-left:6px">% of it
     </label>
     <button class="btn secondary" type="submit">Save</button>
   </form>

@@ -60,7 +60,7 @@ try {
     t_eq(mkt_ledger_post('NONSENSE', 100, []), 0, 'an unknown category is refused');
 
     // ---- escrow release posts the ledger, keeping the monies apart ----
-    setting_set('escrow_commission_pct', 2);
+    $pctKeep = setting_get('connect_commission_pct', 5); setting_set('connect_commission_pct', 2);   // the one platform rate
     [, , $eid] = mkt_escrow_open(9100, 30000, ['client_name' => 'Acme', 'pro_name' => 'Pro X', 'client_party_id' => 77, 'pro_id' => 88]);
     $before = mkt_ledger_totals()['CONNECT_REVENUE'];
     mkt_escrow_release($eid, 'coordinator');
@@ -82,6 +82,6 @@ try {
     t_ok(mkt_finstate_is_terminal('REFUNDED'), 'REFUNDED is terminal');
     t_ok(mkt_finstate_next('CREATED') !== [], 'CREATED has forward transitions');
 } finally {
-    setting_set('escrow_commission_pct', 0);
+    setting_set('connect_commission_pct', $pctKeep);
     if ($own && db()->inTransaction()) db()->rollBack();
 }
