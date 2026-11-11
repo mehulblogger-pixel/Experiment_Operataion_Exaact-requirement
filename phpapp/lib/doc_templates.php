@@ -90,7 +90,7 @@ function doc_tpl_seed() {
     }
     $offer = "Date: {date}\n\nDear {name},\n\nSub: Offer of employment — {position}\n\n"
         . "We are pleased to offer you the position of {position} in the {department} department at {company}.\n\n"
-        . "Your total annual compensation (CTC) will be {ctc}, with a net take-home of {net_pay}. "
+        . "Your total compensation (CTC) will be {ctc}, with a net take-home of {net_pay}. "
         . "Your expected date of joining is {joining_date}. This offer is valid till {offer_valid_till}.\n\n"
         . "The detailed compensation structure is set out below:\n\n{salary_table}\n\n"
         . "{terms}\n\nPlease sign and return a copy of this letter as a token of your acceptance.\n\n"
@@ -135,7 +135,7 @@ function doc_tokens_help() {
         'name' => "Candidate's full name", 'first_name' => 'First name', 'last_name' => 'Last name',
         'position' => 'Position / designation', 'department' => 'Department', 'grade' => 'Grade',
         'phone' => 'Phone / mobile', 'email' => 'Email', 'address' => 'Address', 'location' => 'Location',
-        'ctc' => 'Total CTC', 'net_pay' => 'Net (in-hand) pay', 'salary_table' => 'The full salary-structure table',
+        'ctc' => 'Total CTC — a month, with the year beside it', 'ctc_monthly' => 'CTC a month', 'ctc_annual' => 'CTC a year', 'net_pay' => 'Net (in-hand) pay a month', 'salary_table' => 'The full salary-structure table',
         'joining_date' => 'Date of joining', 'offer_valid_till' => 'Offer validity date', 'terms' => 'Offer terms',
         'company' => 'Company name', 'company_address' => 'Company address',
         'company_logo' => 'Company logo (picture)', 'company_gstin' => 'Company GSTIN', 'company_contact' => 'Company e-mail · phone · website',
@@ -166,19 +166,9 @@ function doc_token_map($candidate) {
     $sal = function_exists('sal_current') ? sal_current((int)$candidate['id']) : null;
     $offer = function_exists('offer_current') ? offer_current((int)$candidate['id']) : null;
 
-    // The salary annexure table (HTML) — reuses the offer-letter renderer's style.
-    $salTable = '';
-    if ($sal && function_exists('sal_lines')) {
-        $secLbl = ['EARNING' => 'Earnings', 'DEDUCTION' => 'Deductions', 'EMPLOYER' => 'Employer contributions'];
-        $salTable = '<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;margin:6px 0">';
-        foreach (['EARNING', 'DEDUCTION', 'EMPLOYER'] as $sec) {
-            $sl = array_filter(sal_lines($sal), fn($l) => ($l['section'] ?? 'EARNING') === $sec);
-            if (!$sl) continue;
-            $salTable .= '<tr><td colspan="2" style="padding:7px 8px 2px;font-weight:700;color:#555;font-size:12px">' . htmlspecialchars($secLbl[$sec], ENT_QUOTES) . '</td></tr>';
-            foreach ($sl as $l) $salTable .= '<tr><td style="padding:3px 8px;border-bottom:1px solid #eee">' . htmlspecialchars($l['name'], ENT_QUOTES) . '</td><td style="padding:3px 8px;border-bottom:1px solid #eee;text-align:right">' . htmlspecialchars($money($l['amount']), ENT_QUOTES) . '</td></tr>';
-        }
-        $salTable .= '<tr><td style="padding:6px 8px;font-weight:700;border-top:2px solid #333">Total CTC</td><td style="padding:6px 8px;text-align:right;font-weight:700;border-top:2px solid #333">' . htmlspecialchars($money($sal['gross_ctc']), ENT_QUOTES) . '</td></tr></table>';
-    }
+    // The salary annexure table (HTML) — the same one the offer letter prints:
+    // the month, with the year beside it (owner, 11 Nov 2026).
+    $salTable = ($sal && function_exists('sal_annexure_html')) ? sal_annexure_html($sal, $money, false) : '';
 
     $name = function_exists('candidate_name') ? candidate_name($candidate) : trim($g('first_name') . ' ' . $g('last_name'));
     return [
@@ -186,7 +176,9 @@ function doc_token_map($candidate) {
         'position' => $position, 'department' => $dept, 'grade' => $grade,
         'phone' => $g('mobile'), 'email' => $g('email'), 'address' => $g('address'),
         'location' => $g('proposed_site') ?: $g('location'),
-        'ctc' => $sal ? $money($sal['gross_ctc']) : '', 'net_pay' => $sal ? $money($sal['net_pay']) : '',
+        'ctc' => $sal ? (function_exists('ctc_month_year') ? ctc_month_year($sal['gross_ctc'], $money) : $money($sal['gross_ctc'])) : '',
+        'net_pay' => $sal ? $money($sal['net_pay']) . ' a month' : '',
+        'ctc_monthly' => $sal ? $money($sal['gross_ctc']) : '', 'ctc_annual' => $sal ? $money((float)$sal['gross_ctc'] * 12) : '',
         'salary_table' => $salTable,
         'joining_date' => $offer ? ($offer['joining_date'] ?? '') : '', 'offer_valid_till' => $offer ? ($offer['expiry_date'] ?? '') : '',
         'terms' => $offer ? (string)($offer['offer_terms'] ?? '') : '',
@@ -246,7 +238,7 @@ function doc_render_template($tpl, $candidate) {
             return in_array($k, ['company_logo', 'letterhead'], true) ? $v : htmlspecialchars($v, ENT_QUOTES);
         }, $raw);
     };
-    $bodyHtml = doc_fill((string)$tpl['body'], $map, $missing);
+    $bodyHtml = doc_fill(function_exists('ctc_wording_fix') ? ctc_wording_fix($tpl['body']) : (string)$tpl['body'], $map, $missing);
     $html = '<div style="font-family:Georgia,serif;max-width:760px;margin:auto;color:#1a2230;line-height:1.6">'
         . $fillHtml($head)
         . '<div style="white-space:normal;font-size:15px">' . $bodyHtml . '</div>'

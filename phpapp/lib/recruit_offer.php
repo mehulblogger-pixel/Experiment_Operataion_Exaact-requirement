@@ -163,6 +163,45 @@ function sal_total($row) {
     if ($t == 0) foreach (array_keys(sal_components()) as $c) $t += (float)($row[$c] ?? 0);
     return $t;
 }
+//  Owner, 11 Nov 2026 — salary in this system is per month (the offer, the
+//  salary structure, the costing). Letters printed it as the "annual" CTC. Every
+//  letter now shows the month, with the year's total beside it.
+function ctc_month_year($monthly, $money) {
+    $m = (float) $monthly;
+    return $money($m) . ' a month (' . $money($m * 12) . ' a year)';
+}
+//  The old wording of the starting templates, which called the monthly figure
+//  annual. A letter still using it reads correctly with the new {ctc}.
+function ctc_wording_fix($text) {
+    return str_replace('Your total annual compensation (CTC) will be {ctc}', 'Your total compensation (CTC) will be {ctc}', (string) $text);
+}
+//  The compensation annexure: one column for the month, the year beside it.
+function sal_annexure_html($sal, $money, $withNet = true) {
+    if (!$sal) return '';
+    $h = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES);
+    $td = 'padding:4px 8px;border-bottom:1px solid #eee';
+    $num = $td . ';text-align:right;white-space:nowrap';
+    $secLbl = ['EARNING' => 'Earnings', 'DEDUCTION' => 'Deductions', 'EMPLOYER' => 'Employer contributions'];
+    $out = '<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;margin:6px 0">'
+         . '<tr><th style="padding:6px 8px;text-align:left;border-bottom:2px solid #333;font-size:12px">Component</th>'
+         . '<th style="padding:6px 8px;text-align:right;border-bottom:2px solid #333;font-size:12px">Per month</th>'
+         . '<th style="padding:6px 8px;text-align:right;border-bottom:2px solid #333;font-size:12px">Per year</th></tr>';
+    $lines = sal_lines($sal);
+    foreach (['EARNING', 'DEDUCTION', 'EMPLOYER'] as $sec) {
+        $sl = array_filter($lines, fn($l) => ($l['section'] ?? 'EARNING') === $sec);
+        if (!$sl) continue;
+        $out .= '<tr><td colspan="3" style="padding:8px 8px 3px;font-weight:700;color:#555;font-size:12px">' . $h($secLbl[$sec]) . '</td></tr>';
+        foreach ($sl as $l)
+            $out .= '<tr><td style="' . $td . '">' . $h($l['name']) . ((int) ($l['statutory'] ?? 0) ? ' <span style="color:#999;font-size:10px">(statutory)</span>' : '') . '</td>'
+                  . '<td style="' . $num . '">' . $h($money($l['amount'])) . '</td><td style="' . $num . '">' . $h($money((float) $l['amount'] * 12)) . '</td></tr>';
+    }
+    $ctc = (float) ($sal['gross_ctc'] ?? 0) ?: sal_total($sal);
+    $tot = 'padding:7px 8px;font-weight:700;border-top:2px solid #333';
+    $out .= '<tr><td style="' . $tot . '">Total CTC</td><td style="' . $tot . ';text-align:right;white-space:nowrap">' . $h($money($ctc)) . '</td><td style="' . $tot . ';text-align:right;white-space:nowrap">' . $h($money($ctc * 12)) . '</td></tr>';
+    if ($withNet && (float) ($sal['net_pay'] ?? 0) > 0)
+        $out .= '<tr><td style="padding:4px 8px;color:#555">Net pay</td><td style="padding:4px 8px;text-align:right;color:#555;white-space:nowrap">' . $h($money($sal['net_pay'])) . '</td><td style="padding:4px 8px;text-align:right;color:#555;white-space:nowrap">' . $h($money((float) $sal['net_pay'] * 12)) . '</td></tr>';
+    return $out . '</table>';
+}
 function sal_save($candidateId, $post) {
     recruit_offer_migrate();
     // Drive off the configurable component definitions (Phase 5.1A).
@@ -466,9 +505,9 @@ function offer_withdraw($id) {
 // via setting 'offer_letter_template'.
 function offer_letter_template() {
     $t = function_exists('setting_get') ? trim((string)setting_get('offer_letter_template', '')) : '';
-    if ($t !== '') return $t;
+    if ($t !== '') return ctc_wording_fix($t);
     return "Dear {name},\n\nWe are pleased to offer you the position of {position} at {company}.\n\n"
-        . "Your total annual compensation (CTC) will be {ctc}. Your expected date of joining is {joining_date}.\n\n"
+        . "Your total compensation (CTC) will be {ctc}. Your expected date of joining is {joining_date}.\n\n"
         . "{terms}\n\nWe look forward to welcoming you to the team.\n\nWarm regards,\n{company}\nDate: {date}";
 }
 function offer_letter_html($offer, $cand, $sal) {
@@ -482,7 +521,7 @@ function offer_letter_html($offer, $cand, $sal) {
         '{name}'         => $name,
         '{position}'     => $position ?: 'the role',
         '{company}'      => $company,
-        '{ctc}'          => $cur . number_format((float)$offer['ctc'], 0),
+        '{ctc}'          => ctc_month_year($offer['ctc'], fn($v) => $cur . number_format((float)$v, 0)),
         '{joining_date}' => $offer['joining_date'] ? (function_exists('fdate') ? fdate($offer['joining_date'], $offer['joining_date']) : $offer['joining_date']) : '—',
         '{terms}'        => (string)$offer['offer_terms'],
         '{date}'         => date('d M Y'),
@@ -490,24 +529,8 @@ function offer_letter_html($offer, $cand, $sal) {
     $body = strtr(offer_letter_template(), $tokens);
     $html = '<div style="font-family:Georgia,serif;max-width:720px;margin:auto;color:#1a2230;line-height:1.6">'
           . '<div style="white-space:pre-wrap;font-size:15px">' . $e($body) . '</div>';
-    // Salary-structure annexure (configurable component breakdown, grouped).
-    if ($sal) {
-        $lines = sal_lines($sal);
-        $secLbl = ['EARNING' => 'Earnings', 'DEDUCTION' => 'Deductions', 'EMPLOYER' => 'Employer contributions'];
-        $html .= '<h3 style="margin:22px 0 8px">Annexure — Compensation structure</h3><table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif">';
-        foreach (['EARNING', 'DEDUCTION', 'EMPLOYER'] as $sec) {
-            $secLines = array_filter($lines, fn($l) => ($l['section'] ?? 'EARNING') === $sec);
-            if (!$secLines) continue;
-            $html .= '<tr><td colspan="2" style="padding:8px 8px 3px;font-weight:700;color:#555;font-size:12px">' . $e($secLbl[$sec]) . '</td></tr>';
-            foreach ($secLines as $l)
-                $html .= '<tr><td style="padding:4px 8px;border-bottom:1px solid #eee">' . $e($l['name']) . ((int)($l['statutory'] ?? 0) ? ' <span style="color:#999;font-size:10px">(statutory)</span>' : '') . '</td><td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:right">' . $e($cur . number_format((float)$l['amount'], 0)) . '</td></tr>';
-        }
-        $ctc = (float)($sal['gross_ctc'] ?? sal_total($sal));
-        $html .= '<tr><td style="padding:7px 8px;font-weight:700;border-top:2px solid #333">Total CTC</td><td style="padding:7px 8px;text-align:right;font-weight:700;border-top:2px solid #333">' . $e($cur . number_format($ctc, 0)) . '</td></tr>';
-        if ((float)($sal['net_pay'] ?? 0) > 0)
-            $html .= '<tr><td style="padding:4px 8px;color:#555">Net pay</td><td style="padding:4px 8px;text-align:right;color:#555">' . $e($cur . number_format((float)$sal['net_pay'], 0)) . '</td></tr>';
-        $html .= '</table>';
-    }
+    // Salary-structure annexure — the month, with the year beside it.
+    if ($sal) $html .= '<h3 style="margin:22px 0 8px">Annexure — Compensation structure</h3>' . sal_annexure_html($sal, fn($v) => $cur . number_format((float)$v, 0));
     return $html . '</div>';
 }
 
