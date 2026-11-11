@@ -75,6 +75,8 @@ function connect_market_migrate() {
     if (function_exists('ensure_column')) {
         //  Owner, 11 Nov 2026 — the date applications close (see cx_req_expiry_sweep).
         ensure_column('cx_requirements', 'closes_on', "VARCHAR(10) DEFAULT ''");
+        //  Owner, 11 Nov 2026 — a requirement made from a recruitment requisition.
+        ensure_column('cx_requirements', 'requisition_id', 'INT DEFAULT 0');
         ensure_column('cx_applications', 'closed_by_award', 'INT DEFAULT 0');
         ensure_column('cx_applications', 'replaced_at', "VARCHAR(30) DEFAULT ''");
     }
@@ -411,6 +413,65 @@ function cx_req_expiry_sweep_maybe() {
     try { cx_req_expiry_sweep(); } catch (Throwable $e) {}
 }
 
+// ============================================================================
+//  FROM A REQUISITION — owner, 11 Nov 2026: "Should a recruitment requisition have
+//  a 'Post this to the Marketplace' button?" — "Yes if the user is subscribed and
+//  paid for market place or has bought any pack."
+//
+//  The paid Marketplace is the company's 'connect' module (connect_enabled():
+//  licence + on/off switch), and posting is the desk's existing right
+//  (connect_market_can()). The requisition's own details become a DRAFT the
+//  coordinator checks and posts — never the client's name (a public board must
+//  not reveal who the work is for) and never the billing rate (what the client
+//  pays is not what professionals should bid against). It is the company's own
+//  work (no poster party), so the client does not see it in their portal.
+// ============================================================================
+function cx_requisition_postable($rq) {
+    return is_array($rq) && in_array(strtoupper((string)($rq['status'] ?? '')), ['OPEN', 'PROPOSED', 'OFFERED', 'PARTIALLY_FILLED'], true);
+}
+/** The live marketplace requirement made from this requisition, if any. */
+function cx_requirement_for_requisition($requisitionId) {
+    connect_market_migrate();
+    return ops_one("SELECT * FROM cx_requirements WHERE requisition_id=? AND status NOT IN ('CLOSED','CANCELLED','EXPIRED') ORDER BY id DESC LIMIT 1", [(int)$requisitionId]) ?: null;
+}
+function cx_requirement_from_requisition($requisitionId) {
+    if (!connect_market_can()) return [false, 'The Marketplace is not part of your plan, or you do not have access to post on it.', 0];
+    $rq = ops_one("SELECT * FROM requisitions WHERE id=?", [(int)$requisitionId]);
+    $word = function_exists('Tl') ? Tl('requisition') : 'requisition';
+    if (!$rq) return [false, ucfirst($word) . ' not found.', 0];
+    if (!cx_requisition_postable($rq)) return [false, 'Only a ' . $word . ' that is still being filled can be posted.', 0];
+    $live = cx_requirement_for_requisition((int)$rq['id']);
+    if ($live) return [true, 'This ' . $word . ' is already on the Marketplace as ' . $live['ref_code'] . '.', (int)$live['id']];
+    $desig = (string)($rq['designation'] ?? '');
+    $role = (defined('DESIGNATIONS') && isset(DESIGNATIONS[$desig])) ? DESIGNATIONS[$desig] : ($desig !== '' ? ucwords(strtolower(str_replace('_', ' ', $desig))) : 'Technical professional');
+    $disc = trim((string)($rq['discipline'] ?? ''));
+    $loc = trim((string)(($rq['deploy_location'] ?? '') ?: ($rq['project_site'] ?? '')));
+    $basis = strtoupper((string)($rq['rate_basis'] ?? 'MONTHLY'));
+    $months = (float)($rq['duration_months'] ?? 0);
+    $work = in_array($basis, ['MANDAY', 'DAILY'], true) ? 'day_rate' : (($months > 0 && $months < 3) ? 'manday' : 'long_deployment');
+    $lines = [];
+    foreach ([['skills', 'Skills'], ['qualification', 'Qualification'], ['relevant_experience', 'Experience']] as [$k, $lbl])
+        if (trim((string)($rq[$k] ?? '')) !== '') $lines[] = $lbl . ': ' . trim((string)$rq[$k]);
+    if ((float)($rq['experience_min'] ?? 0) > 0) $lines[] = 'At least ' . rtrim(rtrim(number_format((float)$rq['experience_min'], 1), '0'), '.') . ' years\' experience';
+    if ($months > 0) $lines[] = 'Duration: about ' . rtrim(rtrim(number_format($months, 1), '0'), '.') . ' month' . ($months == 1 ? '' : 's');
+    foreach ([['duty_hours', 'Duty hours'], ['shift', 'Shift']] as [$k, $lbl]) if (trim((string)($rq[$k] ?? '')) !== '') $lines[] = $lbl . ': ' . trim((string)$rq[$k]);
+    if (trim((string)($rq['responsibilities'] ?? '')) !== '') $lines[] = "\n" . trim((string)$rq['responsibilities']);
+    $id = cx_requirement_create([
+        'title'      => mb_substr($role . ($disc !== '' ? ' — ' . $disc : '') . ($loc !== '' ? ', ' . $loc : ''), 0, 200),
+        'poster_party_id' => 0,
+        'location'   => $loc, 'work_type' => $work,
+        'start_date' => (string)($rq['start_date'] ?? ''), 'end_date' => (string)($rq['end_date'] ?? ''),
+        'positions'  => max(1, (int)($rq['quantity'] ?? 1)),
+        'description'=> implode("\n", $lines),
+    ], false);
+    db()->prepare("UPDATE cx_requirements SET requisition_id=? WHERE id=?")->execute([(int)$rq['id'], $id]);
+    if (function_exists('act_log')) try {
+        act_log('REQUISITION', (int)$rq['id'], 'SYSTEM', 'Marketplace draft ' . (cx_requirement_get($id)['ref_code'] ?? '') . ' made from this ' . $word);
+        act_log('CX_REQUIREMENT', $id, 'SYSTEM', 'Made from ' . $word . ' ' . (string)($rq['req_code'] ?? ('#' . $rq['id'])));
+    } catch (Throwable $e) {}
+    return [true, 'A Marketplace draft is ready — check the details and the rate you will pay, then post it.', $id];
+}
+
 /** Move a requirement to a new status if the transition is legal. */
 function cx_requirement_transition($id, $to) {
     $r = cx_requirement_get($id); if (!$r) return false;
@@ -681,6 +742,11 @@ function ops_connect_requirements($route, $method) {
     if ($method === 'GET') cx_req_expiry_sweep_maybe();
     if ($method === 'POST') {
         $act = (string)($_POST['action'] ?? 'create');
+        if ($act === 'from_requisition') {   // Owner, 11 Nov 2026 — "Post this to the Marketplace"
+            [$fok, $fmsg, $fid] = cx_requirement_from_requisition((int)($_POST['requisition_id'] ?? 0));
+            flash($fmsg, $fok ? 'success' : 'error');
+            redirect($fid ? '/connect-requirement?id=' . (int)$fid : '/requisition?id=' . (int)($_POST['requisition_id'] ?? 0));
+        }
         if ($act === 'set_closing_rules') {   // Owner, 11 Nov 2026 — how long requirements stay open (master only)
             if (function_exists('is_master') && is_master() && function_exists('setting_set')) {
                 $od = max(1, min(365, (int)($_POST['open_days'] ?? 30))); $rd = max(0, min(30, (int)($_POST['remind_days'] ?? 3)));

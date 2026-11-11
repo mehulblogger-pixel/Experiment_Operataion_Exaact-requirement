@@ -7,7 +7,21 @@
 <div class="master-head">
   <div><h1><?= e(T_DETAIL('requisition', $req['req_code'])) ?> <span class="pill <?= $stCls ?>" style="vertical-align:middle;font-size:12px"><?= e(lk_options_or('requisition_status', REQ_STATUS)[$req['status']] ?? $req['status']) ?></span></h1>
     <p class="sub" style="margin:2px 0 0"><?= e(DESIGNATIONS[$req['designation']] ?? ($req['designation'] ?: 'Position')) ?><?php if ((int)($req['quantity'] ?? 1) > 1): ?> <span class="pill p-info" style="font-size:11px">× <?= (int)$req['quantity'] ?></span><?php endif; ?> · <?= e(lk_options_or('requisition_type', REQ_TYPES)[$req['req_type']] ?? '') ?> · <?= e($req['office_name'] ?: '—') ?><?php if (!empty($req['client_name']) || !empty($req['client_legal'])): ?> · <?= e($req['client_name'] ?: $req['client_legal']) ?><?php endif; ?></p></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+  <?php // Owner, 11 Nov 2026 — "Post this to the Marketplace", only where the company
+        // has the Marketplace and this person may post on it.
+    if (function_exists('connect_market_can') && connect_market_can() && function_exists('cx_requisition_postable')):
+      $mktLive = cx_requirement_for_requisition((int)$req['id']);
+      if ($mktLive): ?>
+    <a class="btn secondary" href="/connect-requirement?id=<?= (int)$mktLive['id'] ?>" title="This <?= e(Tl('requisition')) ?> on the Marketplace">🧑‍🏭 On the Marketplace: <?= e($mktLive['ref_code']) ?> · <?= e(ucfirst(strtolower((string)$mktLive['status']))) ?></a>
+    <?php elseif (cx_requisition_postable($req)): ?>
+    <form method="post" action="/connect-requirements" style="margin:0" onsubmit="return confirm('Make a Marketplace posting from this <?= e(addslashes(Tl('requisition'))) ?>? You will check it before it goes live. The client\'s name and your billing rate are not shown.');">
+      <input type="hidden" name="action" value="from_requisition"><input type="hidden" name="requisition_id" value="<?= (int)$req['id'] ?>">
+      <button class="btn secondary" type="submit">🧑‍🏭 Post this to the Marketplace</button>
+    </form>
+    <?php endif; endif; ?>
   <?php if (is_coordinator_level()): ?><a class="btn secondary" href="/requisition-edit?id=<?= (int)$req['id'] ?>">Edit</a><?php endif; ?>
+  </div>
 </div>
 
 <?php //  B3 — what happens next on THIS requirement. Every number comes from

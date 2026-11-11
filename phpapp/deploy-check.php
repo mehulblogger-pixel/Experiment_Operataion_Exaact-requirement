@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '1d87497 · 2026-11-11 18:36 UTC · 711 files';
+$RELEASE = 'fb23546 · 2026-11-11 18:48 UTC · 711 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -95,7 +95,7 @@ $EXPECT  = [
     'lib/connect_hiring.php' => ['s'=>5373,'h'=>'f92a4ba2f9c8ccc7'],
     'lib/connect_identity.php' => ['s'=>58186,'h'=>'6500583342a99ab1'],
     'lib/connect_kpi.php' => ['s'=>25816,'h'=>'6822491cfb7498be'],
-    'lib/connect_market.php' => ['s'=>62502,'h'=>'467e0c4bb996f78e'],
+    'lib/connect_market.php' => ['s'=>67788,'h'=>'3a3cf5284c39b5f9'],
     'lib/connect_match.php' => ['s'=>29253,'h'=>'6a3ceb740240e242'],
     'lib/connect_msg.php' => ['s'=>16414,'h'=>'37fd232a1fba99cc'],
     'lib/connect_org.php' => ['s'=>38793,'h'=>'0c36a9276e72bb91'],
@@ -419,7 +419,7 @@ $EXPECT  = [
     'views/ops/connect_passport_public.php' => ['s'=>6646,'h'=>'d3a171906f276469'],
     'views/ops/connect_passport_share.php' => ['s'=>3238,'h'=>'001e14194e7c30e0'],
     'views/ops/connect_qualifications.php' => ['s'=>17605,'h'=>'3e0dabe90148f43a'],
-    'views/ops/connect_requirement.php' => ['s'=>56189,'h'=>'bccd1cf6092d641a'],
+    'views/ops/connect_requirement.php' => ['s'=>56549,'h'=>'54f9687379fa11ed'],
     'views/ops/connect_requirements.php' => ['s'=>9963,'h'=>'0024969fe7c007ea'],
     'views/ops/connect_source.php' => ['s'=>4918,'h'=>'a8882cf9e99ec24b'],
     'views/ops/connect_talent.php' => ['s'=>9173,'h'=>'1b391a894a2345f8'],
@@ -596,7 +596,7 @@ $EXPECT  = [
     'views/ops/reimbursable_dedup.php' => ['s'=>5102,'h'=>'da32e91a64ec4b37'],
     'views/ops/report_reviews.php' => ['s'=>5133,'h'=>'5430d377e91ab88c'],
     'views/ops/reports.php' => ['s'=>15006,'h'=>'c0238ade91734a27'],
-    'views/ops/requisition_detail.php' => ['s'=>31325,'h'=>'1adcbdd93b7cf9af'],
+    'views/ops/requisition_detail.php' => ['s'=>32649,'h'=>'518c3414da8abb6b'],
     'views/ops/requisition_form.php' => ['s'=>68447,'h'=>'83b3a4020c214fd6'],
     'views/ops/requisition_list.php' => ['s'=>2658,'h'=>'bb32a939b2dc11fb'],
     'views/ops/reset_data.php' => ['s'=>3876,'h'=>'68118be018101456'],

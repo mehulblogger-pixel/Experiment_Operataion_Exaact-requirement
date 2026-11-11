@@ -55,6 +55,7 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
 
 <div class="panel" style="margin-top:12px">
   <div class="cxmeta" style="margin-bottom:8px">
+    <?php if ((int)($req['requisition_id'] ?? 0) > 0): $fromRq = ops_one("SELECT id, req_code FROM requisitions WHERE id=?", [(int)$req['requisition_id']]); if ($fromRq): ?>From <?= e(Tl('requisition')) ?> <a href="/requisition?id=<?= (int)$fromRq['id'] ?>"><strong><?= e($fromRq['req_code'] ?: ('#' . $fromRq['id'])) ?></strong></a> · <?php endif; endif; ?>
     <?php if (!empty($req['poster_name'])): ?>Posted for <strong><?= e($req['poster_name']) ?></strong> · <?php endif; ?>
     <?php if (!empty($req['sector_code'])): ?>Sector <?= e($req['sector_code']) ?> · <?php endif; ?>
     <?php if (!empty($req['discipline_code'])): ?>Discipline <?= e($req['discipline_code']) ?> · <?php endif; ?>

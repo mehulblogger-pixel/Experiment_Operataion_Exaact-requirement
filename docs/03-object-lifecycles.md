@@ -635,6 +635,11 @@ no existing object touched.
   before this existed get a date with at least seven days' notice. Both numbers
   are master-only settings on the Marketplace requirements page (defaults chosen
   from common job-board practice; the owner may change them).
+- *Made from a requisition* (owner, 11 Nov 2026): "Post this to the Marketplace"
+  on a requisition that is still being filled (`OPEN`, `PROPOSED`, `OFFERED`,
+  `PARTIALLY_FILLED`) creates a requirement in **`DRAFT`** linked by
+  `requisition_id`; the coordinator checks it and posts it (`DRAFT → OPEN`). One
+  live requirement per requisition — pressing again opens it. No status added.
 - *Corrections:* the details (title, client, place, work type, dates, positions,
   rates, description) may be changed while the requirement is `DRAFT`, `OPEN` or
   `SHORTLISTING` (`cx_requirement_update`, logged); the status does not change.
