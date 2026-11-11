@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'f69c3e2 · 2026-11-11 17:55 UTC · 710 files';
+$RELEASE = '07cc4ed · 2026-11-11 18:16 UTC · 710 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -75,7 +75,7 @@ $EXPECT  = [
     'lib/connect_advisor.php' => ['s'=>4420,'h'=>'f39961034078a66a'],
     'lib/connect_analytics.php' => ['s'=>10322,'h'=>'55ce5e2749ea0bda'],
     'lib/connect_bench.php' => ['s'=>19261,'h'=>'452adce3bb2a9900'],
-    'lib/connect_bridge.php' => ['s'=>10631,'h'=>'17277f41b8795b01'],
+    'lib/connect_bridge.php' => ['s'=>12043,'h'=>'d65f1e5c964d127d'],
     'lib/connect_capability.php' => ['s'=>16610,'h'=>'84e2c581bc36e29c'],
     'lib/connect_channels.php' => ['s'=>17045,'h'=>'5100b89577ea339f'],
     'lib/connect_client_bench.php' => ['s'=>10478,'h'=>'793a2fd9e8dc13e3'],
@@ -88,14 +88,14 @@ $EXPECT  = [
     'lib/connect_cv.php' => ['s'=>6178,'h'=>'6e5123e99d862fa0'],
     'lib/connect_deploy.php' => ['s'=>8299,'h'=>'d3d261a16ddc833c'],
     'lib/connect_disputes.php' => ['s'=>4865,'h'=>'56ecbec1a7a03f91'],
-    'lib/connect_engage.php' => ['s'=>25091,'h'=>'3c788d9972e9d995'],
+    'lib/connect_engage.php' => ['s'=>26329,'h'=>'fcec563764d09e11'],
     'lib/connect_engvoucher.php' => ['s'=>36368,'h'=>'c56b9458d81af736'],
     'lib/connect_geo.php' => ['s'=>19346,'h'=>'9ee996bdd62de2ca'],
     'lib/connect_govern.php' => ['s'=>7181,'h'=>'22ce5ad54e44ce2a'],
     'lib/connect_hiring.php' => ['s'=>5373,'h'=>'f92a4ba2f9c8ccc7'],
     'lib/connect_identity.php' => ['s'=>58186,'h'=>'6500583342a99ab1'],
     'lib/connect_kpi.php' => ['s'=>25816,'h'=>'6822491cfb7498be'],
-    'lib/connect_market.php' => ['s'=>44745,'h'=>'44def6c0a1512be8'],
+    'lib/connect_market.php' => ['s'=>53236,'h'=>'7e66e6dd0207c500'],
     'lib/connect_match.php' => ['s'=>29253,'h'=>'6a3ceb740240e242'],
     'lib/connect_msg.php' => ['s'=>16414,'h'=>'37fd232a1fba99cc'],
     'lib/connect_org.php' => ['s'=>38793,'h'=>'0c36a9276e72bb91'],
@@ -189,7 +189,7 @@ $EXPECT  = [
     'lib/pdso.php' => ['s'=>62942,'h'=>'b8624fad908da790'],
     'lib/pipelines.php' => ['s'=>14596,'h'=>'8f62abd870e47a71'],
     'lib/platform_mail.php' => ['s'=>22419,'h'=>'95ffd0e9fea3845d'],
-    'lib/portal.php' => ['s'=>124427,'h'=>'764b3fae6a4ddc55'],
+    'lib/portal.php' => ['s'=>125094,'h'=>'7f9d50241e12c944'],
     'lib/position.php' => ['s'=>19441,'h'=>'a0a9d1a9e6a9b10c'],
     'lib/preflight.php' => ['s'=>5451,'h'=>'97e742bbddf7fbd8'],
     'lib/pricing_admin.php' => ['s'=>16307,'h'=>'d7af986c89fc5cfc'],
@@ -418,7 +418,7 @@ $EXPECT  = [
     'views/ops/connect_passport_public.php' => ['s'=>6646,'h'=>'d3a171906f276469'],
     'views/ops/connect_passport_share.php' => ['s'=>3238,'h'=>'001e14194e7c30e0'],
     'views/ops/connect_qualifications.php' => ['s'=>17605,'h'=>'3e0dabe90148f43a'],
-    'views/ops/connect_requirement.php' => ['s'=>52226,'h'=>'a6c56d4579e8290e'],
+    'views/ops/connect_requirement.php' => ['s'=>56104,'h'=>'87eec0be860cde15'],
     'views/ops/connect_requirements.php' => ['s'=>8225,'h'=>'f3962db4ca176d34'],
     'views/ops/connect_source.php' => ['s'=>4918,'h'=>'a8882cf9e99ec24b'],
     'views/ops/connect_talent.php' => ['s'=>9173,'h'=>'1b391a894a2345f8'],
@@ -674,7 +674,7 @@ $EXPECT  = [
     'views/portal/find.php' => ['s'=>12418,'h'=>'75a5a6aab6e7e126'],
     'views/portal/forgot.php' => ['s'=>1316,'h'=>'443297c5fc6bccfe'],
     'views/portal/hire.php' => ['s'=>22948,'h'=>'70f7cc78d9bfd1c0'],
-    'views/portal/hire_req.php' => ['s'=>21347,'h'=>'f67c22df4d0e69f3'],
+    'views/portal/hire_req.php' => ['s'=>24195,'h'=>'08ebaf68552dce6d'],
     'views/portal/hiring.php' => ['s'=>8831,'h'=>'eedf44396241f48c'],
     'views/portal/invoices.php' => ['s'=>2486,'h'=>'ff5b9b4f07b9fb21'],
     'views/portal/issue.php' => ['s'=>4390,'h'=>'8306150ab4c48390'],

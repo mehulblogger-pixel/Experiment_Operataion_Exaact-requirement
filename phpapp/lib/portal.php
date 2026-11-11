@@ -1303,7 +1303,7 @@ function portal_route($route, $method) {
                 } elseif ($act === 'invite' && function_exists('cx_application_add')) {
                     $rid = (int)($_POST['requirement_id'] ?? 0); $pid = (int)($_POST['pro_id'] ?? 0);
                     $req = function_exists('cx_requirement_get') ? cx_requirement_get($rid) : null;
-                    if ($req && (int)$req['poster_party_id'] === (int)$party && $pid) {   // only onto the client's OWN job
+                    if ($req && (int)$req['poster_party_id'] === (int)$party && $pid && cx_requirement_takes_applicants($req)) {   // only onto the client's OWN job, while it is taking people
                         $nm = (string)ops_val("SELECT name FROM cx_professionals WHERE id=?", [$pid]);
                         $newId = cx_application_add($rid, ['applicant_professional_id' => $pid, 'applicant_name' => $nm]);
                         $_SESSION['portal_flash'] = $newId ? ($nm . ' invited to ' . $req['ref_code'] . '.') : ($nm . ' is already on that requirement.');
@@ -1326,7 +1326,7 @@ function portal_route($route, $method) {
                 'disciplines' => function_exists('connect_tx_rows') ? connect_tx_rows('cx_disciplines') : [],
                 'work_types'  => function_exists('cx_pro_work_types') ? cx_pro_work_types() : [],
                 'open_reqs'   => function_exists('cx_requirements_for_party')
-                                    ? array_values(array_filter(cx_requirements_for_party($party), fn($r) => in_array(strtoupper((string)$r['status']), ['OPEN','SHORTLISTING'], true)))
+                                    ? array_values(array_filter(cx_requirements_for_party($party), fn($r) => cx_requirement_takes_applicants($r)))
                                     : [],
             ]);
             exit;
@@ -1377,7 +1377,7 @@ function portal_route($route, $method) {
                 'tier'     => function_exists('connect_verify_tier_label') ? connect_verify_tier_label(function_exists('connect_verify_tier_for_professional') ? connect_verify_tier_for_professional($proId) : 'registered') : 'Registered',
                 'avail'    => function_exists('connect_availability_status') ? connect_availability_status($proId) : null,
                 'open_reqs'=> function_exists('cx_requirements_for_party')
-                                  ? array_values(array_filter(cx_requirements_for_party($party), fn($r) => in_array(strtoupper((string)$r['status']), ['OPEN','SHORTLISTING'], true)))
+                                  ? array_values(array_filter(cx_requirements_for_party($party), fn($r) => cx_requirement_takes_applicants($r)))
                                   : [],
             ]);
             exit;
@@ -1398,7 +1398,7 @@ function portal_route($route, $method) {
                 elseif ($act === 'invite' && function_exists('cx_application_add')) {
                     $rid = (int)($_POST['requirement_id'] ?? 0); $pid = (int)($_POST['pro_id'] ?? 0);
                     $req = function_exists('cx_requirement_get') ? cx_requirement_get($rid) : null;
-                    if ($req && (int)$req['poster_party_id'] === (int)$party && $pid) {
+                    if ($req && (int)$req['poster_party_id'] === (int)$party && $pid && cx_requirement_takes_applicants($req)) {
                         $nm = (string)ops_val("SELECT name FROM cx_professionals WHERE id=?", [$pid]);
                         $newId = cx_application_add($rid, ['applicant_professional_id' => $pid, 'applicant_name' => $nm]);
                         $m = $newId ? ($nm . ' invited to ' . $req['ref_code'] . '.') : ($nm . ' is already on that requirement.');
@@ -1411,7 +1411,7 @@ function portal_route($route, $method) {
                 'bench'     => connect_client_bench_list($party),
                 'previous'  => function_exists('connect_client_bench_previous') ? connect_client_bench_previous($party) : [],
                 'open_reqs' => function_exists('cx_requirements_for_party')
-                                  ? array_values(array_filter(cx_requirements_for_party($party), fn($r) => in_array(strtoupper((string)$r['status']), ['OPEN','SHORTLISTING'], true)))
+                                  ? array_values(array_filter(cx_requirements_for_party($party), fn($r) => cx_requirement_takes_applicants($r)))
                                   : [],
             ]);
             exit;
@@ -1430,6 +1430,11 @@ function portal_route($route, $method) {
                 } elseif ($act === 'award') {
                     $ap = cx_application_get((int)($_POST['application_id'] ?? 0));
                     if ($ap && (int)$ap['requirement_id'] === (int)$req['id']) cx_requirement_award((int)$req['id'], (int)$ap['id']);
+                } elseif ($act === 'replace_award' && function_exists('cx_requirement_replace')) {
+                    //  Owner, 11 Nov 2026 — the awarded person cannot do the job.
+                    [, $rmsg] = cx_requirement_replace((int)$req['id'], (int)($_POST['application_id'] ?? 0), $_POST, portal_client_name());
+                    $_SESSION['portal_flash'] = $rmsg;
+                    redirect('/portal/hire-req?id=' . (int)$req['id']);
                 } elseif ($act === 'engage_save' && function_exists('connect_engage_client_save')) {
                     //  Owner, 11 Nov 2026 — the client records what it bought.
                     [, $bmsg] = connect_engage_client_save((int)$req['id'], (int)portal_partner_id(), $_POST, portal_client_name());
@@ -1440,7 +1445,7 @@ function portal_route($route, $method) {
                     // the resource frees up and the work surfaces as needing cover.
                     $eng = function_exists('connect_engage_for_requirement') ? connect_engage_for_requirement((int)$req['id']) : null;
                     if ($eng && (int)$eng['id'] === (int)($_POST['engagement_id'] ?? 0)) {
-                        [, $emsg] = connect_engage_cancel((int)$eng['id'], (string)($_POST['kind'] ?? 'CANCELLED'), (string)($_POST['reason'] ?? ''), portal_client_name());
+                        [, $emsg] = connect_engage_cancel((int)$eng['id'], (string)($_POST['kind'] ?? 'CANCELLED'), (string)($_POST['reason'] ?? ''), portal_client_name(), (float)($_POST['worked'] ?? 0));
                         $_SESSION['portal_flash'] = $emsg;
                     }
                     redirect('/portal/hire-req?id=' . (int)$req['id']);
@@ -1456,6 +1461,7 @@ function portal_route($route, $method) {
                 'eng'      => $engRow,
                 'eng_kinds'=> function_exists('connect_engage_cancel_kinds') ? connect_engage_cancel_kinds() : [],
                 'eng_bases'=> function_exists('connect_engage_bases') ? connect_engage_bases() : [],
+                'replace_candidates' => function_exists('cx_replacement_candidates') && strtoupper((string)$req['status']) === 'AWARDED' ? cx_replacement_candidates((int)$req['id']) : [],
                 'eng_lock' => function_exists('connect_engage_client_lock_reason') ? connect_engage_client_lock_reason((int)$req['id']) : '',
                 'eng_rate' => ($engRow && (float)$engRow['rate'] > 0) ? (float)$engRow['rate']
                               : (function_exists('connect_bridge_rate') ? connect_bridge_rate($req, cx_application_get((int)($req['awarded_application_id'] ?? 0)) ?: []) : 0),

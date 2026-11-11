@@ -68,6 +68,14 @@ function connect_market_migrate() {
     // a party, not a pool inspector. Additive column so those applications
     // dedupe correctly on the applying party.
     if (function_exists('ensure_column')) ensure_column('cx_applications', 'applicant_party_id', 'INT DEFAULT 0');
+    //  Owner, 11 Nov 2026 — an applicant closed only because someone else was
+    //  awarded may be brought back if that person cannot do the job; one the
+    //  client actually turned down may not. And when the awarded person is
+    //  replaced, when it happened.
+    if (function_exists('ensure_column')) {
+        ensure_column('cx_applications', 'closed_by_award', 'INT DEFAULT 0');
+        ensure_column('cx_applications', 'replaced_at', "VARCHAR(30) DEFAULT ''");
+    }
     // Deputation & rate terms chosen at posting — the preferred engagement basis,
     // the rate model (all-inclusive vs fee-only), and the voucher cadence. These
     // seed the booking (cx_engagements) and are additive/defaulted.
@@ -373,11 +381,114 @@ function cx_requirement_award($requirementId, $applicationId) {
         if ((int)$o['id'] === (int)$applicationId) continue;
         if (in_array(strtoupper((string)$o['status']), ['APPLIED', 'SHORTLISTED', 'OFFERED'], true)) {
             $to = strtoupper((string)$o['status']) === 'OFFERED' ? 'WITHDRAWN' : 'REJECTED';
-            cx_application_transition((int)$o['id'], $to);
+            if (cx_application_transition((int)$o['id'], $to) && $to === 'REJECTED')
+                db()->prepare("UPDATE cx_applications SET closed_by_award=1 WHERE id=?")->execute([(int)$o['id']]);
         }
     }
     if (function_exists('act_log')) try { act_log('CX_REQUIREMENT', (int)$requirementId, 'SYSTEM', 'Awarded to ' . ($a['applicant_name'] ?? ('application #' . (int)$applicationId)) . '; other open applications closed as not selected'); } catch (Throwable $e) {}
     return true;
+}
+
+/**
+ * REPLACEMENT — owner, 11 Nov 2026: "One person, one requirement award … if the
+ * professional who is awarded the job either cancels or is unable to attend …
+ * same can be awarded to the other professional."
+ *
+ * A job is awarded to ONE person. If that person withdraws, does not turn up or
+ * cannot attend, the job is awarded to someone else — the requirement stays
+ * AWARDED throughout (no new requirement status). What happens:
+ *   • the live booking ends with the reason (no-show / withdrawn / cancelled)
+ *     and how much was already worked — that part is still billed;
+ *   • the person replaced: ACCEPTED → WITHDRAWN, with the time it happened;
+ *   • the replacement: any applicant still in play, or one closed only because
+ *     the job had been awarded (REJECTED → SHORTLISTED, then the normal path
+ *     to ACCEPTED). An applicant the client turned down is not offered;
+ *   • a new booking for what is left, at the replacement's own rate, linked to
+ *     the one it replaces.
+ * Returns [ok, message].
+ */
+function cx_replacement_candidates($requirementId) {
+    $r = cx_requirement_get($requirementId); if (!$r) return [];
+    $out = [];
+    foreach (cx_applications_for($requirementId) as $a) {
+        if ((int)$a['id'] === (int)$r['awarded_application_id']) continue;
+        $st = strtoupper((string)$a['status']);
+        if (in_array($st, ['APPLIED', 'SHORTLISTED', 'OFFERED'], true) || ($st === 'REJECTED' && (int)($a['closed_by_award'] ?? 0) === 1)) $out[] = $a;
+    }
+    return $out;
+}
+/** An awarded job whose booking ended early and has no live replacement yet. */
+function cx_requirement_needs_replacement($req) {
+    if (!is_array($req) || strtoupper((string)($req['status'] ?? '')) !== 'AWARDED' || !function_exists('connect_engage_for_requirement')) return false;
+    $e = connect_engage_for_requirement((int)$req['id']);
+    return $e && strtoupper((string)$e['status']) === 'CANCELLED';
+}
+/** May new people be put forward / invited to this job? Open ones, and an
+ *  awarded one that needs a replacement. */
+function cx_requirement_takes_applicants($req) {
+    return is_array($req) && (in_array(strtoupper((string)($req['status'] ?? '')), ['OPEN', 'SHORTLISTING'], true) || cx_requirement_needs_replacement($req));
+}
+function cx_requirement_replace($requirementId, $newApplicationId, array $in = [], $who = '') {
+    $r = cx_requirement_get($requirementId);
+    if (!$r) return [false, 'Requirement not found.'];
+    if (strtoupper((string)$r['status']) !== 'AWARDED') return [false, 'Only an awarded job can be given to someone else.'];
+    $new = cx_application_get($newApplicationId);
+    $ok = false;
+    foreach (cx_replacement_candidates((int)$r['id']) as $c) if ((int)$c['id'] === (int)$newApplicationId) $ok = true;
+    if (!$new || !$ok) return [false, 'Choose someone who applied for this job and is still available.'];
+    $old = cx_application_get((int)$r['awarded_application_id']);
+    $kind = strtoupper((string)($in['kind'] ?? ''));
+    $kinds = function_exists('connect_engage_cancel_kinds') ? connect_engage_cancel_kinds() : [];
+    if (!isset($kinds[$kind])) return [false, 'Say why the job is going to someone else.'];
+    $reason = trim((string)($in['reason'] ?? ''));
+    $worked = max(0, (float)($in['worked'] ?? 0));
+
+    // 1. End the replaced person's booking, keeping what they worked.
+    $eng = function_exists('connect_engage_for_requirement') ? connect_engage_for_requirement((int)$r['id']) : null;
+    if ($eng && in_array(strtoupper((string)$eng['status']), ['BOOKED', 'ACTIVE'], true)) {
+        connect_engage_cancel((int)$eng['id'], $kind, $reason, $who, $worked);
+        $eng = connect_engage_for_requirement((int)$r['id']);
+    } elseif ($eng && strtoupper((string)$eng['status']) === 'CANCELLED' && $worked > 0 && (float)$eng['worked_qty'] <= 0) {
+        db()->prepare("UPDATE cx_engagements SET worked_qty=? WHERE id=?")->execute([min($worked, (float)$eng['quantity'] ?: $worked), (int)$eng['id']]);
+        $eng = connect_engage_for_requirement((int)$r['id']);
+    }
+    // 2. The person replaced.
+    if ($old && strtoupper((string)$old['status']) === 'ACCEPTED')
+        db()->prepare("UPDATE cx_applications SET status='WITHDRAWN', replaced_at=?, updated_at=? WHERE id=?")->execute([date('c'), date('c'), (int)$old['id']]);
+    // 3. The replacement, along the normal path.
+    if (strtoupper((string)$new['status']) === 'REJECTED')
+        db()->prepare("UPDATE cx_applications SET status='SHORTLISTED', closed_by_award=0, updated_at=? WHERE id=?")->execute([date('c'), (int)$new['id']]);
+    $st = strtoupper((string)cx_application_get($newApplicationId)['status']);
+    if ($st === 'APPLIED') { cx_application_transition($newApplicationId, 'SHORTLISTED'); $st = 'SHORTLISTED'; }
+    if ($st === 'SHORTLISTED') { cx_application_transition($newApplicationId, 'OFFERED'); $st = 'OFFERED'; }
+    if ($st === 'OFFERED') cx_application_transition($newApplicationId, 'ACCEPTED');
+    if (strtoupper((string)cx_application_get($newApplicationId)['status']) !== 'ACCEPTED') return [false, 'The replacement could not be accepted.'];
+    db()->prepare("UPDATE cx_requirements SET awarded_application_id=?, updated_at=? WHERE id=?")->execute([(int)$newApplicationId, date('c'), (int)$r['id']]);
+    $oldName = (string)($old['applicant_name'] ?? 'the person awarded'); $newName = (string)($new['applicant_name'] ?? 'the replacement');
+    if (function_exists('act_log')) try { act_log('CX_REQUIREMENT', (int)$r['id'], 'SYSTEM', 'Awarded to ' . $newName . ' in place of ' . $oldName . ' — ' . ($kinds[$kind] ?? $kind) . ($reason !== '' ? ': ' . $reason : '') . ($who !== '' ? ' (by ' . $who . ')' : '')); } catch (Throwable $e) {}
+
+    // 4. A booking for what is left, at the replacement's own rate.
+    $msg = $newName . ' is now awarded the job in place of ' . $oldName . '.';
+    if ($eng && function_exists('connect_engage_save_for_requirement')) {
+        $bases = connect_engage_bases(); $b = $bases[strtoupper((string)$eng['basis'])] ?? null;
+        $left = !empty($b['needs_qty']) ? max(0, (float)$eng['quantity'] - (float)$eng['worked_qty']) : 0;
+        if ($b && (empty($b['needs_qty']) || $left > 0)) {
+            $start = max(date('Y-m-d'), substr((string)$eng['start_date'], 0, 10));
+            $endD = (string)$eng['end_date'];
+            if ($endD !== '' && $endD < $start) $endD = '';
+            [$bok] = connect_engage_save_for_requirement((int)$r['id'], [
+                'basis' => $eng['basis'], 'quantity' => $left, 'frequency_note' => $eng['frequency_note'],
+                'start_date' => $start, 'end_date' => $endD,
+                'rate' => function_exists('connect_bridge_rate') ? connect_bridge_rate(cx_requirement_get((int)$r['id']), cx_application_get($newApplicationId)) : 0,
+                'rate_unit' => $eng['rate_unit'], 'rate_inclusive' => $eng['rate_inclusive'], 'voucher_cadence' => $eng['voucher_cadence'],
+                'reimb_terms' => $eng['reimb_terms'], 'shift' => $eng['shift'], 'notes' => 'Replaces ' . $oldName,
+            ]);
+            $msg .= $bok ? ' A booking for what is left' . ($left > 0 ? ' (' . rtrim(rtrim(number_format($left, 2), '0'), '.') . ' ' . ($eng['rate_unit'] ?: 'day') . '(s))' : '') . ' is recorded at their rate — check the dates.' : ' Record their booking.';
+        } else {
+            $msg .= ' Record their booking.';
+        }
+    }
+    return [true, $msg];
 }
 
 function cx_applications_for($requirementId) {
@@ -531,6 +642,10 @@ function ops_connect_requirement($method) {
             flash($eok ? $emsg . (cx_applications_for($id) ? ' People who already applied see the new details.' : '') : $emsg, $eok ? 'success' : 'error');
         } elseif ($act === 'req_transition') {
             cx_requirement_transition($id, $_POST['to'] ?? '') ? flash('Requirement updated.') : flash('That change is not allowed from the current status.', 'error');
+        } elseif ($act === 'replace_award') {
+            //  Owner, 11 Nov 2026 — the awarded person cannot do the job.
+            [$rok, $rmsg] = cx_requirement_replace($id, (int)($_POST['application_id'] ?? 0), $_POST, function_exists('user_name') ? user_name(current_user()) : '');
+            flash($rmsg, $rok ? 'success' : 'error');
         } elseif ($act === 'apply') {
             $newId = cx_application_add($id, $_POST);
             flash($newId ? 'Application recorded.' : 'That professional has already applied to this requirement.', $newId ? 'success' : 'error');
@@ -605,6 +720,7 @@ function ops_connect_requirement($method) {
     view('ops/connect_requirement', [
         'req'          => $req,
         'apps'         => cx_applications_for($id),
+        'replace_candidates' => cx_replacement_candidates($id),
         'inspectors'   => ops_all("SELECT id, name FROM inspectors WHERE COALESCE(status,'ACTIVE')='ACTIVE' ORDER BY name") ?: [],
         'req_next'     => CX_REQ_TRANSITIONS[strtoupper((string)$req['status'])] ?? [],
         // K3 — ranked recommendations from the pool (only worth showing while open).

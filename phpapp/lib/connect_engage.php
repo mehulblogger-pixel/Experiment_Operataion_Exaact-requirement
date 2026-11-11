@@ -57,6 +57,10 @@ function connect_engage_migrate() {
         ensure_column('cx_engagements', 'cancel_reason', "VARCHAR(400) DEFAULT ''");
         ensure_column('cx_engagements', 'cancelled_at',  "VARCHAR(30) DEFAULT ''");
         ensure_column('cx_engagements', 'cancelled_by',  "VARCHAR(150) DEFAULT ''");
+        //  Owner, 11 Nov 2026 — when a booking ends early, how much of it was
+        //  actually worked (days / months / visits), so that part is still billed
+        //  and the replacement is booked for what is left.
+        ensure_column('cx_engagements', 'worked_qty', 'REAL DEFAULT 0');
         ensure_column('cx_engagements', 'replaces_engagement_id', "INT DEFAULT 0");
     }
 }
@@ -77,15 +81,19 @@ function connect_engage_cancel_kinds() {
  * bookings, so the person is immediately free to be re-booked. Idempotent-ish:
  * re-cancelling only refreshes the reason. Returns [ok, message].
  */
-function connect_engage_cancel($id, $kind, $reason = '', $who = '') {
+function connect_engage_cancel($id, $kind, $reason = '', $who = '', $worked = 0) {
     connect_engage_migrate();
     $id = (int)$id; if ($id <= 0) return [false, 'Unknown engagement.'];
     $kind = strtoupper((string)$kind); if (!isset(connect_engage_cancel_kinds()[$kind])) $kind = 'CANCELLED';
-    $row = ops_one("SELECT id, subject_name, requirement_id FROM cx_engagements WHERE id=?", [$id]);
+    $row = ops_one("SELECT id, subject_name, requirement_id, quantity FROM cx_engagements WHERE id=?", [$id]);
     if (!$row) return [false, 'Unknown engagement.'];
-    db()->prepare("UPDATE cx_engagements SET status='CANCELLED', cancel_kind=?, cancel_reason=?, cancelled_at=?, cancelled_by=?, updated_at=? WHERE id=?")
-        ->execute([$kind, trim((string)$reason), date('c'), (string)$who, date('c'), $id]);
-    if (function_exists('act_log')) { try { act_log('engagement', $id, 'ENGAGEMENT_' . $kind, (string)$row['subject_name'] . ' — ' . (connect_engage_cancel_kinds()[$kind] ?? $kind), ['auto' => 1]); } catch (Throwable $e) {} }
+    $worked = max(0, (float)$worked);
+    if ((float)$row['quantity'] > 0) $worked = min($worked, (float)$row['quantity']);
+    db()->prepare("UPDATE cx_engagements SET status='CANCELLED', cancel_kind=?, cancel_reason=?, cancelled_at=?, cancelled_by=?, worked_qty=?, updated_at=? WHERE id=?")
+        ->execute([$kind, trim((string)$reason), date('c'), (string)$who, $worked, date('c'), $id]);
+    //  On the job's own timeline (this used an unregistered entity name, so the
+    //  entry was stored against nothing).
+    if (function_exists('act_log') && (int)$row['requirement_id'] > 0) { try { act_log('CX_REQUIREMENT', (int)$row['requirement_id'], 'SYSTEM', 'Booking of ' . (string)$row['subject_name'] . ' ended — ' . (connect_engage_cancel_kinds()[$kind] ?? $kind) . (trim((string)$reason) !== '' ? ': ' . trim((string)$reason) : '') . ($worked > 0 ? ' (' . rtrim(rtrim(number_format($worked, 2), '0'), '.') . ' worked)' : ''), ['auto' => 1]); } catch (Throwable $e) {} }
     return [true, 'Booking ended (' . strtolower(str_replace('_', '-', $kind)) . '). The resource is free again' . ((int)$row['requirement_id'] > 0 ? ' — the requirement can be re-sourced for a replacement.' : '.')];
 }
 
@@ -249,6 +257,10 @@ function connect_engage_save_for_requirement($requirementId, array $in) {
 
     $shift = strtoupper(trim((string)($in['shift'] ?? '')));  // Gap-4 — '' = full day
     $existing = connect_engage_for_requirement($requirementId);
+    //  A booking that ended early is history (who did not turn up, what they
+    //  worked). Booking again — the replacement — is a NEW booking linked to it.
+    $replaces = 0;
+    if ($existing && strtoupper((string)$existing['status']) === 'CANCELLED') { $replaces = (int)$existing['id']; $existing = null; }
     if ($existing) {
         db()->prepare("UPDATE cx_engagements SET basis=?, rate=?, rate_unit=?, quantity=?, frequency_note=?, start_date=?, end_date=?, status=?, rate_inclusive=?, voucher_cadence=?, reimb_terms=?, shift=?, notes=?, updated_at=? WHERE id=?")
             ->execute([$basis, $rate, $unit, $qty, $freq, $start, $end, $status, $rateModel, $cadence, $reimbTerms, $shift, trim((string)($in['notes'] ?? '')), date('c'), (int)$existing['id']]);
@@ -260,7 +272,9 @@ function connect_engage_save_for_requirement($requirementId, array $in) {
         ->execute([(int)$requirementId, (int)$subj['application_id'], $subj['kind'], (int)$subj['id'], $subj['name'],
                    (int)($req['poster_party_id'] ?? 0), (string)($req['poster_name'] ?? ''), $basis, $rate, $unit, $qty, $freq,
                    $start, $end, $status, $rateModel, $cadence, $reimbTerms, $shift, trim((string)($in['notes'] ?? '')), date('c'), date('c')]);
-    return [true, 'Booking recorded.', (int)db()->lastInsertId()];
+    $newId = (int)db()->lastInsertId();
+    if ($replaces > 0) connect_engage_mark_replacement($newId, $replaces);
+    return [true, 'Booking recorded.', $newId];
 }
 
 /**

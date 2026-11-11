@@ -157,13 +157,26 @@ $reqLabel = ['OPEN'=>'Open for applications','SHORTLISTING'=>'Start shortlisting
   <?php if ($es === 'CANCELLED' && $ck !== ''): ?>
     <div style="margin-top:10px;padding:11px 13px;border-radius:11px;background:#fff7ea;border:1px solid #efd9a3">
       <strong style="color:#8a6d0b">⚠ Needs cover</strong>
-      <div style="font-size:13px;margin-top:2px">Ended as <em><?= e($ck === 'NO_SHOW' ? 'a no-show' : 'cancelled') ?></em><?= !empty($eng['cancel_reason']) ? ' — ' . e($eng['cancel_reason']) : '' ?>. The resource is free; source a replacement.</div>
-      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
-        <a class="btn" href="/portal/find">🔎 Find a replacement</a>
-        <?php if (in_array('SHORTLISTING', $req_next, true)): ?>
-          <form method="post" action="/portal/hire-req" class="inl"><input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="action" value="req_transition"><input type="hidden" name="to" value="SHORTLISTING"><button class="btn secondary" type="submit">Re-open shortlisting</button></form>
+      <div style="font-size:13px;margin-top:2px">Ended — <em><?= e(lcfirst((string)($eng_kinds[$ck] ?? 'cancelled'))) ?></em><?= !empty($eng['cancel_reason']) ? ' — ' . e($eng['cancel_reason']) : '' ?>. The resource is free; source a replacement.</div>
+      <?php $replace_candidates = $replace_candidates ?? []; $kindsR = $eng_kinds;
+            if (strtoupper((string)$req['status']) === 'AWARDED'): ?>
+        <?php if ($replace_candidates): ?>
+        <form method="post" action="/portal/hire-req" style="margin-top:10px;display:grid;gap:8px" onsubmit="return confirm('Award this job to the person chosen instead?');">
+          <input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="action" value="replace_award">
+          <input type="hidden" name="kind" value="<?= e($ck ?: 'CANCELLED') ?>"><input type="hidden" name="reason" value="<?= e($eng['cancel_reason'] ?? '') ?>">
+          <label style="font-size:13px;font-weight:600">Give the job to
+            <select name="application_id" class="form-control" required><option value="">— choose —</option>
+              <?php foreach ($replace_candidates as $c): ?><option value="<?= (int)$c['id'] ?>"><?= e($c['applicant_name']) ?><?= (float)$c['proposed_rate'] > 0 ? ' — ' . $vinr($c['proposed_rate']) : '' ?></option><?php endforeach; ?>
+            </select></label>
+          <div><button class="btn" type="submit">🤝 Award to the replacement</button> <a class="btn secondary" href="/portal/find">🔎 Find someone else</a></div>
+        </form>
+        <?php else: ?>
+        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+          <a class="btn" href="/portal/find">🔎 Find a replacement</a>
+        </div>
+        <p class="muted" style="font-size:12.5px;margin:6px 0 0">Invite someone onto this job; once they are on it you can award it to them here.</p>
         <?php endif; ?>
-      </div>
+      <?php endif; ?>
     </div>
   <?php elseif (in_array($es, ['BOOKED', 'ACTIVE'], true)): ?>
     <form method="post" action="/portal/hire-req" style="margin-top:10px" onsubmit="return confirm('End this booking early?');">
@@ -173,6 +186,7 @@ $reqLabel = ['OPEN'=>'Open for applications','SHORTLISTING'=>'Start shortlisting
           <?php foreach ($eng_kinds as $k => $lbl): ?><option value="<?= e($k) ?>"><?= e($lbl) ?></option><?php endforeach; ?>
         </select>
         <input name="reason" class="form-control" style="flex:1;min-width:180px" placeholder="Reason (optional)">
+        <?php if ((float)($eng['quantity'] ?? 0) > 0): ?><input name="worked" type="number" step="0.5" min="0" max="<?= e((string)(float)$eng['quantity']) ?>" class="form-control" style="max-width:150px" placeholder="<?= e(ucfirst($eng['rate_unit'] ?: 'day')) ?>s worked"><?php endif; ?>
         <button class="btn secondary" type="submit">End booking</button>
       </div>
     </form>
@@ -197,6 +211,22 @@ $reqLabel = ['OPEN'=>'Open for applications','SHORTLISTING'=>'Start shortlisting
       <?php if ((float)$bk['rate'] > 0): ?> · <?= $vinr($bk['rate']) ?> a <?= e($bk['rate_unit'] ?: 'day') ?><?php endif; ?></div>
   <?php else: ?>
     <p class="muted" style="font-size:13px;margin:0 0 8px"><?php $awName = ''; foreach ($apps as $aa) if ((int)$aa['id'] === $awardedId) $awName = (string)$aa['applicant_name']; ?>Tell us how much you are booking <?= e($awName ?: 'the person you awarded') ?> for — the company plans the deployment and bills from this.</p>
+  <?php endif; ?>
+  <?php $rc = $replace_candidates ?? [];
+        if (!$eng && $rc && strtoupper((string)$req['status']) === 'AWARDED'): ?>
+    <details style="margin:4px 0 8px">
+      <summary style="cursor:pointer;font-size:13px">The person awarded can't do it? Give the job to someone else</summary>
+      <form method="post" action="/portal/hire-req" style="margin-top:8px;display:grid;gap:8px" onsubmit="return confirm('Award this job to the person chosen instead?');">
+        <input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="action" value="replace_award">
+        <label style="font-size:13px;font-weight:600">Why
+          <select name="kind" class="form-control"><?php foreach (($eng_kinds ?? []) as $k => $lbl): if ($k === 'CANCELLED') continue; ?><option value="<?= e($k) ?>"><?= e($lbl) ?></option><?php endforeach; ?></select></label>
+        <label style="font-size:13px;font-weight:600">Give the job to
+          <select name="application_id" class="form-control" required><option value="">— choose —</option>
+            <?php foreach ($rc as $c): ?><option value="<?= (int)$c['id'] ?>"><?= e($c['applicant_name']) ?><?= (float)$c['proposed_rate'] > 0 ? ' — ' . $vinr($c['proposed_rate']) : '' ?></option><?php endforeach; ?>
+          </select></label>
+        <div><button class="btn secondary" type="submit">Award to the replacement</button></div>
+      </form>
+    </details>
   <?php endif; ?>
   <?php if ($eng_lock !== ''): ?>
     <p class="muted" style="font-size:13px;margin:8px 0 0">🔒 <?= e($eng_lock) ?></p>

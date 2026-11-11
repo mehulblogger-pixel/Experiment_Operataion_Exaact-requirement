@@ -630,6 +630,9 @@ no existing object touched.
   booking exists. A requirement is billed **one way only**: once its engagement
   vouchers have produced invoices, "Send to billing" is refused, and a voucher does
   not produce an invoice when the requirement already has a billable event.
+  When a job passed from one person to a replacement, billing adds the bookings
+  up: a live booking in full, one that ended early only for what was worked. A
+  job whose only booking ended with nothing worked (a no-show) is not billed.
 
 ## Connect Application (`cx_applications.status`) — marketplace (K2a)
 
@@ -645,6 +648,23 @@ A professional's application to a requirement (`CX_APP_TRANSITIONS`). Additive
 - Terminal: `ACCEPTED`, `DECLINED`, `WITHDRAWN`, `REJECTED`. Enforced by
   `cx_app_can_transition()`. Awarding a requirement drives the chosen application
   to `ACCEPTED` via its legal path.
+- **Replacement — owner, 11 Nov 2026** ("One person, one requirement award … if the
+  professional who is awarded the job either cancels or is unable to attend … same
+  can be awarded to the other professional"). A job is awarded to **one** person.
+  When that person withdraws, does not turn up or cannot attend,
+  `cx_requirement_replace()` gives the job to another applicant while the
+  requirement **stays `AWARDED`** (no requirement status or transition added). Two
+  application moves exist **only inside a replacement** (they are not in
+  `CX_APP_TRANSITIONS`, so no screen can make them on their own):
+  - `ACCEPTED → WITHDRAWN` for the person replaced (`replaced_at` stamped);
+  - `REJECTED → SHORTLISTED` for an applicant who was closed **only because the job
+    was awarded** (`closed_by_award = 1`), who then takes the normal path to
+    `ACCEPTED`. An applicant the client actually turned down is never brought back.
+  The replaced person's booking ends (`CANCELLED`, kind no-show / withdrawn /
+  cancelled, with `worked_qty`), and a new booking for what is left is recorded at
+  the replacement's own rate, linked by `replaces_engagement_id`. While a job's
+  booking has ended without a replacement, people may be invited or put forward
+  onto it again (`cx_requirement_takes_applicants`).
 
 - **Permission (K2a):** the staff desk reuses existing **coordinator/master**
   gates (`connect_market_can()`) — **no new permission**; `docs/02-permission-matrix.md`

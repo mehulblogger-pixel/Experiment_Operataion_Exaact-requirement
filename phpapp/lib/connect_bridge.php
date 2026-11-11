@@ -70,21 +70,42 @@ function connect_engagement_billable($requirementId) {
     $positions = max(1, (int)($req['positions'] ?? 1));
     //  The booking says how much was bought (so many days or months at a rate);
     //  billing used to charge one day per position whatever was booked.
-    $eng = function_exists('connect_engage_for_requirement') ? connect_engage_for_requirement((int)$req['id']) : null;
-    if ($eng && (float)$eng['quantity'] > 0 && strtoupper((string)$eng['status']) !== 'CANCELLED') {
-        $bRate = (float)$eng['rate'] > 0 ? (float)$eng['rate'] : $rate;
-        if ($bRate <= 0) return 0;
-        $qty = round((float)$eng['quantity'] * $positions, 2);
-        return billable_event_upsert('connect', 'MARKETPLACE_AWARD', (int)$req['id'], [
-            'party_id'        => (int)($req['poster_party_id'] ?? 0),
-            'contract_number' => (string)($req['ref_code'] ?? ''),
-            'service_type'    => trim((string)($req['title'] ?? 'Marketplace engagement')),
-            'qty'             => $qty,
-            'unit'            => (string)($eng['rate_unit'] ?: 'day'),
-            'rate'            => $bRate,
-            'amount'          => round($qty * $bRate, 2),
-            'calc_rule'       => 'Marketplace booking ' . (string)($req['ref_code'] ?? '') . ' — ' . rtrim(rtrim(number_format((float)$eng['quantity'], 2), '0'), '.') . ' ' . ($eng['rate_unit'] ?: 'day') . '(s) × ' . $positions . ' position(s) (finance attests the invoice)',
-        ]);
+    //  Owner, 11 Nov 2026 — a job can pass from one person to a replacement:
+    //  each booking is billed for what it covers — the live one in full, one that
+    //  ended early only for what was actually worked.
+    $engs = [];
+    try { $engs = ops_all("SELECT * FROM cx_engagements WHERE requirement_id=? ORDER BY id", [(int)$req['id']]) ?: []; } catch (Throwable $e) {}
+    if ($engs) {
+        $qty = 0.0; $amount = 0.0; $parts = []; $unit = ''; $live = false;
+        foreach ($engs as $e) {
+            $cancelled = strtoupper((string)$e['status']) === 'CANCELLED';
+            if (!$cancelled) $live = true;
+            $q = $cancelled ? (float)($e['worked_qty'] ?? 0) : (float)$e['quantity'];
+            if ($q <= 0) continue;
+            $r = (float)$e['rate'] > 0 ? (float)$e['rate'] : $rate;
+            if ($r <= 0) continue;
+            $qq = round($q * $positions, 2);
+            $qty += $qq; $amount += round($qq * $r, 2);
+            $unit = (string)($e['rate_unit'] ?: 'day');
+            $parts[] = trim((string)$e['subject_name']) . ' ' . rtrim(rtrim(number_format($q, 2), '0'), '.') . ' ' . $unit . '(s)' . ($cancelled ? ' worked' : '') . ' @ ' . rtrim(rtrim(number_format($r, 2), '0'), '.');
+        }
+        //  Every booking ended and nothing was worked (a no-show): nothing to bill.
+        if (!$live && $qty <= 0) return 0;
+        if ($qty > 0) {
+            $single = count($parts) === 1 ? $engs[count($engs) - 1] : null;
+            return billable_event_upsert('connect', 'MARKETPLACE_AWARD', (int)$req['id'], [
+                'party_id'        => (int)($req['poster_party_id'] ?? 0),
+                'contract_number' => (string)($req['ref_code'] ?? ''),
+                'service_type'    => trim((string)($req['title'] ?? 'Marketplace engagement')),
+                'qty'             => round($qty, 2),
+                'unit'            => $unit,
+                'rate'            => round($amount / $qty, 2),
+                'amount'          => round($amount, 2),
+                'calc_rule'       => count($parts) === 1 && $single && strtoupper((string)$single['status']) !== 'CANCELLED'
+                    ? 'Marketplace booking ' . (string)($req['ref_code'] ?? '') . ' — ' . rtrim(rtrim(number_format((float)$single['quantity'], 2), '0'), '.') . ' ' . ($single['rate_unit'] ?: 'day') . '(s) × ' . $positions . ' position(s) (finance attests the invoice)'
+                    : 'Marketplace bookings ' . (string)($req['ref_code'] ?? '') . ' — ' . implode('; ', $parts) . ' × ' . $positions . ' position(s) (finance attests the invoice)',
+            ]);
+        }
     }
     if ($rate <= 0) return 0;
     $amount = round($positions * $rate, 2);

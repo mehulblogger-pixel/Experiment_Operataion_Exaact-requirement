@@ -336,6 +336,45 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
   egSync();
 </script>
 
+<?php // Owner, 11 Nov 2026 — one person per award; if they cannot do the job it
+      // is awarded to someone else (see cx_requirement_replace).
+  if (strtoupper((string)$req['status']) === 'AWARDED'):
+    $replace_candidates = $replace_candidates ?? [];
+    $awApp = null; foreach ($apps as $aa) if ((int)$aa['id'] === (int)$req['awarded_application_id']) $awApp = $aa;
+    $engEnded = $engagement && strtoupper((string)$engagement['status']) === 'CANCELLED';
+    $kinds = function_exists('connect_engage_cancel_kinds') ? connect_engage_cancel_kinds() : [];
+    $engQtyBasis = $engagement && !empty(($engage_bases[strtoupper((string)$engagement['basis'])] ?? [])['needs_qty']); ?>
+<div class="panel" style="margin-top:14px<?= $engEnded ? ';border:1px solid #efd9a3;background:#fffaf0' : '' ?>">
+  <h3 style="margin:0 0 4px">🔁 Give this job to someone else</h3>
+  <p class="cxmeta" style="margin:0 0 10px"><?= $engEnded ? '⚠ The booking of <strong>' . e($engagement['subject_name']) . '</strong> has ended — this job needs a replacement.' : 'If <strong>' . e($awApp['applicant_name'] ?? 'the person awarded') . '</strong> withdraws, does not turn up or cannot attend, award the job to another applicant. Their booking ends; what they already worked is still billed.' ?></p>
+  <?php if (!$replace_candidates): ?>
+    <p class="cxmeta" style="margin:0">Nobody else is available on this job yet. Put forward one of your own team below, or invite a professional, then come back here.</p>
+  <?php else: ?>
+  <details<?= $engEnded ? ' open' : '' ?>>
+    <summary style="cursor:pointer;font-weight:600;font-size:14px">Choose the replacement</summary>
+    <form method="post" action="/connect-requirement" style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px" onsubmit="return confirm('Award this job to the person chosen instead?');">
+      <input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="action" value="replace_award">
+      <label style="font-size:13px;font-weight:600">Award to
+        <select class="form-control" name="application_id" required><option value="">— choose —</option>
+          <?php foreach ($replace_candidates as $c): ?><option value="<?= (int)$c['id'] ?>"><?= e($c['applicant_name']) ?><?= (float)$c['proposed_rate'] > 0 ? ' — ₹' . number_format((float)$c['proposed_rate'], 0) : '' ?><?= strtoupper((string)$c['status']) === 'REJECTED' ? ' (applied earlier)' : '' ?></option><?php endforeach; ?>
+        </select></label>
+      <label style="font-size:13px;font-weight:600">Why
+        <select class="form-control" name="kind" required>
+          <?php foreach ($kinds as $k => $lbl): ?><option value="<?= e($k) ?>" <?= $engEnded && strtoupper((string)$engagement['cancel_kind']) === $k ? 'selected' : '' ?>><?= e($lbl) ?></option><?php endforeach; ?>
+        </select></label>
+      <?php if ($engQtyBasis): ?>
+      <label style="font-size:13px;font-weight:600">Already worked (<?= e(($engagement['rate_unit'] ?? 'day') . 's') ?>)
+        <input class="form-control" type="number" step="0.5" min="0" name="worked" value="<?= (float)($engagement['worked_qty'] ?? 0) ? e(rtrim(rtrim((string)$engagement['worked_qty'], '0'), '.')) : '' ?>" placeholder="0"></label>
+      <?php endif; ?>
+      <label style="font-size:13px;font-weight:600;grid-column:1/-1">Details (optional)
+        <input class="form-control" name="reason" maxlength="300" value="<?= $engEnded ? e($engagement['cancel_reason'] ?? '') : '' ?>" placeholder="e.g. did not report at site on day 1"></label>
+      <div><button class="btn" type="submit" style="white-space:nowrap">Award to the replacement</button></div>
+    </form>
+  </details>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
 <?php // K21 — Engagement vouchers: the desk approves/pays claims, and raises one
       // for an on-roll inspector or agency-bench person (who have no portal). A
       // marketplace freelancer raises their own in /pro; the desk still approves. ?>
@@ -513,11 +552,11 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
     </div>
   <?php endforeach; endif; ?>
 
-  <?php if (in_array(strtoupper((string)$req['status']), ['OPEN','SHORTLISTING'], true)): ?>
+  <?php if (in_array(strtoupper((string)$req['status']), ['OPEN','SHORTLISTING','AWARDED'], true)): ?>
   <form method="post" action="/connect-requirement" style="margin-top:12px;border-top:1px solid var(--line,#eee);padding-top:12px">
     <input type="hidden" name="id" value="<?= (int)$req['id'] ?>">
     <input type="hidden" name="action" value="apply">
-    <label style="font-size:13px;font-weight:600">Put forward one of your own team</label>
+    <label style="font-size:13px;font-weight:600">Put forward one of your own team<?= strtoupper((string)$req['status']) === 'AWARDED' ? ' — as a possible replacement' : '' ?></label>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
       <select name="inspector_id" style="flex:2;min-width:200px;padding:11px;border:1px solid var(--line,#dde3e2);border-radius:10px">
         <option value="">— choose a team member —</option>
