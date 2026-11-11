@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'a3f5291 · 2026-11-11 17:50 UTC · 710 files';
+$RELEASE = 'f69c3e2 · 2026-11-11 17:55 UTC · 710 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -88,7 +88,7 @@ $EXPECT  = [
     'lib/connect_cv.php' => ['s'=>6178,'h'=>'6e5123e99d862fa0'],
     'lib/connect_deploy.php' => ['s'=>8299,'h'=>'d3d261a16ddc833c'],
     'lib/connect_disputes.php' => ['s'=>4865,'h'=>'56ecbec1a7a03f91'],
-    'lib/connect_engage.php' => ['s'=>21012,'h'=>'8f00d3fd66438479'],
+    'lib/connect_engage.php' => ['s'=>25091,'h'=>'3c788d9972e9d995'],
     'lib/connect_engvoucher.php' => ['s'=>36368,'h'=>'c56b9458d81af736'],
     'lib/connect_geo.php' => ['s'=>19346,'h'=>'9ee996bdd62de2ca'],
     'lib/connect_govern.php' => ['s'=>7181,'h'=>'22ce5ad54e44ce2a'],
@@ -189,7 +189,7 @@ $EXPECT  = [
     'lib/pdso.php' => ['s'=>62942,'h'=>'b8624fad908da790'],
     'lib/pipelines.php' => ['s'=>14596,'h'=>'8f62abd870e47a71'],
     'lib/platform_mail.php' => ['s'=>22419,'h'=>'95ffd0e9fea3845d'],
-    'lib/portal.php' => ['s'=>123470,'h'=>'8944296138f9af36'],
+    'lib/portal.php' => ['s'=>124427,'h'=>'764b3fae6a4ddc55'],
     'lib/position.php' => ['s'=>19441,'h'=>'a0a9d1a9e6a9b10c'],
     'lib/preflight.php' => ['s'=>5451,'h'=>'97e742bbddf7fbd8'],
     'lib/pricing_admin.php' => ['s'=>16307,'h'=>'d7af986c89fc5cfc'],
@@ -674,7 +674,7 @@ $EXPECT  = [
     'views/portal/find.php' => ['s'=>12418,'h'=>'75a5a6aab6e7e126'],
     'views/portal/forgot.php' => ['s'=>1316,'h'=>'443297c5fc6bccfe'],
     'views/portal/hire.php' => ['s'=>22948,'h'=>'70f7cc78d9bfd1c0'],
-    'views/portal/hire_req.php' => ['s'=>16348,'h'=>'00f04064a8121cf1'],
+    'views/portal/hire_req.php' => ['s'=>21347,'h'=>'f67c22df4d0e69f3'],
     'views/portal/hiring.php' => ['s'=>8831,'h'=>'eedf44396241f48c'],
     'views/portal/invoices.php' => ['s'=>2486,'h'=>'ff5b9b4f07b9fb21'],
     'views/portal/issue.php' => ['s'=>4390,'h'=>'8306150ab4c48390'],

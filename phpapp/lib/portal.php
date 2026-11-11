@@ -1430,6 +1430,11 @@ function portal_route($route, $method) {
                 } elseif ($act === 'award') {
                     $ap = cx_application_get((int)($_POST['application_id'] ?? 0));
                     if ($ap && (int)$ap['requirement_id'] === (int)$req['id']) cx_requirement_award((int)$req['id'], (int)$ap['id']);
+                } elseif ($act === 'engage_save' && function_exists('connect_engage_client_save')) {
+                    //  Owner, 11 Nov 2026 — the client records what it bought.
+                    [, $bmsg] = connect_engage_client_save((int)$req['id'], (int)portal_partner_id(), $_POST, portal_client_name());
+                    $_SESSION['portal_flash'] = $bmsg;
+                    redirect('/portal/hire-req?id=' . (int)$req['id']);
                 } elseif ($act === 'engage_cancel' && function_exists('connect_engage_cancel')) {
                     // Stage 7 — end the booking early (cancel / no-show) with a reason;
                     // the resource frees up and the work surfaces as needing cover.
@@ -1450,6 +1455,10 @@ function portal_route($route, $method) {
                 'req_next' => CX_REQ_TRANSITIONS[strtoupper((string)$req['status'])] ?? [],
                 'eng'      => $engRow,
                 'eng_kinds'=> function_exists('connect_engage_cancel_kinds') ? connect_engage_cancel_kinds() : [],
+                'eng_bases'=> function_exists('connect_engage_bases') ? connect_engage_bases() : [],
+                'eng_lock' => function_exists('connect_engage_client_lock_reason') ? connect_engage_client_lock_reason((int)$req['id']) : '',
+                'eng_rate' => ($engRow && (float)$engRow['rate'] > 0) ? (float)$engRow['rate']
+                              : (function_exists('connect_bridge_rate') ? connect_bridge_rate($req, cx_application_get((int)($req['awarded_application_id'] ?? 0)) ?: []) : 0),
                 'vouchers' => ($engRow && function_exists('connect_engv_for_engagement')) ? connect_engv_for_engagement((int)$engRow['id']) : []]);
             exit;
 

@@ -43,6 +43,10 @@ guarded by `connect_enabled()`, so a staff-only / fresh install is unaffected.
   the voucher model (K21) is fixed from the moment the client posts. The client then
   shortlists and awards its own applicants (`views/portal/hire_req.php`). This uses
   the existing `market.post` permission only — no new right is introduced.
+  After awarding, the client **records the booking** on the same page ("Record your
+  booking": how it is booked, how many days or months, from and to). The rate shown
+  is the agreed one and only the company changes it; once the job has gone to
+  billing the booking is locked (owner, 11 Nov 2026).
 - **Review vouchers (Connect marketplace):** the platform is a **matchmaker**, not a
   paymaster — the professional claims their fee + **actual** expenses (with receipts,
   after the inspection; no advances), and the **client who posted the job** reviews

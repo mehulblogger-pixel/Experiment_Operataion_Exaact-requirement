@@ -263,6 +263,59 @@ function connect_engage_save_for_requirement($requirementId, array $in) {
     return [true, 'Booking recorded.', (int)db()->lastInsertId()];
 }
 
+/**
+ * Owner, 11 Nov 2026 — the CLIENT records what it bought (so many days or
+ * months, from when) from its own portal, on a requirement it posted and has
+ * awarded. The client says how much; it does not set the price: the rate stays
+ * the one already booked by the company, else the awarded bid. Once the job has
+ * gone to billing (or its vouchers have been invoiced) the booking is fixed and
+ * only the company can change it. Returns [ok, message].
+ */
+function connect_engage_client_lock_reason($requirementId) {
+    $rid = (int)$requirementId;
+    if (function_exists('connect_engagement_billable_row') && connect_engagement_billable_row($rid))
+        return 'This job has already gone to billing, so the booking can no longer be changed here — ask the company to change it.';
+    if (function_exists('connect_requirement_voucher_invoices') && connect_requirement_voucher_invoices($rid) > 0)
+        return 'Invoices have already been raised for this job, so the booking can no longer be changed here — ask the company to change it.';
+    $e = connect_engage_for_requirement($rid);
+    if ($e && in_array(strtoupper((string)$e['status']), ['COMPLETED', 'CANCELLED'], true))
+        return 'This booking has ended, so it can no longer be changed.';
+    return '';
+}
+function connect_engage_client_save($requirementId, $partyId, array $in, $who = '') {
+    $req = function_exists('cx_requirement_get') ? cx_requirement_get($requirementId) : null;
+    if (!$req || (int)$req['poster_party_id'] <= 0 || (int)$req['poster_party_id'] !== (int)$partyId) return [false, 'Requirement not found.'];
+    if (!in_array(strtoupper((string)$req['status']), ['AWARDED', 'CLOSED'], true)) return [false, 'Record the booking once you have awarded the job.'];
+    $lock = connect_engage_client_lock_reason((int)$req['id']);
+    if ($lock !== '') return [false, $lock];
+    $ex = connect_engage_for_requirement((int)$req['id']);
+    $bases = connect_engage_bases();
+    $basis = strtoupper((string)($in['basis'] ?? ''));
+    if (!isset($bases[$basis])) return [false, 'Choose how the work is booked.'];
+    $start = trim((string)($in['start_date'] ?? '')); $end = trim((string)($in['end_date'] ?? ''));
+    if ($start === '') return [false, 'Give the start date.'];
+    if (!empty($bases[$basis]['needs_end']) && $end === '') return [false, 'Give the end date for ' . $bases[$basis]['label'] . '.'];
+    if ($end !== '' && $end < $start) return [false, 'The end date is before the start.'];
+    $app = function_exists('cx_application_get') ? cx_application_get((int)($req['awarded_application_id'] ?? 0)) : null;
+    $rate = ($ex && (float)$ex['rate'] > 0) ? (float)$ex['rate'] : (function_exists('connect_bridge_rate') ? connect_bridge_rate($req, $app ?: []) : 0);
+    $row = [
+        'basis' => $basis, 'quantity' => $in['quantity'] ?? 0, 'frequency_note' => $in['frequency_note'] ?? '',
+        'start_date' => $start, 'end_date' => $end, 'notes' => trim((string)($in['notes'] ?? ($ex['notes'] ?? ''))),
+        'rate' => $rate,
+        'rate_unit' => ($ex && $ex['rate_unit'] !== '') ? $ex['rate_unit'] : $bases[$basis]['unit'],
+        // What the company already set on the booking stays as it is.
+        'status' => $ex ? $ex['status'] : 'BOOKED',
+    ];
+    if ($ex) foreach (['rate_inclusive', 'voucher_cadence', 'reimb_terms', 'shift'] as $k) $row[$k] = (string)($ex[$k] ?? '');
+    [$ok, $msg] = connect_engage_save_for_requirement((int)$req['id'], $row);
+    if (!$ok) return [false, $msg];
+    if (function_exists('act_log')) try {
+        act_log('CX_REQUIREMENT', (int)$req['id'], 'SYSTEM', 'Booking ' . ($ex ? 'changed' : 'recorded') . ' by the client' . ($who !== '' ? ' (' . $who . ')' : '') . ': ' . connect_engage_basis_label($basis)
+            . ((float)$row['quantity'] > 0 ? ', ' . rtrim(rtrim(number_format((float)$row['quantity'], 2), '0'), '.') : '') . ', from ' . $start . ($end !== '' ? ' to ' . $end : ''));
+    } catch (Throwable $e) {}
+    return [true, $ex ? 'Booking updated.' : 'Booking recorded — the company can now plan and bill it.'];
+}
+
 /** Move an engagement to a new lifecycle status. */
 function connect_engage_set_status($id, $status) {
     connect_engage_migrate();

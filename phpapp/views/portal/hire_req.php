@@ -180,6 +180,63 @@ $reqLabel = ['OPEN'=>'Open for applications','SHORTLISTING'=>'Start shortlisting
 </div>
 <?php endif; ?>
 
+<?php // Owner, 11 Nov 2026 — the client records what it bought: how the work is
+      // booked (days, months, ongoing…), how much, and from when. The price is
+      // the agreed rate; only the company can change it.
+      $eng_bases = $eng_bases ?? []; $eng_lock = (string)($eng_lock ?? ''); $eng_rate = (float)($eng_rate ?? 0);
+      $engSt = $eng ? strtoupper((string)$eng['status']) : '';
+      if ($awardedId > 0 && in_array(strtoupper((string)$req['status']), ['AWARDED', 'CLOSED'], true) && $eng_bases
+          && (!$eng || in_array($engSt, ['BOOKED', 'ACTIVE'], true))):
+        $bk = $eng ?: []; $curB = strtoupper((string)($bk['basis'] ?? 'MAN_DAYS'));
+        $fld = 'width:100%;padding:9px;border:1px solid var(--line,#dde3e2);border-radius:9px'; ?>
+<h3 class="ptitle" style="font-size:16px;margin-top:24px"><?= $eng ? 'Your booking' : 'Record your booking' ?></h3>
+<div class="pcard" style="max-width:680px">
+  <?php if ($eng): ?>
+    <div style="font-size:14px"><strong><?= e(connect_engage_basis_label($bk['basis'])) ?></strong>
+      <?php if ((float)$bk['quantity'] > 0): ?> · <?= e(rtrim(rtrim(number_format((float)$bk['quantity'], 2), '0'), '.')) ?> <?= e($bk['rate_unit'] ?: 'day') ?>(s)<?php endif; ?>
+      <?php if ((float)$bk['rate'] > 0): ?> · <?= $vinr($bk['rate']) ?> a <?= e($bk['rate_unit'] ?: 'day') ?><?php endif; ?></div>
+  <?php else: ?>
+    <p class="muted" style="font-size:13px;margin:0 0 8px"><?php $awName = ''; foreach ($apps as $aa) if ((int)$aa['id'] === $awardedId) $awName = (string)$aa['applicant_name']; ?>Tell us how much you are booking <?= e($awName ?: 'the person you awarded') ?> for — the company plans the deployment and bills from this.</p>
+  <?php endif; ?>
+  <?php if ($eng_lock !== ''): ?>
+    <p class="muted" style="font-size:13px;margin:8px 0 0">🔒 <?= e($eng_lock) ?></p>
+  <?php else: ?>
+  <details<?= $eng ? '' : ' open' ?> style="margin-top:6px">
+    <summary style="cursor:pointer;font-weight:600;font-size:14px"><?= $eng ? '✎ Change the booking' : 'Booking details' ?></summary>
+    <form method="post" action="/portal/hire-req" style="margin-top:10px">
+      <input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="action" value="engage_save">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
+        <label style="font-size:13px;font-weight:600">Booked as
+          <select name="basis" id="pbBasis" onchange="pbSync()" style="<?= $fld ?>">
+            <?php foreach ($eng_bases as $code => $b): ?><option value="<?= e($code) ?>" <?= $curB === $code ? 'selected' : '' ?>><?= e($b['label']) ?></option><?php endforeach; ?>
+          </select></label>
+        <label style="font-size:13px;font-weight:600" id="pbQty"><span id="pbQtyLbl">How many</span>
+          <input type="number" step="0.5" min="0" name="quantity" value="<?= (float)($bk['quantity'] ?? 0) ? e(rtrim(rtrim((string)$bk['quantity'], '0'), '.')) : '' ?>" style="<?= $fld ?>"></label>
+        <label style="font-size:13px;font-weight:600" id="pbFreq">How often
+          <input type="text" name="frequency_note" value="<?= e($bk['frequency_note'] ?? '') ?>" placeholder="e.g. 2 days a week" style="<?= $fld ?>"></label>
+        <label style="font-size:13px;font-weight:600">From
+          <input type="date" name="start_date" required value="<?= e(substr((string)($bk['start_date'] ?? ($req['start_date'] ?? '')), 0, 10)) ?>" style="<?= $fld ?>"></label>
+        <label style="font-size:13px;font-weight:600" id="pbEnd">To
+          <input type="date" name="end_date" value="<?= e(substr((string)($bk['end_date'] ?? ($req['end_date'] ?? '')), 0, 10)) ?>" style="<?= $fld ?>"></label>
+      </div>
+      <label style="font-size:13px;font-weight:600;display:block;margin-top:10px">Anything the company should know
+        <input type="text" name="notes" maxlength="300" value="<?= e($bk['notes'] ?? '') ?>" style="<?= $fld ?>"></label>
+      <p class="muted" style="font-size:12.5px;margin:8px 0">Rate: <?= $eng_rate > 0 ? '<strong>' . $vinr($eng_rate) . '</strong> — the agreed rate' : 'as agreed with the company' ?>. Only the company can change the rate.</p>
+      <button class="btn" type="submit"><?= $eng ? 'Save the booking' : 'Record the booking' ?></button>
+    </form>
+  </details>
+  <script>
+  (function(){var B=<?= json_encode(array_map(fn($b) => ['q' => !empty($b['needs_qty']), 'ql' => $b['qty_label'], 'e' => !empty($b['needs_end']), 'f' => !empty($b['needs_freq'])], $eng_bases)) ?>;
+    window.pbSync=function(){var s=document.getElementById('pbBasis');if(!s)return;var b=B[s.value]||{};
+      document.getElementById('pbQty').style.display=b.q?'':'none';document.getElementById('pbQtyLbl').textContent=(b.ql||'How many');
+      document.getElementById('pbFreq').style.display=b.f?'':'none';
+      var e=document.getElementById('pbEnd').querySelector('input');e.required=!!b.e;};
+    pbSync();})();
+  </script>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
 <?php if ($vouchers): ?>
 <h3 class="ptitle" style="font-size:16px;margin-top:24px">Vouchers</h3>
 <p class="plead" style="margin:-4px 0 10px">Claims raised by the professional against this job — review the receipts, return for clarification, or approve.</p>
