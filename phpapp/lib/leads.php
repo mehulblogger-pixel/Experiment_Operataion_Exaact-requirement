@@ -38,7 +38,7 @@
 
 const LEAD_STATUS = [
     'OPEN'      => 'Open',
-    'CONVERTED' => 'Converted',
+    'CONVERTED' => 'Won — customer',   // owner, 12 Nov 2026: "converted" meant nothing to a user
     'LOST'      => 'Lost',
 ];
 
@@ -827,7 +827,7 @@ function lead_record_move($l, $to) {
 function lead_convert($leadId, array $b = []) {
     $l = lead_row($leadId);
     if (!$l) return ['err' => 'That lead no longer exists.'];
-    if ($l['status'] === 'CONVERTED') return ['err' => 'That lead has already been converted.'];
+    if ($l['status'] === 'CONVERTED') return ['err' => 'That lead is already won — it is a customer now.'];
     // A lost lead is closed: it is reopened, by a manager with a reason, before
     // it can become a customer (D-22). It used to convert straight from lost.
     if ($l['status'] === 'LOST') return ['err' => 'This lead is marked lost. A manager reopens it first, with a reason — then it can be converted.'];
@@ -841,7 +841,7 @@ function lead_convert($leadId, array $b = []) {
     $claim = $pdo->prepare("UPDATE leads SET converted_at=? WHERE id=? AND status<>'CONVERTED'
                             AND (COALESCE(converted_at,'')='' OR converted_at < ?)");
     $claim->execute([date('c'), (int)$l['id'], date('c', time() - 120)]);
-    if ($claim->rowCount() !== 1) return ['err' => 'That lead is being converted, or has just been converted, by someone else.'];
+    if ($claim->rowCount() !== 1) return ['err' => 'Someone else is making this lead a customer right now, or has just done it.'];
     // A refusal after the claim gives the lead back.
     $release = function (array $r) use ($pdo, $l) {
         $pdo->prepare("UPDATE leads SET converted_at='' WHERE id=? AND status<>'CONVERTED'")->execute([(int)$l['id']]);
@@ -899,6 +899,14 @@ function lead_convert($leadId, array $b = []) {
     if ($subject === '') $subject = 'From lead ' . $l['ref'];
     elseif (mb_strlen($subject) > 180) $subject = mb_substr($subject, 0, 177) . '...';
 
+    //  WHO THE ENQUIRY IS ASSIGNED TO, AND WHICH BRANCH (owner, SAL-016, 12 Nov
+    //  2026: "does not show … assigned to the lead's owner … nor our branch").
+    //  A lead's owner can be a typed name with no login behind it; the enquiry
+    //  then had nobody. Never blank now: the lead's owner, else the login whose
+    //  name matches the typed one, else whoever presses the button. The branch
+    //  follows the same person.
+    [$assignTo, $assignOffice] = lead_enquiry_assignee($l);
+
     $inqId = null;
     try {
         // The same numbering every other enquiry takes. "Count the rows and add
@@ -915,10 +923,10 @@ function lead_convert($leadId, array $b = []) {
                        (string)$l['requirement'], (string)$l['sbu'], (string)$l['source'],
                        // assigned_to holds a person's id — it was given the owner's NAME,
                        // so a converted enquiry showed nobody as its owner.
-                       date('Y-m-d'), (int)($l['owner_user_id'] ?? 0) ?: null,
-                       'Converted from lead ' . $l['ref'] . '.', user_name(current_user()), date('c'),
-                       // the lead's branch, else the branch of whoever converts it
-                       (int)($l['office_id'] ?? 0) ?: ((int)(current_user()['home_office_id'] ?? 0) ?: null)]);
+                       date('Y-m-d'), $assignTo,
+                       'Became a customer from lead ' . $l['ref'] . '.', user_name(current_user()), date('c'),
+                       // the lead's branch, else its owner's, else whoever converts it
+                       $assignOffice]);
         $inqId = (int)$pdo->lastInsertId();
         // Record the origin as a real link, not just the note above. Best-effort:
         // an older install without the column must still convert the lead.
@@ -1003,6 +1011,24 @@ function lead_close_won_deals_sweep($leadId = 0) {
         foreach ($rows as $r) lead_close_for_won_deal((int)$r['id']);
     } catch (Throwable $e) {}
 }
+//  [user id, office id] for the enquiry a won lead raises — see lead_convert().
+function lead_enquiry_assignee(array $l) {
+    $uid = (int) ($l['owner_user_id'] ?? 0);
+    $nm  = trim((string) ($l['owner_name'] ?? ''));
+    if (!$uid && $nm !== '') {
+        try {
+            foreach (ops_all("SELECT id, first_name, last_name, username FROM users WHERE COALESCE(is_active,1)=1") ?: [] as $u) {
+                $full = trim((string) $u['first_name'] . ' ' . (string) $u['last_name']);
+                if (strcasecmp($full, $nm) === 0 || strcasecmp((string) $u['username'], $nm) === 0) { $uid = (int) $u['id']; break; }
+            }
+        } catch (Throwable $e) { /* users shape differs */ }
+    }
+    if (!$uid) $uid = (int) (current_user()['id'] ?? 0);
+    $office = (int) ($l['office_id'] ?? 0);
+    if (!$office && $uid) $office = (int) (ops_val("SELECT home_office_id FROM users WHERE id=?", [$uid]) ?: 0);
+    if (!$office) $office = (int) (current_user()['home_office_id'] ?? 0);
+    return [$uid ?: null, $office ?: null];
+}
 function lead_convert_on_quote_win($leadId, $partnerId, $inquiryId = null) {
     $leadId = (int)$leadId; $partnerId = (int)$partnerId;
     if (!$leadId || !$partnerId) return false;
@@ -1045,7 +1071,11 @@ function lead_convert_on_quote_win($leadId, $partnerId, $inquiryId = null) {
 
 // ---- The board -------------------------------------------------------------
 // Grouped by stage, which is how a pipeline is read.
-function lead_board($pipelineId = 0) {
+//  How many closed (won / not pursued) cards a board column draws; the rest are
+//  one click away in the list.
+const LEAD_BOARD_CLOSED_CAP = 30;
+
+function lead_board($pipelineId = 0, array $fyWin = []) {
     leads_migrate();
     $pipe = $pipelineId ?: (int)(pipeline_default()['id'] ?? 0);
     // If no pipeline was explicitly chosen and the default one holds no open
@@ -1091,21 +1121,52 @@ function lead_board($pipelineId = 0) {
                     $by[$sid]['leads'][$i]['deal_id'] = $map[(int)$r['id']] ?? 0;
         }
     }
+    //  THE WON AND NOT-PURSUED COLUMNS (owner, 12 Nov 2026: "the top KPI shows 2
+    //  converted but the card shows none"). The board loaded OPEN leads only, so
+    //  those two columns were empty by construction while the card above counted
+    //  every won lead. Closed leads of the chosen year now sit in them, placed by
+    //  STATUS — a lead won from an open stage (a won quotation, a won deal) keeps
+    //  that stage id, and must not reappear among the open cards.
+    $wonCol = $lostCol = 0;
+    foreach ($stages as $st) {
+        if (!$wonCol && ($st['kind'] ?? '') === 'WON') $wonCol = (int)$st['id'];
+        if (!$lostCol && ($st['kind'] ?? '') === 'LOST') $lostCol = (int)$st['id'];
+    }
+    foreach (['CONVERTED' => $wonCol, 'LOST' => $lostCol] as $status => $colId) {
+        if (!$colId || !isset($by[$colId])) continue;
+        $f = ['pipeline' => $pipe, 'status' => $status,
+              'fy_from' => $fyWin['from'] ?? '', 'fy_to_excl' => $fyWin['to_excl'] ?? ''];
+        $total = leads_count($f);
+        if (!$total) continue;
+        foreach (leads_all($f, " ORDER BY l.updated_at DESC, l.id DESC LIMIT " . LEAD_BOARD_CLOSED_CAP) as $r) {
+            $r['_closed'] = $status;
+            $by[$colId]['leads'][] = $r;
+            $by[$colId]['value'] += (float)$r['value'];
+        }
+        $by[$colId]['total'] = $total + count(array_filter($by[$colId]['leads'], fn($x) => empty($x['_closed'])));
+        $by[$colId]['more']  = max(0, $total - LEAD_BOARD_CLOSED_CAP);
+        $by[$colId]['more_status'] = $status;
+    }
     return ['pipeline' => $pipe, 'stages' => $stages, 'columns' => $by];
 }
 
-function leads_counts() {
+//  $fyWin = ['from' => …, 'to_excl' => …] counts the won / lost cards for the
+//  same year the board shows (empty = all years), so the card and the board agree.
+function leads_counts(array $fyWin = []) {
     leads_migrate();
     [$sw, $sa] = scope_office_clause('l.office_id');
     $q = function ($extra, $args = []) use ($sw, $sa) {
         return leads_try(fn() => (int)ops_val("SELECT COUNT(*) FROM leads l WHERE $sw AND ($extra)", array_merge($sa, $args)), 0);
     };
+    $fyw = ''; $fya = [];
+    if (!empty($fyWin['from']))    { $fyw .= ' AND l.created_at >= ?'; $fya[] = $fyWin['from']; }
+    if (!empty($fyWin['to_excl'])) { $fyw .= ' AND l.created_at < ?';  $fya[] = $fyWin['to_excl']; }
     $open = leads_all(['open' => 1]);
     $stalled = 0; $value = 0.0;
     foreach ($open as $l) { if (lead_stalled($l)) $stalled++; $value += (float)$l['value']; }
     return [
         'open' => count($open), 'value' => $value, 'stalled' => $stalled,
-        'converted' => $q("l.status='CONVERTED'"), 'lost' => $q("l.status='LOST'"),
+        'converted' => $q("l.status='CONVERTED'" . $fyw, $fya), 'lost' => $q("l.status='LOST'" . $fyw, $fya),
     ];
 }
 
@@ -1293,6 +1354,7 @@ function ops_leads($route, $method) {
         $cols = leads_dt_columns();
         $dt   = dt_state('leads', $cols, ['default_sort' => 'value', 'default_dir' => 'desc', 'per' => 50]);
         $fy   = fy_filter();
+        $fyWin = $fy['all'] ? [] : ['from' => $fy['from'], 'to_excl' => $fy['to_excl']];
         $filter = ['status' => (string)($_GET['status'] ?? ''), 'q' => $dt['q'],
                    'fy_from' => $fy['all'] ? '' : $fy['from'], 'fy_to_excl' => $fy['all'] ? '' : $fy['to_excl']];
 
@@ -1318,9 +1380,9 @@ function ops_leads($route, $method) {
         }
         view('ops/leads', [
             'view' => $view, 'rows' => $rows ?: [], 'total' => (int)$total, 'fy' => $fy['fy'],
-            'dt' => $dt, 'cols' => $cols, 'counts' => leads_counts(), 'dueCount' => leads_due_count(),
+            'dt' => $dt, 'cols' => $cols, 'counts' => leads_counts($fyWin), 'dueCount' => leads_due_count(),
             'board' => $view === 'list' ? ['pipeline' => null, 'stages' => [], 'columns' => []]
-                                        : lead_board((int)($_GET['pipeline'] ?? 0)),
+                                        : lead_board((int)($_GET['pipeline'] ?? 0), $fyWin),
             'pipelines' => pipelines_all(), 'canEdit' => $canEdit,
             'lostReasons' => function_exists('lk_options_or') ? lk_options_or('quote_lost_reason', QUOTE_LOST_REASONS) : [],
             // The people a batch of leads can be allocated to from the register.
@@ -1463,10 +1525,12 @@ function ops_leads($route, $method) {
         if ($method === 'POST') {
             $r = lead_convert((int)$l['id'], $_POST);
             if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/lead-convert?id=' . (int)$l['id']); }
-            flash('Converted. ' . ($r['inquiry_id']
-                ? 'The customer is on the master and an inquiry has been raised — carry on from there.'
-                : 'The customer is on the master.'));
-            redirect($r['inquiry_id'] ? '/inquiries' : '/client?id=' . (int)$r['partner_id']);
+            //  Owner, 12 Nov 2026 — plain words, and back to the lead, which now
+            //  shows the customer and the enquiry it led to.
+            flash('Done — ' . $l['company_name'] . ' is now a customer' . ($r['inquiry_id']
+                ? ', and an ' . Tl('inquiry') . ' is raised for what they want. The ' . Tl('inquiry') . ' is in Sales → ' . Tlp('inquiry') . '.'
+                : '.'));
+            redirect('/lead?id=' . (int)$l['id']);
         }
         view('ops/lead_convert', [
             'l' => $l, 'stage_id' => (int)($_GET['stage_id'] ?? $l['stage_id']),
@@ -1552,7 +1616,7 @@ function ops_leads($route, $method) {
         $l  = $id ? ops_one("SELECT * FROM leads WHERE id=?", [$id]) : null;
         if (!$l) { flash('That lead no longer exists.', 'error'); redirect('/leads'); }
         if (($l['status'] ?? '') === 'CONVERTED' || !empty($l['converted_partner_id']) || !empty($l['converted_inquiry_id'])) {
-            flash('This lead has already been converted, so it is the record of where that customer came from. '
+            flash('This lead is already won — it is the record of where that customer came from. '
                 . 'Mark it lost if it should not be chased, but it cannot be deleted.', 'error');
             redirect('/lead?id=' . $id);
         }

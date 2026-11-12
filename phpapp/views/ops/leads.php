@@ -1,7 +1,7 @@
 <?php $c = $counts; $view = $view ?? 'board'; ?>
 <div class="master-head">
   <div><h1>Leads</h1>
-  <p class="sub" style="margin:2px 0 0">People we are chasing before they are customers. Winning one <b>converts</b> it — it becomes a customer and an inquiry, and nothing is typed twice.</p></div>
+  <p class="sub" style="margin:2px 0 0">People we are chasing before they are customers. When one says yes it becomes a customer and an <?= e(Tl('inquiry')) ?> by itself — nothing is typed twice.</p></div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
     <?php if ($canEdit): ?><a class="btn" href="/lead-new">+ New lead</a><?php endif; ?>
     <?php // The list carries its own export, inside the register, so it can say
@@ -16,7 +16,7 @@
   <div class="qcard tone-info"><div class="qic">◎</div><div class="qn"><?= (int)$c['open'] ?></div><div class="ql">Open</div></div>
   <div class="qcard tone-ok"><div class="qic">₹</div><div class="qn" style="font-size:20px"><?= fmoney_short($c['value']) ?></div><div class="ql">Open pipeline value</div></div>
   <div class="qcard <?= $c['stalled'] ? 'tone-bad' : '' ?>"><div class="qic">◷</div><div class="qn"><?= (int)$c['stalled'] ?></div><div class="ql">Past their stage's service level</div></div>
-  <div class="qcard tone-warn"><div class="qic">✓</div><div class="qn"><?= (int)$c['converted'] ?></div><div class="ql">Converted</div></div>
+  <div class="qcard tone-warn"><div class="qic">✓</div><div class="qn"><?= (int)$c['converted'] ?></div><div class="ql">Won — now customers<?= ($fy ?? '') !== '' && strtoupper((string)($fy ?? '')) !== 'ALL' ? ' (this year)' : '' ?></div></div>
   <?php // Module 17 — leads needing attention now (past stage SLA, or an overdue follow-up date). ?>
   <?php $dueCount = $dueCount ?? 0; ?>
   <div class="qcard <?= $dueCount ? 'tone-bad' : '' ?>"><div class="qic">🔔</div><div class="qn"><?= (int)$dueCount ?></div><div class="ql">Need attention now</div></div>
@@ -33,9 +33,9 @@
 <div class="panel" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
   <a class="btn small<?= $view==='board'?'':' secondary' ?>" href="/leads?v=board">Board</a>
   <a class="btn small<?= $view==='list'?'':' secondary' ?>" href="/leads?v=list">List</a>
-  <?php // Financial-year filter for the List. The Board shows the live pipeline
-        // whatever year is picked, so this narrows the list of leads by when they
-        // were created. ?>
+  <?php // Financial-year filter. The list narrows to leads created in that year;
+        // on the board, open leads always show (work in hand), and the won /
+        // not-pursued columns and the "Won" card follow the year — the same count. ?>
   <form method="get" action="/leads" style="display:inline-flex;gap:6px;align-items:center">
     <input type="hidden" name="v" value="<?= e($view) ?>">
     <?php if (($_GET['q'] ?? '') !== ''): ?><input type="hidden" name="q" value="<?= e($_GET['q']) ?>"><?php endif; ?>
@@ -74,13 +74,22 @@
         <div class="panel board-col">
           <div style="display:flex;justify-content:space-between;align-items:baseline">
             <b style="font-size:13.5px"><?= e($s['name']) ?></b>
-            <span class="muted" style="font-size:12px"><?= count($col['leads']) ?></span>
+            <span class="muted" style="font-size:12px"><?= (int)($col['total'] ?? count($col['leads'])) ?></span>
           </div>
           <div class="muted" style="font-size:12px;margin-bottom:8px">
             <?= $col['value'] ? fmoney_short($col['value']) : '—' ?>
             <?= (int)$s['probability'] ? ' · ' . (int)$s['probability'] . '%' : '' ?>
           </div>
-          <?php foreach ($col['leads'] as $l): $sc = lead_score($l); $st = lead_stalled($l); ?>
+          <?php foreach ($col['leads'] as $l):
+                if (!empty($l['_closed'])): // a won / not-pursued lead: no score, no "late" edge ?>
+            <a href="/lead?id=<?= (int)$l['id'] ?>" style="display:block;border:1px solid var(--line);border-radius:8px;padding:9px;margin-bottom:8px;text-decoration:none;background:var(--soft)">
+              <b style="font-size:13px"><?= e($l['company_name']) ?></b>
+              <div class="muted" style="font-size:11.5px;margin-top:2px"><?= e($l['ref']) ?><?= $l['value'] ? ' · ' . fmoney_short($l['value']) : '' ?></div>
+              <div style="font-size:11.5px;margin-top:4px"><?= $l['_closed'] === 'CONVERTED'
+                ? '<span class="pill p-ok" style="font-size:10.5px">✓ Won — customer</span>'
+                : '<span class="pill p-mut" style="font-size:10.5px">Not pursued</span>' ?></div>
+            </a>
+          <?php continue; endif; $sc = lead_score($l); $st = lead_stalled($l); ?>
             <a href="/lead?id=<?= (int)$l['id'] ?>" style="display:block;border:1px solid var(--line);border-radius:8px;padding:9px;margin-bottom:8px;text-decoration:none<?= $st ? ';border-left:3px solid var(--bad)' : '' ?>">
               <b style="font-size:13px"><?= e($l['company_name']) ?></b>
               <div class="muted" style="font-size:11.5px;margin-top:2px"><?= e($l['ref']) ?><?= $l['value'] ? ' · ' . fmoney_short($l['value']) : '' ?></div>
@@ -94,6 +103,7 @@
               </div>
             </a>
           <?php endforeach; ?>
+          <?php if (!empty($col['more'])): ?><a class="muted" style="font-size:12px" href="/leads?v=list&amp;status=<?= e($col['more_status']) ?>">+<?= (int)$col['more'] ?> more — see the list</a><?php endif; ?>
           <?php if (!$col['leads']): ?><p class="muted" style="font-size:12px;margin:0">—</p><?php endif; ?>
         </div>
       <?php endforeach; ?>

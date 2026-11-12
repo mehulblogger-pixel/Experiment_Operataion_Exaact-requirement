@@ -45,7 +45,7 @@ t_ok(strpos($crm, "ensure_column('crm_inquiries', 'lead_id'") !== false,
     'the crm_inquiries table gains a lead_id column');
 t_ok(strpos($crm, 'LEFT JOIN leads l ON l.id=i.lead_id') !== false,
     'the inquiry register shows the origin lead reference');
-t_ok(strpos($form, 'Converted from lead') !== false,
+t_ok(strpos($form, 'Came from lead') !== false,
     'the inquiry form shows it was converted from a lead');
 
 // ---------------------------------------------------------------------------

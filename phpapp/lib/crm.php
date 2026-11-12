@@ -1212,6 +1212,19 @@ function crm_rule_is_unit($r) {
 // of going to business head it went to branch manager." The quotation's primary
 // unit was left blank and Industrial was chosen on its lines; the levels looked
 // at the primary unit only, so the Industrial level never applied.
+//  The lead a quotation was made from, as a trail step back to it — or null
+//  when it was not made from a lead, the lead is gone, or this person cannot
+//  open leads. Used by the quotation page so Back returns to the lead.
+function crm_quote_lead_link(array $q) {
+    $lid = (int) ($q['lead_id'] ?? 0);
+    if (!$lid || !function_exists('lead_row')) return null;
+    if (function_exists('ops_module_gate') && !ops_module_gate('leads', true)) return null;
+    $l = ops_one("SELECT id, ref, company_name FROM leads WHERE id=?", [$lid]);
+    if (!$l) return null;
+    $label = trim((string) $l['ref'] . ((string) $l['company_name'] !== '' ? ' · ' . $l['company_name'] : ''));
+    return ['label' => $label, 'url' => '/lead?id=' . (int) $l['id']];
+}
+
 function crm_quote_units($q) {
     $u = [];
     if (trim((string)($q['sbu'] ?? '')) !== '') $u[] = (string)$q['sbu'];
@@ -1769,7 +1782,9 @@ function ops_crm_inquiries($route, $method) {
         if (!$fy['all']) { $w[] = 'i.created_at >= ?'; $args[] = $fy['from']; $w[] = 'i.created_at < ?'; $args[] = $fy['to_excl']; }
         // origin_ref = the lead this inquiry was converted from (if any), so the
         // register shows where it came from.
-        $rows = ops_all("SELECT i.*, bp.display_name client_disp, l.ref origin_ref, o.name office_name,
+        //  l.owner_name: an enquiry raised before 12 Nov from a lead whose owner
+        //  was only a typed name still shows that name instead of a blank.
+        $rows = ops_all("SELECT i.*, bp.display_name client_disp, l.ref origin_ref, l.owner_name lead_owner_name, o.name office_name,
                                 u.first_name owner_first, u.last_name owner_last, u.username owner_username
                          FROM crm_inquiries i
                          LEFT JOIN offices o ON o.id=i.office_id
@@ -2210,7 +2225,8 @@ function ops_crm_quotes($route, $method) {
                     $moved = lead_files_carry_to_quote($leadId, (int)$id);
                     if ($moved) crm_log_change((int)$id, $moved . ' file(s) carried over from the lead');
                 }
-                flash("$no created."); redirect('/quote?id=' . $id);
+                flash($leadId ? "$no created. It is saved on the lead too — Back takes you to the lead." : "$no created.");
+                redirect('/quote?id=' . $id);
             }
         }
         // A refused save: say why, and draw the form again from what was posted.
@@ -2281,6 +2297,10 @@ function ops_crm_quotes($route, $method) {
             foreach ($orderCalls as &$oc) $oc['invoiced'] = $ocInv[(int)$oc['id']] ?? (float)($oc['invoiced'] ?? 0);
             unset($oc);
         }
+        //  Owner, 12 Nov 2026 — a quotation made from a lead "goes to Sales →
+        //  Quotes and does not return to the lead". It now sits UNDER its lead:
+        //  Home › Sales › Leads › L-0012 · Acme › Q-…, and Back goes to the lead.
+        if (function_exists('nav_under') && ($ql = crm_quote_lead_link($q))) nav_under('quote', 'leads', $ql);
         view('ops/crm/quote_detail', [
             'q' => $q, 'lines' => crm_quote_lines($q['id']),
             'preorderOn' => preorder_checklist_enabled(), 'preorderItems' => preorder_checklist_items(),

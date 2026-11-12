@@ -316,6 +316,24 @@ stateDiagram-v2
   transition) — to the deal's customer when it has one (no second customer or enquiry), otherwise by
   the ordinary conversion (`lead_close_for_won_deal`). Leads whose deal was won earlier are closed the
   next time the lead or the board is opened. No status or transition is added.
+- **Plain words on screen** (owner, 12 Nov 2026 — *"terms like converted are unable to understand by
+  any simple user"*): `CONVERTED` is shown as **"Won — customer"**, the convert screen reads *"They
+  said yes — make {company} a customer"*, and new industry pipelines name their WON stage
+  "Won — customer". Labels only — the status codes and transitions above are unchanged. The
+  enquiry a won lead raises is assigned to the lead's owner (a typed owner name is matched to its
+  login, else the person pressing the button) and carries the lead's branch, else that person's
+  (`lead_enquiry_assignee`), so the register never shows it with nobody or no branch (SAL-016).
+- **The lead page shows one next step** (owner, 12 Nov 2026): a three-step bar — talk to them,
+  send a quotation, their answer — with one main button for where it stands. Stages, working it as a
+  deal and the direct "they said yes" are optional and sit under "More". A quotation made from a
+  lead sits under that lead (trail and Back return to the lead). No permission, status or
+  transition is added.
+- **The leads board's won and not-pursued columns** (owner, 12 Nov 2026 — *"the top KPI shows 2
+  converted but the card shows none"*): the board drew OPEN leads only, so those columns were always
+  empty. They now hold the leads closed in the chosen year, placed by **status** (`CONVERTED` → the
+  pipeline's first WON stage, `LOST` → its first LOST stage — a lead won from an open stage keeps that
+  stage id), at most 30 cards each with "+N more — see the list". The "Won" card counts the same
+  year. Open leads always show, whatever year is picked. Display only.
 - **A lost lead is not converted** — it is reopened first (it used to convert straight from LOST).
 - A reopen is written in the record's history with who, the reason and why it had been closed,
   and adds a stage-history row; the lost reason is cleared so it no longer counts as lost.

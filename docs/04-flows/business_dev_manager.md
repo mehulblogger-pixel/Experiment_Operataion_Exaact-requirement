@@ -18,4 +18,11 @@ flowchart TD
 - **Handoff:** an accepted quote becomes Finance's "contracts to register" task (`ops.php:6306`). On the quote page a sales viewer sees an explicit **"✓ Won — handed to Accounts"** wall (C1, `quote_detail.php`): the accepted quote is locked (`quote_is_locked`), the only way to change it is a **revision**, and the contract/calls are Accounts' and Operations' to do — sales' part is done.
 - **Won without a quotation (direct order):** on the deal, **"Send to Accounts to register the contract"** (`/opportunity-send-to-accounts`) hands it to Finance the same way — no quote needed — and it flows contract → endorse → approve → OPEN → calls. A quick **"raise a work order directly"** (no contract, doesn't pass Finance) is kept as a secondary, folded option for one-offs.
 - **Generate quotation (quote-of-record):** any deal without a quotation offers **"Generate quotation"** (`/opportunity-generate-quote`) — a draft quote pre-filled from the deal (client, subject, value), linked to it, so even a direct order can carry a quote for the record. One is enough: the button greys out once the deal has a quotation. (Quotes are *not* mandatory per order — the invariant is order→contract and contract→rate-basis; this just makes a quote always **available**.)
+- **On a lead — one next step** (owner, 12 Nov 2026): the lead page shows a three-step bar (*Talk to
+  them → Send a quotation → Their answer*) and ONE main button for where it stands — "Log your first
+  contact", then "Make the quotation", then "Open quotation …". A quotation made from the lead sits
+  under the lead (Back returns to it), and when the customer accepts it the lead closes by itself as
+  **Won — customer**. Moving between stages, working it as a deal, marking it lost and the direct
+  *"They said yes without a quotation from us"* (for a purchase order that arrives without our
+  quotation) are optional and sit under **More**. Same permissions as before.
 - Most common task = create & send a quote (a few clicks through the quote form).

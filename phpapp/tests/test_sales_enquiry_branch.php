@@ -74,8 +74,8 @@ unset($_SESSION['uid']); current_user(true); ua(true);
 // ---- an enquiry with no branch is everyone's ------------------------------------------------------
 $pdo->prepare("INSERT INTO crm_inquiries (inquiry_no, client_name, subject, sbu, status, created_by, created_at) VALUES ('INQ-EB-OLD','Old Co','Older enquiry','TPI','OPEN','x',?)")
     ->execute([date('c')]);
-$pg = $drive($SB, 'inquiries', 'GET', ['fy' => 'all'], [], ['INQ-EB-OLD', 'No branch — every branch sees it']);
-t_ok(!empty($pg['has']['INQ-EB-OLD']) && !empty($pg['has']['No branch — every branch sees it']), 'an older enquiry with no branch stays visible to every branch, and says so');
+$pg = $drive($SB, 'inquiries', 'GET', ['fy' => 'all'], [], ['INQ-EB-OLD', 'All branches']);
+t_ok(!empty($pg['has']['INQ-EB-OLD']) && !empty($pg['has']['All branches']), 'an older enquiry with no branch stays visible to every branch, and says so');
 
 // ---- a converted lead's enquiry -----------------------------------------------------------------
 t_as_admin();

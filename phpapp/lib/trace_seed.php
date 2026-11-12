@@ -153,7 +153,7 @@ function trace_seed($force = false) {
 
     // ---- 7. Convert the lead to a customer (status flows back) ------------
     if (($ln = lead_convert($leadId, ['partner_id' => $clientId])) && empty($ln['err']))
-        $step('Lead converted to a customer', $lead['ref'], 'The lead now reads Converted and points at the customer on the master.');
+        $step('Lead converted to a customer', $lead['ref'], 'The lead now reads Won — customer and points at the customer on the master.');
 
     // ---- 8. Register the contract number on the quotation ----------------
     $contractId = null;

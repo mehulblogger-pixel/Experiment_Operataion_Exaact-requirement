@@ -1,5 +1,5 @@
-<div class="master-head"><div><h1>Convert <?= e($l['ref']) ?></h1>
-  <p class="sub" style="margin:2px 0 0">Winning a lead is not a tick in a column. It becomes a customer on the master and an inquiry in the funnel — everything below comes from the lead, so nothing is retyped.</p></div></div>
+<div class="master-head"><div><h1>They said yes — make <?= e($l['company_name']) ?> a customer</h1>
+  <p class="sub" style="margin:2px 0 0"><?= e($l['ref']) ?> · Check the details below and press the button. <?= e($l['company_name']) ?> goes onto your customer list and an <?= e(Tl('inquiry')) ?> is raised for what they want — everything comes from the lead, nothing is typed again.</p></div></div>
 
 <?php if ($dup && $dup['kind'] === 'partner'): ?>
 <div class="panel" style="margin-top:16px;border-left:3px solid var(--warn)">
@@ -41,7 +41,7 @@
   <p class="muted" style="margin-top:10px;font-size:12.5px">The contact becomes the customer's primary contact, and the requirement becomes the inquiry's service requirement. From there the existing quotation flow takes over.</p>
 
   <div style="margin-top:14px;display:flex;gap:10px">
-    <button class="btn">Convert it</button>
+    <button class="btn">Yes — make them a customer</button>
     <a class="btn secondary" href="/lead?id=<?= (int)$l['id'] ?>">Not yet</a>
   </div>
 </form>

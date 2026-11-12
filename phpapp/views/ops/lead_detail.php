@@ -7,7 +7,20 @@
   $converted = ($l['status'] ?? '') === 'CONVERTED' || !empty($l['converted_partner_id']) || !empty($l['converted_inquiry_id']);
   $effLbl = function_exists('act_effort_label') ? act_effort_label($effort ?? []) : '';
 ?>
-<?= function_exists('chain_strip') ? chain_strip('LEAD', (int)$l['id'], 'LEAD', (int)$l['id']) : '' ?>
+<style>
+  /* Owner, 12 Nov 2026 — where the lead is, in three plain steps. */
+  .lead-steps{display:flex;gap:6px;list-style:none;margin:10px 0 0;padding:0;flex-wrap:wrap}
+  .lead-steps li{display:flex;align-items:center;gap:6px;padding:6px 12px 6px 6px;border-radius:999px;background:var(--soft,#f1f4f8);color:var(--muted,#5b6b6a);font-size:13.5px;font-weight:600}
+  .lead-steps li span{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:#fff;border:1px solid var(--line,#d5dde3);font-size:12px}
+  .lead-steps li.done{color:#0f7d5a}.lead-steps li.done span{background:#0f7d5a;border-color:#0f7d5a;color:#fff}
+  .lead-steps li.now{background:#e8efff;color:#1d3fb8}.lead-steps li.now span{background:#1d3fb8;border-color:#1d3fb8;color:#fff}
+</style>
+<?php // The from-lead-to-payment strip. A new lead has nothing after it, so the
+      // strip was nine empty boxes that pushed the next step off a phone screen
+      // (owner, 12 Nov 2026). It appears once something follows the lead. ?>
+<?php $hasNext = !$open || !empty($quotes) || $oppId
+        || (function_exists('opp_try') && opp_try(fn() => ops_val("SELECT 1 FROM opportunities WHERE lead_id=?", [(int)$l['id']]), null)); ?>
+<?= ($hasNext && function_exists('chain_strip')) ? chain_strip('LEAD', (int)$l['id'], 'LEAD', (int)$l['id']) : '' ?>
 
 <div class="master-head"><div>
   <h1><?= e($l['company_name']) ?></h1>
@@ -50,10 +63,12 @@
 <?php // ---- Where it is now, and the one next thing ------------------------- ?>
 <div class="nowband">
   <?php if ($converted): ?>
-    <div class="step">Won — this became a customer.</div>
-    <p class="next">It is now <a href="/client?id=<?= (int)$l['converted_partner_id'] ?>"><b><?= e($l['company_name']) ?> on the customer list</b></a><?php
-      if ($l['converted_inquiry_id']): ?> · <a href="/inquiries">an enquiry was raised</a><?php endif; ?>.
-      Carry on from there.</p>
+    <div class="step">🎉 Won — <?= e($l['company_name']) ?> is now a customer.</div>
+    <p class="next">See them in <a href="/client?id=<?= (int)$l['converted_partner_id'] ?>"><b>the customer list</b></a><?php
+      $wq = null; foreach (($quotes ?? []) as $qq) if (($qq['status'] ?? '') === 'ACCEPTED') { $wq = $qq; break; }
+      if ($wq): ?> · their accepted <?= e(Tl('quote')) ?> <a href="/quote?id=<?= (int)$wq['id'] ?>"><b><?= e($wq['quote_no']) ?></b></a><?php endif;
+      if ($l['converted_inquiry_id']): ?> · <a href="/inquiries">the <?= e(Tl('inquiry')) ?> raised for it</a><?php endif; ?>.
+      The work carries on from the customer and the <?= e(Tl('quote')) ?>; this lead stays as the record of how it was won.</p>
   <?php elseif ($l['status'] === 'LOST'): ?>
     <div class="step">Closed — this one did not happen.</div>
     <?php if ($l['lost_reason']): ?><p class="next">Reason: <b><?= e($lostReasons[$l['lost_reason']] ?? $l['lost_reason']) ?></b><?= $l['lost_note'] ? ' — ' . e($l['lost_note']) : '' ?>.</p><?php endif; ?>
@@ -65,42 +80,55 @@
           <button class="btn small secondary" type="submit">Reopen</button>
         </form></details>
     <?php endif; ?>
-  <?php else: ?>
-    <div class="step">This lead is at <b><?= e($curStage ?: '—') ?></b>.<?php if ($stalled): ?> <span class="pill p-bad" style="font-size:11.5px"><?= (int)$days ?> days here — overdue</span><?php endif; ?></div>
-    <p class="next"><?php if (trim((string)$l['next_action']) !== ''): ?>
-        <b>Next:</b> <?= e($l['next_action']) ?><?= $l['next_action_on'] ? ' <span class="muted">by ' . e(fdate($l['next_action_on'])) . '</span>' : '' ?>
+  <?php else:
+    //  Owner, 12 Nov 2026 — "once lead is generated the screen is very confusing
+    //  … move to contact made, work this as a deal, log a contact, make a
+    //  quotation … so where to click, how to click, why to click." One picture of
+    //  where it is (three plain steps) and ONE thing to do next, chosen from what
+    //  has actually happened; everything else is behind "More" (blueprint: one
+    //  primary action, progressive disclosure).
+    $talked = 0; foreach (($timeline ?? []) as $a) if (empty($a['auto'])) $talked++;
+    $lq = $quotes[0] ?? null;                         // newest quotation on this lead
+    $lqSt = $lq ? (string)$lq['status'] : '';
+    $plainQ = ['DRAFT' => 'being prepared — finish it and submit it', 'PENDING_APPROVAL' => 'waiting for approval',
+               'APPROVED' => 'approved — ready to send to them', 'SENT' => 'sent — waiting for their answer',
+               'REJECTED' => 'sent back by the approver — correct it', 'ACCEPTED' => 'accepted', 'LOST' => 'they said no', 'EXPIRED' => 'expired — send a fresh one'];
+    $step = $lq ? (in_array($lqSt, ['SENT'], true) ? 3 : 2) : ($talked > 0 ? 2 : 1);
+    $steps = [1 => 'Talk to them', 2 => 'Send a ' . Tl('quote'), 3 => 'Their answer']; ?>
+    <ol class="lead-steps" aria-label="Where this lead is">
+      <?php foreach ($steps as $n => $lbl): ?>
+        <li class="<?= $n < $step ? 'done' : ($n === $step ? 'now' : '') ?>"><span><?= $n < $step ? '✓' : $n ?></span><?= e($lbl) ?></li>
+      <?php endforeach; ?>
+    </ol>
+    <p class="next" style="margin-top:8px">
+      <?php if ($lq): ?>
+        Your <?= e(Tl('quote')) ?> <b><?= e($lq['quote_no']) ?></b> is <b><?= e($plainQ[$lqSt] ?? strtolower($lqSt)) ?></b>.
+      <?php elseif ($talked === 0): ?>
+        Nothing is logged yet. Start by noting your first call, e-mail or meeting with <?= e($l['contact_name'] ?: 'them') ?>.
       <?php else: ?>
-        <span class="muted">No next step set yet — log a contact below and say what happens next.</span>
-      <?php endif; ?></p>
+        You have talked to them <?= $talked ?> time<?= $talked === 1 ? '' : 's' ?>. When you know what they need, send them a <?= e(Tl('quote')) ?>.
+      <?php endif; ?>
+      <?php if (trim((string)$l['next_action']) !== ''): ?>
+        <br><span class="muted">Your next step: <?= e($l['next_action']) ?><?= $l['next_action_on'] ? ' — by ' . e(fdate($l['next_action_on'])) : '' ?></span>
+      <?php endif; ?>
+      <?php if ($stalled): ?> <span class="pill p-bad" style="font-size:11.5px"><?= (int)$days ?> days without progress</span><?php endif; ?>
+    </p>
     <?php if ($canEdit): ?>
       <div class="cta">
-        <?php
-          // The immediate next step in the pipeline, surfaced up top so moving a
-          // lead forward is one obvious click — the full stage list still lives on
-          // the Actions tab. ("Work this as a deal" jumps straight to won.)
-          $nextStage = null; $seenCur = false;
-          foreach ($stages as $s) {
-            if ($seenCur && $s['kind'] === 'OPEN') { $nextStage = $s; break; }
-            if ((int)$s['id'] === (int)$l['stage_id']) $seenCur = true;
-          }
-          if (($l['status'] ?? '') === 'OPEN' && $nextStage): ?>
-          <form method="post" action="/lead-move" style="display:inline">
-            <input type="hidden" name="id" value="<?= (int)$l['id'] ?>">
-            <input type="hidden" name="stage_id" value="<?= (int)$nextStage['id'] ?>">
-            <button class="btn small">Move to <?= e($nextStage['name']) ?> →</button>
-          </form>
+        <?php if ($lq && $lqSt !== 'LOST' && $lqSt !== 'EXPIRED'): ?>
+          <a class="btn" href="/quote?id=<?= (int)$lq['id'] ?>">Open <?= e(Tl('quote')) ?> <?= e($lq['quote_no']) ?> →</a>
+          <a class="btn small secondary" href="#log" data-tab-go="Contacts">Log a contact</a>
+        <?php elseif ($talked === 0): ?>
+          <a class="btn" href="#log" data-tab-go="Contacts">📞 Log your first contact</a>
+          <?php if (!empty($canQuote)): ?><a class="btn small secondary" href="/quote-new?lead=<?= (int)$l['id'] ?>">Make a <?= e(Tl('quote')) ?></a><?php endif; ?>
+        <?php else: ?>
+          <?php if (!empty($canQuote)): ?><a class="btn" href="/quote-new?lead=<?= (int)$l['id'] ?>">Make the <?= e(Tl('quote')) ?> →</a><?php endif; ?>
+          <a class="btn small secondary" href="#log" data-tab-go="Contacts">Log a contact</a>
         <?php endif; ?>
-        <?php if ($oppId): ?>
-          <a class="btn small secondary" href="/opportunity?id=<?= (int)$oppId ?>">Open the deal →</a>
-        <?php elseif (function_exists('opp_can_edit') && opp_can_edit()): ?>
-          <form method="post" action="/opportunity-from-lead" style="display:inline">
-            <input type="hidden" name="lead_id" value="<?= (int)$l['id'] ?>">
-            <button class="btn small">Work this as a deal →</button>
-          </form>
-        <?php endif; ?>
-        <a class="btn small secondary" href="#log">Log a contact</a>
-        <?php if (!empty($canQuote)): ?><a class="btn small secondary" href="/quote-new?lead=<?= (int)$l['id'] ?>">Make a quotation</a><?php endif; ?>
+        <?php if ($oppId): ?><a class="btn small secondary" href="/opportunity?id=<?= (int)$oppId ?>">Open the deal</a><?php endif; ?>
+        <a class="muted" style="font-size:12.5px;margin-left:6px" href="#more-actions" data-tab-go="Actions">More — change stage, mark lost…</a>
       </div>
+      <p class="muted" style="font-size:12px;margin:8px 0 0">When they accept the <?= e(Tl('quote')) ?>, this lead closes by itself as <b>won</b> and <?= e($l['company_name']) ?> becomes a customer — nothing else to press.</p>
     <?php endif; ?>
   <?php endif; ?>
 </div>
@@ -203,7 +231,7 @@
   <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:10px">
     <h3 style="margin:0">Quotations <span class="muted" style="font-weight:400;font-size:13px">(<?= count($quotes) ?>)</span></h3>
     <?php if (!empty($canQuote) && $l['status'] !== 'LOST'): ?>
-      <a class="btn small" href="/quote-new?lead=<?= (int)$l['id'] ?>">+ Make a quotation</a>
+      <a class="btn small" href="/quote-new?lead=<?= (int)$l['id'] ?>">+ Make a <?= e(Tl('quote')) ?></a>
       <?php if (function_exists('pc_can_edit') && pc_can_edit()): ?><a class="btn small secondary" href="/project-costings?lead_id=<?= (int)$l['id'] ?>">+ Project costing</a><?php endif; ?>
     <?php endif; ?>
   </div>
@@ -223,7 +251,7 @@
       </tbody>
     </table>
   <?php else: ?>
-    <p class="muted" style="margin:10px 0 0">None yet.<?= (!empty($canQuote) && $l['status'] !== 'LOST') ? ' Use <b>Make a quotation</b> when you are ready to price it.' : '' ?></p>
+    <p class="muted" style="margin:10px 0 0">None yet.<?= (!empty($canQuote) && $l['status'] !== 'LOST') ? ' Use <b>Make a ' . e(Tl('quote')) . '</b> when you are ready to price it.' : '' ?></p>
   <?php endif; ?>
 </div>
 <?php endif; ?>
@@ -271,12 +299,12 @@
   $won = array_values(array_filter($stages, fn($s) => $s['kind']==='WON'));
   $lost= array_values(array_filter($stages, fn($s) => $s['kind']==='LOST'));
 ?>
-<div class="panel" data-tab="Actions" style="margin-top:16px">
-  <h3 style="margin-top:0">Move it to the next step</h3>
-  <p class="muted" style="margin:0 0 14px;font-size:13px">Move it <b>forward</b> only when something really changed. <b>They said yes</b> makes them a customer. <b>It did not happen</b> closes it, and asks why.</p>
+<div class="panel" data-tab="Actions" style="margin-top:16px" id="more-actions">
+  <h3 style="margin-top:0">More — change stage, close it</h3>
+  <p class="muted" style="margin:0 0 14px;font-size:13px">You rarely need this page. The stages below are optional markers for your manager's reports — a lead does <b>not</b> have to pass through them. It closes by itself as <b>won</b> when they accept your <?= e(Tl('quote')) ?>.</p>
 
   <?php if ($fwd): ?>
-    <div class="form-sec" style="margin-top:0"><h3 style="font-size:14px">Move it forward</h3></div>
+    <div class="form-sec" style="margin-top:0"><h3 style="font-size:14px">Mark how far it has got <span class="muted" style="font-weight:400">(optional)</span></h3></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
       <?php foreach ($fwd as $s): ?>
         <form method="post" action="/lead-move" style="display:inline">
@@ -289,8 +317,8 @@
   <?php endif; ?>
 
   <?php if ($won): ?>
-    <div class="form-sec"><h3 style="font-size:14px">They said yes</h3>
-      <p>Makes them a customer and raises the enquiry — you confirm the details on the next screen.</p></div>
+    <div class="form-sec"><h3 style="font-size:14px">They said yes without a <?= e(Tl('quote')) ?> from us</h3>
+      <p>Only for when they placed the order directly — for example they sent a purchase order. It makes them a customer and raises the <?= e(Tl('inquiry')) ?>; you check the details on the next screen. (When they accept a <?= e(Tl('quote')) ?>, this happens by itself.)</p></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
       <?php foreach ($won as $s): ?>
         <form method="post" action="/lead-move" style="display:inline">
@@ -322,8 +350,29 @@
       </form>
     <?php endforeach; endif; ?>
   <?php endif; ?>
+
+  <?php if (!$oppId && function_exists('opp_can_edit') && opp_can_edit()): ?>
+    <div class="form-sec"><h3 style="font-size:14px">Work it as a deal <span class="muted" style="font-weight:400">(optional — big or long pursuits)</span></h3>
+      <p>For a large order that takes months, with several people or several <?= e(Tlp('quote')) ?> — it gets its own deal page and forecast. Most leads never need this.</p></div>
+    <form method="post" action="/opportunity-from-lead" style="display:inline">
+      <input type="hidden" name="lead_id" value="<?= (int)$l['id'] ?>">
+      <button class="btn small secondary">Work this as a deal →</button>
+    </form>
+  <?php endif; ?>
 </div>
 <?php endif; ?>
+<script>
+  // A link that names a tab opens that tab first, then scrolls to its target.
+  document.addEventListener('click', function (ev) {
+    var a = ev.target.closest ? ev.target.closest('a[data-tab-go]') : null; if (!a) return;
+    var want = a.getAttribute('data-tab-go'), btn = null;
+    document.querySelectorAll('[role="tab"]').forEach(function (b) { if (!btn && (b.textContent || '').trim() === want) btn = b; });
+    if (!btn) return;
+    ev.preventDefault(); btn.click();
+    var t = document.querySelector(a.getAttribute('href'));
+    if (t) setTimeout(function () { try { if (t.tagName === 'DETAILS') t.open = true; t.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (_) {} }, 30);
+  });
+</script>
 
 <?php // ---- Folded away: the detail you only need sometimes ----------------- ?>
 <details class="fold" data-tab="Overview">

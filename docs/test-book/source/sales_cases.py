@@ -177,24 +177,24 @@ C('SAL-014', 'Leads', 'Reopening a lost lead — only a manager, only with a rea
 C('SAL-015', 'Leads', 'A lost lead cannot be converted into a customer', 'edge', ['rule', 'worst'],
   'MARKETING_MANAGER', 'Before 20 Oct a lost lead could be turned straight into a customer, bypassing the decision that it was lost.',
   'A lead marked lost (not reopened).',
-  [('Open it and change the address bar from /lead?id=… to /lead-convert?id=… (same number), press Enter, then press "Convert it".', 'Refused: "This lead is marked lost. A manager reopens it first, with a reason — then it can be converted."'),
+  [('Open it and change the address bar from /lead?id=… to /lead-convert?id=… (same number), press Enter, then press "Yes — make them a customer".', 'Refused: "This lead is marked lost. A manager reopens it first, with a reason — then it can be converted."'),
    ('Reopen it (SAL-014), then convert.', 'Conversion now works.')],
   'D-22')
 
 C('SAL-016', 'Leads', 'Converting a won lead into a customer and an enquiry', 'scenario', ['best'],
   'MARKETING_EXECUTIVE', 'Conversion carries the company, contact and requirement across so nothing is retyped.',
   'An open lead at Negotiation, for a company NOT yet on the customer list.',
-  [('Actions tab → "Won →".', 'You are taken to "Convert …" with sections "The customer" and "What comes across".'),
-   ('Leave "Attach to a customer we already have" on "— create a new one", check the name, enter State "Gujarat" → "Convert it".', 'Message "Converted. The customer is on the master and an inquiry has been raised — carry on from there."'),
-   ('Left menu → Sales → Inquiries.', 'A new enquiry for this company, Status Open, assigned to the lead\'s owner (not blank), showing your branch.'),
+  [('On the lead press "More — change stage, mark lost…", then under "They said yes without a quotation from us" press the button.', 'You are taken to "They said yes — make {company} a customer" with sections "The customer" and "What comes across".'),
+   ('Leave "Attach to a customer we already have" on "— create a new one", check the name, enter State "Gujarat" → "Yes — make them a customer".', 'You are back on the lead. Message "Done — {company} is now a customer, and an inquiry is raised for what they want…".'),
+   ('Left menu → Sales → Inquiries.', 'A new enquiry for this company: Status "Open", "Assigned to" shows the lead\'s owner (never blank — a typed owner name is matched to its login), "Branch" shows the lead\'s branch — each in its own column. The "from lead" link opens the lead.'),
    ('Left menu → Directory → Client register.', 'The new customer is listed once.'),
-   ('Open the lead again.', 'Banner "Won — this became a customer." with a link to the customer and the enquiry.')],
-  'lead_convert; enquiry assignee fix 20 Oct')
+   ('Look at the lead.', 'Banner "🎉 Won — {company} is now a customer" with links to the customer list and the enquiry. Its status reads "Won — customer" (the word "Converted" is not used).')],
+  'lead_convert; lead_enquiry_assignee; plain words 12 Nov')
 
 C('SAL-017', 'Leads', 'Three people press Convert on the same lead at the same moment', 'edge', ['worst', 'edge'],
   'several', 'Two clicks at once used to create two customers and two enquiries (SA-18).',
   'An open lead. Three browsers (or three people) on its Convert screen.',
-  [('All three press "Convert it" within the same second.', 'Exactly ONE customer and ONE enquiry are created. The other two see "That lead is being converted, or has just been converted, by someone else." (or "That lead has already been converted.")'),
+  [('All three press "Yes — make them a customer" within the same second.', 'Exactly ONE customer and ONE enquiry are created. The other two see "Someone else is making this lead a customer right now, or has just done it." (or "That lead is already won — it is a customer now.")'),
    ('Client register: search the name.', 'Listed once.')],
   'SA-18; lead claim')
 
@@ -202,7 +202,7 @@ C('SAL-018', 'Leads', 'Converting a lead for a company that is already a custome
   'MARKETING_EXECUTIVE', 'Choosing the existing customer keeps its history in one place.',
   'Lead for "TB Steel Works Pvt Ltd" typed as free text.',
   [('Convert screen.', 'The screen points out a possible duplicate customer.'),
-   ('Pick "TB Steel Works Pvt Ltd" in "Attach to a customer we already have" → Convert it.', 'No new customer is created; the enquiry is raised for the existing one.')],
+   ('Pick "TB Steel Works Pvt Ltd" in "Attach to a customer we already have" → "Yes — make them a customer".', 'No new customer is created; the enquiry is raised for the existing one.')],
   'lead_possible_duplicate')
 
 C('SAL-019', 'Leads', 'Lead documents: attach, list, remove', 'scenario', ['best', 'edge'],
@@ -941,7 +941,7 @@ C('SAL-160', 'Sales flow', 'Lead to opened contract — every hand-off, every nu
    ('[Test BDM] Submit for approval.', 'Chain: Level 2 (Marketing Manager) because ₹6,00,000 is above ₹5,00,000 before tax.'),
    ('[Test MktMgr] Tick the checklist (7/7), Approve.', 'Approved.'),
    ('[Test BDM] Send to client.', 'Sent; follow-up offered.'),
-   ('[Test BDM] Mark accepted (won).', 'Accepted. Deal → Won. Lead → Converted.'),
+   ('[Test BDM] Mark accepted (won).', 'Accepted. Deal → Won. Lead → Won — customer.'),
    ('[Test Finance] Register the contract & request opening.', 'Contract Pending, value ₹6,00,000 (before tax).'),
    ('[Test OpsMgr] Endorse. [Test BranchMgr] Approve & open.', 'Contract OPEN; order floated to Operations.'),
    ('[Test Coord] Left menu → Operations → work orders.', 'A work order can be raised under this contract number with the customer, sites and lines carried over — nothing retyped.'),
