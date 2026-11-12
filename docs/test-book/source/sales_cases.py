@@ -124,7 +124,7 @@ C('SAL-010', 'Leads', 'A sales executive records a new lead — best case', 'sce
   [('Left menu → Sales → Leads.', 'Page headed "Leads" with Year filter, Find, "+ New lead", "⬇ CSV", "Board" and "List".'),
    ('Press "+ New lead".', 'Page "New lead" with sections: Who they are · What they want · Manpower deputation — if this lead is for deputing · Who chases it, and what happens next.'),
    ('"…or type a new company / person\'s name": "TB Cement Ltd". Contact name "Ravi Shah", E-mail ravi@tbcement.test, Telephone 9825012345, Where they came from = "Exhibition or event", The requirement "Third-party inspection of kiln shell, 12 days", Value they are worth ₹4,50,000, Expected to close = next month, Allocated to = admin — me, Branch = "— mine —". Press "Create it".', 'The lead opens with tabs Overview · Contacts · Quotes · Documents · Actions · History, at the first stage of the lead pipeline.'),
-   ('Open the History tab.', 'One move recorded, by you, today.'),
+   ('Open the History tab.', 'It opens straight away (no extra click): "Lead … created" by you, today, and any stage move.'),
    ('Left menu → Sales → Leads → List.', 'TB Cement Ltd appears with your name and branch.')],
   'D-01; lib/leads.php lead_create')
 
@@ -134,7 +134,7 @@ C('SAL-011', 'Leads', 'Lead form — every field, empty and extreme values', 'ed
   [('Press "Create it" with everything empty.', 'Refused with a sentence naming what is missing (at least the company). No lead is created.'),
    ('Company name of 250 characters.', 'Saved (cut to the allowed length) or refused with a clear message — never a blank or error page.'),
    ('Company name with special characters: "Shri Ram & Sons (P) Ltd. — युनिट २".', 'Saved and shown exactly as typed everywhere (list, detail, quote).'),
-   ('Company name "<b>Bold</b> <script>alert(1)</script>".', 'Shown as plain text; no bold, no pop-up.'),
+   ('Company name "<b>Bold</b> <script>alert(1)</script>".', 'Shown as plain text; no bold, no pop-up. On the hosted site the server\'s own firewall may refuse the save with a plain "403 Forbidden" page before it reaches the app — that is the host protecting you, and also a pass (owner, 12 Nov 2026).'),
    ('E-mail "ravi@" (invalid).', 'The browser or the page refuses it with a message.'),
    ('Value they are worth = -5000.', 'Refused, or saved as 0 with a message — record what happens.'),
    ('Value = 99999999999 (99,999 crore).', 'Saved and shown with Indian grouping, not in scientific form.'),

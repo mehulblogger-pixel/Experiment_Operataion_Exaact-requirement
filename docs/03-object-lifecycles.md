@@ -311,6 +311,11 @@ stateDiagram-v2
 ```
 
 - **A manager** is `leads_can_reopen()`: `mod.leads.edit`, `crm.quote.approve`, or a master of leads.
+- **A won deal closes its lead** (owner, 12 Nov 2026 — a lead whose deal was won still showed Open /
+  Qualified): moving a deal to a WON stage moves the lead it came from `OPEN → CONVERTED` (the existing
+  transition) — to the deal's customer when it has one (no second customer or enquiry), otherwise by
+  the ordinary conversion (`lead_close_for_won_deal`). Leads whose deal was won earlier are closed the
+  next time the lead or the board is opened. No status or transition is added.
 - **A lost lead is not converted** — it is reopened first (it used to convert straight from LOST).
 - A reopen is written in the record's history with who, the reason and why it had been closed,
   and adds a stage-history row; the lost reason is cleared so it no longer counts as lost.

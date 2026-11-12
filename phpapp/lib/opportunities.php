@@ -440,7 +440,9 @@ function opp_move($oppId, $stageId, array $b = [], $bypassGate = false) {
                 'Moved to ' . $to['name'] . ($status !== 'OPEN' ? ' — ' . strtolower(OPP_STATUS[$status]) : ''),
                 ['auto' => 1, 'partner_id' => $o['partner_id'] ?: null,
                  'outcome' => $status === 'WON' ? 'won' : ($status === 'LOST' ? 'lost' : '')]);
-    return ['ok' => true, 'status' => $status];
+    //  A won deal closes the lead it came from (owner, 12 Nov 2026).
+    $leadNote = ($status === 'WON' && function_exists('lead_close_for_won_deal')) ? lead_close_for_won_deal((int)$o['id']) : '';
+    return ['ok' => true, 'status' => $status, 'lead_note' => $leadNote];
 }
 
 // D-22 — a manager reopens a won or lost deal, with a reason, back to the stage
@@ -1065,7 +1067,7 @@ function ops_opportunities($route, $method) {
             // congratulating somebody on a win that has not been agreed.
             flash('Not moved yet — “' . $r['gate']['name'] . '” applies to a deal this size, so the move to '
                   . $r['stage']['name'] . ' is waiting on approval.', 'warning');
-        else flash($r['status'] === 'WON' ? 'Won. Raise the order when the customer confirms.'
+        else flash($r['status'] === 'WON' ? 'Won. Raise the order when the customer confirms.' . (!empty($r['lead_note']) ? ' ' . $r['lead_note'] : '')
                  : ($r['status'] === 'LOST' ? 'Recorded as lost, with the reason.' : 'Moved.'));
         redirect('/opportunity?id=' . $id);
     }

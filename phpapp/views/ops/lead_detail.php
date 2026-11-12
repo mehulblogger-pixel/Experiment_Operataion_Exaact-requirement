@@ -398,7 +398,7 @@
 </details>
 <?php endif; ?>
 
-<details class="fold" data-tab="History">
+<details class="fold" data-tab="History" open>
   <summary>Its history <span class="sub"><?= count($timeline ?? []) ?> logged · <?= count($history ?? []) ?> move<?= count($history ?? []) === 1 ? '' : 's' ?></span></summary>
   <div class="fold-body" id="timeline">
     <h4 style="margin:0 0 8px">What's happened</h4>

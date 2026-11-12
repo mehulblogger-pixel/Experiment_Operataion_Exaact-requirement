@@ -472,7 +472,7 @@
 <?php endif; ?>
 
 <?php if ($history): ?>
-<details class="fold" data-tab="History">
+<details class="fold" data-tab="History" open>
   <summary>How it moved <span class="sub"><?= count($history) ?> move<?= count($history) === 1 ? '' : 's' ?></span></summary>
   <div class="fold-body">
     <table class="dt">

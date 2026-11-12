@@ -970,6 +970,39 @@ function lead_convert($leadId, array $b = []) {
 // by acceptance time the customer exists and the quote already carries the work.
 // Idempotent (a lead already CONVERTED/LOST is left alone) and best-effort: this
 // must never block the acceptance it rides on.
+// Owner, 12 Nov 2026 — "Even when the lead is marked as won it still shows … to
+// move ahead. Also it shows in the qualified? is that OK" — No. Winning the DEAL
+// a lead became never touched the lead (only winning its quotation did), so it
+// stayed Open at Qualified with "Open the deal →". A won deal now closes its
+// lead as CONVERTED (docs/03: "a WON stage means convert"): with the deal's
+// customer when it has one — no second customer, no second enquiry — otherwise
+// by the ordinary conversion. Idempotent; never blocks the deal's own move.
+// Returns '' when the lead is (now) converted or there is none, else why not.
+function lead_close_for_won_deal($oppId) {
+    try {
+        $o = ops_one("SELECT id, lead_id, partner_id, status FROM opportunities WHERE id=?", [(int)$oppId]);
+        if (!$o || (int)$o['lead_id'] <= 0 || (string)$o['status'] !== 'WON') return '';
+        $l = lead_row((int)$o['lead_id']);
+        if (!$l || in_array((string)$l['status'], ['CONVERTED', 'LOST'], true)) return '';
+        if ((int)$o['partner_id'] > 0) { lead_convert_on_quote_win((int)$l['id'], (int)$o['partner_id']); return ''; }
+        $r = lead_convert((int)$l['id'], []);
+        if (!empty($r['err'])) return 'The deal is won, but its lead ' . ($l['ref'] ?? '') . ' could not be closed: ' . $r['err'] . ' Open the lead and convert it.';
+        //  The deal gets the customer the conversion made.
+        $pid = (int)(ops_val("SELECT converted_partner_id FROM leads WHERE id=?", [(int)$l['id']]) ?: 0);
+        if ($pid) db()->prepare("UPDATE opportunities SET partner_id=?, partner_name=COALESCE(NULLIF(partner_name,''),?), updated_at=? WHERE id=? AND (partner_id IS NULL OR partner_id=0)")
+                      ->execute([$pid, (string)$l['company_name'], date('c'), (int)$o['id']]);
+        return '';
+    } catch (Throwable $e) { return ''; }
+}
+// Leads whose deal was won before this rule existed: closed the next time the
+// board or the lead is opened.
+function lead_close_won_deals_sweep($leadId = 0) {
+    try {
+        $rows = ops_all("SELECT o.id FROM opportunities o JOIN leads l ON l.id=o.lead_id
+                          WHERE o.status='WON' AND l.status NOT IN ('CONVERTED','LOST')" . ($leadId ? " AND l.id=?" : "") . " LIMIT 50", $leadId ? [(int)$leadId] : []) ?: [];
+        foreach ($rows as $r) lead_close_for_won_deal((int)$r['id']);
+    } catch (Throwable $e) {}
+}
 function lead_convert_on_quote_win($leadId, $partnerId, $inquiryId = null) {
     $leadId = (int)$leadId; $partnerId = (int)$partnerId;
     if (!$leadId || !$partnerId) return false;
@@ -1231,6 +1264,9 @@ function lead_scope_gate($route) {
 function ops_leads($route, $method) {
     lead_scope_gate($route);   // M14 — object-level branch scope, before anything reads an id
     ops_require(leads_can_view(), 'You cannot open the lead register.');
+    //  Owner, 12 Nov 2026 — a lead whose deal was already won is closed now.
+    if ($method === 'GET' && in_array($route, ['lead', 'leads'], true) && function_exists('lead_close_won_deals_sweep'))
+        lead_close_won_deals_sweep($route === 'lead' ? (int)($_GET['id'] ?? 0) : 0);
     leads_migrate();
     $canEdit = leads_can_edit();
 
