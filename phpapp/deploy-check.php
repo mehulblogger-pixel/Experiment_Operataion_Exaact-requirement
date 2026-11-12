@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '5584643 · 2026-11-12 14:09 UTC · 713 files';
+$RELEASE = '0749073 · 2026-11-12 14:21 UTC · 713 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -151,7 +151,7 @@ $EXPECT  = [
     'lib/install_mode.php' => ['s'=>4935,'h'=>'0c1d5ab96ff54b68'],
     'lib/invready.php' => ['s'=>6922,'h'=>'0f7637be388be1fc'],
     'lib/joblock.php' => ['s'=>13155,'h'=>'47c05d15e9e8e13b'],
-    'lib/leads.php' => ['s'=>102816,'h'=>'dce2bb3bd4d602a6'],
+    'lib/leads.php' => ['s'=>104098,'h'=>'4e83654d62f6630a'],
     'lib/licence.php' => ['s'=>31138,'h'=>'ae1f563479d4009c'],
     'lib/licenceissue.php' => ['s'=>33775,'h'=>'8c3a66cc85deaae8'],
     'lib/licencekey.php' => ['s'=>29869,'h'=>'db9ba00546be996a'],

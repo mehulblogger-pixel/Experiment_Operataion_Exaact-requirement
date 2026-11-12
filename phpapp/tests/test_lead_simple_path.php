@@ -99,6 +99,10 @@ try {
         $pastB = lead_board($lp, ['from' => $pf, 'to_excl' => date('Y-m-d', strtotime($pt . ' +1 day'))]);
         t_eq(count($pastB['columns'][$qual]['leads']), 1, 'last year\'s board never shows a lead created this year');
     }
+    //  Owner, 12 Nov 2026: "CSV file downloads but it does not have any lead details in it."
+    $ls = (string)file_get_contents(__DIR__ . '/../lib/leads.php');
+    t_ok(strpos($ls, "\$bd = lead_board((int)(\$_GET['pipeline'] ?? 0), \$fyWin, \$onlyYear);") !== false && strpos($ls, "'Carried forward from'") !== false,
+        'the board\'s CSV holds the board\'s own leads — carried-forward ones included and marked');
     $lv = (string)file_get_contents(__DIR__ . '/../views/ops/leads.php');
     t_ok(strpos($lv, 'Carried forward from FY') !== false && strpos($lv, 'Only leads created in FY') !== false && strpos($lv, 'name="pipeline" value=') !== false,
         'cards say "Carried forward from FY …", the board offers "Only leads created in FY …", and changing the year keeps the pipeline');

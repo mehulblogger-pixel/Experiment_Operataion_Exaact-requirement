@@ -1417,15 +1417,30 @@ function ops_leads($route, $method) {
                    'fy_from' => $fy['all'] ? '' : $fy['from'], 'fy_to_excl' => $fy['all'] ? '' : $fy['to_excl']];
 
         if (wants_csv()) {
-            // Every row the filters match, not the page on screen.
-            $csv = [['Ref','Company','Contact','Stage','Status','Value','Owner','Branch','Source','Expected close','Days in stage','Score']];
-            foreach (leads_all($filter) as $r) {
-                $sc = lead_score($r);
-                $csv[] = [$r['ref'], $r['company_name'], $r['contact_name'], $r['stage_name'], $r['status'],
-                          (float)$r['value'], $r['owner_name'], $r['office_name'], $r['source'],
-                          $r['expected_close'], lead_days_in_stage($r), $sc['score']];
+            // The rows the screen shows (owner, 12 Nov 2026: "CSV file downloads but
+            // it does not have any lead details in it" — the board showed the open
+            // leads carried forward from last year, the file only the year's own).
+            // The list exports every row its filters match; the board exports its
+            // own leads: the year's open leads, those carried forward (unless "only
+            // this year"), and the year's won and not-pursued — none capped.
+            if ($view === 'list') {
+                $rowsCsv = leads_all($filter);
+            } else {
+                $bd = lead_board((int)($_GET['pipeline'] ?? 0), $fyWin, $onlyYear);
+                $rowsCsv = [];
+                foreach ($bd['columns'] as $col) foreach ($col['leads'] as $r) if (empty($r['_closed'])) $rowsCsv[] = $r;
+                foreach (['CONVERTED', 'LOST'] as $stc)
+                    foreach (leads_all(['pipeline' => (int)$bd['pipeline'], 'status' => $stc, 'fy_from' => $fyWin['from'] ?? '', 'fy_to_excl' => $fyWin['to_excl'] ?? '']) as $r) $rowsCsv[] = $r;
             }
-            csv_download('leads-' . date('Y-m-d') . '.csv', $csv);
+            $csv = [['Ref','Company','Contact','Stage','Status','Value','Owner','Branch','Source','Expected close','Days in stage','Score','Created on','Carried forward from']];
+            foreach ($rowsCsv as $r) {
+                $sc = lead_score($r);
+                $csv[] = [$r['ref'], $r['company_name'], $r['contact_name'], $r['stage_name'], LEAD_STATUS[$r['status']] ?? $r['status'],
+                          (float)$r['value'], $r['owner_name'], $r['office_name'], $r['source'],
+                          $r['expected_close'], lead_days_in_stage($r), $sc['score'],
+                          substr((string)$r['created_at'], 0, 10), !empty($r['_carried_from']) ? 'FY ' . $r['_carried_from'] : ''];
+            }
+            csv_download('leads-' . ($fy['all'] ? 'all-years' : 'FY' . $fy['fy']) . '-' . date('Y-m-d') . '.csv', $csv);
         }
 
         // The board needs every open lead to draw its columns; the list pages.
