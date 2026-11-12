@@ -277,7 +277,7 @@ C('SAL-030', 'Opportunities', 'Open a deal and move it to Won', 'scenario', ['be
   [('Left menu → Sales → Opportunities → "+ New opportunity".', 'Form "New opportunity".'),
    ('What is the opportunity? "Refinery shutdown TPI 2026", Customer = TB Refinery Ltd, Pipeline = default, Estimated value ₹12,00,000, Expected close next month, Branch Ahmedabad, Where it came from = An existing customer, Competing against "Bureau X", Contact "Mr Patel", Next action "Site visit", By when tomorrow → "Open the opportunity".', 'The deal opens with tabs Overview · Quotes · Actions · History at the first stage.'),
    ('Actions tab → "Move it to" = Quotation sent (50%) → "Move it".', 'Message "Moved." Probability shows 50%.'),
-   ('Move it to Won (100%).', 'Message "Won. Raise the order when the customer confirms." Banner "Won — TB Refinery Ltd said yes."'),
+   ('Move it to Won (100%).', 'Message "Won — TB Refinery Ltd said yes. Next: on the Actions tab, send it to Accounts to register the contract." Banner "Won — TB Refinery Ltd said yes. 🎉" with the same next step, and the Actions tab offers "Send to Accounts to register the contract" (owner, 12 Nov 2026: the old message contradicted the banner).'),
    ('Left menu → Insights → Sales dashboard.', 'Won value includes ₹12,00,000; "Who is selling" credits Test BDM.')],
   'opp_move')
 

@@ -678,6 +678,23 @@ function opp_order_block($o) {
     return '';
 }
 
+// The one next step for a WON deal, in the same words the deal screen shows
+// (owner, test book SAL-030, 12 Nov 2026: the message "Won. Raise the order
+// when the customer confirms." contradicted the banner "… said yes" and the
+// button the screen actually offered, "Send to Accounts to register the
+// contract"). A win goes to Accounts first; a direct order is the side path.
+function opp_won_next(array $o) {
+    if (!empty($o['call_id'])) return 'The work order is raised — open it from this deal.';
+    if (!empty($o['contract_id'])) {
+        $os = strtoupper((string)(ops_val("SELECT open_status FROM partner_contracts WHERE id=?", [(int)$o['contract_id']]) ?: 'OPEN'));
+        return $os === 'OPEN' ? 'The contract is registered and open — the orders are raised from it.'
+                              : 'The contract is registered and waiting for its two signatures; then the orders are raised from it.';
+    }
+    if (trim((string)($o['sent_to_accounts_at'] ?? '')) !== '') return 'It is with Accounts to register the contract — nothing more for you to do here.';
+    if (empty($o['partner_id'])) return 'Next: add the customer to the master (Actions tab), then send it to Accounts to register the contract.';
+    return 'Next: on the Actions tab, send it to Accounts to register the contract.';
+}
+
 // Which quotation the order should carry: the accepted one, else the newest
 // attached. Stated on screen either way, because guessing silently is how the
 // wrong rate ends up on a job.
@@ -1067,7 +1084,10 @@ function ops_opportunities($route, $method) {
             // congratulating somebody on a win that has not been agreed.
             flash('Not moved yet — “' . $r['gate']['name'] . '” applies to a deal this size, so the move to '
                   . $r['stage']['name'] . ' is waiting on approval.', 'warning');
-        else flash($r['status'] === 'WON' ? 'Won. Raise the order when the customer confirms.' . (!empty($r['lead_note']) ? ' ' . $r['lead_note'] : '')
+        else flash($r['status'] === 'WON'
+                 ? (function () use ($id, $r) { $o = opp_row($id) ?: [];
+                       $who = trim((string)($o['client_name'] ?? '') ?: (string)($o['partner_name'] ?? ''));
+                       return 'Won — ' . ($who !== '' ? $who : 'the customer') . ' said yes. ' . opp_won_next($o) . (!empty($r['lead_note']) ? ' ' . $r['lead_note'] : ''); })()
                  : ($r['status'] === 'LOST' ? 'Recorded as lost, with the reason.' : 'Moved.'));
         redirect('/opportunity?id=' . $id);
     }

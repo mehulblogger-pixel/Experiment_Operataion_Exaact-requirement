@@ -59,8 +59,8 @@
     <div class="step">Won — <?= e($custName ?: 'the customer') ?> said yes. 🎉</div>
     <?php if (!empty($o['call_id'])): ?>
       <p class="next">The work order is raised — <a href="/call?id=<?= (int)$o['call_id'] ?>"><b>open it</b></a>.</p>
-    <?php elseif ($canOrder): ?>
-      <p class="next">Next: <b>raise the order</b> so operations can start — the panel is just below.</p>
+    <?php elseif (function_exists('opp_won_next')): ?>
+      <p class="next"><?= e(opp_won_next($o)) ?></p>
     <?php endif; ?>
     <?php if (empty($o['call_id']) && empty($o['contract_id']) && trim((string)($o['sent_to_accounts_at'] ?? '')) === ''): ?>
     <?php if (function_exists('leads_can_reopen') && leads_can_reopen()): ?>
