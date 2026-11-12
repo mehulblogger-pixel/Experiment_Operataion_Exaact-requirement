@@ -2,7 +2,13 @@
 <div class="master-head">
   <div><h1>Pipelines &amp; funnels</h1>
   <p class="sub" style="margin:2px 0 0">Have as many as your business needs — new business, renewals, repeat orders, each with its own stages. Adjust any of them to match how you actually work, or build one from scratch.</p></div>
-  <?php if (!$industry): ?><a class="btn secondary" href="/industry">Start from an industry template</a><?php endif; ?>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <?php // Owner, 12 Nov 2026 (SAL-033): "I am unable to trace it" — the rules that hold a
+          // deal at a stage until a manager agrees live on /stage-gates; they guard these
+          // pipelines' stages, so they are reachable from here too. Same gate as the page. ?>
+    <?php if (function_exists('gate_can_view') && gate_can_view() && gate_can_manage()): ?><a class="btn secondary" href="/stage-gates">Approval rules for deal stages</a><?php endif; ?>
+    <?php if (!$industry): ?><a class="btn secondary" href="/industry">Start from an industry template</a><?php endif; ?>
+  </div>
 </div>
 
 <?php foreach ($entities as $kind => $label): $list = $byKind[$kind] ?? []; ?>

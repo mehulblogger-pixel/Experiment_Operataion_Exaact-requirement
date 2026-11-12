@@ -297,7 +297,7 @@ C('SAL-032', 'Opportunities', 'Moving a deal to the stage it is already in', 'ed
 
 C('SAL-033', 'Opportunities', 'A stage rule holds a big deal until a manager agrees', 'scenario', ['rule'],
   'several', 'Stage gates stop a large deal being called won or lost without a manager.',
-  'Left menu → Sales → Pipelines & funnels → stage rules ("Approval rules for deal stages"): a rule "Won above ₹10 lakh needs Marketing Manager".',
+  'As Test MktMgr (or an admin): Left menu → Sales → Pipelines & funnels → "Approval rules for deal stages" (also reached from Sales → Approvals → "Approval rules", or Set up Sales → "Add or change the rules for deal stages") → "＋ New rule": a rule "Won above ₹10 lakh needs Marketing Manager".',
   [('As Test BDM, move a ₹12,00,000 deal to Won.', 'Message "Not moved yet — "<rule>" applies to a deal this size, so the move to Won is waiting on approval." The deal is NOT won.'),
    ('Try to move it again.', 'Refused: "This deal is already waiting on an approval to move. Withdraw that request first."'),
    ('As Test MktMgr: Left menu → Sales → Approvals → Waiting.', 'The request is listed: Deal, Move, Value, Raised by, Waiting on.'),

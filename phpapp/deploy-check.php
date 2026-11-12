@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '502d711 · 2026-11-12 16:20 UTC · 713 files';
+$RELEASE = '0669e33 · 2026-11-12 17:15 UTC · 713 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -567,7 +567,7 @@ $EXPECT  = [
     'views/ops/partner_import.php' => ['s'=>6405,'h'=>'dd873e0e376783b1'],
     'views/ops/person_erase.php' => ['s'=>2748,'h'=>'790e73d880be6d75'],
     'views/ops/pipeline_edit.php' => ['s'=>7169,'h'=>'d72f4149566ccc5e'],
-    'views/ops/pipelines.php' => ['s'=>4360,'h'=>'d3909c30e881c937'],
+    'views/ops/pipelines.php' => ['s'=>4890,'h'=>'66209f5a33fc84b9'],
     'views/ops/platform_setup.php' => ['s'=>16348,'h'=>'0e24ab8fe2b81fb3'],
     'views/ops/portal_user_perms.php' => ['s'=>4461,'h'=>'7e54018feb626c27'],
     'views/ops/portal_users.php' => ['s'=>12861,'h'=>'cc442582bbfe4415'],
