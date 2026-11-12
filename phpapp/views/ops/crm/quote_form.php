@@ -262,7 +262,7 @@
       <td><select class="form-control l_loc" name="l_location[]" data-cur="<?= e((string)($ln['location_id'] ?? '')) ?>"><option value="">— add a site above —</option></select></td>
       <td><select class="form-control" name="l_order[]"><?php foreach ($orderOpts as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($ln['order_type'] ?? 'LINE')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></td>
       <td><input class="form-control num l_qty" type="number" step="0.01" min="0" name="l_qty[]" value="<?= e($ln['qty'] ?? '') ?>"></td>
-      <td><select class="form-control" name="l_unit[]"><?php foreach ($unitOpts as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($ln['unit'] ?? 'MANDAY')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></td>
+      <td><select class="form-control" name="l_unit[]"><?php foreach ($unitOpts as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($ln['unit'] ?? (function_exists('default_charge_unit') ? default_charge_unit() : 'MANDAY'))===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></td>
       <td><input class="form-control num l_rate" type="number" step="0.01" name="l_rate[]" value="<?= e($ln['rate'] ?? '') ?>"></td>
       <td class="num l_amt"><?= isset($ln['amount']) ? number_format((float)$ln['amount'],0) : '0' ?></td>
       <td><button type="button" class="btn small danger lrm" title="Remove this line">✕</button></td>

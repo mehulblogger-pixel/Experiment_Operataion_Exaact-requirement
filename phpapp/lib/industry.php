@@ -550,10 +550,12 @@ function industry_apply_pipelines($key) {
         $added += industry_seed_list('lead_source', 'Lead source', $t['sources']);
         $added += industry_seed_list('quote_lost_reason', 'Lost reason', $t['lost']);
     }
+    $unitsAdded = industry_seed_units($key);
+    $added += $unitsAdded;
 
     if (function_exists('act_log'))
         act_log('', 0, 'SYSTEM', 'Industry template pipelines added: ' . $t['label'], ['auto' => 1]);
-    return ['ok' => true, 'pipelines' => $made, 'list_values' => $added, 'label' => $t['label']];
+    return ['ok' => true, 'pipelines' => $made, 'list_values' => $added, 'units_added' => $unitsAdded, 'label' => $t['label']];
 }
 
 // Which accreditation pack (if any) an industry carries. Only inspection and
@@ -598,7 +600,9 @@ function industry_set_company($key) {
     setting_set('industry_applied_at', date('c'));
     if (function_exists('act_log'))
         act_log('', 0, 'SYSTEM', 'Company industry set to ' . $t['label'] . ' — wording and accreditation rules', ['auto' => 1]);
-    return ['ok' => true, 'label' => $t['label'], 'wording' => $wording,
+    //  Owner, 12 Nov 2026 — the units this trade bills in (see INDUSTRY_UNITS).
+    $unitsAdded = industry_seed_units($key);
+    return ['units_added' => $unitsAdded, 'ok' => true, 'label' => $t['label'], 'wording' => $wording,
             'inspection_pack' => ($key === 'inspection'), 'accreditation_pack' => $accrPack];
 }
 
@@ -622,6 +626,65 @@ const INDUSTRY_TERM_MAP = [
     'generic'       => 'general',
 ];
 
+// ============================================================================
+//  BILLING UNITS BY INDUSTRY — owner, 12 Nov 2026 (test book, Profile E):
+//  "Unit remains the same for trading and distribution and all other Industry
+//  types as of Inspection and Testing." Quote, order and contract lines offered
+//  only inspection units (man-day, visit …), so a trader could not quote 20 valves
+//  or a builder a square metre. Each industry now brings the units its trade
+//  bills in. Added to the company's unit list (Masters → Charge unit), never
+//  replacing what is there — the inspection units stay for service lines — and
+//  the first one becomes the unit a new line starts with. (Codes avoid the old
+//  aliases in CHARGE_UNIT_ALIASES — "MONTH" there means Man-month.)
+// ============================================================================
+const INDUSTRY_UNITS = [
+    'inspection'    => [],
+    'labs'          => ['SAMPLE' => 'Per sample', 'TEST' => 'Per test', 'PARAMETER' => 'Per parameter', 'HOUR' => 'Per hour'],
+    'manufacturing' => ['NOS' => 'Nos', 'SET' => 'Set', 'KG' => 'Kg', 'TONNE' => 'Tonne', 'METRE' => 'Metre', 'LITRE' => 'Litre', 'BOX' => 'Box', 'PAIR' => 'Pair'],
+    'trading'       => ['NOS' => 'Nos', 'SET' => 'Set', 'BOX' => 'Box', 'CARTON' => 'Carton', 'DOZEN' => 'Dozen', 'KG' => 'Kg', 'TONNE' => 'Tonne', 'METRE' => 'Metre', 'LITRE' => 'Litre', 'ROLL' => 'Roll', 'PAIR' => 'Pair'],
+    'services'      => ['HOUR' => 'Per hour', 'PER_MONTH' => 'Per month', 'SESSION' => 'Per session'],
+    'construction'  => ['STAGE' => 'Per stage / milestone', 'SQM' => 'Square metre', 'CUM' => 'Cubic metre', 'RMT' => 'Running metre', 'TONNE' => 'Tonne', 'NOS' => 'Nos', 'PER_MONTH' => 'Per month'],
+    'itservices'    => ['HOUR' => 'Per hour', 'PER_MONTH' => 'Per month', 'USER_MONTH' => 'Per user per month', 'LICENCE' => 'Per licence'],
+    'healthcare'    => ['SESSION' => 'Per session', 'TEST' => 'Per test', 'PER_MONTH' => 'Per month'],
+    'education'     => ['SEAT' => 'Per participant', 'SESSION' => 'Per session', 'HOUR' => 'Per hour', 'COURSE' => 'Per course'],
+    'logistics'     => ['TRIP' => 'Per trip', 'CONTAINER' => 'Per container', 'KG' => 'Kg', 'TONNE' => 'Tonne', 'CUM' => 'Cubic metre', 'PALLET' => 'Per pallet'],
+    'realestate'    => ['SQFT' => 'Square foot', 'SQM' => 'Square metre', 'PER_MONTH' => 'Per month', 'NOS' => 'Nos'],
+    'staffing'      => ['HOUR' => 'Per hour', 'PER_MONTH' => 'Per month'],
+    'generic'       => ['NOS' => 'Nos', 'HOUR' => 'Per hour', 'PER_MONTH' => 'Per month'],
+];
+function industry_seed_units($key) {
+    $units = INDUSTRY_UNITS[$key] ?? [];
+    $n = 0;
+    try {
+        if (function_exists('lk_ensure_type_map')) lk_ensure_type_map('charge_unit', 'Charge unit', defined('CHARGE_UNITS') ? CHARGE_UNITS : [], 'Operations');
+        $t = function_exists('lk_type') ? lk_type('charge_unit') : null;
+        //  A company without Operations still quotes: the list is made for Sales,
+        //  with the standard units first so no existing line loses its unit.
+        if (!$t && function_exists('lk_add_type')) {
+            $tid = lk_add_type('charge_unit', 'Charge unit', null, 0, 50); $so = 0;
+            foreach ((defined('CHARGE_UNITS') ? CHARGE_UNITS : []) as $c => $l) lk_add_value($tid, null, $c, $l, $so++);
+            if (function_exists('lk_set_module')) lk_set_module('charge_unit', 'Sales');
+            $t = lk_type('charge_unit');
+        }
+        if (!$t) return 0;
+        $tid = (int)$t['id'];
+        $seq = (int)ops_val("SELECT COALESCE(MAX(sort_order),0) FROM lookup_values WHERE type_id=?", [$tid]);
+        foreach ($units as $code => $label) {
+            if (ops_val("SELECT id FROM lookup_values WHERE type_id=? AND (code=? OR label=?)", [$tid, $code, $label])) continue;
+            lk_add_value($tid, null, $code, $label, ++$seq);
+            $n++;
+        }
+        if (function_exists('setting_set')) setting_set('default_charge_unit', $units ? (string)array_key_first($units) : 'MANDAY');
+    } catch (Throwable $e) { /* lookups shaped differently on an older install */ }
+    return $n;
+}
+// The unit a new quote / order line starts with: the company's industry's first
+// unit (Nos for a trader), else Man-day.
+function default_charge_unit() {
+    $u = function_exists('setting_get') ? (string)setting_get('default_charge_unit', '') : '';
+    return $u !== '' ? $u : 'MANDAY';
+}
+
 // Add values to a master list without disturbing what is already there.
 function industry_seed_list($typeKey, $typeLabel, array $values) {
     $n = 0;
@@ -632,11 +695,13 @@ function industry_seed_list($typeKey, $typeLabel, array $values) {
         $seq = (int)ops_val("SELECT COALESCE(MAX(sort_order),0) FROM lookup_values WHERE type_id=?", [$tid]);
         foreach ($values as $v) {
             $code = strtoupper(preg_replace('/[^A-Za-z0-9]+/', '_', $v));
-            $has = ops_val("SELECT id FROM lookup_values WHERE type_id=? AND (label=? OR value_key=?)",
+            //  Owner, 12 Nov 2026 — this named a column that does not exist
+            //  (value_key; it is code), and the try/catch below hid it, so applying
+            //  an industry never added its lead sources or lost reasons.
+            $has = ops_val("SELECT id FROM lookup_values WHERE type_id=? AND (label=? OR code=?)",
                            [$tid, $v, $code]);
             if ($has) continue;
-            db()->prepare("INSERT INTO lookup_values (type_id,value_key,label,sort_order,active)
-                           VALUES (?,?,?,?,1)")->execute([$tid, $code, $v, ++$seq]);
+            lk_add_value($tid, null, $code, $v, ++$seq);
             $n++;
         }
     } catch (Throwable $e) { /* lookups shaped differently on an older install */ }
@@ -661,6 +726,7 @@ function ops_industry($route, $method) {
             $r = industry_set_company($key);
             if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/industry'); }
             flash('Your company\'s industry is now ' . $r['label'] . '. '
+                . (!empty($r['units_added']) ? 'Quotation and order lines now also offer ' . implode(', ', array_slice(array_values(INDUSTRY_UNITS[$key] ?? []), 0, 4)) . (count(INDUSTRY_UNITS[$key] ?? []) > 4 ? ' and more' : '') . '. ' : '')
                 . ($r['accreditation_pack'] !== '' ? 'The ' . INDUSTRY_ACCR_LABELS[$r['accreditation_pack']] . ' accreditation rules are ON.' : 'No accreditation rules are on.'));
             redirect('/industry?show=' . $key);
         }
@@ -670,7 +736,7 @@ function ops_industry($route, $method) {
         $n = 2 + count($r['pipelines']['alt'] ?? []);
         flash($r['label'] . ' pipelines added. ' . $n . ' pipelines created — a main funnel (now the default), '
             . 'an alternate funnel and a lead pipeline'
-            . ($r['list_values'] ? ', with ' . $r['list_values'] . ' list values added' : '')
+            . ($r['list_values'] ? ', with ' . $r['list_values'] . ' list values added' . (!empty($r['units_added']) ? ' (including ' . $r['units_added'] . ' billing units for quotation lines, such as ' . implode(', ', array_slice(array_values(INDUSTRY_UNITS[$key] ?? []), 0, 3)) . ')' : '') : '')
             . '. Your wording and accreditation rules are unchanged. Anything already in flight keeps the pipeline it was on.');
         redirect('/opportunities');
     }

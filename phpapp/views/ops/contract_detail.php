@@ -143,11 +143,11 @@
     <div class="ff ff-wide"><label>Quantity sold <span class="muted">— one line per item; edit, add or remove</span></label>
       <table class="grid cl-table"><thead><tr><th>Description</th><th style="width:110px">Qty</th><th style="width:160px">Unit</th><th style="width:34px"></th></tr></thead>
         <tbody data-cl-rows="edit">
-          <?php $editRows = $lines ?: [['description'=>'','quantity'=>'','unit'=>'MANDAY']]; foreach ($editRows as $ln): ?>
+          <?php $editRows = $lines ?: [['description'=>'','quantity'=>'','unit'=>(function_exists('default_charge_unit') ? default_charge_unit() : 'MANDAY')]]; foreach ($editRows as $ln): ?>
             <tr class="cl-row">
               <td><input class="form-control" name="cl_desc[]" value="<?= e($ln['description'] ?? '') ?>" placeholder="e.g. Third-party inspection"></td>
               <td><input class="form-control" type="number" step="0.01" min="0" name="cl_qty[]" value="<?= e((string)($ln['quantity'] ?? '')) ?: '' ?>"></td>
-              <td><select class="form-control" name="cl_unit[]"><?php foreach (lk_options_or('charge_unit', CHARGE_UNITS) as $k=>$v): ?><option value="<?= e($k) ?>" <?= (string)($ln['unit'] ?? 'MANDAY')===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></td>
+              <td><select class="form-control" name="cl_unit[]"><?php foreach (lk_options_or('charge_unit', CHARGE_UNITS) as $k=>$v): ?><option value="<?= e($k) ?>" <?= (string)($ln['unit'] ?? (function_exists('default_charge_unit') ? default_charge_unit() : 'MANDAY'))===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></td>
               <td><button type="button" class="btn small secondary cl-del" title="Remove line">✕</button></td>
             </tr>
           <?php endforeach; ?>

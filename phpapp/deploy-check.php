@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'ef789b9 · 2026-11-12 05:42 UTC · 711 files';
+$RELEASE = '64c7b4f · 2026-11-12 06:00 UTC · 711 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -146,7 +146,7 @@ $EXPECT  = [
     'lib/identity.php' => ['s'=>45233,'h'=>'4267d813af8001e8'],
     'lib/impartiality.php' => ['s'=>18224,'h'=>'70a0c7b051724178'],
     'lib/indexes.php' => ['s'=>13279,'h'=>'92bb3debc6451b96'],
-    'lib/industry.php' => ['s'=>34146,'h'=>'e88ea9dcfe770706'],
+    'lib/industry.php' => ['s'=>39383,'h'=>'26222750a5e300e6'],
     'lib/inspectorprofile.php' => ['s'=>3920,'h'=>'f995d0ac6cff433f'],
     'lib/install_mode.php' => ['s'=>4935,'h'=>'0c1d5ab96ff54b68'],
     'lib/invready.php' => ['s'=>6922,'h'=>'0f7637be388be1fc'],
@@ -427,7 +427,7 @@ $EXPECT  = [
     'views/ops/connect_taxonomy_admin.php' => ['s'=>11051,'h'=>'db0b340f99a00f89'],
     'views/ops/connect_verify.php' => ['s'=>5528,'h'=>'47b1c892e99a1dd2'],
     'views/ops/consents.php' => ['s'=>3523,'h'=>'5dd8e9b08a104408'],
-    'views/ops/contract_detail.php' => ['s'=>24870,'h'=>'28720d3ce4dad018'],
+    'views/ops/contract_detail.php' => ['s'=>25004,'h'=>'2646cdd7cc4ad0a1'],
     'views/ops/contract_openings.php' => ['s'=>5102,'h'=>'98769400b4ef5772'],
     'views/ops/contract_overrides.php' => ['s'=>8886,'h'=>'e22fdf59af73f743'],
     'views/ops/cost_reconciliation.php' => ['s'=>5547,'h'=>'3c2d6f2dcd59c0a8'],
@@ -441,7 +441,7 @@ $EXPECT  = [
     'views/ops/crm/inquiry_list.php' => ['s'=>4792,'h'=>'365e128c3e1ccef2'],
     'views/ops/crm/quote_detail.php' => ['s'=>74215,'h'=>'37f65c5e0e8428fe'],
     'views/ops/crm/quote_external.php' => ['s'=>8907,'h'=>'7aa7bd1259a0c79d'],
-    'views/ops/crm/quote_form.php' => ['s'=>44958,'h'=>'2a7c293cf3b67a35'],
+    'views/ops/crm/quote_form.php' => ['s'=>45025,'h'=>'0421cdde3be7f046'],
     'views/ops/crm/quote_list.php' => ['s'=>8038,'h'=>'36be301c9d7ffe37'],
     'views/ops/crm/reports.php' => ['s'=>3263,'h'=>'f9d0840a7994e767'],
     'views/ops/crm/template_form.php' => ['s'=>3958,'h'=>'3671a20d6c01c474'],
