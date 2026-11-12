@@ -129,7 +129,10 @@ function pc_migrate() {
               // Owner, 9 Nov 2026 — the role's flexible list of cost heads
               // (lib/costing_heads.php): amount / % / qty × rate / formula,
               // per month / day / year / one time, with remarks.
-              ['project_costing_lines','spec',"TEXT"]] as $c) {
+              ['project_costing_lines','spec',"TEXT"],
+              // Owner, 12 Nov 2026 — which approval level a step came from, so a
+              // change of approver reaches the costings already waiting.
+              ['project_costing_approvals','rule_id',"INT DEFAULT 0"]] as $c) {
         if (function_exists('ensure_column')) ensure_column($c[0], $c[1], $c[2]);
     }
 }
@@ -218,15 +221,15 @@ function pc_build_approvals($h) {
     $pdo = db(); $id = (int)$h['id'];
     $pdo->prepare("DELETE FROM project_costing_approvals WHERE costing_id=?")->execute([$id]);
     $steps = function_exists('crm_quote_rule_steps') ? crm_quote_rule_steps(pc_as_quote($h)) : [];
-    $ins = $pdo->prepare("INSERT INTO project_costing_approvals (costing_id, level, approver_role, approver_user_id, status) VALUES (?,?,?,?,'PENDING')");
-    if (!$steps) { $ins->execute([$id, 1, '', null]); return 1; }
+    $ins = $pdo->prepare("INSERT INTO project_costing_approvals (costing_id, level, approver_role, approver_user_id, status, rule_id) VALUES (?,?,?,?,'PENDING',?)");
+    if (!$steps) { $ins->execute([$id, 1, '', null, 0]); return 1; }
     foreach ($steps as $s) {
         $role = (string)($s['approver_role'] ?? ''); $uid = ($s['approver_user_id'] ?? null) ?: null;
         if ($role === 'REPORTS_TO') {   // the author's reporting manager, N levels up
             $uid = (!empty($h['created_by_user_id']) && function_exists('reporting_manager_at')) ? (reporting_manager_at((int)$h['created_by_user_id'], (int)$s['level']) ?: null) : null;
             $role = '';
         }
-        $ins->execute([$id, (int)$s['level'], $role, $uid]);
+        $ins->execute([$id, (int)$s['level'], $role, $uid, (int)($s['id'] ?? 0)]);
     }
     return count($steps);
 }

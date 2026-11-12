@@ -38,6 +38,13 @@ try {
     t_eq($roles($mkQ('IND', [['IND', 150000]])), ['BRANCH_MANAGER', 'SBU_HEAD'], 'primary unit Industrial: the same chain, as test book SAL-005 says');
     t_eq($roles($mkQ('OGC', [['OGC', 150000]])), ['BRANCH_MANAGER'], 'an Oil & Gas quotation with no Industrial line: Level 1 only');
 
+    //  Owner, 12 Nov 2026 — "Hope this is applicable to all the Business Units …
+    //  not limited to industrial only right?" Any unit, as soon as it has a level.
+    $ins->execute(['Level 5', 'SBU', 'OGC', 0, 0, 5, 'BUSINESS_DIRECTOR', null, date('c')]);
+    t_eq($roles($mkQ('', [['OGC', 150000]])), ['BRANCH_MANAGER', 'BUSINESS_DIRECTOR'], 'the same works for any unit: an Oil & Gas-only level is reached from an Oil & Gas line');
+    t_eq($roles($mkQ('', [['MIN', 150000]])), ['BRANCH_MANAGER'], 'a unit with no level of its own adds nobody');
+    $pdo->exec("DELETE FROM quote_approval_rules WHERE level=5");
+
     t_section('Quotation approval — a unit\'s level goes to THAT unit\'s head');
     $mkU = function ($u, $sbus) use ($pdo) {
         $pdo->prepare("INSERT INTO users (username, first_name, role, scope_sbus, permissions, is_active) VALUES (?,?,'SBU_HEAD',?,'',1)")->execute([$u, $u, $sbus]);

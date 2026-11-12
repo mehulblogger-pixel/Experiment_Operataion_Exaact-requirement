@@ -1082,12 +1082,49 @@ function appr_level_save($post) {
              max(0,(int)($post['sla_days']??2)), max(0,(int)($post['reminder_days']??1)), $esc, (int)($post['escalate_user_id']??0)?:null];
     $lid = (int)($post['level_id'] ?? 0);
     if ($lid > 0) { $data[] = $lid;
+        $oldLv = ops_one("SELECT * FROM recruit_approval_levels WHERE id=?", [$lid]);
         db()->prepare("UPDATE recruit_approval_levels SET seq=?,label=?,approver_role=?,approver_user_id=?,sla_days=?,reminder_days=?,escalate_role=?,escalate_user_id=? WHERE id=?")->execute($data);
+        if ($oldLv) $GLOBALS['appr_level_moved'] = appr_level_reroute_pending($oldLv, ['approver_role' => $role, 'approver_user_id' => (int)($post['approver_user_id'] ?? 0)]);
     } else { array_unshift($data, $rid);
         db()->prepare("INSERT INTO recruit_approval_levels (rule_id,seq,label,approver_role,approver_user_id,sla_days,reminder_days,escalate_role,escalate_user_id) VALUES (?,?,?,?,?,?,?,?,?)")->execute($data);
     }
     appr_audit_policy($rid, 'Approval level saved: ' . (trim((string)($post['label'] ?? '')) ?: 'level ' . (int)($post['seq'] ?? 0))
         . ($role !== '' ? ' → ' . $role : ''));
+}
+/**
+ * Owner, 12 Nov 2026 — "the pending quote must now show to Y not to the X
+ * automatically. This shall be the case to every approval." When a level's
+ * approver changes, every request raised under that rule still waiting at that
+ * level moves to the new approver. Steps already decided are never touched.
+ * An org-chart approver ("reporting manager", "HOD") is kept as the token on the
+ * step — a hiring admin may act on it, as for any token that cannot be pinned.
+ * The approver waited on right now is e-mailed. Returns how many steps moved.
+ */
+function appr_level_reroute_pending(array $old, array $new) {
+    $oRole = (string)($old['approver_role'] ?? ''); $oUid = (int)($old['approver_user_id'] ?? 0);
+    $nRole = (string)($new['approver_role'] ?? ''); $nUid = (int)($new['approver_user_id'] ?? 0);
+    if ($oRole === $nRole && $oUid === $nUid) return 0;
+    $who = function_exists('_appr_actor') ? _appr_actor() : '';
+    $name = function ($role, $uid) {
+        if ($uid > 0) { $u = ops_one("SELECT first_name, last_name, username FROM users WHERE id=?", [$uid]); return $u ? (trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')) ?: (string)$u['username']) : 'user #' . $uid; }
+        return $role !== '' ? (ORG_ROLES[$role] ?? ucwords(strtolower(str_replace('_', ' ', $role)))) : 'nobody in particular';
+    };
+    $rows = ops_all("SELECT s.*, r.entity, r.entity_id, r.current_seq FROM recruit_approval_steps s JOIN recruit_approval_requests r ON r.id=s.request_id
+                      WHERE r.rule_id=? AND r.status='PENDING' AND s.seq=? AND s.status='PENDING'", [(int)$old['rule_id'], (int)$old['seq']]) ?: [];
+    $n = 0;
+    foreach ($rows as $st) {
+        db()->prepare("UPDATE recruit_approval_steps SET approver_role=?, approver_user_id=? WHERE id=?")->execute([$nUid > 0 ? '' : $nRole, $nUid ?: null, (int)$st['id']]);
+        $line = ($st['label'] ?: 'Level ' . (int)$st['seq']) . ' approval moved from ' . $name((string)$st['approver_role'], (int)$st['approver_user_id']) . ' to ' . $name($nRole, $nUid)
+              . ' — the approval levels were changed' . ($who !== '' ? ' by ' . $who : '');
+        $ek = strtoupper((string)$st['entity']);
+        if (function_exists('act_log')) try { act_log(defined('ACT_ENTITIES') && isset(ACT_ENTITIES[$ek]) ? $ek : 'APPROVAL_POLICY', defined('ACT_ENTITIES') && isset(ACT_ENTITIES[$ek]) ? (int)$st['entity_id'] : (int)$old['rule_id'], 'SYSTEM', $line, ['auto' => 1]); } catch (Throwable $e) {}
+        if ((int)$st['seq'] === (int)$st['current_seq'] && function_exists('appr_email_approver')) {
+            try { $req = appr_request((int)$st['request_id']); $fresh = ops_one("SELECT * FROM recruit_approval_steps WHERE id=?", [(int)$st['id']]); if ($req && $fresh) appr_email_approver($fresh, $req, 'requested'); } catch (Throwable $e) {}
+        }
+        $n++;
+    }
+    if ($n) appr_audit_policy((int)$old['rule_id'], $n . ' pending approval' . ($n === 1 ? '' : 's') . ' moved to ' . $name($nRole, $nUid) . ' (level ' . (int)$old['seq'] . ')');
+    return $n;
 }
 function appr_level_delete($id) {
     appr_migrate();
@@ -2602,7 +2639,7 @@ function ops_recruit_approvals($route, $method) {
         if ($do === 'rule_save') { $id = appr_rule_save((int)($_POST['id'] ?? 0), $_POST); flash('Rule saved.'); redirect('/recruit-approvals?id=' . $id); return true; }
         if ($do === 'rule_toggle') { $r = appr_rule((int)($_POST['id'] ?? 0)); if ($r) appr_rule_set_active($r['id'], (int)$r['active'] === 0); flash('Rule updated.'); redirect('/recruit-approvals'); return true; }
         //  UAT 1.7.2 — return to the chain, not the top of the screen.
-        if ($do === 'level_save') { appr_level_save($_POST); flash('Level saved.'); redirect('/recruit-approvals?id=' . (int)($_POST['rule_id'] ?? 0) . '#levels'); return true; }
+        if ($do === 'level_save') { $GLOBALS['appr_level_moved'] = 0; appr_level_save($_POST); $mv = (int)($GLOBALS['appr_level_moved'] ?? 0); flash('Level saved.' . ($mv ? ' ' . $mv . ' approval' . ($mv === 1 ? '' : 's') . ' already waiting at this level now go' . ($mv === 1 ? 'es' : '') . ' to the new approver.' : '')); redirect('/recruit-approvals?id=' . (int)($_POST['rule_id'] ?? 0) . '#levels'); return true; }
         if ($do === 'level_delete') { appr_level_delete((int)($_POST['level_id'] ?? 0)); flash('Level removed.'); redirect('/recruit-approvals?id=' . (int)($_POST['rule_id'] ?? 0) . '#levels'); return true; }
         //  GATE 4 — the organisation's own self-approval policy. Written through
         //  setting_set(), which already records who changed which key and from what

@@ -240,6 +240,7 @@ function idems_migrate() {
         // alongside the free-text note, on both the vetting return and the approver reject/sendback.
         ensure_column('report_vetting', 'correction_area', "VARCHAR(200) DEFAULT ''");
         ensure_column('report_vetting', 'correction_deadline', "VARCHAR(20) DEFAULT ''");
+        ensure_column('report_approvals', 'rule_id', 'INT DEFAULT 0');   // the rule a step came from (owner, 12 Nov 2026)
         ensure_column('report_approvals', 'correction_area', "VARCHAR(200) DEFAULT ''");
         ensure_column('report_approvals', 'correction_deadline', "VARCHAR(20) DEFAULT ''");
         ensure_column('report_docs', 'vet_status', "VARCHAR(20) DEFAULT ''");
@@ -6199,7 +6200,7 @@ function idems_build_approval_chain($doc) {
     } elseif ($rules) {
         foreach ($rules as $r) {
             $uid = idems_resolve_approver($r['approver_kind'], $r['approver_user_id'], $doc);
-            $steps[] = ['level'=>(int)$r['level'], 'kind'=>$r['approver_kind'], 'role'=>$r['approver_role'] ?? '', 'user'=>$uid, 'sla'=>(int)$r['sla_hours']];
+            $steps[] = ['level'=>(int)$r['level'], 'kind'=>$r['approver_kind'], 'role'=>$r['approver_role'] ?? '', 'user'=>$uid, 'sla'=>(int)$r['sla_hours'], 'rule'=>(int)$r['id']];
         }
     } else {
         // default: single-level to the inspector's mapped approver (or reporting manager)
@@ -6217,11 +6218,11 @@ function idems_build_approval_chain($doc) {
         if ($fb) $steps = [['level'=>1, 'kind'=>'INSPECTOR_MAP', 'role'=>'', 'user'=>(int)$fb, 'sla'=>24]];
     }
     $actionable = 0;
-    $ins = $pdo->prepare("INSERT INTO report_approvals (report_doc_id,level,approver_kind,approver_role,approver_user_id,resolved_user_id,status,sla_due,created_at) VALUES (?,?,?,?,?,?,'PENDING',?,?)");
+    $ins = $pdo->prepare("INSERT INTO report_approvals (report_doc_id,level,approver_kind,approver_role,approver_user_id,resolved_user_id,status,sla_due,created_at,rule_id) VALUES (?,?,?,?,?,?,'PENDING',?,?,?)");
     foreach ($steps as $s) {
         if ($s['user'] || $s['role']) $actionable++;
         $sla = $s['sla'] > 0 ? date('c', strtotime('+' . $s['sla'] . ' hours')) : '';
-        $ins->execute([$doc['id'], $s['level'], $s['kind'], $s['role'], $s['user'] ?: null, $s['user'] ?: null, $sla, date('c')]);
+        $ins->execute([$doc['id'], $s['level'], $s['kind'], $s['role'], $s['user'] ?: null, $s['user'] ?: null, $sla, date('c'), (int)($s['rule'] ?? 0)]);
     }
     return $actionable;
 }
@@ -6844,6 +6845,56 @@ function ops_idems_vetting_checklist($method) {
     return true;
 }
 
+// ============================================================================
+//  Owner, 12 Nov 2026 — "the pending quote must now show to Y not to the X
+//  automatically. This shall be the case to every approval." For reports, two
+//  setup changes move who approves: a rule's approver, and an inspector's mapped
+//  approver. Either way, every report still waiting at that step moves to the
+//  new approver, with a line in the report's audit trail. An approver picked on
+//  the report itself (REPORT_PICK) is that report's own choice and is kept.
+// ============================================================================
+function idems_user_label($uid) {
+    if (!$uid) return 'nobody yet';
+    $u = ops_one("SELECT first_name, last_name, username FROM users WHERE id=?", [(int)$uid]);
+    return $u ? (trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')) ?: (string)$u['username']) : 'user #' . (int)$uid;
+}
+function idems_reroute_step(array $st, $kind, $role, $ruleUser, $why) {
+    $doc = ops_one("SELECT * FROM report_docs WHERE id=?", [(int)$st['report_doc_id']]);
+    if (!$doc) return false;
+    $uid = idems_resolve_approver($kind, $ruleUser, $doc);
+    $before = (int)($st['resolved_user_id'] ?: $st['approver_user_id']);
+    if ((string)$st['approver_kind'] === (string)$kind && (string)$st['approver_role'] === (string)$role && $before === (int)$uid) return false;
+    db()->prepare("UPDATE report_approvals SET approver_kind=?, approver_role=?, approver_user_id=?, resolved_user_id=? WHERE id=?")
+        ->execute([$kind, $role, $uid ?: null, $uid ?: null, (int)$st['id']]);
+    idems_log('report', (int)$doc['id'], 'APPROVER_CHANGED', ['irn' => $doc['irn'] ?? '', 'field' => 'level ' . (int)$st['level'],
+        'old' => $before ? idems_user_label($before) : ((string)$st['approver_role'] ?: 'nobody'), 'new' => $uid ? idems_user_label($uid) : ($role !== '' ? $role : 'nobody'), 'reason' => $why]);
+    if ($uid && function_exists('idems_notify_approver')) { try { $fresh = ops_one("SELECT * FROM report_approvals WHERE id=?", [(int)$st['id']]); idems_notify_approver($doc, $fresh); } catch (Throwable $e) {} }
+    return true;
+}
+function idems_rule_reroute_pending(array $old, array $new) {
+    if ((string)$old['approver_kind'] === (string)$new['approver_kind'] && (int)$old['approver_user_id'] === (int)$new['approver_user_id']
+        && (string)$old['approver_role'] === (string)$new['approver_role']) return 0;
+    $isUser = (string)$old['approver_kind'] === 'USER' && (int)$old['approver_user_id'] > 0;
+    $rows = ops_all("SELECT * FROM report_approvals WHERE status='PENDING' AND (rule_id=? OR ((rule_id IS NULL OR rule_id=0) AND level=? AND approver_kind=? AND COALESCE(approver_role,'')=?"
+                  . ($isUser ? " AND approver_user_id=?" : "") . "))",
+                    array_merge([(int)$old['id'], (int)$old['level'], (string)$old['approver_kind'], (string)$old['approver_role']], $isUser ? [(int)$old['approver_user_id']] : [])) ?: [];
+    $n = 0;
+    foreach ($rows as $st) {
+        if (idems_reroute_step($st, (string)$new['approver_kind'], (string)$new['approver_role'], $new['approver_user_id'], 'the approval rule "' . $old['name'] . '" was changed')) {
+            db()->prepare("UPDATE report_approvals SET rule_id=? WHERE id=?")->execute([(int)$old['id'], (int)$st['id']]);
+            $n++;
+        }
+    }
+    return $n;
+}
+function idems_map_reroute_pending($inspectorId) {
+    $rows = ops_all("SELECT a.* FROM report_approvals a JOIN report_docs d ON d.id=a.report_doc_id
+                      WHERE a.status='PENDING' AND a.approver_kind='INSPECTOR_MAP' AND d.inspector_id=?", [(int)$inspectorId]) ?: [];
+    $n = 0;
+    foreach ($rows as $st) if (idems_reroute_step($st, 'INSPECTOR_MAP', '', null, "the inspector's approver was changed")) $n++;
+    return $n;
+}
+
 // ---- Handler: per-inspector approver mapping ----
 function ops_idems_approver_map($method) {
     ops_require(is_master() || can('idems.type.manage') || can('users.manage.global'), 'You cannot manage approver mapping.');
@@ -6858,7 +6909,8 @@ function ops_idems_approver_map($method) {
                 ->execute([$ap, $tp, $_POST['temp_from'] ?? '', $_POST['temp_to'] ?? '', date('c'), $ex['id']]);
             else $pdo->prepare("INSERT INTO idems_approver_map (inspector_id,approver_user_id,temp_user_id,temp_from,temp_to,active,updated_at) VALUES (?,?,?,?,?,1,?)")
                 ->execute([$iid, $ap, $tp, $_POST['temp_from'] ?? '', $_POST['temp_to'] ?? '', date('c')]);
-            flash('Approver mapping saved.');
+            $mv = idems_map_reroute_pending($iid);
+            flash('Approver mapping saved.' . ($mv ? ' ' . $mv . ' report' . ($mv === 1 ? '' : 's') . ' already waiting now go' . ($mv === 1 ? 'es' : '') . ' to the new approver.' : ''));
         }
         redirect('/approver-map');
     }
@@ -6886,9 +6938,11 @@ function ops_idems_approval_rules($route, $method) {
             'approver_user_id'=>($_POST['approver_user_id'] ?? '')!==''?(int)$_POST['approver_user_id']:null, 'approver_role'=>trim($_POST['approver_role'] ?? ''),
             'sla_hours'=>max(0,(int)($_POST['sla_hours'] ?? 24)),
         ];
-        if ($id) { $set=implode('=?, ',array_keys($vals)).'=?'; $args=array_values($vals); $args[]=$id; $pdo->prepare("UPDATE idems_approval_rules SET $set WHERE id=?")->execute($args); }
+        $mv = 0;
+        if ($id) { $oldRule = ops_one("SELECT * FROM idems_approval_rules WHERE id=?", [$id]); $set=implode('=?, ',array_keys($vals)).'=?'; $args=array_values($vals); $args[]=$id; $pdo->prepare("UPDATE idems_approval_rules SET $set WHERE id=?")->execute($args);
+                   if ($oldRule) $mv = idems_rule_reroute_pending($oldRule, $vals); }
         else { $vals2=$vals+['sort_order'=>(int)ops_val("SELECT COALESCE(MAX(sort_order),0)+10 FROM idems_approval_rules"),'created_at'=>date('c')]; $cols=array_keys($vals2); $ph=implode(',',array_fill(0,count($cols),'?')); $pdo->prepare("INSERT INTO idems_approval_rules (".implode(',',$cols).") VALUES ($ph)")->execute(array_values($vals2)); }
-        flash('Approval rule saved.'); redirect('/idems-approval-rules');
+        flash('Approval rule saved.' . ($mv ? ' ' . $mv . ' report' . ($mv === 1 ? '' : 's') . ' already waiting now go' . ($mv === 1 ? 'es' : '') . ' to the new approver.' : '')); redirect('/idems-approval-rules');
     }
     $edit = ($route === 'idems-approval-rule-edit') ? ops_one("SELECT * FROM idems_approval_rules WHERE id=?", [(int)($_GET['id'] ?? 0)]) : null;
     view('ops/idems/approval_rules', ['rows'=>ops_all("SELECT r.*, o.name office_name, bp.display_name client_name FROM idems_approval_rules r LEFT JOIN offices o ON o.id=r.office_id LEFT JOIN business_partners bp ON bp.id=r.client_id ORDER BY r.level, r.sort_order, r.id"),

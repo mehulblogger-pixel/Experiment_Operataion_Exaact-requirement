@@ -281,9 +281,11 @@ function gate_rule_save(array $b, $id = 0) {
              empty($b['active']) ? 0 : 1];
     if ($id > 0) {
         $args[] = (int)$id;
+        $old = ops_one("SELECT * FROM stage_gates WHERE id=?", [(int)$id]);
         db()->prepare("UPDATE stage_gates SET name=?, entity_kind=?, pipeline_id=?, stage_id=?, stage_kind=?,
                        sbu=?, min_amount=?, max_amount=?, approver_role=?, approver_user_id=?, active=? WHERE id=?")
            ->execute($args);
+        if ($old) $GLOBALS['gate_moved'] = gate_reroute_pending($old, trim((string)($b['approver_role'] ?? '')), (int)($b['approver_user_id'] ?? 0));
     } else {
         $u = current_user();
         $args[] = $u ? user_name($u) : ''; $args[] = date('c');
@@ -292,6 +294,27 @@ function gate_rule_save(array $b, $id = 0) {
                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")->execute($args);
     }
     return '';
+}
+
+// Owner, 12 Nov 2026 — "the pending quote must now show to Y not to the X
+// automatically. This shall be the case to every approval." A deal waiting at a
+// gate whose approver is changed now waits for the new approver; decided
+// requests are history and are not touched. Returns how many moved.
+function gate_reroute_pending(array $old, $newRole, $newUid) {
+    $oRole = (string)($old['approver_role'] ?? ''); $oUid = (int)($old['approver_user_id'] ?? 0);
+    if ($oRole === (string)$newRole && $oUid === (int)$newUid) return 0;
+    $name = function ($role, $uid) {
+        if ($uid > 0) { $u = ops_one("SELECT first_name, last_name, username FROM users WHERE id=?", [$uid]); return $u ? (trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')) ?: (string)$u['username']) : 'user #' . $uid; }
+        return $role !== '' ? (ORG_ROLES[$role] ?? $role) : 'anyone who may approve';
+    };
+    $u = current_user(); $who = $u ? user_name($u) : '';
+    $rows = ops_all("SELECT id, entity_kind, entity_id FROM stage_gate_requests WHERE gate_id=? AND status='PENDING'", [(int)$old['id']]) ?: [];
+    foreach ($rows as $r) {
+        db()->prepare("UPDATE stage_gate_requests SET approver_role=?, approver_user_id=? WHERE id=?")->execute([(string)$newRole, ((int)$newUid) ?: null, (int)$r['id']]);
+        if (function_exists('act_log'))
+            try { act_log((string)$r['entity_kind'], (int)$r['entity_id'], 'SYSTEM', 'Approval (' . $old['name'] . ') moved from ' . $name($oRole, $oUid) . ' to ' . $name((string)$newRole, (int)$newUid) . ' — the approval rule was changed' . ($who !== '' ? ' by ' . $who : ''), ['auto' => 1]); } catch (Throwable $e) {}
+    }
+    return count($rows);
 }
 
 // A rule that has held real requests is switched off rather than deleted, so
@@ -337,9 +360,11 @@ function ops_stage_gates($route, $method) {
         redirect('/stage-gates');
     }
     if ($route === 'stage-gate-save' && $method === 'POST') {
+        $GLOBALS['gate_moved'] = 0;
         $err = gate_rule_save($_POST, (int)($_POST['id'] ?? 0));
         if ($err) { flash($err, 'error'); redirect('/stage-gates?edit=' . (int)($_POST['id'] ?? 0)); }
-        flash('Approval rule saved.', 'success');
+        $mv = (int)($GLOBALS['gate_moved'] ?? 0);
+        flash('Approval rule saved.' . ($mv ? ' ' . $mv . ' deal' . ($mv === 1 ? '' : 's') . ' already waiting now go' . ($mv === 1 ? 'es' : '') . ' to the new approver.' : ''), 'success');
         redirect('/stage-gates');
     }
 

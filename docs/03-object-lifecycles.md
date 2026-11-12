@@ -196,6 +196,18 @@ writes one line in the quotation's history (who, what, why).
   **that** unit (`quote_approvals.sbu`), even on a quotation whose primary unit is another. A
   quotation saved with no primary unit takes the unit of its biggest line, noted in its history.
   The quotation shows who comes after the person it is waiting with ("Then: …").
+- **Waiting approvals follow a changed approver — every approval** (owner, 12 Nov 2026: "the pending
+  quote must now show to Y not to the X automatically. This shall be the case to every approval").
+  A step copies who approves when the item is submitted. When an approval setup changes who
+  approves — another role or another named person — every step of that level **still PENDING**
+  moves to the new approver at the moment of the save, with a line in the item's history; steps
+  already approved, rejected or cancelled are never changed. This applies to: quotation and
+  project-costing levels (`crm_level_reroute_pending`, steps remember their level in `rule_id`),
+  recruitment approval levels (`appr_level_reroute_pending`: hiring requests, requisitions, offers
+  …), deal stage gates (`gate_reroute_pending`), and report approvals — both a report rule's
+  approver and an inspector's mapped approver (`idems_rule_reroute_pending`,
+  `idems_map_reroute_pending`). An approver picked on a report itself is kept. No status or move
+  is added; the step stays PENDING.
 - **Approval steps sign in order** (owner's D-05, 20 Oct 2026): a level-2 step is refused while any
   level-1 step is still pending. A step waiting longer than the days set in Set up Sales
   (`quote_approval_escalate_days`) is opened to the next level's approvers as well (D-11a); a

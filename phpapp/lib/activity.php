@@ -115,6 +115,9 @@ const ACT_ENTITIES = [
     // verification desk opening a person's document are put on the same spine.
     'CX_REQUIREMENT'    => ['Marketplace requirement', '/connect-requirement?id='],
     'CX_PROFESSIONAL'   => ['Marketplace professional', '/connect-verify'],
+    // Owner, 12 Nov 2026 — a costing's approval moving to a new approver (and the
+    // costing events already logged under this name) belong on its timeline.
+    'PROJECT_COSTING'   => ['Project costing', '/project-costing?id='],
 ];
 
 // A constant cannot call T(), so the two entries that name a business noun are

@@ -329,6 +329,7 @@ function crm_migrate() {
         // D-11a — escalation: when a step has waited longer than the company
         // allows, the next level up may sign it too (recorded on the step).
         ensure_column('quote_approvals', 'sbu', "VARCHAR(20) DEFAULT ''");   // a unit-only level's unit (owner, 12 Nov 2026)
+        ensure_column('quote_approvals', 'rule_id', 'INT DEFAULT 0');         // the level a step came from (owner, 12 Nov 2026)
         ensure_column('quote_approvals', 'escalated_at', "VARCHAR(30) DEFAULT ''");
         ensure_column('quote_approvals', 'escalate_role', "VARCHAR(40) DEFAULT ''");
         ensure_column('quote_approvals', 'escalate_user_id', 'INT NULL');
@@ -3670,7 +3671,7 @@ function crm_build_approvals($q) {
         return 1;
     }
     $ownerId = crm_quote_owner_user_id($q);
-    $ins = $pdo->prepare("INSERT INTO quote_approvals (quote_id,level,approver_role,approver_user_id,status,sbu) VALUES (?,?,?,?,'PENDING',?)");
+    $ins = $pdo->prepare("INSERT INTO quote_approvals (quote_id,level,approver_role,approver_user_id,status,sbu,rule_id) VALUES (?,?,?,?,'PENDING',?,?)");
     foreach ($steps as $s) {
         $role = $s['approver_role'] ?? '';
         $uid  = ($s['approver_user_id'] ?? null) ?: null;
@@ -3680,10 +3681,79 @@ function crm_build_approvals($q) {
             $resolved = $ownerId && function_exists('reporting_manager_at') ? reporting_manager_at($ownerId, (int)$s['level']) : null;
             $role = ''; $uid = $resolved ?: null;   // unresolved → generic step (any approver)
         }
-        $ins->execute([$q['id'], (int)$s['level'], $role, $uid, crm_rule_is_unit($s) ? (string)$s['sbu'] : '']);
+        $ins->execute([$q['id'], (int)$s['level'], $role, $uid, crm_rule_is_unit($s) ? (string)$s['sbu'] : '', (int)($s['id'] ?? 0)]);
     }
     return count($steps);
 }
+// ============================================================================
+//  WHEN THE APPROVER OF A LEVEL CHANGES — owner, 12 Nov 2026: "Suppose first we
+//  have approval of any level to X designation and due to organizational changes
+//  that now goes to Y. X has three to four pending quotation when organizational
+//  changes happened. So the pending quote must now show to Y not to the X
+//  automatically. This shall be the case to every approval."
+//
+//  A step copies "who approves" when the quotation (or costing) is submitted.
+//  When a level's approver is changed (another role, or another named person),
+//  every step of that level still waiting — on quotations awaiting approval and
+//  costings submitted — moves to the new approver, with a line in its history.
+//  Steps already approved or rejected are history and are never touched. Steps
+//  made before steps remembered their level are matched by level, approver and
+//  business unit. Returns how many steps moved.
+// ============================================================================
+function crm_level_reroute_pending(array $old, array $new, $who = '') {
+    $oRole = (string)($old['approver_role'] ?? ''); $oUid = (int)($old['approver_user_id'] ?? 0);
+    $nRole = (string)($new['approver_role'] ?? ''); $nUid = (int)($new['approver_user_id'] ?? 0);
+    if ($oRole === $nRole && $oUid === $nUid) return 0;
+    $rid = (int)$old['id']; $lvl = (int)$old['level'];
+    $oSbu = crm_rule_is_unit($old) ? (string)$old['sbu'] : '';
+    $label = function ($role, $uid) {
+        if ($uid > 0) { $u = ops_one("SELECT first_name, last_name, username FROM users WHERE id=?", [$uid]); return $u ? (trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')) ?: (string)$u['username']) : 'user #' . $uid; }
+        if ($role === 'REPORTS_TO') return "the preparer's reporting manager";
+        return $role !== '' ? (ORG_ROLES[$role] ?? $role) : 'anyone who may approve';
+    };
+    $from = $label($oRole, $oUid); $to = $label($nRole, $nUid);
+    //  Old steps (no level remembered) are recognised by what was copied onto them;
+    //  a "reporting manager" level was resolved to a person, so it cannot be.
+    $legacy = $oRole !== 'REPORTS_TO';
+    $resolve = function ($ownerId) use ($nRole, $nUid, $lvl) {
+        if ($nRole === 'REPORTS_TO') {
+            $r = ($ownerId && function_exists('reporting_manager_at')) ? reporting_manager_at((int)$ownerId, $lvl) : null;
+            return ['', $r ?: null];
+        }
+        return [$nRole, $nUid ?: null];
+    };
+    $n = 0;
+    //  Written so MySQL and SQLite agree (an empty approver is NULL or 0; a
+    //  COALESCE compared with a bound value is not reliable on SQLite).
+    $uidSql = $oUid > 0 ? "a.approver_user_id=?" : "(a.approver_user_id IS NULL OR a.approver_user_id=0)";
+    $legSql = "(a.rule_id IS NULL OR a.rule_id=0) AND a.level=? AND COALESCE(a.approver_role,'')=? AND $uidSql";
+    $legArgs = array_merge([$lvl, $oRole], $oUid > 0 ? [$oUid] : []);
+    $rows = ops_all("SELECT a.id, a.quote_id FROM quote_approvals a JOIN quotations q ON q.id=a.quote_id
+                      WHERE a.status='PENDING' AND q.is_current=1 AND q.status='PENDING_APPROVAL'
+                        AND (a.rule_id=? OR (" . ($legacy ? $legSql . " AND COALESCE(a.sbu,'')=?" : "1=0") . "))",
+                    $legacy ? array_merge([$rid], $legArgs, [$oSbu]) : [$rid]) ?: [];
+    foreach ($rows as $a) {
+        $q = crm_quote_get((int)$a['quote_id']);
+        [$role, $uid] = $resolve($q ? crm_quote_owner_user_id($q) : null);
+        db()->prepare("UPDATE quote_approvals SET approver_role=?, approver_user_id=?, rule_id=? WHERE id=?")->execute([$role, $uid, $rid, (int)$a['id']]);
+        crm_log_change((int)$a['quote_id'], 'Level ' . $lvl . ' approval moved from ' . $from . ' to ' . $to . ' — the approval levels were changed' . ($who !== '' ? ' by ' . $who : ''));
+        $n++;
+    }
+    try {
+        $rows = ops_all("SELECT a.id, a.costing_id, c.created_by_user_id, c.code FROM project_costing_approvals a JOIN project_costings c ON c.id=a.costing_id
+                          WHERE a.status='PENDING' AND c.status='SUBMITTED'
+                            AND (a.rule_id=? OR (" . ($legacy ? $legSql : "1=0") . "))",
+                        $legacy ? array_merge([$rid], $legArgs) : [$rid]) ?: [];
+        foreach ($rows as $a) {
+            [$role, $uid] = $resolve($a['created_by_user_id'] ?? null);
+            db()->prepare("UPDATE project_costing_approvals SET approver_role=?, approver_user_id=?, rule_id=? WHERE id=?")->execute([$role, $uid, $rid, (int)$a['id']]);
+            if (function_exists('act_log')) try { act_log('PROJECT_COSTING', (int)$a['costing_id'], 'SYSTEM', 'Level ' . $lvl . ' approval moved from ' . $from . ' to ' . $to . ' — the approval levels were changed' . ($who !== '' ? ' by ' . $who : '')); } catch (Throwable $e) {}
+            $n++;
+        }
+    } catch (Throwable $e) {}
+    return $n;
+}
+
 // The system-user id who owns a quote (for reporting-chain approvals): owner_id if
 // set, else the user whose username or full name matches created_by. Matched in PHP
 // so it works identically on MySQL and SQLite (no DB-specific string concat).
@@ -4150,7 +4220,9 @@ function ops_crm_approval_rules($route, $method) {
             if ($r) {
                 $pdo->prepare("UPDATE quote_approval_rules SET name=?,match_type=?,sbu=?,min_amount=?,max_amount=?,level=?,approver_role=?,approver_user_id=?,active=? WHERE id=?")
                     ->execute(array_merge($vals, [$r['id']]));
-                flash('Approval rule saved.');
+                //  Owner, 12 Nov 2026 — what is already waiting follows the new approver.
+                $moved = crm_level_reroute_pending($r, ['approver_role' => $role, 'approver_user_id' => $uid], user_name(current_user()));
+                flash('Approval rule saved.' . ($moved ? ' ' . $moved . ' approval' . ($moved === 1 ? '' : 's') . ' already waiting at this level now go' . ($moved === 1 ? 'es' : '') . ' to the new approver.' : ''));
             } else {
                 $pdo->prepare("INSERT INTO quote_approval_rules (name,match_type,sbu,min_amount,max_amount,level,approver_role,approver_user_id,active,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)")
                     ->execute(array_merge($vals, [date('c')]));
