@@ -78,6 +78,30 @@ try {
     $wonAll = (int) ops_val("SELECT COUNT(*) FROM leads WHERE status='CONVERTED' AND pipeline_id=?", [$lp]);
     t_eq((int) $b['columns'][$wonS]['total'], $wonAll, 'the won column count is the number of won leads');
     t_ok(leads_counts($win)['converted'] >= $wonAll, 'and the "Won" card counts the same year');
+
+    t_section('Leads board — open leads carry forward into the new year, marked');
+    //  Owner, 12 Nov 2026: "When Lead board filter with years the lead / new inquiry does not
+    //  respect" — then, deciding: "No open leads may be hidden for the new year", marked,
+    //  with "Only leads created in FY …" when wanted.
+    $pdo->prepare("INSERT INTO leads (ref, company_name, requirement, value, status, pipeline_id, stage_id, created_at, updated_at) VALUES (?, 'LSP Last Year Co', 'x', 5000, 'OPEN', ?, ?, ?, ?)")
+        ->execute(['LSPY-' . mt_rand(1000, 99999), $lp, $qual, date('c', strtotime($win['from'] ?? date('Y-m-d')) - 86400 * 10), date('c')]);
+    if ($win) {
+        $b2 = lead_board($lp, $win);
+        $col = $b2['columns'][$qual]['leads'];
+        t_eq(count($col), 2, 'an open lead from an earlier year stays on this year\'s board');
+        $cf = array_values(array_filter($col, fn($r) => !empty($r['_carried_from'])));
+        t_ok(count($cf) === 1 && $cf[0]['_carried_from'] === fy_of(substr($cf[0]['created_at'], 0, 10)) && $cf[0]['_carried_from'] !== current_fy(),
+            '… marked "carried forward" with the year it came from');
+        t_eq((int)$b2['other_years_open'], 1, 'the board counts the carried-forward leads');
+        t_eq(count(lead_board($lp, $win, true)['columns'][$qual]['leads']), 1, '"Only leads created in FY …" shows just that year\'s');
+        t_ok(leads_counts($win, true)['open'] < leads_counts($win)['open'], 'and the Open card follows the same choice');
+        [$pf, $pt] = fy_range(fy_of(date('Y-m-d', strtotime($win['from']) - 86400 * 10)));
+        $pastB = lead_board($lp, ['from' => $pf, 'to_excl' => date('Y-m-d', strtotime($pt . ' +1 day'))]);
+        t_eq(count($pastB['columns'][$qual]['leads']), 1, 'last year\'s board never shows a lead created this year');
+    }
+    $lv = (string)file_get_contents(__DIR__ . '/../views/ops/leads.php');
+    t_ok(strpos($lv, 'Carried forward from FY') !== false && strpos($lv, 'Only leads created in FY') !== false && strpos($lv, 'name="pipeline" value=') !== false,
+        'cards say "Carried forward from FY …", the board offers "Only leads created in FY …", and changing the year keeps the pipeline');
 } finally {
     if ($own && $pdo->inTransaction()) $pdo->rollBack();
 }

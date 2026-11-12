@@ -1111,7 +1111,7 @@ function lead_convert_on_quote_win($leadId, $partnerId, $inquiryId = null) {
 //  one click away in the list.
 const LEAD_BOARD_CLOSED_CAP = 30;
 
-function lead_board($pipelineId = 0, array $fyWin = []) {
+function lead_board($pipelineId = 0, array $fyWin = [], $only = false) {
     leads_migrate();
     $pipe = $pipelineId ?: (int)(pipeline_default()['id'] ?? 0);
     // If no pipeline was explicitly chosen and the default one holds no open
@@ -1127,7 +1127,26 @@ function lead_board($pipelineId = 0, array $fyWin = []) {
         }
     }
     $stages = pipeline_stages($pipe);
-    $rows = leads_all(['pipeline' => $pipe, 'open' => 1]);
+    //  THE YEAR IS RESPECTED (owner, 12 Nov 2026: "When Lead board filter with
+    //  years the lead / new inquiry does not respect. It shows of 2026-27 also").
+    //  Open leads are those created in the chosen year, like the List. So that
+    //  work still being chased never silently drops off the board when the
+    //  financial year turns, the board counts the open leads of OTHER years and
+    //  says so, with one click to see all years.
+    //  CARRIED FORWARD (owner's decision, 12 Nov 2026: "No open leads may be
+    //  hidden for the new year"): an open lead created in an EARLIER year stays on
+    //  the board, marked with the year it came from. "Only leads created in FY …"
+    //  ($only) hides them when the person wants just that year's leads; the board
+    //  then says how many it is not showing. A lead created AFTER the chosen year
+    //  never appears on an earlier year's board.
+    $fyF = ['fy_from' => $fyWin['from'] ?? '', 'fy_to_excl' => $fyWin['to_excl'] ?? ''];
+    $inYear = leads_all(['pipeline' => $pipe, 'open' => 1] + $fyF);
+    $carried = [];
+    if ($fyF['fy_from'] !== '')
+        $carried = leads_all(['pipeline' => $pipe, 'open' => 1, 'fy_to_excl' => $fyF['fy_from']]);
+    foreach ($carried as $i => $r) $carried[$i]['_carried_from'] = function_exists('fy_of') ? fy_of(substr((string)$r['created_at'], 0, 10)) : '';
+    $rows = $only ? $inYear : array_merge($inYear, $carried);
+    $otherYears = count($carried);
     $by = [];
     foreach ($stages as $s) $by[(int)$s['id']] = ['stage' => $s, 'leads' => [], 'value' => 0.0];
     foreach ($rows as $r) {
@@ -1183,12 +1202,12 @@ function lead_board($pipelineId = 0, array $fyWin = []) {
         $by[$colId]['more']  = max(0, $total - LEAD_BOARD_CLOSED_CAP);
         $by[$colId]['more_status'] = $status;
     }
-    return ['pipeline' => $pipe, 'stages' => $stages, 'columns' => $by];
+    return ['pipeline' => $pipe, 'stages' => $stages, 'columns' => $by, 'other_years_open' => $otherYears, 'only' => (bool)$only];
 }
 
-//  $fyWin = ['from' => …, 'to_excl' => …] counts the won / lost cards for the
-//  same year the board shows (empty = all years), so the card and the board agree.
-function leads_counts(array $fyWin = []) {
+//  $fyWin = ['from' => …, 'to_excl' => …] — the year the board shows (empty =
+//  all years). Every card counts that same year, so the cards and the board agree.
+function leads_counts(array $fyWin = [], $only = false) {
     leads_migrate();
     [$sw, $sa] = scope_office_clause('l.office_id');
     $q = function ($extra, $args = []) use ($sw, $sa) {
@@ -1197,7 +1216,9 @@ function leads_counts(array $fyWin = []) {
     $fyw = ''; $fya = [];
     if (!empty($fyWin['from']))    { $fyw .= ' AND l.created_at >= ?'; $fya[] = $fyWin['from']; }
     if (!empty($fyWin['to_excl'])) { $fyw .= ' AND l.created_at < ?';  $fya[] = $fyWin['to_excl']; }
-    $open = leads_all(['open' => 1]);
+    // Open = created in the year, plus those carried forward from earlier years
+    // unless the person asked for that year's leads only (as the board).
+    $open = leads_all(['open' => 1, 'fy_from' => $only ? ($fyWin['from'] ?? '') : '', 'fy_to_excl' => $fyWin['to_excl'] ?? '']);
     $stalled = 0; $value = 0.0;
     foreach ($open as $l) { if (lead_stalled($l)) $stalled++; $value += (float)$l['value']; }
     return [
@@ -1391,6 +1412,7 @@ function ops_leads($route, $method) {
         $dt   = dt_state('leads', $cols, ['default_sort' => 'value', 'default_dir' => 'desc', 'per' => 50]);
         $fy   = fy_filter();
         $fyWin = $fy['all'] ? [] : ['from' => $fy['from'], 'to_excl' => $fy['to_excl']];
+        $onlyYear = !$fy['all'] && !empty($_GET['only']);
         $filter = ['status' => (string)($_GET['status'] ?? ''), 'q' => $dt['q'],
                    'fy_from' => $fy['all'] ? '' : $fy['from'], 'fy_to_excl' => $fy['all'] ? '' : $fy['to_excl']];
 
@@ -1416,9 +1438,10 @@ function ops_leads($route, $method) {
         }
         view('ops/leads', [
             'view' => $view, 'rows' => $rows ?: [], 'total' => (int)$total, 'fy' => $fy['fy'],
-            'dt' => $dt, 'cols' => $cols, 'counts' => leads_counts($fyWin), 'dueCount' => leads_due_count(),
+            'dt' => $dt, 'cols' => $cols, 'counts' => leads_counts($fyWin, $onlyYear), 'dueCount' => leads_due_count(),
+            'onlyYear' => $onlyYear,
             'board' => $view === 'list' ? ['pipeline' => null, 'stages' => [], 'columns' => []]
-                                        : lead_board((int)($_GET['pipeline'] ?? 0), $fyWin),
+                                        : lead_board((int)($_GET['pipeline'] ?? 0), $fyWin, $onlyYear),
             'pipelines' => pipelines_all(), 'canEdit' => $canEdit,
             'lostReasons' => function_exists('lk_options_or') ? lk_options_or('quote_lost_reason', QUOTE_LOST_REASONS) : [],
             // The people a batch of leads can be allocated to from the register.

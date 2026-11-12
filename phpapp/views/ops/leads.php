@@ -1,4 +1,9 @@
-<?php $c = $counts; $view = $view ?? 'board'; ?>
+<?php $c = $counts; $view = $view ?? 'board';
+  // The year every card counts — said on the card, so a number is never read for another year.
+  $isYear = ($fy ?? '') !== '' && strtoupper((string)($fy ?? '')) !== 'ALL';
+  $fyTag = $isYear ? ' (FY ' . $fy . ')' : ' (all years)';
+  // Open leads carry forward from earlier years unless "only this year" is ticked.
+  $openTag = $isYear ? (!empty($onlyYear) ? ' (created in FY ' . $fy . ')' : ' (FY ' . $fy . ' + carried forward)') : ' (all years)'; ?>
 <div class="master-head">
   <div><h1>Leads</h1>
   <p class="sub" style="margin:2px 0 0">People we are chasing before they are customers. When one says yes it becomes a customer and an <?= e(Tl('inquiry')) ?> by itself — nothing is typed twice.</p></div>
@@ -13,10 +18,10 @@
 </div>
 
 <div class="qcards" style="margin-top:16px">
-  <div class="qcard tone-info"><div class="qic">◎</div><div class="qn"><?= (int)$c['open'] ?></div><div class="ql">Open</div></div>
-  <div class="qcard tone-ok"><div class="qic">₹</div><div class="qn" style="font-size:20px"><?= fmoney_short($c['value']) ?></div><div class="ql">Open pipeline value</div></div>
+  <div class="qcard tone-info"><div class="qic">◎</div><div class="qn"><?= (int)$c['open'] ?></div><div class="ql">Open<?= e($openTag) ?></div></div>
+  <div class="qcard tone-ok"><div class="qic">₹</div><div class="qn" style="font-size:20px"><?= fmoney_short($c['value']) ?></div><div class="ql">Open pipeline value<?= e($openTag) ?></div></div>
   <div class="qcard <?= $c['stalled'] ? 'tone-bad' : '' ?>"><div class="qic">◷</div><div class="qn"><?= (int)$c['stalled'] ?></div><div class="ql">Past their stage's service level</div></div>
-  <div class="qcard tone-warn"><div class="qic">✓</div><div class="qn"><?= (int)$c['converted'] ?></div><div class="ql">Won — now customers<?= ($fy ?? '') !== '' && strtoupper((string)($fy ?? '')) !== 'ALL' ? ' (this year)' : '' ?></div></div>
+  <div class="qcard tone-warn"><div class="qic">✓</div><div class="qn"><?= (int)$c['converted'] ?></div><div class="ql">Won — now customers<?= e($fyTag) ?></div></div>
   <?php // Module 17 — leads needing attention now (past stage SLA, or an overdue follow-up date). ?>
   <?php $dueCount = $dueCount ?? 0; ?>
   <div class="qcard <?= $dueCount ? 'tone-bad' : '' ?>"><div class="qic">🔔</div><div class="qn"><?= (int)$dueCount ?></div><div class="ql">Need attention now</div></div>
@@ -33,11 +38,14 @@
 <div class="panel" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
   <a class="btn small<?= $view==='board'?'':' secondary' ?>" href="/leads?v=board">Board</a>
   <a class="btn small<?= $view==='list'?'':' secondary' ?>" href="/leads?v=list">List</a>
-  <?php // Financial-year filter. The list narrows to leads created in that year;
-        // on the board, open leads always show (work in hand), and the won /
-        // not-pursued columns and the "Won" card follow the year — the same count. ?>
+  <?php // Financial-year filter (owner, 12 Nov 2026). The list shows leads created in
+        // that year. The board and the cards also carry forward the open leads of
+        // earlier years, marked, unless "Only leads created in FY …" is ticked.
+        // Changing the year keeps the pipeline and the tick. ?>
   <form method="get" action="/leads" style="display:inline-flex;gap:6px;align-items:center">
     <input type="hidden" name="v" value="<?= e($view) ?>">
+    <?php if ($view === 'board' && !empty($board['pipeline'])): ?><input type="hidden" name="pipeline" value="<?= (int)$board['pipeline'] ?>"><?php endif; ?>
+    <?php if (!empty($onlyYear)): ?><input type="hidden" name="only" value="1"><?php endif; ?>
     <?php if (($_GET['q'] ?? '') !== ''): ?><input type="hidden" name="q" value="<?= e($_GET['q']) ?>"><?php endif; ?>
     <label class="muted" style="font-size:12px">Year</label><?= fy_select_html($fy ?? current_fy()) ?>
   </form>
@@ -46,6 +54,8 @@
   <?php if ($view === 'board' && count($pipelines ?? []) > 1): $curPipe = (int)($board['pipeline'] ?? 0); ?>
     <form method="get" action="/leads" style="display:inline-flex;gap:6px;align-items:center">
       <input type="hidden" name="v" value="board">
+      <input type="hidden" name="fy" value="<?= e($fy ?? current_fy()) ?>">
+      <?php if (!empty($onlyYear)): ?><input type="hidden" name="only" value="1"><?php endif; ?>
       <label class="muted" style="font-size:12px">Pipeline</label>
       <select class="form-control" name="pipeline" onchange="this.form.submit()" style="height:30px;padding:2px 8px;font-size:13px">
         <?php foreach ($pipelines as $pp): ?>
@@ -68,6 +78,18 @@
   <?php // Named apart from $cols, which is the register's column definitions.
         // Two different things under one name is how a page 500s a screen later. ?>
   <?php $boardCols = $board['columns']; ?>
+  <?php if ($isYear && (!empty($board['other_years_open']) || !empty($onlyYear))): $n = (int)$board['other_years_open'];
+        $q = fn($only) => http_build_query(array_filter(['v' => 'board', 'fy' => $fy, 'pipeline' => (int)($board['pipeline'] ?? 0), 'only' => $only ? 1 : null])); ?>
+    <div class="panel" style="margin-top:12px;border-left:3px solid var(--info,#2f6fde);padding:10px 14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <?php if (empty($onlyYear)): ?>
+        <span>↻ <?= $n ?> open lead<?= $n === 1 ? '' : 's' ?> carried forward from earlier years — still being chased, marked on the board.</span>
+        <a class="btn small secondary" href="/leads?<?= e($q(true)) ?>">Only leads created in FY <?= e($fy) ?></a>
+      <?php else: ?>
+        <span>Showing only leads created in FY <?= e($fy) ?><?= $n ? ' — ' . $n . ' open lead' . ($n === 1 ? '' : 's') . ' carried forward from earlier years ' . ($n === 1 ? 'is' : 'are') . ' not shown' : '' ?>.</span>
+        <a class="btn small secondary" href="/leads?<?= e($q(false)) ?>">Include carried-forward leads</a>
+      <?php endif; ?>
+    </div>
+  <?php endif; ?>
   <div class="board-wrap mt-4">
     <div class="board">
       <?php foreach ($board['stages'] as $s): $col = $boardCols[(int)$s['id']] ?? ['leads'=>[],'value'=>0]; ?>
@@ -93,6 +115,7 @@
             <a href="/lead?id=<?= (int)$l['id'] ?>" style="display:block;border:1px solid var(--line);border-radius:8px;padding:9px;margin-bottom:8px;text-decoration:none<?= $st ? ';border-left:3px solid var(--bad)' : '' ?>">
               <b style="font-size:13px"><?= e($l['company_name']) ?></b>
               <div class="muted" style="font-size:11.5px;margin-top:2px"><?= e($l['ref']) ?><?= $l['value'] ? ' · ' . fmoney_short($l['value']) : '' ?></div>
+              <?php if (!empty($l['_carried_from'])): ?><div style="font-size:11.5px;margin-top:3px;color:var(--info,#2f6fde)" title="Created in FY <?= e($l['_carried_from']) ?> and still open">↻ Carried forward from FY <?= e($l['_carried_from']) ?></div><?php endif; ?>
               <div style="font-size:11.5px;margin-top:4px">
                 <span class="pill <?= $sc['score']>=60?'p-ok':($sc['score']>=35?'p-warn':'p-mut') ?>" style="font-size:10.5px"><?= (int)$sc['score'] ?></span>
                 <?php if ($st): ?><span class="pill p-bad" style="font-size:10.5px"><?= lead_days_in_stage($l) ?>d</span><?php endif; ?>

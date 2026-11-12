@@ -333,7 +333,12 @@ stateDiagram-v2
   empty. They now hold the leads closed in the chosen year, placed by **status** (`CONVERTED` → the
   pipeline's first WON stage, `LOST` → its first LOST stage — a lead won from an open stage keeps that
   stage id), at most 30 cards each with "+N more — see the list". The "Won" card counts the same
-  year. Open leads always show, whatever year is picked. Display only.
+  year. **Open leads carry forward** (owner's decision, 12 Nov 2026: *"No open leads may be hidden for
+  the new year"*): the board shows the open leads created in the chosen year **and** those created
+  in earlier years that are still open, each marked "↻ Carried forward from FY …"; "Only leads created
+  in FY …" hides the carried ones, and the board then says how many it is not showing. A lead created
+  after the chosen year never appears on that year's board. The Open cards follow the same choice and
+  say so. Display only.
 - **A lost lead is not converted** — it is reopened first (it used to convert straight from LOST).
 - A reopen is written in the record's history with who, the reason and why it had been closed,
   and adds a stage-history row; the lost reason is cleared so it no longer counts as lost.
