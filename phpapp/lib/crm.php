@@ -328,6 +328,7 @@ function crm_migrate() {
         ensure_column('quotations', 'preorder_waived_at', "VARCHAR(40) DEFAULT ''");
         // D-11a — escalation: when a step has waited longer than the company
         // allows, the next level up may sign it too (recorded on the step).
+        ensure_column('quote_approvals', 'sbu', "VARCHAR(20) DEFAULT ''");   // a unit-only level's unit (owner, 12 Nov 2026)
         ensure_column('quote_approvals', 'escalated_at', "VARCHAR(30) DEFAULT ''");
         ensure_column('quote_approvals', 'escalate_role', "VARCHAR(40) DEFAULT ''");
         ensure_column('quote_approvals', 'escalate_user_id', 'INT NULL');
@@ -1203,16 +1204,42 @@ function crm_rule_is_unit($r) {
     return in_array($mt, ['SBU', 'BUSINESS UNIT', 'BUSINESS U'], true) && trim((string) ($r['sbu'] ?? '')) !== '';
 }
 
-// The active levels that speak for this quotation's business unit: the
-// company-wide ones and its own unit's.
+// The business units a quotation is for: its primary unit and the unit of each
+// of its lines. Owner, 12 Nov 2026 — "I have added Level 4 … with only
+// industrial business unit that goes to the Business Unit Head, but when I
+// prepared quotation above 1.0 lacs under the Industrial Business Head, instead
+// of going to business head it went to branch manager." The quotation's primary
+// unit was left blank and Industrial was chosen on its lines; the levels looked
+// at the primary unit only, so the Industrial level never applied.
+function crm_quote_units($q) {
+    $u = [];
+    if (trim((string)($q['sbu'] ?? '')) !== '') $u[] = (string)$q['sbu'];
+    if (!empty($q['id']) && array_key_exists('quote_no', $q))
+        foreach (ops_all("SELECT DISTINCT sbu FROM quote_lines WHERE quote_id=? AND COALESCE(sbu,'')<>''", [(int)$q['id']]) ?: [] as $l) $u[] = (string)$l['sbu'];
+    return array_values(array_unique($u));
+}
+// The active levels that speak for this quotation: the company-wide ones, and
+// those of every business unit it is for.
 function crm_quote_applicable_rules($q) {
-    $sbu = (string)($q['sbu'] ?? '');
+    $units = crm_quote_units($q);
     $out = [];
     foreach (ops_all("SELECT * FROM quote_approval_rules WHERE active=1 ORDER BY level, min_amount, id") ?: [] as $r) {
-        if (crm_rule_is_unit($r) && $r['sbu'] !== $sbu) continue;
+        if (crm_rule_is_unit($r) && !in_array((string)$r['sbu'], $units, true)) continue;
         $out[] = $r;
     }
     return $out;
+}
+// A quotation saved with no primary business unit takes the unit of its
+// biggest line, so the right unit's head is asked and its reports count it.
+function crm_quote_fill_unit_from_lines($qid) {
+    $q = ops_one("SELECT id, sbu FROM quotations WHERE id=?", [(int)$qid]);
+    if (!$q || trim((string)$q['sbu']) !== '') return '';
+    $l = ops_one("SELECT sbu FROM quote_lines WHERE quote_id=? AND COALESCE(sbu,'')<>'' ORDER BY amount DESC, line_no LIMIT 1", [(int)$qid]);
+    if (!$l) return '';
+    db()->prepare("UPDATE quotations SET sbu=? WHERE id=?")->execute([(string)$l['sbu'], (int)$qid]);
+    $lbl = lk_options_or('sbu', OPS_SBUS)[$l['sbu']] ?? $l['sbu'];
+    if (function_exists('crm_log_change')) crm_log_change((int)$qid, ucfirst(Tl('sbu')) . ' set to ' . $lbl . ' from its line items (none was chosen)');
+    return (string)$l['sbu'];
 }
 // Does this level's range hold the value? A range includes its "up to"; where
 // the next level starts exactly there, the shared value belongs to the lower
@@ -1996,7 +2023,7 @@ function ops_crm_quotes($route, $method) {
             // Line items on an external quote too. Without them the quantities an
             // open order is drawn down against do not exist, so nothing can tell
             // that an ARC won through a portal has been served out.
-            $nLines = crm_save_lines_from_post($id, $b);
+            $nLines = crm_save_lines_from_post($id, $b); crm_quote_fill_unit_from_lines($id);
             crm_log_change($id, 'Registered from ' . (lk_options_or('quote_origin', QUOTE_ORIGINS)[$b['origin'] ?? ''] ?? 'an external portal')
                 . ($nLines ? ' with ' . $nLines . ' line item(s)' : ''));
             if ($extStatus === 'SENT') crm_schedule_followups($id);
@@ -2140,7 +2167,7 @@ function ops_crm_quotes($route, $method) {
                 $pdo->prepare("UPDATE quotations SET $set, updated_at=? WHERE id=?")->execute(array_merge(array_values($hdr), [date('c'), $q['id']]));
                 // Sites first — line items point at them by id.
                 crm_save_locations($q['id'], $b);
-                crm_save_lines($q['id'], $b); crm_quote_recalc($q['id']);
+                crm_save_lines($q['id'], $b); crm_quote_recalc($q['id']); crm_quote_fill_unit_from_lines($q['id']);
                 // D-07 — any change to the commercial terms or the terms &
                 // conditions cancels an approval, given or in progress. What
                 // was approved is no longer what would be sent.
@@ -2174,7 +2201,7 @@ function ops_crm_quotes($route, $method) {
                 $id = $pdo->lastInsertId();
                 if ($once !== '') $_SESSION['quote_form_once'][$once] = (int)$id;
                 crm_save_locations($id, $b);
-                crm_save_lines($id, $b); crm_quote_recalc($id);
+                crm_save_lines($id, $b); crm_quote_recalc($id); crm_quote_fill_unit_from_lines($id);
                 if ($inqId) $pdo->prepare("UPDATE crm_inquiries SET status='QUOTED' WHERE id=?")->execute([$inqId]);
                 // Carry the lead's attachments onto the quote, so the customer's
                 // RFQ, specs and correspondence stay for future reference.
@@ -3643,7 +3670,7 @@ function crm_build_approvals($q) {
         return 1;
     }
     $ownerId = crm_quote_owner_user_id($q);
-    $ins = $pdo->prepare("INSERT INTO quote_approvals (quote_id,level,approver_role,approver_user_id,status) VALUES (?,?,?,?,'PENDING')");
+    $ins = $pdo->prepare("INSERT INTO quote_approvals (quote_id,level,approver_role,approver_user_id,status,sbu) VALUES (?,?,?,?,'PENDING',?)");
     foreach ($steps as $s) {
         $role = $s['approver_role'] ?? '';
         $uid  = ($s['approver_user_id'] ?? null) ?: null;
@@ -3653,7 +3680,7 @@ function crm_build_approvals($q) {
             $resolved = $ownerId && function_exists('reporting_manager_at') ? reporting_manager_at($ownerId, (int)$s['level']) : null;
             $role = ''; $uid = $resolved ?: null;   // unresolved → generic step (any approver)
         }
-        $ins->execute([$q['id'], (int)$s['level'], $role, $uid]);
+        $ins->execute([$q['id'], (int)$s['level'], $role, $uid, crm_rule_is_unit($s) ? (string)$s['sbu'] : '']);
     }
     return count($steps);
 }
@@ -3698,6 +3725,9 @@ function crm_step_approvers_direct($step) {
         return $u ? [$u] : [];
     }
     $q = !empty($step['quote_id']) ? crm_quote_get((int)$step['quote_id']) : null;
+    //  A level for one business unit goes to the head of THAT unit, even on a
+    //  quotation whose primary unit is another.
+    if ($q && trim((string)($step['sbu'] ?? '')) !== '') $q['sbu'] = (string)$step['sbu'];
     if (($step['approver_role'] ?? '') !== '') {
         return crm_role_approvers_for([(string)$step['approver_role']], $q);
     }
@@ -3734,6 +3764,7 @@ function crm_role_approvers_for(array $roles, $q) {
 // Only if they are among the people that step goes to (see above).
 function crm_role_step_covers_me($step, $q) {
     if (!$q) return true;
+    if (trim((string)($step['sbu'] ?? '')) !== '') $q['sbu'] = (string)$step['sbu'];   // a unit-only level: that unit's people
     $roles = ($step['approver_role'] ?? '') !== '' ? [(string)$step['approver_role']] : [];
     if (!$roles) foreach (ORG_ROLES as $rk => $rl) if (role_perms($rk) && in_array('crm.quote.approve', role_perms($rk), true)) $roles[] = $rk;
     $me = (int)(current_user()['id'] ?? 0);

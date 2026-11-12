@@ -320,6 +320,16 @@
     <div class="panel" style="margin:0 0 10px;background:var(--soft)">
       <b>⏳ Waiting with <?= e($pendingWith) ?></b>
       <?php if ($pendingStep): ?><span class="muted"> — level <?= (int)$pendingStep['level'] ?> of <?= count($approvals) ?></span><?php endif; ?>
+      <?php // Owner, 12 Nov 2026 — say who comes next, so a chain that starts with
+            // the Branch Manager does not look as if the unit head was skipped.
+        if ($pendingStep && crm_approval_mode() === 'order'):
+          $nextNames = [];
+          foreach ($approvals as $ni => $na) {
+            if ($na['status'] !== 'PENDING' || (int)$na['id'] === (int)$pendingStep['id'] || (int)$na['level'] < (int)$pendingStep['level']) continue;
+            $np = $stepPeople[$ni] ?? [];
+            $nextNames[] = 'level ' . (int)$na['level'] . ' — ' . ($np ? implode(', ', array_map('crm_person_label', array_slice($np, 0, 2))) : (!empty($na['approver_role']) ? (ORG_ROLES[$na['approver_role']] ?? $na['approver_role']) : 'any approver'));
+          }
+          if ($nextNames): ?><div class="muted" style="font-size:12.5px;margin-top:3px">Then: <?= e(implode(' → ', $nextNames)) ?></div><?php endif; endif; ?>
     </div>
   <?php endif; ?>
   <table class="dt">

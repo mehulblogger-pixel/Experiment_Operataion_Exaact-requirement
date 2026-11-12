@@ -190,6 +190,12 @@ writes one line in the quotation's history (who, what, why).
   could apply to the same quotation may not overlap, and a higher range needs a higher level number
   — both refused at the save, in plain words (`crm_approval_band_problem()`). Project costings follow
   the same chain. No status or move is added; the steps are the same approval steps as before.
+- **A level for one business unit** (owner, 12 Nov 2026 — an Industrial-only Level 4 was never
+  reached): it applies when the quotation's primary business unit **or any of its lines** is that
+  unit (`crm_quote_units()`), and its step goes to — and may be signed only by — the people over
+  **that** unit (`quote_approvals.sbu`), even on a quotation whose primary unit is another. A
+  quotation saved with no primary unit takes the unit of its biggest line, noted in its history.
+  The quotation shows who comes after the person it is waiting with ("Then: …").
 - **Approval steps sign in order** (owner's D-05, 20 Oct 2026): a level-2 step is refused while any
   level-1 step is still pending. A step waiting longer than the days set in Set up Sales
   (`quote_approval_escalate_days`) is opened to the next level's approvers as well (D-11a); a
