@@ -9488,9 +9488,38 @@ function ops_pending_tasks() {
     }
 
     // ---- Approvals waiting on ME -------------------------------------------
-    // Quotations — the current step is mine to sign (named, by role, or generic).
-    if (function_exists('crm_quotes_awaiting_me'))
+    //  Owner, 12 Nov 2026 — "All the pending task like Project costing approval is
+    //  not shown on the dashboard of the Branch manager or the approval hierarchy.
+    //  All approval pending under any designations or level must show as pending
+    //  task on their individual dashboard." Only quotations were counted here;
+    //  costings, recruitment, deal stages and lead reassignments were only on the
+    //  Approvals page. Every queue now comes from the one list that page uses
+    //  (approvals_hub_sections), so the dashboard and the page always agree.
+    if (function_exists('approvals_hub_sections')) {
+        $hubLook = [
+            'quotes'        => ['🧾', 'quotes to approve', 'quotations waiting at your approval level', '/quotes?mine=approve'],
+            'costings'      => ['📐', 'project costings to approve', 'costings waiting at your approval level', '/approvals'],
+            'recruit'       => ['🧑‍💼', 'recruitment approvals', 'hiring requests, requisitions, offers or salaries waiting on you', '/my-approvals'],
+            'gates'         => ['🛂', 'deals to approve', 'deals held at a stage until you agree', '/approvals'],
+            'lead_reassign' => ['🔁', 'lead reassignments', 'leads waiting for you to approve a new owner', '/approvals'],
+        ];
+        try {
+            foreach (approvals_hub_sections() as $sec) {
+                $lk = $hubLook[$sec['key']] ?? ['✔', strtolower((string)$sec['title']) . ' to approve', (string)$sec['sub'], '/approvals'];
+                $n = count($sec['items']);
+                //  One item: open it directly, so the approver is one tap from deciding.
+                $href = $lk[3];
+                if ($n === 1) {
+                    $it = $sec['items'][0];
+                    if ($sec['key'] === 'quotes' && !empty($it['id'])) $href = '/quote?id=' . (int)$it['id'];
+                    elseif ($sec['key'] === 'costings' && !empty($it['id'])) $href = '/project-costing?id=' . (int)$it['id'];
+                }
+                $add($n, $lk[0], $lk[1], $lk[2], $href, 'info');
+            }
+        } catch (Throwable $e) { /* never let this take the dashboard down */ }
+    } elseif (function_exists('crm_quotes_awaiting_me')) {
         $add(crm_quotes_awaiting_me(), '🧾', 'quotes to approve', 'quotations awaiting your approval', '/quotes?mine=approve', 'info');
+    }
 
     // Accepted quotes waiting for a contract number — the Accounts hand-off, so a
     // won order does not sit unregistered. Shown to whoever may register a

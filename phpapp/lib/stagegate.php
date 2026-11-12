@@ -137,10 +137,13 @@ function gate_approvers($req) {
                                        FROM users WHERE id = ? AND is_active = 1", [(int)$req['approver_user_id']]), null);
         return $u ? [$u] : [];
     }
-    if (trim((string)($req['approver_role'] ?? '')) !== '')
+    if (trim((string)($req['approver_role'] ?? '')) !== '') {
+        $keys = function_exists('approver_role_keys') ? approver_role_keys($req['approver_role']) : [(string)$req['approver_role']];
+        $phk = implode(',', array_fill(0, count($keys), '?'));
         return gate_try(fn() => ops_all("SELECT id, username, first_name, last_name, email, role
-                                         FROM users WHERE role = ? AND is_active = 1
-                                         ORDER BY first_name, username", [$req['approver_role']]), []) ?: [];
+                                         FROM users WHERE role IN ($phk) AND is_active = 1
+                                         ORDER BY first_name, username", $keys), []) ?: [];
+    }
     $roles = [];
     foreach (ORG_ROLES as $rk => $rl) {
         $p = role_perms($rk);

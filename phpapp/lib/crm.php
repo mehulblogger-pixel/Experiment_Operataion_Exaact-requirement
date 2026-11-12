@@ -3709,7 +3709,7 @@ function crm_level_reroute_pending(array $old, array $new, $who = '') {
     $label = function ($role, $uid) {
         if ($uid > 0) { $u = ops_one("SELECT first_name, last_name, username FROM users WHERE id=?", [$uid]); return $u ? (trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')) ?: (string)$u['username']) : 'user #' . $uid; }
         if ($role === 'REPORTS_TO') return "the preparer's reporting manager";
-        return $role !== '' ? (ORG_ROLES[$role] ?? $role) : 'anyone who may approve';
+        return $role !== '' ? (function_exists('role_name') ? role_name($role) : (ORG_ROLES[$role] ?? $role)) : 'anyone who may approve';
     };
     $from = $label($oRole, $oUid); $to = $label($nRole, $nUid);
     //  Old steps (no level remembered) are recognised by what was copied onto them;
@@ -3822,6 +3822,7 @@ function crm_step_approvers_direct($step) {
 //  quotation is never stuck. Set up Sales warns about such gaps.
 function crm_role_approvers_for(array $roles, $q) {
     if (!$roles) return [];
+    if (function_exists('approver_role_keys')) { $ex = []; foreach ($roles as $r) foreach (approver_role_keys($r) as $k) $ex[$k] = true; $roles = array_keys($ex); }
     $ph = implode(',', array_fill(0, count($roles), '?'));
     $all = ops_all("SELECT id, username, first_name, last_name, email, role, is_superuser, home_office_id, scope_offices, scope_sbus, permissions
                     FROM users WHERE role IN ($ph) AND is_active=1 ORDER BY first_name, username", $roles) ?: [];
@@ -3918,8 +3919,23 @@ function ops_quote_delegations($method) {
 }
 function crm_person_label($u) {
     $nm = trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')) ?: ($u['username'] ?? '');
-    $role = ORG_ROLES[$u['role'] ?? ''] ?? ($u['role'] ?? '');
+    $role = function_exists('role_name') && ($u['role'] ?? '') !== '' ? role_name($u['role']) : (ORG_ROLES[$u['role'] ?? ''] ?? ($u['role'] ?? ''));
     return $role !== '' ? "$nm ($role)" : $nm;
+}
+// Who one step is with, in words. Owner, 12 Nov 2026 — a level addressed to
+// "Business Unit Head" read "any approver" when nobody held that role, which hid
+// the real problem: nobody could sign it but an administrator.
+function crm_step_who($step, $max = 3) {
+    $people = crm_step_approvers($step);
+    if ($people) {
+        $names = array_map('crm_person_label', array_slice($people, 0, $max));
+        $more = count($people) - count($names);
+        return implode(', ', $names) . ($more > 0 ? " and $more other(s)" : '');
+    }
+    $role = (string)($step['approver_role'] ?? '');
+    if ($role !== '') return (function_exists('role_name') ? role_name($role) : (ORG_ROLES[$role] ?? $role)) . ' — nobody active holds this role yet (give it to someone under People)';
+    if (!empty($step['approver_user_id'])) return 'a person who is no longer active — change this level in Set up Sales';
+    return 'anyone who may approve quotations';
 }
 // The lowest still-pending level, and who it is with — as a readable phrase.
 function crm_pending_with($qid) {
@@ -3927,19 +3943,12 @@ function crm_pending_with($qid) {
         $all = ops_all("SELECT * FROM quote_approvals WHERE quote_id=? AND status='PENDING' ORDER BY level, id", [(int)$qid]) ?: [];
         if (count($all) > 1) {
             $parts = [];
-            foreach ($all as $s) { $p = array_map('crm_person_label', array_slice(crm_step_approvers($s), 0, 2)); $parts[] = 'level ' . (int)$s['level'] . ': ' . ($p ? implode(', ', $p) : 'any approver'); }
+            foreach ($all as $s) $parts[] = 'level ' . (int)$s['level'] . ': ' . crm_step_who($s, 2);
             return implode('; ', $parts) . ' (all at the same time)';
         }
     }
     $step = ops_one("SELECT * FROM quote_approvals WHERE quote_id=? AND status='PENDING' ORDER BY level, id LIMIT 1", [(int)$qid]);
-    if (!$step) return '';
-    $people = crm_step_approvers($step);
-    if (!$people) return ($step['approver_role'] ?? '') !== ''
-        ? ('anyone with the role ' . (ORG_ROLES[$step['approver_role']] ?? $step['approver_role']))
-        : 'any approver';
-    $names = array_map('crm_person_label', array_slice($people, 0, 3));
-    $more = count($people) - count($names);
-    return implode(', ', $names) . ($more > 0 ? " and $more other(s)" : '');
+    return $step ? crm_step_who($step) : '';
 }
 function crm_pending_step($qid) {
     return ops_one("SELECT * FROM quote_approvals WHERE quote_id=? AND status='PENDING' ORDER BY level, id LIMIT 1", [(int)$qid]);
@@ -3968,7 +3977,8 @@ function crm_quote_ids_awaiting_me() {
                        AND (? = 'together' OR a.level = (SELECT MIN(a2.level) FROM quote_approvals a2 WHERE a2.quote_id=a.quote_id AND a2.status='PENDING'))", [crm_approval_mode()]) ?: [];
     foreach ($rows as $st) {
         if (isset($ids[(int)$st['quote_id']])) continue;
-        if (function_exists('scope_allows') && !is_master() && !scope_allows($st['q_office'] ?? null, $st['q_sbu'] ?? null)) continue;
+        //  A unit-only level is checked against its own unit (owner, 12 Nov 2026).
+        if (function_exists('scope_allows') && !is_master() && !scope_allows($st['q_office'] ?? null, trim((string)($st['sbu'] ?? '')) !== '' ? $st['sbu'] : ($st['q_sbu'] ?? null))) continue;
         if (crm_can_act_approval($st)) $ids[(int)$st['quote_id']] = true;
     }
     return array_keys($ids);
@@ -4029,7 +4039,7 @@ function crm_can_act_approval($step) {
 // generic step they may sign because they hold the approve right?
 function crm_step_is_mine($step, $uid, $role, $holdsApprove) {
     if (!empty($step['approver_user_id'])) return (int)$step['approver_user_id'] === (int)$uid;
-    if (($step['approver_role'] ?? '') !== '') return (string)$role === (string)$step['approver_role'];
+    if (($step['approver_role'] ?? '') !== '') return function_exists('user_holds_approver_role') ? user_holds_approver_role($role, $step['approver_role']) : (string)$role === (string)$step['approver_role'];
     return (bool)$holdsApprove;
 }
 // Can the current user act on any still-pending approval step of this quote? True
@@ -4197,7 +4207,7 @@ function ops_crm_approval_rules($route, $method) {
             $mt = in_array($b['match_type'] ?? 'ANY', ['SBU', 'Business Unit'], true) && trim((string)($b['sbu'] ?? '')) !== '' ? 'SBU' : 'ANY';
             $min = (float)($b['min_amount'] ?? 0); $max = (float)($b['max_amount'] ?? 0); $lvl = max(1, (int)($b['level'] ?? 1));
             $role = (string)($b['approver_role'] ?? '');
-            if ($role !== '' && $role !== 'REPORTS_TO' && !isset(ORG_ROLES[$role])) $role = '';
+            if ($role !== '' && $role !== 'REPORTS_TO' && !isset((function_exists('roles_all') ? roles_all() : ORG_ROLES)[$role])) $role = '';
             $uid = ($b['approver_user_id'] ?? '') !== '' ? (int)$b['approver_user_id'] : null;
             //  Refused, not stored: a band that ends where it starts covers nothing.
             $problem = $min < 0 || $max < 0 ? 'Values cannot be negative.'
@@ -4212,7 +4222,7 @@ function ops_crm_approval_rules($route, $method) {
             if ($name === '') {
                 $pu = $uid ? ops_one("SELECT first_name, last_name, username FROM users WHERE id=?", [$uid]) : null;
                 $who = $pu ? (trim(($pu['first_name'] ?? '') . ' ' . ($pu['last_name'] ?? '')) ?: (string)$pu['username'])
-                     : ($role === 'REPORTS_TO' ? 'Reporting manager' : ($role !== '' ? ORG_ROLES[$role] : 'Any approver'));
+                     : ($role === 'REPORTS_TO' ? 'Reporting manager' : ($role !== '' ? (function_exists('role_name') ? role_name($role) : ORG_ROLES[$role]) : 'Any approver'));
                 $name = 'Level ' . $lvl . ' — ' . $who;
             }
             $vals = [$name, $mt, $mt === 'SBU' ? (string)$b['sbu'] : '', $min, $max,
@@ -4230,7 +4240,7 @@ function ops_crm_approval_rules($route, $method) {
             }
             redirect($back);
         }
-        view('ops/crm/approval_rule_form', ['r' => $r, 'sbuOpts' => lk_options_or('sbu', OPS_SBUS), 'roles' => ORG_ROLES,
+        view('ops/crm/approval_rule_form', ['r' => $r, 'sbuOpts' => lk_options_or('sbu', OPS_SBUS), 'roles' => function_exists('roles_all') ? roles_all() : ORG_ROLES,
             'users' => ops_all("SELECT id, first_name, last_name, username FROM users WHERE is_active=1 ORDER BY first_name, username")]); return;
     }
 }

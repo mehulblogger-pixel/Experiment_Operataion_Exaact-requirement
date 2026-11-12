@@ -1371,7 +1371,8 @@ function appr_level_eligible($level, $ctx = []) {
         }
         return ['kind' => 'ORG', 'users' => $who, 'role' => $role];
     }
-    try { $rows = ops_all("SELECT id, first_name, last_name, username, is_active, role FROM users WHERE role=? AND is_active=1 ORDER BY first_name", [$role]); }
+    $rk = function_exists('approver_role_keys') ? approver_role_keys($role) : [$role];
+    try { $rows = ops_all("SELECT id, first_name, last_name, username, is_active, role FROM users WHERE role IN (" . implode(',', array_fill(0, count($rk), '?')) . ") AND is_active=1 ORDER BY first_name", $rk); }
     catch (Throwable $e) { $rows = []; }
     return ['kind' => 'ROLE', 'users' => $rows, 'role' => $role];
 }
@@ -1684,7 +1685,7 @@ function appr_can_act($step, $user = null) {
     // acts so the chain is never stranded.
     if ($role !== '' && function_exists('appr_is_org_approver') && appr_is_org_approver($role))
         return function_exists('hiring_admin_can') ? hiring_admin_can() : (function_exists('is_admin_level') && is_admin_level());
-    if ($role !== '' && (string)$user['role'] === $role) return true;
+    if ($role !== '' && (function_exists('user_holds_approver_role') ? user_holds_approver_role($user['role'] ?? '', $role) : (string)$user['role'] === $role)) return true;
     // M2 — acting for somebody who holds the configured role. The delegator must
     // genuinely hold it: a delegation cannot manufacture an authority its
     // delegator never had.
@@ -1694,7 +1695,7 @@ function appr_can_act($step, $user = null) {
             // readers. This asks only the question that is specific to a role
             // step: does the delegator genuinely hold the role being delegated?
             try { $du = ops_one("SELECT role FROM users WHERE id=?", [$dl]); } catch (Throwable $e) { $du = null; }
-            if ($du && (string) $du['role'] === $role) return true;
+            if ($du && (function_exists('user_holds_approver_role') ? user_holds_approver_role($du['role'], $role) : (string) $du['role'] === $role)) return true;
         }
     }
     return false;
@@ -2417,7 +2418,7 @@ function appr_step_recipients($step, $req = null) {
     } else {
         $role = (string) ($step['approver_role'] ?? '');
         if ($role !== '') {
-            try { foreach (ops_all("SELECT * FROM users WHERE role=? AND is_active=1", [$role]) as $u) $add($u); }
+            try { foreach (ops_all("SELECT * FROM users WHERE role IN (" . implode(',', array_fill(0, count(function_exists('approver_role_keys') ? approver_role_keys($role) : [$role]), '?')) . ") AND is_active=1", function_exists('approver_role_keys') ? approver_role_keys($role) : [$role]) as $u) $add($u); }
             catch (Throwable $e) {}
         }
     }
@@ -2471,7 +2472,7 @@ function appr_email_escalate($step, $req = null) {
     $erole = (string) ($step['escalate_role'] ?? '');
     try {
         if ($euid > 0) $add(ops_one("SELECT * FROM users WHERE id=?", [$euid]));
-        elseif ($erole !== '') foreach (ops_all("SELECT * FROM users WHERE role=? AND is_active=1", [$erole]) as $u) $add($u);
+        elseif ($erole !== '') foreach (ops_all("SELECT * FROM users WHERE role IN (" . implode(',', array_fill(0, count(function_exists('approver_role_keys') ? approver_role_keys($erole) : [$erole]), '?')) . ") AND is_active=1", function_exists('approver_role_keys') ? approver_role_keys($erole) : [$erole]) as $u) $add($u);
         else foreach (ops_all("SELECT * FROM users WHERE role IN ('MASTER_ADMIN','ADMIN','BRANCH_MANAGER','SBU_HEAD') AND is_active=1") as $u) $add($u);
     } catch (Throwable $e) {}
     //  The INFORMATIONAL disclosure level: entitlement and branch scope, without

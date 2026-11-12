@@ -122,6 +122,24 @@ function roles_all() {
     foreach (custom_roles_all() as $k => $v) $r[$k] = $v['label'];
     return $r;
 }
+// Owner, 12 Nov 2026 — "All approval pending under any designations or level
+// must show". An approval addressed to a role (a designation) belongs to
+// everyone who holds it — including a role this company made from it (Roles &
+// access → a custom role "based on" Business Unit Head). A custom role already
+// takes its base role's permissions; it now also takes its approvals, so a
+// "BU Head – Industrial" is asked to sign a "Business Unit Head" level, sees it on
+// the dashboard, and can approve it. Never wider: only roles built on that one.
+function approver_role_keys($role) {
+    $role = strtoupper(trim((string) $role));
+    if ($role === '') return [];
+    $keys = [$role];
+    if (isset(ORG_ROLES[$role])) foreach (custom_roles_all() as $k => $v) if ($v['base'] === $role) $keys[] = $k;
+    return $keys;
+}
+function user_holds_approver_role($userRole, $stepRole) {
+    $u = strtoupper(trim((string) $userRole));
+    return $u !== '' && in_array($u, approver_role_keys($stepRole), true);
+}
 // A role KEY's display label (built-in or custom); the key itself as a last
 // resort. (Distinct from ops.php role_label(), which labels a whole user row.)
 function role_name($role) {

@@ -6284,7 +6284,7 @@ function idems_can_act_step($step) {
     $uid = (int)(current_user()['id'] ?? 0);
     if (!empty($step['delegated_to']) && (int)$step['delegated_to'] === $uid) return true;
     if (!empty($step['resolved_user_id']) && (int)$step['resolved_user_id'] === $uid) return true;
-    if (!empty($step['approver_role']) && user_role() === $step['approver_role']) return true;
+    if (!empty($step['approver_role']) && (function_exists('user_holds_approver_role') ? user_holds_approver_role(user_role(), $step['approver_role']) : user_role() === $step['approver_role'])) return true;
     if (empty($step['resolved_user_id']) && empty($step['approver_role']) && can('idems.finalize')) return true;
     return false;
 }
@@ -6303,10 +6303,12 @@ function idems_awaiting_my_approval_clause() {
               SELECT 1 FROM report_approvals a
               WHERE a.report_doc_id=d.id AND a.status='PENDING'
                 AND a.level=(SELECT MIN(a2.level) FROM report_approvals a2 WHERE a2.report_doc_id=d.id AND a2.status='PENDING')
-                AND ( a.resolved_user_id=? OR a.delegated_to=? OR (COALESCE(a.approver_role,'')<>'' AND a.approver_role=?)"
+                AND ( a.resolved_user_id=? OR a.delegated_to=? OR (COALESCE(a.approver_role,'')<>'' AND a.approver_role IN (?,?))"
               . ($canFin ? " OR (COALESCE(a.resolved_user_id,0)=0 AND COALESCE(a.approver_role,'')='')" : "")
               . " ) )";
-    return [$sql, [$uid, $uid, $role]];
+    //  A custom role also answers for the role it is built on (owner, 12 Nov 2026).
+    $base = function_exists('role_effective_key') ? (string) role_effective_key($role) : $role;
+    return [$sql, [$uid, $uid, $role, $base]];
 }
 // How many reports are waiting on ME right now for review/approval — the reviewer/
 // approver queue count, so a dashboard can surface it instead of leaving it buried.

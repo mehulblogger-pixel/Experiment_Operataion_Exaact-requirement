@@ -199,7 +199,8 @@ function setupqa_sales_other_approvals() {
 function setupqa_quote_levels_data() {
     $can = function_exists('can') && (can('crm.quote.approve') || (function_exists('is_master') && is_master()));
     $rows = function_exists('ops_all') ? (ops_all("SELECT * FROM quote_approval_rules ORDER BY level, min_amount, id") ?: []) : [];
-    $roles = ORG_ROLES; unset($roles['INSPECTOR']);
+    //  Owner, 12 Nov 2026 — the company's own roles too (Roles & access).
+    $roles = function_exists('roles_all') ? roles_all() : ORG_ROLES; unset($roles['INSPECTOR']);
     return ['can' => $can, 'rows' => $rows, 'roles' => $roles,
             'users' => $can ? (ops_all("SELECT id, first_name, last_name, username FROM users WHERE is_active=1 ORDER BY first_name, username") ?: []) : [],
             'sbuOpts' => function_exists('lk_options_or') ? lk_options_or('sbu', OPS_SBUS) : []];

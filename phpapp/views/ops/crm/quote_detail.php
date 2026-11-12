@@ -338,8 +338,7 @@
     <?php foreach ($approvals as $ai => $a):
       $people = $stepPeople[$ai] ?? [];
       if ($people) { $names = array_map('crm_person_label', array_slice($people, 0, 4)); $more = count($people) - count($names); $who = implode(', ', $names) . ($more > 0 ? " and $more other(s)" : ''); }
-      elseif (!empty($a['approver_role'])) $who = 'Anyone with the role ' . (ORG_ROLES[$a['approver_role']] ?? $a['approver_role']) . ' (nobody holds it yet)';
-      else $who = 'Any approver';
+      else $who = ucfirst(crm_step_who($a));
     ?>
     <tr>
       <td class="num"><b><?= (int)$a['level'] ?></b></td>
