@@ -237,9 +237,16 @@ function contract_amendment_apply(array $c, array $am, $me, $meId, $note) {
     $pdo = db();
     $n = json_decode((string)$am['new_values'], true) ?: [];
     $isBilling = isset($n['billing']);
-    $pdo->beginTransaction();
+    $isMs = isset($n['milestones']);
+    $own = !$pdo->inTransaction(); if ($own) $pdo->beginTransaction();
     try {
-        if ($isBilling) {
+        if ($isMs && function_exists('ms_contract_replace_planned')) {
+            // A billing-schedule amendment: the planned milestones are replaced;
+            // those already reached never change.
+            $m = $n['milestones'];
+            ms_contract_replace_planned((int)$c['id'], array_values(array_filter((array)($m['rows'] ?? []), fn($r) => ($r['status'] ?? 'PLANNED') === 'PLANNED')),
+                (float)($m['retention'] ?? 0), (float)($m['base'] ?? 0));
+        } elseif ($isBilling) {
             $pdo->prepare("UPDATE partner_contracts SET billing_triggers=?, billing_period=? WHERE id=?")
                 ->execute([(string)($n['billing']['triggers'] ?? ''), (string)($n['billing']['period'] ?? ''), (int)$c['id']]);
         } else {
@@ -249,8 +256,8 @@ function contract_amendment_apply(array $c, array $am, $me, $meId, $note) {
         }
         $pdo->prepare("UPDATE contract_amendments SET status='APPROVED', decided_by=?, decided_by_id=?, decided_at=?, decision_note=? WHERE id=?")
             ->execute([(string)$me, $meId, date('c'), mb_substr((string)$note, 0, 400), (int)$am['id']]);
-        $pdo->commit();
-    } catch (Throwable $e) { $pdo->rollBack(); return $e->getMessage(); }
+        if ($own) $pdo->commit();
+    } catch (Throwable $e) { if ($own) $pdo->rollBack(); return $e->getMessage(); }
     // New billing terms: re-work out what is due on the contract's jobs.
     if ($isBilling && function_exists('billunit_contract_terms_apply')) {
         $fresh = ops_one("SELECT * FROM partner_contracts WHERE id=?", [(int)$c['id']]) ?: $c;
@@ -265,6 +272,9 @@ function contract_amendment_apply(array $c, array $am, $me, $meId, $note) {
 function contract_amendment_summary($am) {
     $o = json_decode((string)$am['old_values'], true) ?: []; $n = json_decode((string)$am['new_values'], true) ?: [];
     $out = [];
+    // An amendment of the billing schedule (milestones, owner 12 Nov 2026).
+    if (isset($n['milestones']) && function_exists('ms_snapshot_words'))
+        return 'billing milestones ' . ms_snapshot_words($o['milestones'] ?? []) . ' → ' . ms_snapshot_words($n['milestones']);
     // An amendment of the billing terms (owner, 8 Nov 2026 — Option 1).
     if (isset($n['billing']) && function_exists('billunit_terms_words'))
         return 'billing terms ' . billunit_terms_words($o['billing']['triggers'] ?? '', $o['billing']['period'] ?? '')

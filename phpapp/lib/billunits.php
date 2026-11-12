@@ -238,7 +238,7 @@ function billunit_label($e) {
             return 'Man-month — ' . $code . ' — ' . ($from !== '' ? date('F Y', strtotime($from)) : '') . ' (' . $fd($from) . ' to ' . $fd($to) . ')'
                  . (abs($q - 1) > 0.0001 ? ' — ' . rtrim(rtrim(number_format($q, 4), '0'), '.') . ' month' : '');
         case 'MILESTONE':
-            return 'Milestone — ' . $code . ' — ' . (string)($e['calc_rule'] ?? '');
+            return 'Milestone — ' . ($code !== '' ? $code . ' — ' : '') . (string)($e['calc_rule'] ?? '');
         case 'ADJUSTMENT':
             return 'Adjustment — ' . $code . ' — ' . (string)($e['evidence'] ?? '');
     }

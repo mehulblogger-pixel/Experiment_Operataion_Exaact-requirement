@@ -25,4 +25,9 @@ flowchart TD
   **Won — customer**. Moving between stages, working it as a deal, marking it lost and the direct
   *"They said yes without a quotation from us"* (for a purchase order that arrives without our
   quotation) are optional and sit under **More**. Same permissions as before.
+- **Billing by milestones** (owner, 12 Nov 2026): on a quotation, "Billing by milestones" →
+  "Set up milestones" sets the stages the customer pays in (shares adding up to 100% of the price
+  before GST, optional retention). The schedule prints on the quotation PDF, and changing it
+  cancels an approval. The contract takes it when the quotation is won. Same permissions as
+  editing the quotation.
 - Most common task = create & send a quote (a few clicks through the quote form).

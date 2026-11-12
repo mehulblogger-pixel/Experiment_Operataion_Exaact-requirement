@@ -1414,7 +1414,10 @@ function crm_quote_commercial_print($qid) {
     $sites = array_map(fn($s) => [(string)$s['label'], (string)$s['location_type'], (string)$s['line1'], (string)$s['line2'],
         (string)$s['city'], (string)$s['state'], (string)$s['pincode'], (string)$s['country'], (int)$s['vendor_id']],
         ops_all("SELECT * FROM quote_locations WHERE quote_id=? ORDER BY sort_order, id", [(int)$qid]) ?: []);
-    return json_encode([$h, $lines, $sites]);
+    // The billing schedule (milestones) is part of the offer: changing it
+    // cancels an approval like changing a price (owner, 12 Nov 2026).
+    $ms = function_exists('ms_print_quote') ? ms_print_quote((int)$qid) : '';
+    return json_encode($ms !== '' ? [$h, $lines, $sites, $ms] : [$h, $lines, $sites]);
 }
 
 // What a quotation must carry before it can be submitted, approved or sent — an
@@ -2690,6 +2693,9 @@ function ops_crm_quotes($route, $method) {
                 $lins->execute(array_merge([$nid], $row));
             }
         }
+
+        // The billing schedule travels with the revision too.
+        if (function_exists('ms_copy_quote')) ms_copy_quote((int)$q['id'], $nid);
 
         // Now demote every other revision of this quote.
         $pdo->prepare("UPDATE quotations SET is_current=0 WHERE quote_no=? AND id<>?")->execute([$q['quote_no'], $nid]);

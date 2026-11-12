@@ -110,7 +110,7 @@ C('SAL-004', 'Before you start', 'Company types to test — run the Sales tests 
    ('Profile C — Manpower supply / deputation: "Recruitment & staffing". Quote by Man-month.', 'Man-month quotations need an approved project costing (if your Set up Sales answer says so).'),
    ('Profile D — Manufacturer selling products: "Manufacturing & engineering". Try to quote 50 cabinets.', 'Making it the company\'s industry says the quotation lines now also offer Nos, Set, Kg, Tonne and more. A new quotation line starts in Nos; the service units (Man-day …) are still there for service lines. There is still no HSN code field — record that as a GAP.'),
    ('Profile E — Trader (products + services): "Trading & distribution".', 'Lines offer Nos, Set, Box, Carton, Dozen, Kg, Tonne, Metre, Litre, Roll, Pair as well as the service units; a new line starts in Nos (owner, 12 Nov 2026).'),
-   ('Profile F — Construction / EPC: "Construction, projects & infrastructure". Quote lump-sum stages.', 'Lines also offer "Per stage / milestone", square / cubic / running metre. Billing a project in milestones is NOT built yet — record what you see (owner, 12 Nov 2026: "No such milestone billing etc. found").'),
+   ('Profile F — Construction / EPC: "Construction, projects & infrastructure". Quote lump-sum stages.', 'Lines also offer "Per stage / milestone", square / cubic / running metre. The quotation page has "Billing by milestones" → "Set up milestones" (see SAL-158).'),
    ('Profile G — One-person consultancy: no approval levels at all; Set up Sales "No approval is needed".', 'Quotes can be sent straight from Draft.'),
    ('After each profile, go back to Profile A on the test workspace.', 'Wording returns to inspection words.')],
   'D-29; CHARGE_UNITS; industry templates', live=False)
@@ -913,6 +913,25 @@ C('SAL-155', 'Company types', 'EPC / project company: lump-sum stages', 'scenari
   [('Lines "Design review" 1 Per lot / lump sum ₹2,00,000; "Site supervision" 6 Man-month ₹1,20,000.', 'Man-month line triggers the costing rule if Set up Sales requires it.'),
    ('Open order (ARC / call-off) vs Line-item order on each line.', 'Both choices saved and printed.')],
   'ORDER_TYPES', company='F')
+
+C('SAL-158', 'Company types', 'Construction / EPC: bill a project by milestones, with retention', 'scenario', ['best', 'rule', 'edge'],
+  'several', 'A project is paid in stages; nothing is billed before the stage is confirmed, and retention is not chased before it is due (owner, 12 Nov 2026).',
+  'Profile F. A quotation in Draft with a priced line (e.g. subtotal ₹10,00,000).',
+  [('[BDM] Quotation → Overview → "Billing by milestones" → "Set up milestones" → "Fill a common example". Retention % 10; tick "Releases retention" on "After the warranty period". Press "Save the schedule".', '"Adds up to 100% ✓" before saving; then "Billing schedule saved — 4 milestone(s)." The table shows 10% ₹1,00,000 · 40% ₹4,00,000 · 40% ₹4,00,000 · 10% ₹1,00,000 and the retention sentence.'),
+   ('Change one share so they add up to 90% and save.', 'Refused: "The milestones add up to 90% — they must add up to 100% of the price. Nothing was saved."'),
+   ('Download the quotation PDF.', 'A "Payment milestones" section lists each milestone with its share and amount "plus GST", and the retention sentence.'),
+   ('Submit for approval, then change the schedule.', 'Saved with "…the approval was cancelled — submit it again."'),
+   ('Approve, send, mark accepted; Finance registers the contract; manager endorses, branch manager approves (contract Open). Open the contract.', '"Billing by milestones" shows the same four milestones, all "Planned", with "✓ Mark reached".'),
+   ('[Finance] On the contract.', 'No "Mark reached" button — Finance bills milestones, it does not confirm them.'),
+   ('[Coordinator] "✓ Mark reached" on the advance: date tomorrow.', 'Refused: a milestone cannot be reached in the future.'),
+   ('Date today, "What shows it is reached?" = "PO received 12 Nov", attach the PO PDF → "Confirm — ready to bill".', '"Marked reached. Finance sees it under Billing → Due to bill." The row shows "Reached — ready to bill", who, when, the note and a 📎 link that opens the file.'),
+   ('[Finance] Money → Billable events → Due to bill.', 'The milestone is listed for the client, "Milestone reached: Advance — with the order". Tick it → "Raise one invoice for the ticked units".'),
+   ('Open the draft invoice → print.', 'Line "Milestone — <contract> — Advance — with the order (10%)" ₹1,00,000 + GST = ₹1,18,000; then "Less: retention 10% — payable when “After the warranty period” is reached − ₹10,000" and "Payable now ₹1,08,000".'),
+   ('Issue it; open Receivables.', 'The invoice is aged for ₹1,08,000 only — the ₹10,000 retention is not due and not chased.'),
+   ('[Coordinator] Try "Undo" on the billed advance.', 'No Undo offered (it is billed). On a reached milestone not yet invoiced, Undo with a reason sets it back to Planned and off the Due to bill list.'),
+   ('[Finance] On the open contract, "Change the schedule" → change shares → "Request the amendment" with a reason.', 'An amendment waits for two signatures; the current schedule stays until approved; reached milestones never change.'),
+   ('[Coordinator] Mark "After the warranty period" reached; open Receivables.', 'The retention on the earlier invoices is now due and counted.')],
+  'lib/milestones.php; billing units; D-25 amendment', company='F', live=False)
 
 C('SAL-156', 'Company types', 'One-person consultancy: no approval at all', 'scenario', ['best', 'rule'],
   'MASTER_ADMIN', 'A one-person company approves nothing.', 'Profile G: no approval levels; Set up Sales "No approval is needed".',

@@ -83,8 +83,13 @@ function ar_rows_from_books($basis = 'DUE', $today = null) {
          WHERE $w AND i.status IN ('ISSUED','PART_PAID')
          ORDER BY i.due_date ASC, i.invoice_date ASC, i.id ASC", $a));
     $out = [];
+    //  Retention on milestone bills (owner, 12 Nov 2026): the retained part of an
+    //  invoice is owed only once its release milestone is reached, so until then
+    //  it is neither due nor overdue — it is not aged at all.
+    $msRet = function_exists('ms_invoice_retention') ? ms_invoice_retention(array_map(fn($r) => (int)$r['id'], $rows)) : [];
     foreach ($rows as $r) {
         $s = books_settled((int)$r['id']);
+        if ($msRet) $s['outstanding'] = round($s['outstanding'] - ms_invoice_retention_not_due((int)$r['id'], $s['outstanding'], $msRet, $today), 2);
         if ($s['outstanding'] <= 1) continue;         // settled; nothing to chase
         $due = trim((string)$r['due_date']);
         $inv = trim((string)$r['invoice_date']);
@@ -160,8 +165,11 @@ function ar_overdue_reminders($today = null, $renagDays = 7) {
         "SELECT * FROM invoices WHERE status IN ('ISSUED','PART_PAID')
          AND COALESCE(due_date,'') <> '' AND due_date < ? ORDER BY due_date, id", [$today]), []) ?: [];
     $due = [];
+    $msRet = function_exists('ms_invoice_retention') ? ms_invoice_retention(array_map(fn($r) => (int)$r['id'], $rows)) : [];
     foreach ($rows as $r) {
         $s = books_settled((int)$r['id']);
+        // Retention not yet payable is not chased (owner, 12 Nov 2026).
+        if ($msRet) $s['outstanding'] = round(($s['outstanding'] ?? 0) - ms_invoice_retention_not_due((int)$r['id'], $s['outstanding'] ?? 0, $msRet, $today), 2);
         if (($s['outstanding'] ?? 0) <= 1) continue;                    // settled — nothing to chase
         $last = trim((string)($r['reminded_at'] ?? ''));
         if ($last !== '' && strtotime($last) > strtotime($today . ' -' . (int)$renagDays . ' days')) continue; // chased recently

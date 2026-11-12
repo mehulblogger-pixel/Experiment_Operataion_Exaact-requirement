@@ -462,6 +462,14 @@
   </div>
 </div>
 
+<?php // Billing by milestones (owner, 12 Nov 2026) — the schedule the contract takes when this is won.
+      if (function_exists('ms_rows_quote')):
+        $msMode = 'quote'; $msBase = ms_quote_base($q); $msRows = ms_with_amounts(ms_rows_quote((int)$q['id']), $msBase);
+        $msRet = (float)($q['ms_retention_pct'] ?? 0); $msCanEdit = ms_can_edit_quote($q);
+        $msAction = '/quote-milestones'; $msHidden = ['quote_id' => (int)$q['id']]; $msShowMoney = true;
+        if ($msRows || $msCanEdit) include __DIR__ . '/../_milestones.php';
+      endif; ?>
+
 <?php if (!empty($orderCalls)):
   $cInv=0;$cRec=0; foreach($orderCalls as $oc){ $cInv+=(float)$oc['invoiced']; $cRec+=(float)$oc['received']; } ?>
 <div class="panel" data-tab="Jobs &amp; order">

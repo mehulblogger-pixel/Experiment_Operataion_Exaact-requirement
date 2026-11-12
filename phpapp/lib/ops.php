@@ -3457,7 +3457,7 @@ function ops_route_module_map() {
         'adspro-sync'=>'leads','adspro-backfill'=>'leads',
         'stage-gates'=>'leads','stage-gate-save'=>'leads','stage-gate-delete'=>'leads',
         'inquiries'=>'inquiries','inquiry-new'=>'inquiries','inquiry-edit'=>'inquiries','inquiry-delete'=>'inquiries',
-        'quotes'=>'quotes','quote'=>'quotes','quote-new'=>'quotes','quote-edit'=>'quotes','quote-revise'=>'quotes','quote-status'=>'quotes','quote-doc'=>'quotes','quote-pdf'=>'quotes','quote-approve'=>'quotes','quote-unapprove'=>'quotes','quote-approval-rules'=>'quotes','quote-contract'=>'quotes','quote-add-contract'=>'quotes','quote-float'=>'quotes','client-quotes'=>'calls','quote-context'=>'calls','quote-client'=>'quotes','quote-files'=>'quotes','quote-file'=>'quotes','quote-file-delete'=>'quotes','quote-unlock'=>'quotes','quote-followup'=>'quotes','quote-external'=>'quotes','quotes-export'=>'quotes','quote-final'=>'quotes','quote-compose'=>'quotes','followup-compose'=>'quotes','quote-preorder-save'=>'quotes','preorder-checklist'=>'quotes','sales-setup'=>'quotes','quote-delegations'=>'quotes',
+        'quotes'=>'quotes','quote'=>'quotes','quote-new'=>'quotes','quote-edit'=>'quotes','quote-revise'=>'quotes','quote-status'=>'quotes','quote-doc'=>'quotes','quote-pdf'=>'quotes','quote-approve'=>'quotes','quote-unapprove'=>'quotes','quote-approval-rules'=>'quotes','quote-contract'=>'quotes','quote-add-contract'=>'quotes','quote-float'=>'quotes','client-quotes'=>'calls','quote-context'=>'calls','quote-client'=>'quotes','quote-files'=>'quotes','quote-file'=>'quotes','quote-file-delete'=>'quotes','quote-unlock'=>'quotes','quote-followup'=>'quotes','quote-external'=>'quotes','quotes-export'=>'quotes','quote-final'=>'quotes','quote-compose'=>'quotes','followup-compose'=>'quotes','quote-preorder-save'=>'quotes','quote-milestones'=>'quotes','preorder-checklist'=>'quotes','sales-setup'=>'quotes','quote-delegations'=>'quotes',
         'attendance-recon'=>'reconcile',
         'availability'=>'jobs','schedule'=>'jobs',
         'documents'=>'idems','document'=>'idems','document-new'=>'idems','document-edit'=>'idems','document-submit'=>'idems','document-finalize'=>'idems','document-delete'=>'idems','document-fill'=>'idems','release-notes'=>'idems','document-ai-review'=>'idems','document-rn-flag'=>'idems','document-scope-from-qap'=>'idems','document-polish-text'=>'idems',
@@ -4287,6 +4287,10 @@ function ops_dispatch($route, $method) {
             return geofence_save_job($route, $method);
         case $route === 'contract':
             return ops_contract_360();
+        case $route === 'contract-milestones' || $route === 'milestone-file':   // billing by milestones (owner, 12 Nov 2026)
+            return ops_milestones($route, $method);
+        case $route === 'quote-milestones' && $method === 'POST':
+            return ops_milestones($route, $method);
         case $route === 'contract-edit' && $method === 'POST':
             return ops_contract_edit($method);
         case $route === 'contract-delete' && $method === 'POST':
@@ -9457,6 +9461,10 @@ function ops_pending_tasks() {
     // own follow-ups sit alongside the system-derived approvals on My Work.
     if (function_exists('task_open_count'))
         $add(task_open_count($myId), '✅', 'my tasks', 'follow-ups you added and haven\'t ticked off', '/tasks', 'info', 'do');
+
+    // Milestones reached and ready to bill (owner, 12 Nov 2026) — Finance's to-do.
+    if (function_exists('ms_ready_to_bill_count') && function_exists('billunit_can_invoice') && billunit_can_invoice())
+        $add(ms_ready_to_bill_count(), '🏁', 'milestones ready to bill', 'reached and confirmed — put them on an invoice', '/billable-events#due', 'warn', 'money');
 
     //  ---- INTERVIEWS I AM SITTING ON (UAT A9, 2026-10-18) -------------------
     //

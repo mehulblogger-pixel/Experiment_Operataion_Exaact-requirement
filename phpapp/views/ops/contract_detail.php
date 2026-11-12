@@ -239,6 +239,21 @@
 </div>
 <?php endif; ?>
 
+<?php // Billing by milestones (owner, 12 Nov 2026): the won quotation's schedule,
+      // marked reached by the coordinator or a manager, then billed by Finance.
+      if (function_exists('ms_rows_contract')):
+        ms_contract_ensure($c);
+        $cMs = ops_one("SELECT * FROM partner_contracts WHERE id=?", [(int)$c['id']]) ?: $c;
+        $msMode = 'contract'; $msBase = ms_contract_base($cMs);
+        $msRows = ms_with_amounts(ms_rows_contract((int)$c['id']), $msBase);
+        $msRet = (float)($cMs['ms_retention_pct'] ?? 0);
+        $msCanEdit = ms_can_edit_contract(); $msCanMark = ms_can_mark($cMs); $msOpen = ms_contract_open($cMs);
+        $msAmend = $msOpen; $msPendingAmend = function_exists('contract_pending_amendment') && (bool)contract_pending_amendment((int)$c['id']);
+        $msAction = '/contract-milestones'; $msHidden = ['contract_id' => (int)$c['id']];
+        $msShowMoney = !empty($canSeeMoney); $msRetSummary = $msRet > 0 ? ms_contract_retention($cMs) : null;
+        if ($msRows || $msCanEdit) include __DIR__ . '/_milestones.php';
+      endif; ?>
+
 <?php // ---- Source quotation ---------------------------------------------- ?>
 <?php if ($quote): ?>
 <div class="panel"><h3 class="tab-sub" style="margin-top:0">Quotation</h3>

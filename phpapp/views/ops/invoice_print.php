@@ -141,8 +141,22 @@
       <tr><td colspan="7" class="r">Less: TDS @ <?= e(rtrim(rtrim(number_format((float)$inv['tds_pct'],2),'0'),'.')) ?>% (on taxable value)</td><td class="r">− <?= $m($inv['tds_amount']) ?></td></tr>
       <tr class="tot"><td colspan="7" class="r">Net payable</td><td class="r"><?= $m(function_exists('books_net_payable') ? books_net_payable($inv) : ((float)$inv['total'] - (float)$inv['tds_amount'])) ?></td></tr>
     <?php endif; ?>
+    <?php // Retention on a milestone bill (owner, 12 Nov 2026): part of the value, payable later.
+      $msRet = function_exists('ms_invoice_retention') ? (ms_invoice_retention([(int)$inv['id']])[(int)$inv['id']] ?? null) : null;
+      if ($msRet && $msRet['amount'] > 0):
+        $netNow = (function_exists('books_net_payable') ? books_net_payable($inv) : (float)$inv['total']) - $msRet['amount']; ?>
+      <?php if ($msRet['due_on'] === ''): ?>
+        <tr><td colspan="7" class="r">Less: retention <?= e(rtrim(rtrim(number_format((float)$msRet['pct'],2),'0'),'.')) ?>% — payable when “<?= e($msRet['release']) ?>” is reached</td><td class="r">− <?= $m($msRet['amount']) ?></td></tr>
+        <tr class="tot"><td colspan="7" class="r">Payable now</td><td class="r"><?= $m($netNow) ?></td></tr>
+      <?php else: ?>
+        <tr><td colspan="7" class="r">Includes retention <?= e(rtrim(rtrim(number_format((float)$msRet['pct'],2),'0'),'.')) ?>% (<?= $m($msRet['amount']) ?>) — payable now: “<?= e($msRet['release']) ?>” reached <?= e(fdate($msRet['due_on'])) ?></td><td class="r"></td></tr>
+      <?php endif; ?>
+    <?php endif; ?>
   </tfoot>
 </table>
+<?php if (!empty($msRet) && $msRet['amount'] > 0): ?>
+  <p class="words muted" style="font-size:11px">Retention is a deferred payment, not a reduction of the invoice value: GST is charged on the full value above.</p>
+<?php endif; ?>
 <?php if ((float)($inv['tds_amount'] ?? 0) > 0): ?>
   <p class="words muted" style="font-size:11px">TDS is deducted by the customer on the taxable value (excl. GST) and deposited against the supplier's PAN; it is not a reduction of the invoice value.</p>
 <?php endif; ?>

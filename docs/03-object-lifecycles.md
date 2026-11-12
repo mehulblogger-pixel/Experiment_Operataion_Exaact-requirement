@@ -550,7 +550,8 @@ stateDiagram-v2
 - **Billing units (owner's universal man-day / man-month billing rule, 31 Oct 2026;
   `lib/billunits.php`).** A unit is a billable event with a unique `unit_key`
   (`MD|job|inspector|date` one man-day, `MM|job|YYYY-MM` one man-month period,
-  `MS|…` a document milestone, `AD|…` an adjustment); `source_module='unit'`,
+  `MS|…` a document milestone, `MSC|contract|milestone` a reached billing milestone,
+  `AD|…` an adjustment); `source_module='unit'`,
   `source_kind` = MANDAY / MANMONTH / MILESTONE / ADJUSTMENT. An invoice line carries
   `billable_event_id`, and a unit may sit on **only one invoice that is not
   cancelled** — the "billed exactly once" guarantee. `due_on` records when the
@@ -636,6 +637,44 @@ stateDiagram-v2
   (`connect_bridge.php`), and the billing units above.
 
 ---
+
+## Billing milestone (`billing_milestones.status`) — owner, 12 Nov 2026
+
+Billing a project in stages (test book Profile F — construction / EPC). The owner approved the
+proposal of 12 Nov 2026 as written: the schedule is set on the **quotation** and carried to the
+**contract** when it is won; each milestone is **Planned → Reached**; the contract's coordinator or
+a manager marks it reached; Finance bills it; optional **retention** is held from each bill and
+payable at a chosen milestone (`lib/milestones.php`).
+
+`MS_STATUS`: **PLANNED → ACHIEVED** ("Reached"). Billed / on an invoice is **not a status of the
+milestone** — it is read from its billing unit (the ledger above), so it can never disagree with
+the invoices.
+
+```mermaid
+stateDiagram-v2
+  [*] --> PLANNED : schedule saved on the quotation (shares add up to 100%), copied to the contract once (ms_contract_ensure)
+  PLANNED --> ACHIEVED : contract-milestones act=reach · ops.job.close / master, own branch · contract OPEN · date not in the future · note of what proves it (proof file optional)
+  ACHIEVED --> PLANNED : act=undo · same right · a reason · only while its unit is on no invoice (and, for the release milestone, no retention collected)
+  PLANNED --> [*] : replaced — by a direct save on a contract not yet open, or an approved amendment on an open one
+```
+
+- **Reached → one billing unit**, key `MSC|<contract>|<milestone>`, `source_kind` MILESTONE,
+  amount = its share of the price **before GST** (the quotation's subtotal, or the contract's
+  "price before GST"), **due the day it was reached**. From there it is an ordinary unit: billed
+  once, only through an issued invoice, returned to "to be billed" if that invoice is cancelled.
+  An undo clears the unit's due date (the unit stays — its key is unique) so it cannot be billed.
+  Reaching it twice is impossible: only a PLANNED row becomes reached (one conditional update).
+- **Retention** (optional % on the schedule, with exactly one milestone marked "releases
+  retention"). Each milestone bill carries its **full value and GST**; the retained share
+  (the % of the milestone value before GST) is shown on the invoice as "payable when … is reached"
+  with "Payable now". Receivables neither ages nor chases it until the release milestone is
+  reached; then it is due. *GST treatment — retention as part of the value of supply — is the
+  usual Indian practice; the owner is asked to confirm it with the company's CA.*
+- **Changing the schedule**: on a quotation, while it may be edited, and the change cancels an
+  approval (it is in the commercial fingerprint); a revision carries the schedule. On a contract
+  not yet open, a direct save (a manager's endorsement already given is withdrawn, as for billing
+  terms). On an **open** contract, only as an **amendment** (two signatures, D-25); reached
+  milestones never change. No status or transition is added to the contract or the amendment.
 
 ## Connect Requirement (`cx_requirements.status`) — marketplace (K2a)
 

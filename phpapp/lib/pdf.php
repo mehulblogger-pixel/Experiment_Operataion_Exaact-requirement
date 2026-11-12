@@ -398,6 +398,14 @@ function quote_pdf_build($q, $lines, $tpl, $sig = [], $lh = []) {
     $p->gap(2);
     $p->line('Amount in words: ' . amount_in_words_inr((float)$q['total_amount']), 9, false, 14, [70, 70, 70]);
     $p->gap(6);
+    // ---- billing by milestones (owner, 12 Nov 2026) ----
+    $msLines = function_exists('ms_pdf_lines') ? ms_pdf_lines($q) : [];
+    if ($msLines) {
+        $p->hr();
+        $p->line('Payment milestones', 10, true, 15);
+        foreach ($msLines as $t) foreach ($p->wrap($t, 9, $p->contentW()) as $wl) $p->line($wl, 9, false, 12, [70, 70, 70]);
+        $p->gap(6);
+    }
     // ---- terms ----
     $p->hr();
     $p->line('Terms & Conditions', 10, true, 15);

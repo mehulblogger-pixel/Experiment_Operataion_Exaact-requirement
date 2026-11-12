@@ -103,3 +103,11 @@ inspection pack is switched on), or **+ Raise a nonconformity** on a job's
 decide the disposition, open the corrective action or close it; those stay with
 the Quality Head, the Technical Head and administrators. See
 `docs/02-permission-matrix.md` footnote 20.
+
+### Billing milestones (owner, 12 Nov 2026)
+
+On a contract billed by milestones (Contract → "Billing by milestones"), the coordinator — or a
+Branch / Operation Manager — presses **"✓ Mark reached"** when a stage is done. They give the date
+(never in the future), what proves it, and optionally a proof file. That makes the milestone ready to bill for Finance. A mistaken mark can be undone, with a reason, until it is on an
+invoice. Same right as closing a job (`ops.job.close`), within their own branch. See
+`docs/03-object-lifecycles.md`, "Billing milestone".

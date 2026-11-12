@@ -67,3 +67,12 @@ see who it is paying. Finance does not edit vendors. See
 On the owner's answer (Q-K), Finance also opens **Directory → Client register**,
 read only, to look up the customer it is invoicing or chasing. Finance does not
 add or edit clients.
+
+### Billing milestones (owner, 12 Nov 2026)
+
+A reached milestone appears under **Money → Billable events → Due to bill**, and as
+"milestones ready to bill" on My Work. Tick it and raise the invoice as for any due unit. The
+invoice carries the full milestone value and its GST. With retention, it shows "Less: retention …
+payable when … is reached" and "Payable now". Receivables does not age or chase the retention
+until that milestone is reached. Finance does not mark milestones reached. Finance may change an
+open contract's schedule only by amendment (two signatures).
