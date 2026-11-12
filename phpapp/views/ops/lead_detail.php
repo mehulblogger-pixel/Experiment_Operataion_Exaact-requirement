@@ -165,11 +165,32 @@
   <?php endif; ?>
 </div>
 
-<?php // ---- Log a contact — the main daily action --------------------------- ?>
-<?php if ($canEdit && $open): ?>
-<div class="panel" data-tab="Contacts" style="margin-top:16px" id="log">
-  <h3 style="margin-top:0">Log a contact</h3>
-  <p class="muted" style="margin:0 0 12px">Every call, message or meeting — so the story is never lost and the follow-up is never forgotten.</p>
+<?php // ---- Contacts — every contact logged, and logging the next one ----------
+      // Owner, 12 Nov 2026: "Log contact shall log every contact made in the lead
+      // history with its details as a list." The list is here, newest first, with
+      // everything typed each time; "＋ Log a contact" opens the form above it.
+      $contacts = $contacts ?? [];
+      $canLog = $canEdit && $open; ?>
+<style>
+  .ct-list{list-style:none;margin:0;padding:0}
+  .ct{border:1px solid var(--line,#d5dde3);border-radius:10px;padding:10px 12px;margin:0 0 8px;background:var(--panel,#fff)}
+  .ct-top{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:baseline}
+  .ct-ic{font-size:16px}
+  .ct-said{margin:6px 0 0;white-space:pre-wrap}
+  .ct-meta{margin:6px 0 0;font-size:12.5px;color:var(--muted,#5b6b6a);display:flex;flex-wrap:wrap;gap:4px 14px}
+  .ct-log>summary{list-style:none;display:inline-block;cursor:pointer}
+  .ct-log>summary::-webkit-details-marker{display:none}
+  .ct-log[open]>summary{margin-bottom:10px}
+</style>
+<div class="panel" data-tab="Contacts" style="margin-top:16px" id="contacts">
+  <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap">
+    <h3 style="margin:0">Contacts <span class="muted" style="font-weight:400;font-size:13px">(<?= count($contacts) ?>)</span></h3>
+  </div>
+  <p class="muted" style="margin:4px 0 12px">Every call, message or meeting with them, newest first — so the story is never lost and the follow-up is never forgotten.</p>
+
+  <?php if ($canLog): ?>
+  <details class="ct-log" id="log"<?= $contacts ? '' : ' open' ?>>
+    <summary class="btn small">＋ Log a contact</summary>
   <form method="post" action="/lead-contact">
     <input type="hidden" name="id" value="<?= (int)$l['id'] ?>">
     <div class="form-grid">
@@ -222,8 +243,38 @@
     </div>
     <div class="form-actions"><button class="btn" type="submit">Save this contact</button></div>
   </form>
+  </details>
+  <?php endif; ?>
+
+  <?php if ($contacts): ?>
+  <ul class="ct-list" style="margin-top:12px">
+    <?php foreach ($contacts as $a):
+      $kind = (string)$a['kind']; $mins = function_exists('lead_minutes_words') ? lead_minutes_words($a['duration_mins'] ?? 0) : ''; ?>
+    <li class="ct">
+      <div class="ct-top">
+        <span class="ct-ic" aria-hidden="true"><?= LEAD_CONTACT_ICONS[$kind] ?? '•' ?></span>
+        <b><?= e(LEAD_CONTACT_METHODS[$kind] ?? (ACT_KINDS[$kind] ?? $kind)) ?></b>
+        <?php if (($a['direction'] ?? '') !== ''): ?><span class="muted" style="font-size:12.5px"><?= $a['direction'] === 'IN' ? '⭠ they contacted us' : '⭢ we contacted them' ?></span><?php endif; ?>
+        <?php if (trim((string)($a['with_whom'] ?? '')) !== ''): ?><span>with <b><?= e($a['with_whom']) ?></b></span><?php endif; ?>
+        <?php if (trim((string)($a['outcome'] ?? '')) !== ''): ?><span class="pill p-warn" style="font-size:11px"><?= e($a['outcome']) ?></span><?php endif; ?>
+        <span class="muted" style="font-size:12.5px;margin-left:auto"><?= e(fdate(substr((string)$a['occurred_at'], 0, 10))) ?> · <?= e($a['owner'] ?: '—') ?></span>
+      </div>
+      <?php if (trim((string)($a['body'] ?? '')) !== ''): ?><div class="ct-said"><?= e($a['body']) ?></div><?php endif; ?>
+      <?php if ($mins !== '' || trim((string)($a['next_step'] ?? '')) !== '' || trim((string)($a['next_step_on'] ?? '')) !== ''): ?>
+      <div class="ct-meta">
+        <?php if ($mins !== ''): ?><span>⏱ <?= e($mins) ?></span><?php endif; ?>
+        <?php if (trim((string)($a['next_step'] ?? '')) !== '' || trim((string)($a['next_step_on'] ?? '')) !== ''): ?>
+          <span>➜ Next: <?= e(trim((string)($a['next_step'] ?? '')) ?: 'follow up') ?><?= trim((string)($a['next_step_on'] ?? '')) !== '' ? ' — by ' . e(fdate($a['next_step_on'])) : '' ?></span>
+        <?php endif; ?>
+      </div>
+      <?php endif; ?>
+    </li>
+    <?php endforeach; ?>
+  </ul>
+  <?php elseif (!$canLog): ?>
+    <p class="muted" style="margin:0">No contact has been logged on this lead.</p>
+  <?php endif; ?>
 </div>
-<?php endif; ?>
 
 <?php // ---- Quotations, straight off the lead ------------------------------ ?>
 <?php if (!empty($canQuote) || $quotes): ?>
@@ -461,7 +512,11 @@
                 <?php if (!empty($a['direction'])): ?><span class="muted" style="font-size:11px"><?= $a['direction']==='IN'?'⭠ in':'⭢ out' ?></span><?php endif; ?>
                 <?= e($a['subject']) ?>
                 <?php if (!empty($a['outcome'])): ?> <span class="pill p-warn" style="font-size:11px"><?= e($a['outcome']) ?></span><?php endif; ?></td>
-            <td class="muted" style="font-size:12.5px;max-width:340px"><?= nl2br(e((string)($a['body'] ?? ''))) ?></td>
+            <td class="muted" style="font-size:12.5px;max-width:340px"><?= nl2br(e((string)($a['body'] ?? ''))) ?>
+              <?php $hm = function_exists('lead_minutes_words') ? lead_minutes_words($a['duration_mins'] ?? 0) : ''; $hn = trim((string)($a['next_step'] ?? '')); $ho = trim((string)($a['next_step_on'] ?? ''));
+                if ($hm !== '' || $hn !== '' || $ho !== ''): ?>
+                <div style="margin-top:3px"><?= $hm !== '' ? '⏱ ' . e($hm) : '' ?><?= ($hm !== '' && ($hn !== '' || $ho !== '')) ? ' · ' : '' ?><?= ($hn !== '' || $ho !== '') ? '➜ Next: ' . e($hn ?: 'follow up') . ($ho !== '' ? ' — by ' . e(fdate($ho)) : '') : '' ?></div>
+              <?php endif; ?></td>
             <td style="white-space:nowrap"><?= e($a['owner'] ?: '—') ?></td></tr>
       <?php endforeach; ?>
       </tbody>

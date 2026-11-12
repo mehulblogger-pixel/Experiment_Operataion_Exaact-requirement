@@ -219,7 +219,8 @@ C('SAL-019', 'Leads', 'Lead documents: attach, list, remove', 'scenario', ['best
 C('SAL-020', 'Leads', 'Log a contact and the next step', 'scenario', ['best'],
   'MARKETING_EXECUTIVE', 'Follow-up discipline is what wins business; the next step appears on the dashboard.',
   'An open lead.',
-  [('Contacts tab → "Log a contact": How = Telephone call, Which way = We contacted them, When = today, Who you spoke to "Ravi", What was said "Wants revised rate", How it went "Positive", Time it took = 15 minutes, Next thing to do "Send revised rate", By when = tomorrow → "Save this contact".', 'The contact appears in history; the lead shows Next: Send revised rate by tomorrow.'),
+  [('Contacts tab → "＋ Log a contact": How = Telephone call, Which way = We contacted them, When = today, Who you spoke to "Ravi", What was said "Wants revised rate", How it went "Positive", Time it took = 15 minutes, Next thing to do "Send revised rate", By when = tomorrow → "Save this contact".', 'You land back on the Contacts tab. The list shows it at the top: 📞 Telephone call · we contacted them · with Ravi · "Positive" · today · you; "Wants revised rate"; ⏱ 15 minutes · ➜ Next: Send revised rate — by tomorrow. The lead shows Next: Send revised rate by tomorrow (owner, 12 Nov 2026: every contact as a list, with its details).'),
+   ('Log a second contact (an e-mail, they contacted us, no next step).', 'It appears above the first; each keeps its own details. History → "What\'s happened" lists both, with the time taken and the next step.'),
    ('Set By when to yesterday.', 'The lead shows as overdue on the Leads board and in "Your next actions" on the Sales home.')],
   'lead-contact')
 

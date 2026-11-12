@@ -30,4 +30,8 @@ flowchart TD
   before GST, optional retention). The schedule prints on the quotation PDF, and changing it
   cancels an approval. The contract takes it when the quotation is won. Same permissions as
   editing the quotation.
+- **Contacts on a lead** (owner, 12 Nov 2026): the lead's **Contacts** tab lists every call, message,
+  meeting, visit and note logged, newest first — how, which way, who, what was said, how it went, the
+  time it took and the next step agreed on that contact. **＋ Log a contact** opens the form above the
+  list; saving returns to it. Same permissions as before.
 - Most common task = create & send a quote (a few clicks through the quote form).

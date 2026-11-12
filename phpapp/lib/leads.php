@@ -158,6 +158,14 @@ function leads_migrate() {
         ensure_column('leads', 'manpower_count',  "INT DEFAULT 0");
         ensure_column('leads', 'manpower_skills', "TEXT");                     // skills / qualifications sought
         ensure_column('leads', 'site_location',   "VARCHAR(300) DEFAULT ''");  // required for a man-month deputation
+        // The next step agreed ON EACH CONTACT, kept with that contact (owner, 12 Nov
+        // 2026: "log every contact made … with its details as a list"). The lead's own
+        // next_action still holds only the latest one, which drives the follow-up list.
+        if (function_exists('act_migrate')) {
+            act_migrate();
+            ensure_column('activities', 'next_step', "VARCHAR(255) DEFAULT ''");
+            ensure_column('activities', 'next_step_on', "VARCHAR(10) DEFAULT ''");
+        }
     }
     // Owner, 20 Oct 2026: reassigning a lead needs a manager's approval. One row
     // per request: PENDING → APPROVED | REJECTED | CANCELLED (docs/03).
@@ -701,6 +709,14 @@ function lead_log_contact($leadId, array $b = []) {
     // drives the "what needs chasing" list — this is the bit people forget.
     $nextAction = trim((string)($b['next_action'] ?? ''));
     $nextOn     = trim((string)($b['next_action_on'] ?? ''));
+    // …and on the contact itself, so the list of contacts shows what was agreed each time.
+    if ($nextAction !== '' || $nextOn !== '') {
+        try {
+            $aid = (int)ops_val("SELECT MAX(id) FROM activities WHERE entity_kind='LEAD' AND entity_id=? AND auto=0", [(int)$l['id']]);
+            if ($aid) db()->prepare("UPDATE activities SET next_step=?, next_step_on=? WHERE id=?")
+                          ->execute([mb_substr($nextAction, 0, 255), substr($nextOn, 0, 10), $aid]);
+        } catch (Throwable $e) { /* the column arrives with the next migrate */ }
+    }
     $sets = []; $args = [];
     if ($nextAction !== '' || $nextOn !== '') {
         $sets[] = 'next_action=?';    $args[] = substr($nextAction, 0, 255);
@@ -715,6 +731,26 @@ function lead_log_contact($leadId, array $b = []) {
         db()->prepare("UPDATE leads SET " . implode(',', $sets) . ", updated_at=? WHERE id=?")->execute($args);
     }
     return ['ok' => true];
+}
+
+// Every contact logged on a lead — calls, messages, meetings, visits, notes —
+// newest first, with what was agreed each time. The system's own entries
+// (created, moved, won) are History's, not Contacts'.
+function lead_contacts($leadId) {
+    if (!function_exists('act_migrate')) return [];
+    $kinds = "'" . implode("','", array_keys(LEAD_CONTACT_METHODS)) . "'";
+    try {
+        return ops_all("SELECT * FROM activities WHERE entity_kind='LEAD' AND entity_id=? AND auto=0 AND kind IN ($kinds)
+                        ORDER BY occurred_at DESC, id DESC LIMIT 300", [(int)$leadId]) ?: [];
+    } catch (Throwable $e) { return []; }
+}
+const LEAD_CONTACT_ICONS = ['CALL' => '📞', 'WHATSAPP' => '💬', 'EMAIL' => '✉️', 'MEETING' => '🤝', 'VISIT' => '📍', 'NOTE' => '📝'];
+// "15 minutes", "1 hour 30 minutes", "Half a day" — how long a contact took.
+function lead_minutes_words($m) {
+    $m = (int)$m; if ($m <= 0) return '';
+    if ($m === 240) return 'Half a day'; if ($m === 480) return 'A full day';
+    $h = intdiv($m, 60); $r = $m % 60;
+    return trim(($h ? $h . ' hour' . ($h > 1 ? 's' : '') : '') . ($r ? ' ' . $r . ' minutes' : ''));
 }
 
 // Quotations raised from this lead. Tolerant on purpose: a Sales-off install
@@ -1399,6 +1435,7 @@ function ops_leads($route, $method) {
             'l' => $l, 'score' => lead_score($l), 'history' => lead_history((int)$l['id']),
             'stages' => pipeline_stages((int)$l['pipeline_id']),
             'timeline' => function_exists('act_for_entity') ? act_for_entity('LEAD', (int)$l['id'], 50) : [],
+            'contacts' => lead_contacts((int)$l['id']),
             'lostReasons' => function_exists('lk_options_or') ? lk_options_or('quote_lost_reason', QUOTE_LOST_REASONS) : [],
             // Quotations raised straight off this lead. Newest first, so the
             // current offer is at the top.
@@ -1600,7 +1637,7 @@ function ops_leads($route, $method) {
         if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/lead?id=' . $id); }
         flash('Logged. ' . (trim((string)($_POST['next_action'] ?? '')) !== ''
             ? 'The next step is on the lead.' : 'Add the next step whenever you know it.'));
-        redirect('/lead?id=' . $id . '#timeline');
+        redirect('/lead?id=' . $id . '#lead=contacts');
     }
 
     // Deleting a lead. There was no way to do this at all, which is why the

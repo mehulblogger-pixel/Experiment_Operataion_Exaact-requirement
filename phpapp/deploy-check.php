@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '319f4b3 · 2026-11-12 11:36 UTC · 713 files';
+$RELEASE = '406bd4e · 2026-11-12 13:18 UTC · 713 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -151,7 +151,7 @@ $EXPECT  = [
     'lib/install_mode.php' => ['s'=>4935,'h'=>'0c1d5ab96ff54b68'],
     'lib/invready.php' => ['s'=>6922,'h'=>'0f7637be388be1fc'],
     'lib/joblock.php' => ['s'=>13155,'h'=>'47c05d15e9e8e13b'],
-    'lib/leads.php' => ['s'=>98635,'h'=>'87a4dc6e4af562c0'],
+    'lib/leads.php' => ['s'=>100958,'h'=>'ee84e7d40ad4f71c'],
     'lib/licence.php' => ['s'=>31138,'h'=>'ae1f563479d4009c'],
     'lib/licenceissue.php' => ['s'=>33775,'h'=>'8c3a66cc85deaae8'],
     'lib/licencekey.php' => ['s'=>29869,'h'=>'db9ba00546be996a'],
@@ -527,7 +527,7 @@ $EXPECT  = [
     'views/ops/job_form.php' => ['s'=>58267,'h'=>'fc27fcee363d06e0'],
     'views/ops/jobs.php' => ['s'=>7058,'h'=>'54c963c415ee7600'],
     'views/ops/lead_convert.php' => ['s'=>3111,'h'=>'7796f2979e388479'],
-    'views/ops/lead_detail.php' => ['s'=>35426,'h'=>'e7c1dfdb5e6d1141'],
+    'views/ops/lead_detail.php' => ['s'=>39384,'h'=>'e895d18db0689c29'],
     'views/ops/lead_form.php' => ['s'=>13316,'h'=>'4b62e8d6ec3009bd'],
     'views/ops/leads.php' => ['s'=>11917,'h'=>'7dd85c5ab41b6448'],
     'views/ops/ledger.php' => ['s'=>4304,'h'=>'414f7ffeb7052c79'],
