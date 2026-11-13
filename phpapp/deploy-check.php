@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '0669e33 · 2026-11-12 17:15 UTC · 713 files';
+$RELEASE = '529e049 · 2026-11-13 04:05 UTC · 713 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -194,7 +194,7 @@ $EXPECT  = [
     'lib/position.php' => ['s'=>19441,'h'=>'a0a9d1a9e6a9b10c'],
     'lib/preflight.php' => ['s'=>5451,'h'=>'97e742bbddf7fbd8'],
     'lib/pricing_admin.php' => ['s'=>16307,'h'=>'d7af986c89fc5cfc'],
-    'lib/projcosting.php' => ['s'=>83843,'h'=>'7747c8e5aa1ccce2'],
+    'lib/projcosting.php' => ['s'=>90768,'h'=>'0bc7a11edeb07c4b'],
     'lib/pwreset.php' => ['s'=>9509,'h'=>'50675e1d291df7b0'],
     'lib/qr.php' => ['s'=>17936,'h'=>'4d50b69b53bfa5e2'],
     'lib/qualitycase.php' => ['s'=>6179,'h'=>'280289c99f157cd7'],
@@ -581,7 +581,7 @@ $EXPECT  = [
     'views/ops/product_package.php' => ['s'=>4732,'h'=>'a87a7a169d94fe14'],
     'views/ops/profitability_detail.php' => ['s'=>10185,'h'=>'f49f71530b916b7e'],
     'views/ops/profitability_list.php' => ['s'=>9655,'h'=>'8fed2c9925d511dc'],
-    'views/ops/project_costing.php' => ['s'=>50772,'h'=>'95b5467b9e398874'],
+    'views/ops/project_costing.php' => ['s'=>60715,'h'=>'5413b71e7a4cd35e'],
     'views/ops/project_costing_print.php' => ['s'=>8615,'h'=>'2e727aa195a39a28'],
     'views/ops/project_costings.php' => ['s'=>7268,'h'=>'d7beebe3f25879f4'],
     'views/ops/raise_call.php' => ['s'=>4805,'h'=>'0f81d9189bc08419'],

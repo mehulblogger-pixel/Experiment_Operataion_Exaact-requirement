@@ -267,6 +267,16 @@ stateDiagram-v2
   who drafted it and carries the costing's enquiry, lead and business unit.
 - Reopening an APPROVED costing clears who approved it and when, and writes a line in its quotation's
   history; that quotation cannot move forward again until the costing is approved again.
+- **A salary break-up from the CTC, and one save for the page (owner, 13 Nov 2026).** On a role,
+  "Quick start — from the CTC" builds the cost heads from one figure — what a person costs the company
+  a month — using the company's own salary components (Recruitment → Compensation setup: Basic as a %
+  of CTC, what follows Basic, the balancing component), solved by the same engine as the offer letter
+  (`comp_solve_from_ctc` → `pc_heads_from_ctc`). Earnings become salary heads and employer contributions
+  statutory heads; employee deductions are not a company cost and are left out. The heads add up to the
+  CTC exactly and stay editable; the margin typed beside it sets the rate as before. No percentage is
+  defined in the costing itself. **Either button on the page saves both boxes** — "Save settings" also
+  saves a role being typed, "Add / Save role" also saves changed settings (`pc_settings_save`,
+  `pc_role_save`); a role that cannot be saved is kept on the page. Nothing here changes a status.
 - **Flexible cost heads (owner, 9 Nov 2026):** a role's cost build-up is a list of heads
   (`project_costing_lines.spec`, worked out by `lib/costing_heads.php`) — each an amount (the box is a
   calculator), a % of other heads (with an optional "counted up to" cap on the base and an optional

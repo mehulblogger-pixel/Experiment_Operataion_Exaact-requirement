@@ -399,9 +399,23 @@ C('SAL-050', 'Project costing', 'Build a costing for a 12-month site deputation 
    ('Same from a lead: open an open lead → Quotes tab → "+ Project costing" → Create costing.', 'The costing says "For: lead <its reference> — <company>".'),
    ('"＋ Add a role": Role "QA/QC Engineer", Personnel / salary 60,000, Statutory 9,000, Transport / travel 4,000, Accommodation / rentals 8,000, Food / meal allowance 3,000, PPE / safety kit 500, Units (BOQ) 12, Target margin (%) 20 → "Add role".', 'The role row shows Direct/mo = ₹84,500, a Loaded/mo, a Rate/lump, Units 12, Revenue, Profit and Margin ≈ 20%.'),
    ('Add a second role "Welding Inspector" with Personnel 45,000, Units 12, Target margin 15.', 'Both roles listed; totals add up.'),
-   ('"Loadings, basis & details": Overhead % 8, Insurance % 1, Bad debt % 1, Contingency % 2, Negotiation % 3 → "Save settings".', 'Rates rise with the loadings; Negotiation % lifts the proposed rate only.'),
+   ('"Loadings, basis & details": Overhead % 8, Insurance % 1, Bad debt % 1, Contingency % 2, Negotiation % 3 → "Save settings".', '"Settings saved." Rates rise with the loadings; Negotiation % lifts the proposed rate only.'),
    ('Press "🖨 Print / PDF".', 'A printable sheet opens with every role and head.')],
   'owner 20 Oct 2026; pc_link_source(); pc_line_calc')
+
+C('SAL-059', 'Project costing', 'Quick start from the CTC, and no Save button loses what you typed', 'scenario', ['best', 'rule', 'edge'],
+  'BUSINESS_DEV_MANAGER', 'Owner, 13 Nov 2026: "It said costing is saved but then it shows zero"; "we must enter CTC, margin shall be entered and salary structure shall be generated accordingly"; the heads screen "bleeds and is weird, confusing".',
+  'Signed in as Test BDM. A Draft costing with no roles yet (as SAL-050 up to "Create costing").',
+  [('"＋ Add a role" → "Quick start — from the CTC": CTC per person, a month 45000, Margin you want 22 → "Build the salary break-up".', 'A green line: "✓ Built from a CTC of ₹45,000 a month with your salary components — Basic is 40% of the CTC…". Heads appear (Basic, HRA, Special allowance, Provident Fund (employer), Gratuity …) with their amounts; the totals strip shows Direct cost ₹45,000 exactly and a Rate; "Target margin (%)" below reads 22.'),
+   ('Leave the CTC empty and press "Build the salary break-up".', 'A red line asks for the CTC first; nothing changes.'),
+   ('On a "% of other heads" row (e.g. HRA) press the box after "% of".', 'A small pop-over opens over the page — "A % of these heads", two columns, with "Done". It does not push or cover the row\'s other boxes. Ticking a head changes the box\'s text at once; "Done", Esc or a click elsewhere closes it.'),
+   ('On that row open "＋ Limits, minimum / maximum, remark".', '"Counted up to", "Applies only up to", "Minimum", "Maximum" and "Remark" each have a label and their own box.'),
+   ('Type Role "Shift Engineer", Man-months (BOQ) 12. Do NOT press "Add role" — scroll down and press "Save settings".', 'Message "Saved — the settings and the role "Shift Engineer"." Team roles shows 1 role; Project revenue, cost, profit and margin are no longer ₹0.'),
+   ('Change Overhead % to 8, build another role from a CTC of 30000 named "Helper", BOQ 6 → press "Add role" (not "Save settings").', 'Message "Role added — "Helper", and the settings saved." Overhead % still reads 8.'),
+   ('With the role box empty, press "Save settings".', '"Settings saved." (on a costing with no role at all it adds: "No role has been added yet, so the totals stay at zero — add one under "＋ Add a role"".)'),
+   ('Type heads but leave Role empty → "Save settings".', '"Settings saved. The role is not saved yet — Give the role a name." The heads you typed are still on the page.'),
+   ('Open the costing from its deal or quotation.', 'The same roles and totals — the costing is one record wherever it is opened from.')],
+  'pc_heads_from_ctc; comp_solve_from_ctc; pc_role_save; pc_settings_save', live=False)
 
 C('SAL-051', 'Project costing', 'A costing is approved through the same levels as a quotation — never by its author', 'scenario', ['rule'],
   'several', 'Owner, 20 Oct 2026: "approval level as of quotation shall be applicable." D-11 B: maker and checker are different people.',

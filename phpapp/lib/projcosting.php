@@ -878,6 +878,114 @@ function pc_line_from_post(array $p, array $h) {
     return [$line, array_values(array_unique($errs)), $ev];
 }
 
+// ---- Saving, in one place ---------------------------------------------------
+//  The costing page has two boxes — the role being built and the settings — and
+//  each had its own button that saved ONLY its own box, discarding whatever was
+//  typed in the other when the page reloaded (owner, 13 Nov 2026). Both buttons
+//  now send both boxes; these two functions are what either of them calls.
+function pc_settings_save(array $h, array $p) {
+    $id = (int)$h['id'];
+    db()->prepare("UPDATE project_costings SET title=?, client_id=?, office_id=?, site=?, basis=?, load_on=?,
+        overhead_pct=?, insurance_pct=?, baddebt_pct=?, contingency_pct=?, negotiation_pct=?,
+        inclusions=?, exclusions=?, notes=?, sbu=?, updated_at=? WHERE id=?")
+        ->execute([trim((string)($p['title'] ?? $h['title'])), (int)($p['client_id'] ?? 0) ?: null,
+            (int)($p['office_id'] ?? 0) ?: null, trim((string)($p['site'] ?? '')),
+            strtoupper((string)($p['basis'] ?? $h['basis'])),
+            strtoupper((string)($p['load_on'] ?? 'COST')) === 'RATE' ? 'RATE' : 'COST',
+            (float)($p['overhead_pct'] ?? 0), (float)($p['insurance_pct'] ?? 0),
+            (float)($p['baddebt_pct'] ?? 0), (float)($p['contingency_pct'] ?? 0),
+            (float)($p['negotiation_pct'] ?? 0),
+            trim((string)($p['inclusions'] ?? '')), trim((string)($p['exclusions'] ?? '')),
+            trim((string)($p['notes'] ?? '')), substr(trim((string)($p['sbu'] ?? ($h['sbu'] ?? ''))), 0, 20), date('c'), $id]);
+    pc_restamp($id);
+}
+// Did the page send a role worth saving — a name, or at least one head?
+function pc_post_has_role(array $p) {
+    if (!isset($p['items_json'])) return false;
+    $raw = json_decode((string)$p['items_json'], true);
+    return trim((string)($p['role_label'] ?? '')) !== '' || (is_array($raw) && count($raw) > 0);
+}
+// Save (add or update) the role in $p on costing $h. Returns
+// ['errs' => [...], 'line_id' => int, 'role' => name]. With errors nothing is
+// stored, and what was typed is kept for the page to show again.
+function pc_role_save(array $h, array $p) {
+    $cid = (int)$h['id']; $pdo = db();
+    $lineId = (int)($p['line_id'] ?? 0);
+    if ($lineId && !ops_one("SELECT id FROM project_costing_lines WHERE id=? AND costing_id=?", [$lineId, $cid])) $lineId = 0;
+    [$line, $errs] = pc_line_from_post($p, $h);
+    if ($errs) {
+        // Keep what was typed, so nothing has to be entered twice.
+        $_SESSION['pc_line_draft'][$cid] = ['line_id' => $lineId, 'post' => array_intersect_key($p,
+            array_flip(['group_label', 'role_label', 'headcount', 'boq_qty', 'target_margin', 'rate_manual', 'dpm', 'items_json']))];
+        return ['errs' => $errs, 'line_id' => $lineId, 'role' => $line['role_label']];
+    }
+    $c = pc_line_calc($line, $h);
+    $args = [$line['group_label'], $line['role_label'], json_encode($c['heads'], JSON_UNESCAPED_UNICODE), $line['boq_qty'],
+             $line['target_margin'], $line['rate_manual'], $c['oneoff'], $line['headcount'], $line['spec']];
+    if ($lineId) {
+        $pdo->prepare("UPDATE project_costing_lines SET group_label=?, role_label=?, heads=?, boq_qty=?, target_margin=?, rate_manual=?, oneoff=?, headcount=?, spec=? WHERE id=? AND costing_id=?")
+            ->execute(array_merge($args, [$lineId, $cid]));
+    } else {
+        $seq = (int)ops_val("SELECT COALESCE(MAX(seq),0)+1 FROM project_costing_lines WHERE costing_id=?", [$cid]);
+        $pdo->prepare("INSERT INTO project_costing_lines (costing_id,seq,group_label,role_label,heads,boq_qty,target_margin,rate_manual,oneoff,headcount,spec,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
+            ->execute(array_merge([$cid, $seq], $args, [date('c')]));
+        $lineId = (int)$pdo->lastInsertId();
+    }
+    unset($_SESSION['pc_line_draft'][$cid]);
+    pc_restamp($cid);
+    return ['errs' => [], 'line_id' => $lineId, 'role' => $line['role_label']];
+}
+
+// ---- A salary structure from a CTC -------------------------------------------
+//  Owner, 13 Nov 2026: "we must enter CTC, margin shall be entered and salary
+//  structure shall be generated accordingly." The structure is NOT invented
+//  here: it is the company's own salary components (Recruitment → Compensation
+//  setup — Basic as a % of CTC, what follows Basic, the balancing component),
+//  solved for the CTC by the same engine the offer letter uses
+//  (comp_solve_from_ctc). What the company pays in — the earnings and the
+//  employer's contributions — become the role's cost heads; what is deducted
+//  from the employee's pay is not a cost to the company and is left out.
+//  Returns ['items' => heads, 'ctc' => figure, 'note' => words] or ['err' => why].
+function pc_heads_from_ctc($ctc) {
+    if (!function_exists('comp_solve_from_ctc')) return ['err' => 'Salary components are not set up on this workspace.'];
+    $ctc = round((float)$ctc, 2);
+    $r = comp_solve_from_ctc($ctc);
+    if (!empty($r['err'])) return ['err' => (string)$r['err']];
+    $defs = array_values(array_filter(comp_defs(true), fn($d) => in_array($d['section'], ['EARNING', 'EMPLOYER'], true)));
+    $amt = []; foreach ($r['lines'] as $l) $amt[(string)$l['code']] = (float)$l['amount'];
+    // Short names the heads editor accepts, kept the company's own where they fit.
+    $code = []; $taken = [];
+    foreach ($defs as $d) {
+        $c = strtoupper((string)$d['code']);
+        if (!preg_match('/^[A-Z_][A-Z0-9_]{0,23}$/', $c) || in_array($c, CH_FUNCS, true) || in_array($c, $taken, true)) $c = ch_code_from((string)$d['name'], $taken);
+        $code[(string)$d['code']] = $c; $taken[] = $c;
+    }
+    $grossOf = [];   // what a "% of gross" is a % of: the earnings worked out before it
+    foreach ($defs as $d) if ($d['section'] === 'EARNING' && $d['calc'] !== 'PCT_GROSS' && ($amt[(string)$d['code']] ?? 0) > 0) $grossOf[] = $code[(string)$d['code']];
+    $linked = []; $flat = [];
+    foreach ($defs as $d) {
+        $v = (float)($amt[(string)$d['code']] ?? 0);
+        if ($v <= 0) continue;                                   // a component at nothing is not a head
+        $base = ['code' => $code[(string)$d['code']], 'label' => (string)$d['name'], 'per' => 'MONTH',
+                 'grp' => $d['section'] === 'EARNING' ? 'PAY' : 'STAT'];
+        $flat[] = $base + ['type' => 'AMOUNT', 'amount' => $v, 'calc' => (string)$v];
+        if ($d['calc'] === 'PCT_BASIC' && isset($code['BASIC']) && ($amt['BASIC'] ?? 0) > 0)
+            $linked[] = $base + ['type' => 'PCT', 'pct' => (float)$d['rate'], 'of' => [$code['BASIC']]];
+        elseif ($d['calc'] === 'PCT_GROSS' && $grossOf)
+            $linked[] = $base + ['type' => 'PCT', 'pct' => (float)$d['rate'], 'of' => $grossOf];
+        else $linked[] = $base + ['type' => 'AMOUNT', 'amount' => $v, 'calc' => (string)$v];
+    }
+    if (!$flat) return ['err' => 'No salary component came to an amount for this CTC. Check Compensation setup.'];
+    // The heads keep their link to Basic (change Basic and HRA, PF follow) — but
+    // only if they add up to the CTC exactly; otherwise plain amounts, which do.
+    [$items] = ch_items_clean($linked);
+    $ev = ch_evaluate($items, 'MONTH');
+    if (!$ev['ok'] || abs((float)$ev['direct'] - $ctc) > 0.5) { [$items] = ch_items_clean($flat); }
+    return ['items' => $items, 'ctc' => $ctc,
+            'note' => 'Built from a CTC of ' . fmoney($ctc) . ' a month with your salary components — Basic is '
+                    . rtrim(rtrim(number_format(comp_basic_pct(), 2), '0'), '.') . '% of the CTC. Change any head; the totals follow.'];
+}
+
 // ---- Routing ---------------------------------------------------------------
 // M16 — ONE door for the module, the same shape as lead_scope_gate() in leads.php.
 // The routes name their costing as either `id` or `costing_id`; both are resolved
@@ -941,21 +1049,21 @@ function ops_projcosting($route, $method) {
         $id = (int)($_POST['id'] ?? 0); $h = pc_get($id);
         if (!$h) { flash('Costing not found.', 'error'); redirect('/project-costings'); }
         ops_require(pc_can_edit() && !pc_locked($h), 'This costing is locked.');
-        $pdo->prepare("UPDATE project_costings SET title=?, client_id=?, office_id=?, site=?, basis=?, load_on=?,
-            overhead_pct=?, insurance_pct=?, baddebt_pct=?, contingency_pct=?, negotiation_pct=?,
-            inclusions=?, exclusions=?, notes=?, sbu=?, updated_at=? WHERE id=?")
-            ->execute([trim((string)($_POST['title'] ?? $h['title'])), (int)($_POST['client_id'] ?? 0) ?: null,
-                (int)($_POST['office_id'] ?? 0) ?: null, trim((string)($_POST['site'] ?? '')),
-                strtoupper((string)($_POST['basis'] ?? $h['basis'])),
-                strtoupper((string)($_POST['load_on'] ?? 'COST')) === 'RATE' ? 'RATE' : 'COST',
-                (float)($_POST['overhead_pct'] ?? 0), (float)($_POST['insurance_pct'] ?? 0),
-                (float)($_POST['baddebt_pct'] ?? 0), (float)($_POST['contingency_pct'] ?? 0),
-                (float)($_POST['negotiation_pct'] ?? 0),
-                trim((string)($_POST['inclusions'] ?? '')), trim((string)($_POST['exclusions'] ?? '')),
-                trim((string)($_POST['notes'] ?? '')), substr(trim((string)($_POST['sbu'] ?? ($h['sbu'] ?? ''))), 0, 20), date('c'), $id]);
-        pc_restamp($id);
-        flash('Costing saved.');
-        redirect('/project-costing?id=' . $id);
+        pc_settings_save($h, $_POST);
+        //  Owner, 13 Nov 2026 — "It said costing is saved but then it shows zero …
+        //  Where the saved costing is gone." A role typed in the box above was
+        //  thrown away, because this button saved the settings only. The page now
+        //  sends the role along, and it is saved here too.
+        $msg = 'Settings saved.'; $level = 'success'; $to = '/project-costing?id=' . $id;
+        if (pc_post_has_role($_POST)) {
+            $r = pc_role_save(pc_get($id), $_POST);
+            if ($r['errs']) { $msg .= ' The role is not saved yet — ' . implode(' ', array_slice($r['errs'], 0, 4)); $level = 'error'; $to .= ($r['line_id'] ? '&edit=' . $r['line_id'] : '') . '#add-role'; }
+            else $msg = 'Saved — the settings and the role "' . $r['role'] . '".';
+        } elseif (!(int)ops_val("SELECT COUNT(*) FROM project_costing_lines WHERE costing_id=?", [$id])) {
+            $msg .= ' No role has been added yet, so the totals stay at zero — add one under "＋ Add a role".'; $level = 'warning';
+        }
+        flash($msg, $level);
+        redirect($to);
     }
 
     // ---- Costing heads: the library and the templates (Masters-level setup) ----
@@ -1009,6 +1117,15 @@ function ops_projcosting($route, $method) {
         return true;
     }
 
+    // ---- A salary structure from a CTC (nothing is saved) ----
+    if ($route === 'project-costing-ctc-heads' && $method === 'POST') {
+        header('Content-Type: application/json');
+        if (!pc_can_edit()) { echo json_encode(['ok' => false, 'err' => 'You cannot edit costings.']); return true; }
+        $r = pc_heads_from_ctc($_POST['ctc'] ?? 0);
+        echo json_encode(empty($r['err']) ? ['ok' => true] + $r : ['ok' => false, 'err' => $r['err']], JSON_UNESCAPED_UNICODE);
+        return true;
+    }
+
     // ---- Live figures while a role is being edited (nothing is saved) ----
     if ($route === 'project-costing-line-preview' && $method === 'POST') {
         $cid = (int)($_POST['costing_id'] ?? 0); $h = pc_get($cid);
@@ -1030,28 +1147,15 @@ function ops_projcosting($route, $method) {
         ops_require(pc_can_edit() && !pc_locked($h), 'This costing is locked.');
         $lineId = (int)($_POST['line_id'] ?? 0);
         if ($lineId && !ops_one("SELECT id FROM project_costing_lines WHERE id=? AND costing_id=?", [$lineId, $cid])) { flash('Role not found.', 'error'); redirect('/project-costing?id=' . $cid); }
-        [$line, $errs] = pc_line_from_post($_POST, $h);
-        if ($errs) {
-            // Keep what was typed, so nothing has to be entered twice.
-            $_SESSION['pc_line_draft'][$cid] = ['line_id' => $lineId, 'post' => array_intersect_key($_POST,
-                array_flip(['group_label', 'role_label', 'headcount', 'boq_qty', 'target_margin', 'rate_manual', 'dpm', 'items_json']))];
-            flash('Not saved yet — ' . implode(' ', array_slice($errs, 0, 4)), 'error');
+        // Settings changed in the box below travel with this button too (13 Nov 2026).
+        $withSettings = !empty($_POST['with_settings']);
+        if ($withSettings) { pc_settings_save($h, $_POST); $h = pc_get($cid); }
+        $r = pc_role_save($h, $_POST);
+        if ($r['errs']) {
+            flash(($withSettings ? 'Settings saved. ' : '') . 'The role is not saved yet — ' . implode(' ', array_slice($r['errs'], 0, 4)), 'error');
             redirect('/project-costing?id=' . $cid . ($lineId ? '&edit=' . $lineId : '') . '#add-role');
         }
-        $c = pc_line_calc($line, $h);
-        $args = [$line['group_label'], $line['role_label'], json_encode($c['heads'], JSON_UNESCAPED_UNICODE), $line['boq_qty'],
-                 $line['target_margin'], $line['rate_manual'], $c['oneoff'], $line['headcount'], $line['spec']];
-        if ($lineId) {
-            $pdo->prepare("UPDATE project_costing_lines SET group_label=?, role_label=?, heads=?, boq_qty=?, target_margin=?, rate_manual=?, oneoff=?, headcount=?, spec=? WHERE id=? AND costing_id=?")
-                ->execute(array_merge($args, [$lineId, $cid]));
-        } else {
-            $seq = (int)ops_val("SELECT COALESCE(MAX(seq),0)+1 FROM project_costing_lines WHERE costing_id=?", [$cid]);
-            $pdo->prepare("INSERT INTO project_costing_lines (costing_id,seq,group_label,role_label,heads,boq_qty,target_margin,rate_manual,oneoff,headcount,spec,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
-                ->execute(array_merge([$cid, $seq], $args, [date('c')]));
-        }
-        unset($_SESSION['pc_line_draft'][$cid]);
-        pc_restamp($cid);
-        flash($lineId ? 'Role updated.' : 'Role added.');
+        flash(($lineId ? 'Role updated' : 'Role added') . ' — "' . $r['role'] . '"' . ($withSettings ? ', and the settings saved.' : '.'));
         redirect('/project-costing?id=' . $cid);
     }
     if ($route === 'project-costing-line-save' && $method === 'POST') {

@@ -34,4 +34,8 @@ flowchart TD
   meeting, visit and note logged, newest first — how, which way, who, what was said, how it went, the
   time it took and the next step agreed on that contact. **＋ Log a contact** opens the form above the
   list; saving returns to it. Same permissions as before.
+- **Project costing — quick start from the CTC** (owner, 13 Nov 2026): on "＋ Add a role", type the
+  CTC per person a month and the margin wanted, press "Build the salary break-up": the heads (Basic,
+  HRA, PF …) come from the company's salary components and add up to the CTC; the rate follows the
+  margin. Any head can still be changed. Either Save on the page keeps both the role and the settings.
 - Most common task = create & send a quote (a few clicks through the quote form).

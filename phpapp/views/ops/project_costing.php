@@ -225,8 +225,9 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
 ?>
 <style>
   .che{margin-top:6px}
-  .che .ch-head{display:grid;grid-template-columns:28px minmax(150px,1.5fr) 120px 150px minmax(220px,2.4fr) 110px minmax(120px,1fr) 34px;gap:8px;align-items:start;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;padding:0 8px 4px}
-  .che .ch-row{display:grid;grid-template-columns:28px minmax(150px,1.5fr) 120px 150px minmax(220px,2.4fr) 110px minmax(120px,1fr) 34px;gap:8px;align-items:start;border:1px solid var(--line);border-radius:10px;padding:8px;margin-bottom:6px;background:var(--card)}
+  .che .ch-head{display:grid;grid-template-columns:28px minmax(130px,1.6fr) 100px 136px minmax(190px,2.6fr) 100px minmax(96px,1fr) 32px;gap:8px;align-items:start;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;padding:0 8px 4px}
+  .che .ch-row{display:grid;grid-template-columns:28px minmax(130px,1.6fr) 100px 136px minmax(190px,2.6fr) 100px minmax(96px,1fr) 32px;gap:8px;align-items:start;border:1px solid var(--line);border-radius:10px;padding:8px;margin-bottom:6px;background:var(--card)}
+  .che .ch-row > *{min-width:0}   /* every column may shrink — nothing pushes past the panel's edge */
   .che .ch-row.err{border-color:var(--red,#dc2626);background:#fef2f2}
   .che input,.che select{width:100%;box-sizing:border-box;padding:7px 8px;border:1px solid var(--field-line,#cbd5e1);border-radius:7px;font-size:13px;background:var(--card)}
   .che .mv{display:flex;flex-direction:column;gap:2px}
@@ -236,21 +237,40 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
   .che .val{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12.5px}
   .che .val > *{flex:1 1 70px}
   .che .val .w{flex:0 0 auto;color:var(--muted)}
-  .che .ofd{flex:1 1 calc(100% - 120px);font-size:12.5px;min-width:0}
-  .che .ofd summary{cursor:pointer;padding:7px 8px;border:1px solid var(--field-line,#cbd5e1);border-radius:7px;background:var(--card);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;list-style:none}
-  .che .ofd[open] summary{border-bottom-left-radius:0;border-bottom-right-radius:0}
-  .che .ofd .ofbox{border:1px solid var(--field-line,#cbd5e1);border-top:0;border-radius:0 0 7px 7px;padding:6px 8px}
-  .che .mini{flex:1 1 120px;display:flex;flex-direction:column;gap:2px;font-size:10.5px;color:var(--muted);font-weight:600}
-  .che .ofbox{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12px;padding:4px 0}
-  .che .ofbox label{display:inline-flex;gap:4px;align-items:center;white-space:nowrap}
-  .che .ofbox input{width:auto}
+  /* "% of other heads" — owner, 13 Nov 2026: "it bleeds and is weird, confusing".
+     The picker is a pop-over ABOVE the page (it no longer pushes or spills over the
+     row), two columns, with Done; its button always says what is chosen. */
+  .che .ofd{flex:1 1 90px;font-size:12.5px;min-width:0;position:relative}
+  .che .ofd summary{cursor:pointer;padding:7px 26px 7px 8px;border:1px solid var(--field-line,#cbd5e1);border-radius:7px;background:var(--card);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;list-style:none;position:relative}
+  .che .ofd summary::-webkit-details-marker{display:none}
+  .che .ofd summary::after{content:'▾';position:absolute;right:8px;top:50%;transform:translateY(-50%);color:var(--muted)}
+  .che .ofd summary.none{color:var(--red,#b91c1c);border-color:var(--red,#dc2626)}
+  .che .ofd .ofbox{position:absolute;z-index:30;top:calc(100% + 4px);left:0;min-width:300px;max-width:min(440px,80vw);max-height:280px;overflow:auto;
+    background:var(--card,#fff);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 32px rgba(15,23,42,.18);padding:10px 12px;
+    display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;font-size:12.5px}
+  .che .ofbox .ofh{grid-column:1 / -1;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
+  .che .ofbox label{display:flex;gap:6px;align-items:flex-start;line-height:1.3;cursor:pointer}
+  .che .ofbox input{width:auto;margin-top:2px;flex:0 0 auto}
+  .che .ofbox .ofdone{grid-column:1 / -1;justify-self:end;margin-top:4px}
+  .che .lim{flex:1 1 100%;font-size:11.5px;color:var(--muted)}
   .che .res{text-align:right;font-variant-numeric:tabular-nums;font-weight:700;font-size:13.5px;padding-top:6px}
   .che .why{display:block;font-weight:400;font-size:11px;color:var(--muted);margin-top:2px;text-align:left}
   .che .ch-row.err .why{color:var(--red,#b91c1c)}
   .che details.more{grid-column:2 / -2;font-size:12px}
   .che details.more summary{cursor:pointer;color:var(--muted)}
-  .che details.more .mg{display:grid;grid-template-columns:120px 120px 1fr;gap:8px;margin-top:6px}
+  .che details.more .mg{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-top:6px}
+  .che details.more .mg label{display:flex;flex-direction:column;gap:3px;font-size:11px;font-weight:600;color:var(--muted)}
+  .che details.more .mg .wide{grid-column:1 / -1}
   .che .note-chip{grid-column:2 / -2;font-size:12px;color:var(--muted);margin-top:-2px}
+  .che .ctcq{margin-top:14px;border:1px solid var(--line);border-left:3px solid var(--brand,#0f5f5a);border-radius:10px;padding:12px 14px;background:var(--soft)}
+  .che .ctcq-t{font-size:13.5px;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+  .che .ctcq-t .muted{font-size:12.5px}
+  .che .ctcq-f{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-top:8px}
+  .che .ctcq-f label{display:flex;flex-direction:column;gap:3px;font-size:11.5px;font-weight:600;color:var(--muted);flex:1 1 180px;max-width:260px}
+  .che .ctcq-f .btn{flex:0 0 auto}
+  .che .ctcq-n{font-size:12px;margin-top:8px}
+  .che .ctcq-n.bad{color:var(--red,#b91c1c)}
+  .che .ctcq-n.ok{color:var(--ok,#0f7d5a)}
   .che .addbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}
   .che .addbar select{width:auto;min-width:240px;max-width:100%}
   .che .totals{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:10px}
@@ -258,7 +278,7 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
   .che .totals b{display:block;font-size:16px;color:var(--ink);text-transform:none;letter-spacing:0;font-variant-numeric:tabular-nums}
   .che .errs{display:none;margin:8px 0}
   .che .empty{border:1px dashed var(--line);border-radius:10px;padding:16px;text-align:center;color:var(--muted);font-size:13px}
-  @media(max-width:1100px){
+  @media(max-width:1180px){
     .che .ch-head{display:none}
     .che .ch-row{grid-template-columns:1fr 1fr;padding:10px}
     .che .ch-row > .mv{grid-column:1;flex-direction:row;order:9}
@@ -268,7 +288,8 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
     .che .ch-row > .rm{grid-column:2;order:10}
     .che details.more,.che .note-chip{grid-column:1 / -1}
     .che details.more .mg{grid-template-columns:1fr 1fr}
-    .che details.more .mg > :last-child{grid-column:1 / -1}
+    .che .ofd{flex:1 1 100%}
+    .che .ofd .ofbox{position:static;min-width:0;max-width:none;width:auto;box-shadow:none;margin-top:6px;grid-template-columns:1fr}
   }
 </style>
 <div class="panel" id="add-role" style="scroll-margin-top:70px">
@@ -283,6 +304,21 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
       <div class="ff"><label for="ch_ppl">People <span class="muted">for this role</span></label><input class="form-control" id="ch_ppl" type="number" min="1" step="1" name="headcount" value="<?= $fv('headcount') ?: 1 ?>"></div>
       <div class="ff"><label for="ch_dpm">Working days in a month</label><input class="form-control" id="ch_dpm" type="number" min="1" max="31" step="0.5" name="dpm" value="<?= $fv('dpm') ?: $e($dpmDefault) ?>" title="Turns per-day heads into a month, and monthly heads into a day rate"></div>
     </div>
+
+    <?php // Owner, 13 Nov 2026: "we must enter CTC, margin shall be entered and salary structure shall be
+          // generated accordingly." Built from the company's own salary components (Compensation setup).
+          $ctcOn = function_exists('comp_defs') && function_exists('pc_heads_from_ctc') && comp_defs(true);
+          if ($ctcOn): ?>
+    <div class="ctcq" id="ch_ctcq">
+      <div class="ctcq-t"><b>Quick start — from the CTC</b> <span class="muted">Type what one person costs the company a month and the margin you want; the salary break-up and the rate are worked out for you.</span></div>
+      <div class="ctcq-f">
+        <label>CTC per person, a month (<?= $e($sym) ?>)<input id="ch_ctc" type="number" min="0" step="any" inputmode="decimal" placeholder="e.g. 45000"></label>
+        <label>Margin you want (%)<input id="ch_ctc_tm" type="number" min="0" max="99.9" step="0.1" inputmode="decimal" placeholder="e.g. 22" value="<?= $num0('target_margin') ?>"></label>
+        <button type="button" class="btn" id="ch_ctc_go">Build the salary break-up</button>
+      </div>
+      <div class="ctcq-n muted" id="ch_ctc_note">Uses your company's salary components — Basic is <?= $e(rtrim(rtrim(number_format(comp_basic_pct(), 2), '0'), '.')) ?>% of the CTC<?= (function_exists('hiring_admin_can') && hiring_admin_can()) ? ' (<a href="/comp-setup">change the components</a>)' : '' ?>. You can still change any head afterwards.</div>
+    </div>
+    <?php endif; ?>
 
     <p class="sub" style="margin:14px 0 6px">Cost heads — <b><?= $e($sym) ?> <?= $e($unitWord) ?></b>. Each head can be an amount, a % of other heads, quantity × rate or a formula, entered per month, per day, per year or one time. Names can be changed freely — a % keeps pointing at the right head.</p>
     <div class="addbar">
@@ -344,31 +380,38 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
   function render(){
     rowsEl.innerHTML='';
     empty.style.display=rows.length?'none':'block';
+    // The short names are what a formula uses; with no formula on the role they are only noise.
+    var hasFormula=rows.some(function(x){ return x.type==='FORMULA'; });
     rows.forEach(function(r,i){
       var t=r.type||'AMOUNT', pers=(t==='PCT'||t==='FORMULA')?['MONTH','ONCE']:null;
       var d=document.createElement('div'); d.className='ch-row'; d.dataset.i=i; d.dataset.code=r.code;
       var of=(r.of||[]);
-      var ofHtml=rows.map(function(o,j){ if(j===i) return ''; return '<label><input type="checkbox" class="f-of" value="'+esc(o.code)+'"'+(of.indexOf(o.code)>=0?' checked':'')+'> '+esc(o.label||o.code)+'</label>'; }).join('');
+      var nameOf=function(c){ var o=rows.filter(function(x){return x.code===c;})[0]; return o?(String(o.label||'').trim()||'Unnamed head'):c; };
+      var ofHtml=rows.map(function(o,j){ if(j===i) return ''; return '<label><input type="checkbox" class="f-of" value="'+esc(o.code)+'"'+(of.indexOf(o.code)>=0?' checked':'')+'> <span>'+esc(String(o.label||'').trim()||'Unnamed head')+'</span></label>'; }).join('');
+      var lim=[]; if(+r.cap) lim.push('counted up to '+money(r.cap)); if(+r.upto) lim.push('applies only up to '+money(r.upto));
       var val='';
       if(t==='AMOUNT') val='<input class="f-calc" inputmode="decimal" value="'+esc(r.calc!=null?r.calc:(r.amount||''))+'" placeholder="e.g. 18000 or 1500*2+300" aria-label="Amount">';
       if(t==='QTYRATE') val='<input class="f-qty" type="number" step="any" value="'+num(r.qty)+'" placeholder="Qty" aria-label="Quantity"><span class="w">×</span><input class="f-rate" type="number" step="any" value="'+num(r.rate)+'" placeholder="Rate" aria-label="Rate">';
-      if(t==='PCT') val='<input class="f-pct" type="number" step="any" value="'+num(r.pct)+'" placeholder="%" aria-label="Percent" style="flex:0 0 74px"><span class="w">% of</span>'
-        +'<details class="ofd"'+(of.length?'':' open')+'><summary>'+(of.length?esc(of.map(function(c){ var o=rows.filter(function(x){return x.code===c;})[0]; return o?(o.label||c):c; }).join(' + ')):'<span style="color:var(--red,#b91c1c)">choose the heads</span>')+' ▾</summary>'
-        +'<div class="ofbox">'+(ofHtml||'<span class="muted">add the heads it is a % of first</span>')+'</div></details>'
-        +'<label class="mini">Counted up to<input class="f-cap" type="number" step="any" min="0" value="'+num(r.cap)+'" placeholder="no limit" title="Only this much of the base counts — e.g. PF on wages up to 15,000"></label>'
-        +'<label class="mini">Applies only up to<input class="f-upto" type="number" step="any" min="0" value="'+num(r.upto)+'" placeholder="always" title="Not applied at all when the base is above this — e.g. ESIC up to 21,000"></label>';
+      if(t==='PCT') val='<input class="f-pct" type="number" step="any" value="'+num(r.pct)+'" placeholder="%" aria-label="Percent" style="flex:0 0 70px"><span class="w">% of</span>'
+        +'<details class="ofd"><summary class="'+(of.length?'':'none')+'" title="Which heads it is a % of">'+(of.length?esc(of.map(nameOf).join(' + ')):'choose the heads')+'</summary>'
+        +'<div class="ofbox" role="group" aria-label="Which heads it is a % of"><div class="ofh">A % of these heads</div>'+(ofHtml||'<span class="muted">Add the heads it is a % of first.</span>')
+        +'<button type="button" class="btn small ofdone">Done</button></div></details>'
+        +(lim.length?'<div class="lim">'+esc(lim.join(' · '))+'</div>':'');
       if(t==='FORMULA') val='<input class="f-expr" value="'+esc(r.expr||'')+'" placeholder="e.g. MIN(BASIC,15000)*12%" aria-label="Formula" style="flex:1 1 100%"><span class="w" style="font-size:11px">Use the short names: '+esc(codes(i).join(', ')||'—')+' · MIN MAX ROUND IF</span>';
       d.innerHTML='<div class="mv"><button type="button" class="up" title="Move up" aria-label="Move up">▲</button><button type="button" class="dn" title="Move down" aria-label="Move down">▼</button></div>'
-        +'<div class="nm"><input class="f-label" value="'+esc(r.label||'')+'" placeholder="Name of the head" aria-label="Head name"><div class="code">'+esc(r.code)+(r.lib_from?' · library value from '+esc(r.lib_from):'')+'</div></div>'
+        +'<div class="nm"><input class="f-label" value="'+esc(r.label||'')+'" placeholder="Name of the head" aria-label="Head name" title="'+esc(r.label||'')+'">'
+        +((hasFormula||r.lib_from)?'<div class="code">'+(hasFormula?'short name '+esc(r.code):'')+(r.lib_from?(hasFormula?' · ':'')+'library value from '+esc(r.lib_from):'')+'</div>':'')+'</div>'
         +'<div><select class="f-grp" aria-label="Group">'+opt(GROUPS,r.grp||'COST')+'</select></div>'
         +'<div><select class="f-type" aria-label="How it is worked out">'+opt(TYPES,t)+'</select></div>'
         +'<div class="val vl">'+val+'</div>'
         +'<div><select class="f-per" aria-label="Entered per">'+opt(PER,r.per||'MONTH',pers)+'</select></div>'
         +'<div class="res"><span class="r-val">—</span><span class="why r-why"></span></div>'
         +'<button type="button" class="rm" title="Remove this head" aria-label="Remove this head">✕</button>'
-        +'<details class="more"'+((r.min!=null||r.max!=null)?' open':'')+'><summary>'+(r.note?'Remark, minimum / maximum':'＋ Remark, minimum / maximum')+'</summary><div class="mg">'
-        +'<input class="f-min" type="number" step="any" value="'+(r.min!=null?esc(r.min):'')+'" placeholder="Minimum"><input class="f-max" type="number" step="any" value="'+(r.max!=null?esc(r.max):'')+'" placeholder="Maximum">'
-        +'<input class="f-note" maxlength="300" value="'+esc(r.note||'')+'" placeholder="Remark — e.g. as per client tender clause 4.2"></div></details>'
+        +'<details class="more"><summary>'+(t==='PCT'?'＋ Limits, minimum / maximum, remark':'＋ Minimum / maximum, remark')+'</summary><div class="mg">'
+        +(t==='PCT'?'<label>Counted up to<input class="f-cap" type="number" step="any" min="0" value="'+num(r.cap)+'" placeholder="no limit" title="Only this much of the base counts — e.g. PF on wages up to 15,000"></label>'
+                   +'<label>Applies only up to<input class="f-upto" type="number" step="any" min="0" value="'+num(r.upto)+'" placeholder="always" title="Not applied at all when the base is above this — e.g. ESIC up to 21,000"></label>':'')
+        +'<label>Minimum<input class="f-min" type="number" step="any" value="'+(r.min!=null?esc(r.min):'')+'" placeholder="none"></label><label>Maximum<input class="f-max" type="number" step="any" value="'+(r.max!=null?esc(r.max):'')+'" placeholder="none"></label>'
+        +'<label class="wide">Remark<input class="f-note" maxlength="300" value="'+esc(r.note||'')+'" placeholder="e.g. as per client tender clause 4.2"></label></div></details>'
         +(r.note?'<div class="note-chip">💬 '+esc(r.note)+'</div>':'');
       rowsEl.appendChild(d);
     });
@@ -406,10 +449,29 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
   });
   rowsEl.addEventListener('change',function(ev){
     if(ev.target.classList.contains('f-type')){ read(); var r=rows[+ev.target.closest('.ch-row').dataset.i]; if((r.type==='PCT'||r.type==='FORMULA')&&r.per!=='ONCE') r.per='MONTH'; render(); return; }
-    if(ev.target.classList.contains('f-label')){ read(); render(); return; }   // the % / formula pickers show the new name
+    if(ev.target.classList.contains('f-label')){
+      read(); var ri=+ev.target.closest('.ch-row').dataset.i, rr=rows[ri];
+      // A blank head was given the stand-in short name HEAD / HEAD_2 …; once it has a name it takes one
+      // from that name — unless a % or a formula already points at it (it keeps working either way).
+      if(rr && /^HEAD(_\d+)?$/.test(rr.code||'') && String(rr.label||'').trim()!==''){
+        var used=rows.some(function(x,j){ return j!==ri && ((x.of||[]).indexOf(rr.code)>=0 || (x.type==='FORMULA' && new RegExp('\\b'+rr.code+'\\b','i').test(x.expr||''))); });
+        if(!used) rr.code=codeFrom(rr.label, codes(ri));
+      }
+      render(); return; }   // the % / formula pickers show the new name
     read(); schedule();
   });
   rowsEl.addEventListener('input',function(ev){ if(!ev.target.classList.contains('f-label')){ read(); schedule(); } });
+  //  The "% of" picker: its button says what is ticked the moment it is ticked;
+  //  Done, a click elsewhere or Esc closes it; only one is open at a time.
+  function ofSummary(dd){
+    var sm=dd.querySelector('summary'); var names=[].map.call(dd.querySelectorAll('.f-of:checked'),function(x){ return x.parentNode.textContent.trim(); });
+    sm.textContent=names.length?names.join(' + '):'choose the heads'; sm.classList.toggle('none',!names.length);
+  }
+  rowsEl.addEventListener('change',function(ev){ if(ev.target.classList.contains('f-of')) ofSummary(ev.target.closest('.ofd')); });
+  rowsEl.addEventListener('click',function(ev){ if(ev.target.classList.contains('ofdone')){ var dd=ev.target.closest('.ofd'); dd.open=false; dd.querySelector('summary').focus(); } });
+  rowsEl.addEventListener('toggle',function(ev){ if(ev.target.classList&&ev.target.classList.contains('ofd')&&ev.target.open) rowsEl.querySelectorAll('.ofd[open]').forEach(function(o){ if(o!==ev.target) o.open=false; }); },true);
+  document.addEventListener('click',function(ev){ rowsEl.querySelectorAll('.ofd[open]').forEach(function(o){ if(!o.contains(ev.target)) o.open=false; }); });
+  document.addEventListener('keydown',function(ev){ if(ev.key==='Escape') rowsEl.querySelectorAll('.ofd[open]').forEach(function(o){ o.open=false; }); });
   document.getElementById('ch_blank').addEventListener('click',function(){ add({label:'',type:'AMOUNT',per:'<?= $basis === 'DAILY' ? 'DAY' : 'MONTH' ?>',grp:'COST'}); });
   document.getElementById('ch_lib').addEventListener('change',function(){ var c=this.value; this.value=''; if(!c) return; for(var k=0;k<LIB.length;k++) if(LIB[k].code===c){ add(LIB[k]); break; } });
   var tpl=document.getElementById('ch_tpl'); if(tpl) tpl.addEventListener('change',function(){
@@ -438,7 +500,53 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
       set('pv_marg',j.revenue?(+j.margin).toFixed(1)+'%':'—');
     }).catch(function(){});
   }
-  f.addEventListener('submit',function(){ read(); document.getElementById('ch_items_json').value=JSON.stringify(rows); });
+  //  EITHER BUTTON SAVES THE WHOLE PAGE (owner, 13 Nov 2026: "It said costing is
+  //  saved but then it shows zero"). "Save settings" used to reload the page and
+  //  throw away the role being typed; "Add role" did the same to changed settings.
+  function carry(from,to){ new FormData(from).forEach(function(v,k){
+    if(k==='_csrf'||k==='_ft'||typeof v!=='string'||to.querySelector('[name="'+k+'"]')) return;
+    var i=document.createElement('input'); i.type='hidden'; i.name=k; i.value=v; to.appendChild(i); }); }
+  var settingsDirty=false;
+  ['input','change'].forEach(function(t){ document.addEventListener(t,function(ev){ if(ev.target.closest && ev.target.closest('#pcSettings')) settingsDirty=true; }); });
+  f.addEventListener('submit',function(){
+    read(); document.getElementById('ch_items_json').value=JSON.stringify(rows);
+    var sf=document.getElementById('pcSettings');
+    if(sf && settingsDirty){ carry(sf,f); var w=document.createElement('input'); w.type='hidden'; w.name='with_settings'; w.value='1'; f.appendChild(w); }
+  });
+  document.addEventListener('submit',function(ev){
+    // getAttribute, not .id: this form has a field NAMED "id", which hides the form's own id.
+    if(!ev.target || !ev.target.getAttribute || ev.target.getAttribute('id')!=='pcSettings') return;
+    read(); var nm=(document.getElementById('ch_role').value||'').trim();
+    if(!nm && !rows.length) return;                      // nothing typed in the role box
+    document.getElementById('ch_items_json').value=JSON.stringify(rows);
+    carry(f,ev.target);
+  });
+  //  QUICK START — a salary break-up from the CTC, with the company's own components.
+  var cq=document.getElementById('ch_ctc_go');
+  if(cq){
+    var cNote=document.getElementById('ch_ctc_note'), cTm=document.getElementById('ch_ctc_tm'), pTm=document.getElementById('pc_tm');
+    cTm.addEventListener('input',function(){ pTm.value=cTm.value; schedule(); });
+    pTm.addEventListener('input',function(){ cTm.value=pTm.value; });
+    var build=function(){
+      var v=parseFloat(document.getElementById('ch_ctc').value);
+      if(!(v>0)){ cNote.className='ctcq-n bad'; cNote.textContent='Type the CTC first — what one person costs the company a month.'; document.getElementById('ch_ctc').focus(); return; }
+      read(); if(rows.length && !confirm('Replace the heads on this role with the salary break-up for this CTC?')) return;
+      var fd=new FormData(); fd.set('_csrf',f.querySelector('[name=_csrf]').value); fd.set('costing_id',f.querySelector('[name=costing_id]').value); fd.set('ctc',v);
+      cq.disabled=true;
+      fetch('/project-costing-ctc-heads',{method:'POST',body:fd,credentials:'same-origin'}).then(function(r){return r.json();}).then(function(j){
+        cq.disabled=false;
+        if(!j.ok){ cNote.className='ctcq-n bad'; cNote.textContent=j.err||'It could not be worked out.'; return; }
+        rows=j.items; rows.forEach(function(r){ if(r.amount!=null && r.calc==null) r.calc=r.amount?String(r.amount):''; });
+        if(cTm.value!=='') pTm.value=cTm.value;
+        cNote.className='ctcq-n ok'; cNote.textContent='✓ '+j.note+(cTm.value===''?' Now type the margin you want — the rate follows.':'');
+        render();
+        var nx=document.getElementById(cTm.value===''?'ch_ctc_tm':(document.getElementById('ch_role').value.trim()===''?'ch_role':'pc_boq')); if(nx) nx.focus();
+      }).catch(function(){ cq.disabled=false; cNote.className='ctcq-n bad'; cNote.textContent='It could not be worked out just now — try again.'; });
+    };
+    cq.addEventListener('click',build);
+    document.getElementById('ch_ctc').addEventListener('keydown',function(ev){ if(ev.key==='Enter'){ ev.preventDefault(); build(); } });
+    cTm.addEventListener('keydown',function(ev){ if(ev.key==='Enter'){ ev.preventDefault(); build(); } });
+  }
   var tf=document.getElementById('ch_tplform'); if(tf) tf.addEventListener('submit',function(ev){ read(); if(!rows.length){ ev.preventDefault(); alert('Add some heads first.'); return; } tf.querySelector('[name=items_json]').value=JSON.stringify(rows); });
   render();
   <?php if ($editLn || $draft): ?>document.getElementById('add-role').scrollIntoView();<?php endif; ?>
@@ -450,7 +558,7 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
   <div class="panel">
     <h3 class="tab-sub" style="margin-top:0">Loadings, basis &amp; details</h3>
     <?php if ($canEdit): ?>
-    <form method="post" action="/project-costing-save">
+    <form method="post" action="/project-costing-save" id="pcSettings">
       <input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="id" value="<?= (int)$h['id'] ?>">
       <div class="form-grid">
         <div class="ff ff-wide"><label>Title</label><input class="form-control" name="title" value="<?= $e($h['title']) ?>"></div>
@@ -474,7 +582,8 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
         <div class="ff ff-wide"><label>Exclusions <span class="muted">— "Not included…"</span></label><textarea class="form-control" name="exclusions" rows="2"><?= $e($h['exclusions']) ?></textarea></div>
         <div class="ff ff-wide"><label>Notes</label><input class="form-control" name="notes" value="<?= $e($h['notes']) ?>"></div>
       </div>
-      <div style="margin-top:8px"><button class="btn" type="submit">Save settings</button></div>
+      <div style="margin-top:8px"><button class="btn" type="submit">Save settings</button>
+        <span class="muted" style="font-size:12px;margin-left:8px">Also saves a role you are typing above — nothing on this page is lost.</span></div>
     </form>
     <?php else: ?>
       <div class="kv-grid" style="font-size:13px">
