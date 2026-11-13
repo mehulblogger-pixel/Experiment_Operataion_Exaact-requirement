@@ -45,7 +45,8 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
      squeezed the Submit / Approve / Make-a-quotation buttons out of sight. */
   .pc .pc-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
   .pc .lockmsg{background:var(--warn-soft,#fdf1e3);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:12.5px;margin:10px 0}
-  @media(max-width:1000px){.pc .kpis{grid-template-columns:repeat(2,1fr)} .pc .wide-scroll{overflow-x:auto}}
+  .pc .wide-scroll{overflow-x:auto}   /* a role with many heads scrolls inside its own card — it never pushes past the page */
+  @media(max-width:1000px){.pc .kpis{grid-template-columns:repeat(2,1fr)}}
 </style>
 
 <div class="pc">
@@ -265,6 +266,11 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
   .che .ctcq{margin-top:14px;border:1px solid var(--line);border-left:3px solid var(--brand,#0f5f5a);border-radius:10px;padding:12px 14px;background:var(--soft)}
   .che .ctcq-t{font-size:13.5px;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
   .che .ctcq-t .muted{font-size:12.5px}
+  .che .ctcq-m{display:flex;flex-wrap:wrap;gap:6px 8px;margin-top:8px}
+  .che .ctcq-m label{display:inline-flex;gap:6px;align-items:center;font-size:13px;font-weight:600;padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--card);cursor:pointer}
+  .che .ctcq-m label:has(input:checked){border-color:var(--brand,#0f5f5a);background:color-mix(in srgb,var(--brand,#0f5f5a) 10%,var(--card,#fff))}
+  .che .ctcq-m input{width:auto}
+  .che .ctcq-f label[hidden]{display:none}
   .che .ctcq-f{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-top:8px}
   .che .ctcq-f label{display:flex;flex-direction:column;gap:3px;font-size:11.5px;font-weight:600;color:var(--muted);flex:1 1 180px;max-width:260px}
   .che .ctcq-f .btn{flex:0 0 auto}
@@ -310,13 +316,18 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
           $ctcOn = function_exists('comp_defs') && function_exists('pc_heads_from_ctc') && comp_defs(true);
           if ($ctcOn): ?>
     <div class="ctcq" id="ch_ctcq">
-      <div class="ctcq-t"><b>Quick start — from the CTC</b> <span class="muted">Type what one person costs the company a month and the margin you want; the salary break-up and the rate are worked out for you.</span></div>
+      <div class="ctcq-t"><b>Quick start</b> <span class="muted">Answer one question and the salary break-up is worked out for you.</span></div>
+      <div class="ctcq-m" role="radiogroup" aria-label="What do you know?">
+        <label><input type="radio" name="ch_ctc_mode" value="ctc" checked> I know the CTC</label>
+        <label><input type="radio" name="ch_ctc_mode" value="rate"> I know the rate the <?= $e(Tl('client')) ?> pays</label>
+      </div>
       <div class="ctcq-f">
-        <label>CTC per person, a month (<?= $e($sym) ?>)<input id="ch_ctc" type="number" min="0" step="any" inputmode="decimal" placeholder="e.g. 45000"></label>
+        <label data-ctc-mode="ctc">CTC per person, a month (<?= $e($sym) ?>)<input id="ch_ctc" type="number" min="0" step="any" inputmode="decimal" placeholder="e.g. 45000"></label>
+        <label data-ctc-mode="rate" hidden>Rate the <?= $e(Tl('client')) ?> pays, <?= $e($basis === 'FIXED' ? 'for the job' : $unitWord) ?> (<?= $e($sym) ?>)<input id="ch_ctc_rate" type="number" min="0" step="any" inputmode="decimal" placeholder="e.g. 66000"></label>
         <label>Margin you want (%)<input id="ch_ctc_tm" type="number" min="0" max="99.9" step="0.1" inputmode="decimal" placeholder="e.g. 22" value="<?= $num0('target_margin') ?>"></label>
         <button type="button" class="btn" id="ch_ctc_go">Build the salary break-up</button>
       </div>
-      <div class="ctcq-n muted" id="ch_ctc_note">Uses your company's salary components — Basic is <?= $e(rtrim(rtrim(number_format(comp_basic_pct(), 2), '0'), '.')) ?>% of the CTC<?= (function_exists('hiring_admin_can') && hiring_admin_can()) ? ' (<a href="/comp-setup">change the components</a>)' : '' ?>. You can still change any head afterwards.</div>
+      <div class="ctcq-n muted" id="ch_ctc_note" data-ctc="Type what one person costs the company a month; the break-up is filled in and the rate follows your margin." data-rate="Type the rate and the margin; it works back to the CTC you can afford, and fills in its break-up."><span data-ctc-hint>Type what one person costs the company a month; the break-up is filled in and the rate follows your margin.</span> Uses your company's salary components — Basic is <?= $e(rtrim(rtrim(number_format(comp_basic_pct(), 2), '0'), '.')) ?>% of the CTC<?= (function_exists('hiring_admin_can') && hiring_admin_can()) ? ' (<a href="/comp-setup">change the components</a>)' : '' ?>. You can still change any head afterwards.</div>
     </div>
     <?php endif; ?>
 
@@ -527,25 +538,45 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
     var cNote=document.getElementById('ch_ctc_note'), cTm=document.getElementById('ch_ctc_tm'), pTm=document.getElementById('pc_tm');
     cTm.addEventListener('input',function(){ pTm.value=cTm.value; schedule(); });
     pTm.addEventListener('input',function(){ cTm.value=pTm.value; });
+    var cRate=document.getElementById('ch_ctc_rate'), cCtc=document.getElementById('ch_ctc');
+    var mode=function(){ var m=document.querySelector('input[name=ch_ctc_mode]:checked'); return m?m.value:'ctc'; };
+    //  One question decides which box is shown — never both (owner: "the screen shall not be very confusing").
+    [].forEach.call(document.querySelectorAll('input[name=ch_ctc_mode]'),function(rd){ rd.addEventListener('change',function(){
+      var m=mode(); [].forEach.call(document.querySelectorAll('#ch_ctcq [data-ctc-mode]'),function(l){ l.hidden=l.getAttribute('data-ctc-mode')!==m; });
+      var hint=cNote.querySelector('[data-ctc-hint]'); if(hint) hint.textContent=cNote.getAttribute('data-'+m);
+      (m==='rate'?cRate:cCtc).focus();
+    }); });
+    var bad=function(msg,el){ cNote.className='ctcq-n bad'; cNote.textContent=msg; if(el) el.focus(); };
     var build=function(){
-      var v=parseFloat(document.getElementById('ch_ctc').value);
-      if(!(v>0)){ cNote.className='ctcq-n bad'; cNote.textContent='Type the CTC first — what one person costs the company a month.'; document.getElementById('ch_ctc').focus(); return; }
-      read(); if(rows.length && !confirm('Replace the heads on this role with the salary break-up for this CTC?')) return;
-      var fd=new FormData(); fd.set('_csrf',f.querySelector('[name=_csrf]').value); fd.set('costing_id',f.querySelector('[name=costing_id]').value); fd.set('ctc',v);
+      var m=mode(), fd=new FormData(); fd.set('_csrf',f.querySelector('[name=_csrf]').value); fd.set('costing_id',f.querySelector('[name=costing_id]').value);
+      if(m==='rate'){
+        var rt=parseFloat(cRate.value), mg=parseFloat(cTm.value);
+        if(!(rt>0)) return bad('Type the rate the client pays first.',cRate);
+        if(!(mg>=0)) return bad('Type the margin you want — it decides how much of the rate is left for the person.',cTm);
+        fd.set('mode','rate'); fd.set('rate',rt); fd.set('margin',mg); fd.set('dpm',document.getElementById('ch_dpm').value);
+      } else {
+        var v=parseFloat(cCtc.value);
+        if(!(v>0)) return bad('Type the CTC first — what one person costs the company a month.',cCtc);
+        fd.set('ctc',v);
+      }
+      read(); if(rows.length && !confirm('Replace the heads on this role with this salary break-up?')) return;
       cq.disabled=true;
       fetch('/project-costing-ctc-heads',{method:'POST',body:fd,credentials:'same-origin'}).then(function(r){return r.json();}).then(function(j){
         cq.disabled=false;
-        if(!j.ok){ cNote.className='ctcq-n bad'; cNote.textContent=j.err||'It could not be worked out.'; return; }
+        if(!j.ok) return bad(j.err||'It could not be worked out.');
         rows=j.items; rows.forEach(function(r){ if(r.amount!=null && r.calc==null) r.calc=r.amount?String(r.amount):''; });
         if(cTm.value!=='') pTm.value=cTm.value;
-        cNote.className='ctcq-n ok'; cNote.textContent='✓ '+j.note+(cTm.value===''?' Now type the margin you want — the rate follows.':'');
+        var pr=document.getElementById('pc_rate');
+        if(m==='rate'){ pr.value=j.rate_manual; cCtc.value=j.ctc; } else if(pr.value!=='' && confirm('This role has a fixed rate typed in, which overrides the margin. Clear it so the rate follows your margin?')) pr.value='';
+        cNote.className='ctcq-n ok'; cNote.textContent='✓ '+j.note+((m==='ctc'&&cTm.value==='')?' Now type the margin you want — the rate follows.':'');
         render();
-        var nx=document.getElementById(cTm.value===''?'ch_ctc_tm':(document.getElementById('ch_role').value.trim()===''?'ch_role':'pc_boq')); if(nx) nx.focus();
-      }).catch(function(){ cq.disabled=false; cNote.className='ctcq-n bad'; cNote.textContent='It could not be worked out just now — try again.'; });
+        var nx=document.getElementById((m==='ctc'&&cTm.value==='')?'ch_ctc_tm':(document.getElementById('ch_role').value.trim()===''?'ch_role':'pc_boq')); if(nx) nx.focus();
+      }).catch(function(){ cq.disabled=false; bad('It could not be worked out just now — try again.'); });
     };
     cq.addEventListener('click',build);
     document.getElementById('ch_ctc').addEventListener('keydown',function(ev){ if(ev.key==='Enter'){ ev.preventDefault(); build(); } });
     cTm.addEventListener('keydown',function(ev){ if(ev.key==='Enter'){ ev.preventDefault(); build(); } });
+    cRate.addEventListener('keydown',function(ev){ if(ev.key==='Enter'){ ev.preventDefault(); build(); } });
   }
   var tf=document.getElementById('ch_tplform'); if(tf) tf.addEventListener('submit',function(ev){ read(); if(!rows.length){ ev.preventDefault(); alert('Add some heads first.'); return; } tf.querySelector('[name=items_json]').value=JSON.stringify(rows); });
   render();

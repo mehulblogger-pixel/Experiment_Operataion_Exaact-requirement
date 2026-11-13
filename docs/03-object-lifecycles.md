@@ -268,7 +268,7 @@ stateDiagram-v2
 - Reopening an APPROVED costing clears who approved it and when, and writes a line in its quotation's
   history; that quotation cannot move forward again until the costing is approved again.
 - **A salary break-up from the CTC, and one save for the page (owner, 13 Nov 2026).** On a role,
-  "Quick start — from the CTC" builds the cost heads from one figure — what a person costs the company
+  "Quick start" builds the cost heads from one figure — what a person costs the company
   a month — using the company's own salary components (Recruitment → Compensation setup: Basic as a %
   of CTC, what follows Basic, the balancing component), solved by the same engine as the offer letter
   (`comp_solve_from_ctc` → `pc_heads_from_ctc`). Earnings become salary heads and employer contributions
@@ -277,6 +277,23 @@ stateDiagram-v2
   defined in the costing itself. **Either button on the page saves both boxes** — "Save settings" also
   saves a role being typed, "Add / Save role" also saves changed settings (`pc_settings_save`,
   `pc_role_save`); a role that cannot be saved is kept on the page. Nothing here changes a status.
+- **The other way round — from the rate the client pays (owner, 13 Nov 2026: "both ways, but the
+  screen shall not be very confusing").** Quick start asks one question — "I know the CTC" or "I know
+  the rate the client pays" — and shows only that direction's box. The second takes the rate (for the
+  sheet's unit: a man-month, a man-day, or the lump sum) and the margin wanted, and works back through
+  the costing's own loadings and negotiation padding to the CTC the company can afford
+  (`pc_ctc_from_rate`, which is `pc_line_calc` read backwards), then builds the same break-up from it.
+  The CTC is rounded down to the rupee so the margin is never under the one asked; the role's fixed
+  rate is set to the client's rate. When margin and loadings leave nothing for the pay it says so and
+  builds nothing. Same gate (`pc_can_edit`), no new permission, no status.
+- **A costing stays with its quotation once the quotation is out (owner, 13 Nov 2026: "Once contract
+  is made the costing shall not be unlinked" — "once won and/or has a contract", and from the moment
+  it is sent: "that's the perfect thing").** `project-costing-attach` refuses to unlink or move a
+  costing whose quotation has gone to the client (Sent), has been won (Accepted) or has a contract,
+  and one whose deal is Won, has gone to Accounts or has a contract (`pc_unlink_block_quote`,
+  `pc_unlink_block_deal`). The quotation and deal pages show "🔒 Stays linked — …" in place of
+  "Unlink". Before that point unlinking is allowed and logged as before. To change the figures after
+  that, raise a revision. This adds no status and no transition; it only closes a door.
 - **Flexible cost heads (owner, 9 Nov 2026):** a role's cost build-up is a list of heads
   (`project_costing_lines.spec`, worked out by `lib/costing_heads.php`) — each an amount (the box is a
   calculator), a % of other heads (with an optional "counted up to" cap on the base and an optional

@@ -247,10 +247,16 @@
   <?php if ($pcRow): ?>
     <a class="btn small secondary" href="/project-costing?id=<?= (int)$pcRow['id'] ?>"><b><?= e($pcRow['code']) ?></b> — <?= e($pcRow['title']) ?></a>
     <span class="muted" style="font-size:12.5px">revenue <?= fmoney_short($pcRow['exp_revenue']) ?> · margin <?= (float)$pcRow['exp_revenue']>0 ? number_format((float)$pcRow['exp_profit']/(float)$pcRow['exp_revenue']*100,1) : '0' ?>%</span>
+    <?php // Locked once this quotation is sent, won or has a contract (owner, 13 Nov 2026).
+          $pcLock = function_exists('pc_unlink_block_quote') ? pc_unlink_block_quote((int)$q['id']) : '';
+          if ($pcLock !== ''): ?>
+      <span class="muted" style="margin-left:auto;font-size:12.5px" title="<?= e($pcLock) ?>">🔒 Stays linked — this <?= e(Tl('quote')) ?> <?= strpos($pcLock, ' has a contract') !== false ? 'has a contract' : (strpos($pcLock, ' has been won') !== false ? 'has been won' : 'has gone to the ' . e(Tl('client'))) ?></span>
+    <?php else: ?>
     <form method="post" action="/project-costing-attach" style="display:inline;margin-left:auto" onsubmit="return confirm('Unlink this costing from the quotation? It is not deleted — you can attach it again from here.')">
       <input type="hidden" name="costing_id" value="<?= (int)$pcRow['id'] ?>"><input type="hidden" name="quote_id" value="0"><input type="hidden" name="back" value="<?= e($back) ?>">
       <button class="btn small btn-ghost">Unlink</button>
     </form>
+    <?php endif; ?>
   <?php else: ?>
     <form method="post" action="/project-costing-new" style="display:inline">
       <input type="hidden" name="quote_id" value="<?= (int)$q['id'] ?>"><input type="hidden" name="client_id" value="<?= (int)($q['client_id'] ?? 0) ?>">

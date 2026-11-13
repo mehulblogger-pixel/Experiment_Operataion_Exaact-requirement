@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '529e049 · 2026-11-13 04:05 UTC · 713 files';
+$RELEASE = '05fdc75 · 2026-11-13 04:43 UTC · 713 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -194,7 +194,7 @@ $EXPECT  = [
     'lib/position.php' => ['s'=>19441,'h'=>'a0a9d1a9e6a9b10c'],
     'lib/preflight.php' => ['s'=>5451,'h'=>'97e742bbddf7fbd8'],
     'lib/pricing_admin.php' => ['s'=>16307,'h'=>'d7af986c89fc5cfc'],
-    'lib/projcosting.php' => ['s'=>90768,'h'=>'0bc7a11edeb07c4b'],
+    'lib/projcosting.php' => ['s'=>98151,'h'=>'d2047cb37a046ba5'],
     'lib/pwreset.php' => ['s'=>9509,'h'=>'50675e1d291df7b0'],
     'lib/qr.php' => ['s'=>17936,'h'=>'4d50b69b53bfa5e2'],
     'lib/qualitycase.php' => ['s'=>6179,'h'=>'280289c99f157cd7'],
@@ -441,7 +441,7 @@ $EXPECT  = [
     'views/ops/crm/approval_rule_list.php' => ['s'=>3304,'h'=>'da79bb76a5dfb4a3'],
     'views/ops/crm/inquiry_form.php' => ['s'=>4981,'h'=>'036471e837dfefeb'],
     'views/ops/crm/inquiry_list.php' => ['s'=>5135,'h'=>'2a20fa11bca686b2'],
-    'views/ops/crm/quote_detail.php' => ['s'=>74777,'h'=>'b8cc4274d0bd611c'],
+    'views/ops/crm/quote_detail.php' => ['s'=>75373,'h'=>'fb65f5c34636c28e'],
     'views/ops/crm/quote_external.php' => ['s'=>8907,'h'=>'7aa7bd1259a0c79d'],
     'views/ops/crm/quote_form.php' => ['s'=>45025,'h'=>'0421cdde3be7f046'],
     'views/ops/crm/quote_list.php' => ['s'=>8038,'h'=>'36be301c9d7ffe37'],
@@ -560,7 +560,7 @@ $EXPECT  = [
     'views/ops/office_finance.php' => ['s'=>10390,'h'=>'0c4ba07f736f995d'],
     'views/ops/operations_home.php' => ['s'=>16889,'h'=>'5e9df2e4207f6766'],
     'views/ops/opportunities.php' => ['s'=>6993,'h'=>'f6c105203b970888'],
-    'views/ops/opportunity_detail.php' => ['s'=>34377,'h'=>'1781b54a9eaa0da4'],
+    'views/ops/opportunity_detail.php' => ['s'=>34859,'h'=>'ce7c64bd81bf1320'],
     'views/ops/opportunity_form.php' => ['s'=>6508,'h'=>'cb05777e648dc213'],
     'views/ops/ops_desk.php' => ['s'=>5950,'h'=>'50cc74a4ae6338bb'],
     'views/ops/owner_home.php' => ['s'=>7755,'h'=>'9be8dd1b0498872a'],
@@ -581,7 +581,7 @@ $EXPECT  = [
     'views/ops/product_package.php' => ['s'=>4732,'h'=>'a87a7a169d94fe14'],
     'views/ops/profitability_detail.php' => ['s'=>10185,'h'=>'f49f71530b916b7e'],
     'views/ops/profitability_list.php' => ['s'=>9655,'h'=>'8fed2c9925d511dc'],
-    'views/ops/project_costing.php' => ['s'=>60715,'h'=>'5413b71e7a4cd35e'],
+    'views/ops/project_costing.php' => ['s'=>63724,'h'=>'962ce9176502d912'],
     'views/ops/project_costing_print.php' => ['s'=>8615,'h'=>'2e727aa195a39a28'],
     'views/ops/project_costings.php' => ['s'=>7268,'h'=>'d7beebe3f25879f4'],
     'views/ops/raise_call.php' => ['s'=>4805,'h'=>'0f81d9189bc08419'],

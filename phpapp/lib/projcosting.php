@@ -878,6 +878,41 @@ function pc_line_from_post(array $p, array $h) {
     return [$line, array_values(array_unique($errs)), $ev];
 }
 
+// ---- A costing stays with what it priced ---------------------------------------
+//  Owner, 13 Nov 2026: "Once contract is made the costing shall not be unlinked"
+//  — and, deciding the rule: locked from the moment the quotation is sent to the
+//  customer, and once it is won or has a contract (any one of these). Before
+//  that, unlinking stays allowed and is written in both histories. The same for
+//  a deal: locked once it is won, handed to Accounts, or has a contract.
+//  Returns '' when the link may still be removed, else the sentence that says why not.
+function pc_unlink_block_quote($quoteId) {
+    $one = $quoteId ? ops_one("SELECT id, parent_id FROM quotations WHERE id=?", [(int)$quoteId]) : null;
+    if (!$one) return '';
+    //  A revision is the same quotation re-priced (pc_for_quote), so the whole family
+    //  counts: once ANY revision has gone out, the costing stays — whichever revision
+    //  it happens to be stored against, and whichever one the user is looking at.
+    $base = (int)($one['parent_id'] ?: $one['id']);
+    $fam = ops_all("SELECT id, quote_no, rev, status, sent_at, contract_id, contract_number FROM quotations WHERE id=? OR parent_id=? ORDER BY rev DESC, id DESC", [$base, $base]);
+    $tail = ' The costing is the record of how that price was worked out, so it stays linked. To change the price, raise a revision of the ' . Tl('quote') . '.';
+    $name = fn($q) => (string)$q['quote_no'] . ((int)$q['rev'] > 0 ? ' (revision ' . (int)$q['rev'] . ')' : '');
+    foreach ($fam as $q) if ((int)($q['contract_id'] ?? 0) || trim((string)($q['contract_number'] ?? '')) !== '')
+        return $name($q) . ' has a contract' . (trim((string)($q['contract_number'] ?? '')) !== '' ? ' (' . $q['contract_number'] . ')' : '') . '.' . $tail;
+    foreach ($fam as $q) if ((string)$q['status'] === 'ACCEPTED') return $name($q) . ' has been won — the ' . Tl('client') . ' accepted it.' . $tail;
+    foreach ($fam as $q) if ((string)$q['status'] === 'SENT' || trim((string)($q['sent_at'] ?? '')) !== '')
+        return $name($q) . ' has gone to the ' . Tl('client') . (trim((string)($q['sent_at'] ?? '')) !== '' ? ' (sent ' . fdate(substr((string)$q['sent_at'], 0, 10)) . ')' : '') . '.' . $tail;
+    return '';
+}
+function pc_unlink_block_deal($oppId) {
+    $o = $oppId ? ops_one("SELECT * FROM opportunities WHERE id=?", [(int)$oppId]) : null;
+    if (!$o) return '';
+    $ref = (string)($o['ref'] ?? 'This deal');
+    $tail = ' The costing is the record of how it was priced, so it stays linked.';
+    if ((int)($o['contract_id'] ?? 0)) return $ref . ' has a contract.' . $tail;
+    if (trim((string)($o['sent_to_accounts_at'] ?? '')) !== '') return $ref . ' has been handed to Accounts to register the contract.' . $tail;
+    if ((string)($o['status'] ?? '') === 'WON') return $ref . ' has been won.' . $tail;
+    return '';
+}
+
 // ---- Saving, in one place ---------------------------------------------------
 //  The costing page has two boxes — the role being built and the settings — and
 //  each had its own button that saved ONLY its own box, discarding whatever was
@@ -984,6 +1019,37 @@ function pc_heads_from_ctc($ctc) {
     return ['items' => $items, 'ctc' => $ctc,
             'note' => 'Built from a CTC of ' . fmoney($ctc) . ' a month with your salary components — Basic is '
                     . rtrim(rtrim(number_format(comp_basic_pct(), 2), '0'), '.') . '% of the CTC. Change any head; the totals follow.'];
+}
+
+//  THE OTHER WAY ROUND — from the rate the client pays (owner, 13 Nov 2026:
+//  "Yes, both ways, but the screen shall not be very confusing"). Given the rate
+//  for one unit of the sheet (a man-month, a man-day, or the lump sum) and the
+//  margin wanted, work back through the costing's own loadings to what is left
+//  for the person: the CTC a month the company can afford. It is pc_line_calc()
+//  read backwards, so the two directions can never disagree:
+//      what the costing may cost  = rate × (1 − margin)
+//      loadings on COST:  direct  = that ÷ (1 + loadings)
+//      loadings on RATE:  direct  = that − loadings × (rate before negotiation)
+//  The CTC is rounded DOWN to the rupee, so the margin is never below the one asked.
+//  Returns ['ctc', 'rate_manual' (the rate before the negotiation padding)] or ['err'].
+function pc_ctc_from_rate($rate, $margin, array $h, $dpm = 0) {
+    $rate = (float)$rate; $tm = (float)$margin;
+    $unit = strtoupper((string)($h['basis'] ?? 'LONG')) === 'DAILY' ? 'a man-day' : (strtoupper((string)($h['basis'] ?? '')) === 'FIXED' ? 'for the job' : 'a man-month');
+    if ($rate <= 0) return ['err' => 'Type the rate the ' . Tl('client') . ' pays first.'];
+    if ($tm < 0 || $tm >= 100) return ['err' => 'The margin must be from 0 up to (not including) 100%.'];
+    $load = (float)($h['overhead_pct'] ?? 0) + (float)($h['insurance_pct'] ?? 0) + (float)($h['baddebt_pct'] ?? 0) + (float)($h['contingency_pct'] ?? 0);
+    $neg = (float)($h['negotiation_pct'] ?? 0);
+    $before = $rate / (1 + $neg / 100);                      // the rate before the negotiation padding
+    $mayCost = $rate * (1 - $tm / 100);
+    $direct = strtoupper((string)($h['load_on'] ?? 'COST')) === 'RATE' ? $mayCost - $before * $load / 100 : $mayCost / (1 + $load / 100);
+    if (strtoupper((string)($h['basis'] ?? 'LONG')) === 'DAILY') {
+        $dpm = (float)$dpm; if ($dpm < 1 || $dpm > 31) $dpm = ch_days_per_month();
+        $direct *= $dpm;                                     // a day's cost → the month's CTC
+    }
+    $ctc = floor($direct);
+    if ($ctc <= 0) return ['err' => 'At ' . fmoney($rate) . ' ' . $unit . ' with a ' . rtrim(rtrim(number_format($tm, 2), '0'), '.') . '% margin and this costing\'s loadings ('
+        . rtrim(rtrim(number_format($load, 2), '0'), '.') . '%), nothing is left for the person\'s pay. Lower the margin, or check the rate.'];
+    return ['ctc' => $ctc, 'rate_manual' => round($before, 2), 'unit' => $unit, 'negotiation_pct' => $neg];
 }
 
 // ---- Routing ---------------------------------------------------------------
@@ -1121,7 +1187,23 @@ function ops_projcosting($route, $method) {
     if ($route === 'project-costing-ctc-heads' && $method === 'POST') {
         header('Content-Type: application/json');
         if (!pc_can_edit()) { echo json_encode(['ok' => false, 'err' => 'You cannot edit costings.']); return true; }
-        $r = pc_heads_from_ctc($_POST['ctc'] ?? 0);
+        if (($_POST['mode'] ?? '') === 'rate') {
+            // From the rate the client pays: work back to the CTC, then build it.
+            $h = pc_get((int)($_POST['costing_id'] ?? 0));
+            if (!$h) { echo json_encode(['ok' => false, 'err' => 'Costing not found.']); return true; }
+            $b = pc_ctc_from_rate($_POST['rate'] ?? 0, $_POST['margin'] ?? 0, $h, $_POST['dpm'] ?? 0);
+            if (!empty($b['err'])) { echo json_encode(['ok' => false, 'err' => $b['err']], JSON_UNESCAPED_UNICODE); return true; }
+            $r = pc_heads_from_ctc($b['ctc']);
+            if (empty($r['err'])) {
+                $r['rate_manual'] = $b['rate_manual'];
+                $r['note'] = 'At ' . fmoney((float)$_POST['rate']) . ' ' . $b['unit'] . ' and a ' . rtrim(rtrim(number_format((float)$_POST['margin'], 2), '0'), '.')
+                           . '% margin, you can afford a CTC of ' . fmoney($b['ctc']) . ' a month. The break-up below adds up to it; the rate is fixed at what the ' . Tl('client') . ' pays.'
+                           //  With a negotiation padding the "fixed rate" box holds the rate BEFORE the padding — say so, or 62,857 beside "66,000" looks like a mistake.
+                           . ($b['negotiation_pct'] > 0 ? ' (The fixed-rate box shows ' . fmoney($b['rate_manual']) . ': this costing adds ' . rtrim(rtrim(number_format($b['negotiation_pct'], 2), '0'), '.') . '% negotiation padding on top, which brings it to ' . fmoney((float)$_POST['rate']) . '.)' : '');
+            }
+        } else {
+            $r = pc_heads_from_ctc($_POST['ctc'] ?? 0);
+        }
         echo json_encode(empty($r['err']) ? ['ok' => true] + $r : ['ok' => false, 'err' => $r['err']], JSON_UNESCAPED_UNICODE);
         return true;
     }
@@ -1255,6 +1337,12 @@ function ops_projcosting($route, $method) {
         $qid = isset($_POST['quote_id']) ? (int)$_POST['quote_id'] : null;
         $oid = isset($_POST['opportunity_id']) ? (int)$_POST['opportunity_id'] : null;
         $was = (int)($h['quote_id'] ?? 0); $wasOpp = (int)($h['opportunity_id'] ?? 0);
+        $back = (string)($_POST['back'] ?? '');
+        // Removing or moving a link that has become the record of a price (13 Nov 2026).
+        $why = '';
+        if ($qid !== null && $was && $qid !== $was) $why = pc_unlink_block_quote($was);
+        if ($why === '' && $oid !== null && $wasOpp && $oid !== $wasOpp) $why = pc_unlink_block_deal($wasOpp);
+        if ($why !== '') { flash('Not unlinked — ' . $why, 'error'); redirect($back !== '' ? $back : '/project-costing?id=' . $id); }
         if ($qid !== null) $pdo->prepare("UPDATE project_costings SET quote_id=?, updated_at=? WHERE id=?")->execute([$qid ?: null, date('c'), $id]);
         if ($oid !== null) $pdo->prepare("UPDATE project_costings SET opportunity_id=?, updated_at=? WHERE id=?")->execute([$oid ?: null, date('c'), $id]);
         // Every link and unlink is written down — on the costing, and in the
@@ -1270,7 +1358,6 @@ function ops_projcosting($route, $method) {
         flash(($qid || $oid) ? 'Costing ' . $h['code'] . ' linked.'
             : 'Costing ' . $h['code'] . ' unlinked — it is not deleted. Find it under Sales → Project costing ("Not on a quotation"), or attach it again with "attach existing…".');
         // Return to wherever the request came from.
-        $back = (string)($_POST['back'] ?? '');
         redirect($back !== '' ? $back : '/project-costing?id=' . $id);
     }
 

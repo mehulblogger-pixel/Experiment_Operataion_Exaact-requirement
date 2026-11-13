@@ -132,14 +132,19 @@
   <?php if ($pcRow): ?>
     <a class="btn small secondary" href="/project-costing?id=<?= (int)$pcRow['id'] ?>"><b><?= e($pcRow['code']) ?></b> — <?= e($pcRow['title']) ?></a>
     <span class="muted" style="font-size:12.5px">revenue <?= fmoney_short($pcRow['exp_revenue']) ?></span>
+    <?php $pcLock = function_exists('pc_unlink_block_deal') ? pc_unlink_block_deal((int)$o['id']) : '';
+          if ($pcLock !== ''): ?>
+      <span class="muted" style="margin-left:auto;font-size:12.5px" title="<?= e($pcLock) ?>">🔒 Stays linked — this deal <?= !empty($o['contract_id']) ? 'has a contract' : (trim((string)($o['sent_to_accounts_at'] ?? '')) !== '' ? 'is with Accounts' : 'has been won') ?></span>
+    <?php else: ?>
     <form method="post" action="/project-costing-attach" style="display:inline;margin-left:auto" onsubmit="return confirm('Unlink this costing from the deal?')">
       <input type="hidden" name="costing_id" value="<?= (int)$pcRow['id'] ?>"><input type="hidden" name="opportunity_id" value="0"><input type="hidden" name="back" value="<?= e($back) ?>">
       <button class="btn small btn-ghost">Unlink</button>
     </form>
+    <?php endif; ?>
   <?php else: ?>
     <form method="post" action="/project-costing-new" style="display:inline">
       <input type="hidden" name="opportunity_id" value="<?= (int)$o['id'] ?>"><input type="hidden" name="client_id" value="<?= (int)($o['client_id'] ?? 0) ?>">
-      <input type="hidden" name="title" value="<?= e($o['title'] ?? $o['ref'] ?? 'Costing') ?>">
+      <input type="hidden" name="title" value="<?= e(trim((string)($o['name'] ?? '')) ?: ($o['ref'] ?? 'Costing')) ?>">
       <button class="btn small primary">＋ Create costing for this deal</button>
     </form>
     <?php if (!empty($costingUnlinked)): ?>

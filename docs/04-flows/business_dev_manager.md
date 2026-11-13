@@ -38,4 +38,10 @@ flowchart TD
   CTC per person a month and the margin wanted, press "Build the salary break-up": the heads (Basic,
   HRA, PF …) come from the company's salary components and add up to the CTC; the rate follows the
   margin. Any head can still be changed. Either Save on the page keeps both the role and the settings.
+- **…or from the rate the client pays** (owner, 13 Nov 2026): the same Quick start asks "I know the
+  CTC" or "I know the rate the client pays". Choose the second, type the rate and the margin: it tells
+  you the CTC you can afford and fills in its break-up. Only the box for your choice is shown.
+- **A costing stays with its quotation once the quotation is sent, won or has a contract** (owner,
+  13 Nov 2026): "Unlink" is replaced by "🔒 Stays linked". To change figures after that, raise a
+  revision. While the quotation is a draft or in approval, unlinking works as before and is logged.
 - Most common task = create & send a quote (a few clicks through the quote form).
