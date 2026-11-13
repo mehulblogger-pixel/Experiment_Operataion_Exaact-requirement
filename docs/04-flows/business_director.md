@@ -14,6 +14,7 @@ flowchart TD
 
 - **Landing:** `/` exec dashboard (`dashboard.php:391`).
 - **Can:** view **every** module (except identity, stripped at `access.php:366-369`); read all money figures; view the compliance audit log; endorse contract openings (`contracts.php:473-477`).
+- **The signatures are each company's own rule (owner, 13 Nov 2026).** What is described here is the standard rule. A company can change how many approvals a contract needs (two, one, none) and who gives each under **Admin → Approvals → Sales → Contract**. On the screen you are offered the one signature that is yours to give now, and you read — by name — who it is waiting for otherwise.
 - **Cannot (by default):** edit operational records, manage users, change **system settings** (no `settings.manage` — the settings tile is hidden, `areas.php:213`), or see identity documents.
 - **Handoffs:** primarily a reader; endorsing a contract hands off to the Branch Manager.
 - Most common task = read dashboards (0-click landing) and drill into figures.

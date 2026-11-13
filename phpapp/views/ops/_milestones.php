@@ -125,7 +125,7 @@ foreach (($msHidden ?? []) as $k => $v) $hidden .= '<input type="hidden" name="'
             <div class="ff-help">The shares are of this figure.</div></div>
           <?php if (!empty($msAmend)): ?>
             <div class="ff ff-wide"><label>Reason for the change</label><input class="form-control" name="amend_reason" maxlength="400" placeholder="e.g. Client agreed to split delivery into two stages">
-              <div class="ff-help">This contract is open, so a change is an amendment: a manager endorses it and the branch manager approves it. Until then the current schedule stays.</div></div>
+              <div class="ff-help">This contract is open, so a change is an amendment: <?= e(contract_rule_sentence(true)) ?>. Until then the current schedule stays.</div></div>
           <?php endif; ?>
         <?php endif; ?>
       </div>

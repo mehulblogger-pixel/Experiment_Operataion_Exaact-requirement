@@ -67,8 +67,8 @@
   <?php if ($canSeeMoney && (float)($c['value'] ?? 0) > 0): ?><div><span class="k">Value</span><?= e(cur_sym()) ?><?= number_format((float)$c['value'],0) ?></div><?php endif; ?>
   <div><span class="k">Billing branch</span><?= e($c['branch_name'] ?: '—') ?></div>
   <?php if (!empty($c['requested_by'])): ?><div><span class="k">Requested</span><?= e($c['requested_by']) ?><?= $c['requested_at']?' · '.e(substr($c['requested_at'],0,10)):'' ?></div><?php endif; ?>
-  <?php if (!empty($c['mgr_endorsed_at'])): ?><div><span class="k">Endorsed (manager)</span><?= e($c['mgr_endorsed_by']) ?> · <?= e(substr($c['mgr_endorsed_at'],0,10)) ?></div><?php endif; ?>
-  <?php if (!empty($c['bm_approved_at'])): ?><div><span class="k">Approved (branch mgr)</span><?= e($c['bm_approved_by']) ?> · <?= e(substr($c['bm_approved_at'],0,10)) ?></div><?php endif; ?>
+  <?php if (!empty($c['mgr_endorsed_at'])): ?><div><span class="k">First signature</span><?= e($c['mgr_endorsed_by']) ?> · <?= e(substr($c['mgr_endorsed_at'],0,10)) ?></div><?php endif; ?>
+  <?php if (!empty($c['bm_approved_at'])): ?><div><span class="k">Final approval</span><?= e($c['bm_approved_by']) ?> · <?= e(substr($c['bm_approved_at'],0,10)) ?></div><?php endif; ?>
   <?php if (!empty($c['notes'])): ?><div class="kv-wide"><span class="k">Notes</span><?= e($c['notes']) ?></div><?php endif; ?>
 </div></div>
 
@@ -103,22 +103,11 @@
       <b style="margin-left:6px"><?= e(contract_amendment_summary($am)) ?></b>
       <div class="muted" style="font-size:12.5px;margin-top:3px">
         Asked by <?= e($am['requested_by']) ?> on <?= e(fdate($am['requested_at'])) ?> — <?= e($am['reason']) ?>
-        <?= trim((string)$am['endorsed_at']) !== '' ? ' · endorsed by ' . e($am['endorsed_by']) . ' on ' . e(fdate($am['endorsed_at'])) : '' ?>
+        <?= trim((string)$am['endorsed_at']) !== '' ? ' · first signature by ' . e($am['endorsed_by']) . ' on ' . e(fdate($am['endorsed_at'])) : '' ?>
         <?= trim((string)$am['decided_at']) !== '' ? ' · ' . strtolower(e($am['status'])) . ' by ' . e($am['decided_by']) . ' on ' . e(fdate($am['decided_at'])) . ($am['decision_note'] !== '' ? ' — ' . e($am['decision_note']) : '') : '' ?>
       </div>
-      <?php if ($pend): $endorsed = trim((string)$am['endorsed_at']) !== ''; ?>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
-          <?php if (!$endorsed && !empty($canEndorse)): ?>
-            <form method="post" action="/contract-open"><input type="hidden" name="id" value="<?= (int)$c['id'] ?>"><input type="hidden" name="do" value="amend-endorse"><button class="btn small">Endorse</button></form>
-          <?php endif; ?>
-          <?php if (($endorsed || is_master()) && !empty($canApprove)): ?>
-            <form method="post" action="/contract-open"><input type="hidden" name="id" value="<?= (int)$c['id'] ?>"><input type="hidden" name="do" value="amend-approve"><button class="btn small">Approve amendment</button></form>
-          <?php endif; ?>
-          <?php if (!empty($canEndorse) || !empty($canApprove)): ?>
-            <form method="post" action="/contract-open" style="display:flex;gap:6px"><input type="hidden" name="id" value="<?= (int)$c['id'] ?>"><input type="hidden" name="do" value="amend-reject">
-              <input class="form-control" name="note" required placeholder="Why it is rejected" style="width:200px"><button class="btn small secondary">Reject</button></form>
-          <?php endif; ?>
-        </div>
+      <?php if ($pend): ?>
+        <div style="margin-top:8px"><?php $sg = contract_amend_stage($c, $am); $sgId = (int)$c['id']; $sgKind = 'amend'; include __DIR__ . '/_contract_sign.php'; ?></div>
       <?php endif; ?>
     </div>
   <?php endforeach; ?>
@@ -157,7 +146,7 @@
     <?php if ($os === 'OPEN'): ?>
     <div class="ff ff-wide"><label for="amend_reason">Reason for the amendment <span class="muted">— needed only if you change the value, dates or quantities</span></label>
       <input class="form-control" id="amend_reason" name="amend_reason" maxlength="400" placeholder="For example: customer extended the work by three months, PO amendment 2">
-      <small class="muted">This contract is open, so new figures need a manager's endorsement and the branch manager's approval, as the opening did. Until then it keeps its current figures.</small></div>
+      <small class="muted">This contract is open, so new figures are an amendment: <?= e(contract_rule_sentence(true)) ?>. Until then it keeps its current figures.</small></div>
     <?php endif; ?>
     <button class="btn small" type="submit">Save changes</button>
   </form>
@@ -232,7 +221,7 @@
         billunit_can_set_contract_terms() && !(function_exists('contract_pending_amendment') && contract_pending_amendment((int)$c['id'])),
         'Every ' . Tl('job') . ' under this contract follows these terms unless its work order or the ' . Tl('job') . ' sets its own. Nothing ticked: a deployment bills month by month, man-day work at closure.',
         strtoupper((string)($c['open_status'] ?? '') ?: 'OPEN') === 'OPEN'
-          ? 'This contract is open (signed off). A change to its billing terms is an amendment: it needs a manager\'s endorsement and the branch manager\'s approval, and the current terms stay in force until then.' : '') ?>
+          ? 'This contract is open (signed off). A change to its billing terms is an amendment — ' . contract_rule_sentence(true) . ' — and the current terms stay in force until then.' : '') ?>
   <?php if (function_exists('contract_pending_amendment') && contract_pending_amendment((int)$c['id'])): ?>
     <p class="muted" style="font-size:12.5px;margin:8px 0 0">An amendment is waiting for its signatures (<a href="#amendments">see it</a>) — the billing terms can be changed again once it is decided.</p>
   <?php endif; ?>
@@ -251,7 +240,10 @@
         $msAmend = $msOpen; $msPendingAmend = function_exists('contract_pending_amendment') && (bool)contract_pending_amendment((int)$c['id']);
         $msAction = '/contract-milestones'; $msHidden = ['contract_id' => (int)$c['id']];
         $msShowMoney = !empty($canSeeMoney); $msRetSummary = $msRet > 0 ? ms_contract_retention($cMs) : null;
-        if ($msRows || $msCanEdit) include __DIR__ . '/_milestones.php';
+        //  Drawn in its OWN scope: the piece has working names of its own ($st, $r, $i …)
+        //  and, included bare, its "$st" replaced this page's status — which hid the
+        //  whole "Won — contract registration" panel on any quotation with a schedule.
+        if ($msRows || $msCanEdit) (static function (array $__page) { extract($__page); include __DIR__ . '/_milestones.php'; })(get_defined_vars());
       endif; ?>
 
 <?php // ---- Source quotation ---------------------------------------------- ?>

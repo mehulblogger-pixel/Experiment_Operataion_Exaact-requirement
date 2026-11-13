@@ -275,7 +275,7 @@
       <b>Contract <?= e($contractRow['contract_number']) ?></b>
       <?= $cOpen
           ? ' is registered and open — raise inspection ' . e(Tlp('call')) . ' from it whenever the work comes in.'
-          : ' is registered and <b>awaiting approval</b> — a manager endorses it and the branch manager approves it, then it opens and the ' . e(Tlp('call')) . ' can be raised from it.' ?>
+          : ' is registered and <b>waiting for approval</b>. ' . e(contract_waiting_words($contractRow)) . ' The ' . e(Tlp('call')) . ' are raised from it once it is open.' ?>
       <?php if ($cOpen && (can('ops.call.create') || is_master())): ?>
         <div style="margin-top:8px"><a class="btn small" href="/call-new?contract_id=<?= (int)$contractRow['id'] ?>">▶ Raise <?= e(Tl('call')) ?></a></div>
       <?php endif; ?>

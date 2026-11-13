@@ -386,6 +386,23 @@ function cockpit_sections() {
         'note' => $hasLogo ? 'customised' : 'default',
     ];
 
+    // Approvals — owner, 13 Nov 2026: "when a company is set up, can we ask
+    // accordingly". Who signs off quotations, costings and the opening of a
+    // contract is each company's own answer; this points the person setting the
+    // company up at the one place those answers live. Informational (weight 0):
+    // the standard rules work untouched, so it never lowers readiness.
+    if (function_exists('apsetup_open') && apsetup_open()) {
+        $own = function_exists('setting_get') && (trim((string) setting_get('contract_open_signatures', '')) !== ''
+            || trim((string) setting_get('contract_sig1_roles', '')) !== '' || trim((string) setting_get('contract_sig2_roles', '')) !== '');
+        $secs['approvals'] = [
+            'key' => 'approvals', 'icon' => '✅', 'label' => 'Approvals',
+            'desc' => 'Who signs off quotations, costings and contracts — the standard rules, or your own.',
+            'route' => '/approvals-setup',
+            'status' => 'complete', 'pct' => 100, 'weight' => 0,
+            'note' => $own ? 'your own rules' : 'standard rules — change them any time',
+        ];
+    }
+
     return $secs;
 }
 

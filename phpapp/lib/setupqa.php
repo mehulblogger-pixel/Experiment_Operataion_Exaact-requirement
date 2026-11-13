@@ -34,6 +34,10 @@ function setupqa_value(array $q) {
 function setupqa_save(array $set, array $post) {
     $changed = [];
     foreach ($set['sections'] as $sec) {
+        //  A section may be narrower than the set it sits in (the contract rule is a
+        //  company setting, not something every quotation approver may rewrite).
+        if (isset($sec['can']) && !($sec['can'])()) continue;
+        if (!empty($sec['save'])) foreach (($sec['save'])($post) as $line) $changed[] = $line;
         foreach ($sec['questions'] ?? [] as $q) {
             if (!array_key_exists($q['key'], $post)) continue;
             $v = (string) $post[$q['key']];
@@ -46,6 +50,36 @@ function setupqa_save(array $set, array $post) {
     if ($changed && function_exists('act_log'))
         act_log('SETTINGS', 0, 'SETUP', ucfirst($set['title']) . ' answered: ' . implode('; ', $changed), []);
     return $changed;
+}
+
+// The tabs of Admin → Approvals → Sales (owner, 13 Nov 2026: "one sub tab under
+// approval as Sales Approval, when clicked it opens sub tabs like quote approval,
+// contract approval, costing approval and so on"). Each tab is the SAME sections
+// Set up Sales shows, one subject at a time — one copy of every rule, two ways in.
+const SALES_APPROVAL_TABS = ['quote' => 'Quotation', 'costing' => 'Project costing', 'contract' => 'Contract', 'deals' => 'Deal stages', 'leads' => 'Leads'];
+function ops_sales_approvals($method) {
+    $set = setupqa_sales_set();
+    ops_require(($set['can'])(), 'Only someone who may change the Sales settings can open the Sales approvals.');
+    $tab = (string)($_GET['tab'] ?? $_POST['tab'] ?? 'quote'); if (!isset(SALES_APPROVAL_TABS[$tab])) $tab = 'quote';
+    $tabs = SALES_APPROVAL_TABS;
+    if (function_exists('Tl')) $tabs['quote'] = ucfirst(Tl('quote'));
+    $set['sections'] = array_values(array_filter($set['sections'], fn($sec) => ($sec['tab'] ?? '') === $tab));
+    if ($method === 'POST') {
+        $changed = setupqa_save($set, $_POST);
+        flash($changed ? 'Saved — ' . implode('; ', $changed) . '. It applies from now on.' : 'Nothing changed — the rule was already this.');
+        redirect('/sales-approvals?tab=' . $tab);
+    }
+    //  Back means UP: an administrator came through Admin → Approvals; a quotation
+    //  approver (who has no Admin area) came through Sales → Set up Sales.
+    $viaAdmin = false;
+    if (function_exists('apsetup_open')) foreach (apsetup_open() as $a) if (($a['key'] ?? '') === 'sales') $viaAdmin = true;
+    if (function_exists('nav_under')) {
+        if ($viaAdmin) nav_under('sales-approvals', 'admin', ['label' => 'Approvals', 'url' => '/approvals-setup']);
+        else nav_under('sales-approvals', 'sales', ['label' => 'Set up Sales', 'url' => '/sales-setup']);
+    }
+    view('ops/sales_approvals', ['set' => $set, 'tab' => $tab, 'tabs' => $tabs, 'viaAdmin' => $viaAdmin,
+        'strip' => ($viaAdmin && function_exists('apsetup_strip')) ? apsetup_strip('sales') : '']);
+    return true;
 }
 
 function ops_setup_questions($setKey, $method) {
@@ -66,6 +100,7 @@ function ops_setup_questions($setKey, $method) {
 // ---- Sales -------------------------------------------------------------------
 function setupqa_sales_set() {
     $L = function_exists('Tl') ? Tl('quote') : 'quotation';
+    $O = setupqa_sales_other_approvals_by_tab();
     return [
         'title' => 'Sales',
         'route' => 'sales-setup',
@@ -75,6 +110,7 @@ function setupqa_sales_set() {
         'can'   => fn() => is_master() || can('settings.manage') || can('crm.quote.approve'),
         'sections' => [
             [
+                'tab' => 'quote',
                 'title' => 'Approving a ' . $L,
                 'facts' => setupqa_sales_level_facts(),
                 'questions' => [
@@ -109,13 +145,6 @@ function setupqa_sales_set() {
                         'options' => ['0' => 'Never — it waits for its own approver', '1' => 'After 1 day', '2' => 'After 2 days', '3' => 'After 3 days', '7' => 'After a week'],
                         'default' => '0',
                     ],
-                    [
-                        'key' => 'quote_manmonth_costing',
-                        'ask' => 'Must a man-month ' . $L . ' come from an approved project costing before it is submitted, approved or sent?',
-                        'why' => 'A man-month price carries salaries, allowances and overheads for months; the costing shows they are covered. Whoever made the ' . $L . ' can still change its prices afterwards, with a note saying why.',
-                        'options' => ['yes' => 'Yes — an approved costing first', 'no' => 'No — the costing is optional'],
-                        'default' => 'yes',
-                    ],
                 ],
                 //  The levels themselves are edited right here (owner, SAL-002:
                 //  "in Sales setup we must have option to set the applicable rules
@@ -124,18 +153,64 @@ function setupqa_sales_set() {
                 'link2' => ['/quote-delegations', 'Set who covers for an approver who is away'],
             ],
             [
+                'tab' => 'costing',
+                'title' => 'Approving a project costing',
+                'facts' => [$O['costing'], 'The levels are the ' . $L . ' levels — change them on the ' . ucfirst($L) . ' tab; there is no second list to keep in step.'],
+                'questions' => [
+                    [
+                        'key' => 'quote_manmonth_costing',
+                        'ask' => 'Must a man-month ' . $L . ' come from an approved project costing before it is submitted, approved or sent?',
+                        'why' => 'A man-month price carries salaries, allowances and overheads for months; the costing shows they are covered. Whoever made the ' . $L . ' can still change its prices afterwards, with a note saying why.',
+                        'options' => ['yes' => 'Yes — an approved costing first', 'no' => 'No — the costing is optional'],
+                        'default' => 'yes',
+                    ],
+                ],
+                'link' => null,
+            ],
+            [
+                //  Owner, 13 Nov 2026: "Hope these approvals are not hard coded … All
+                //  approvals shall be set by the individual organisation."
+                'tab' => 'contract',
+                'title' => 'Opening a contract',
+                'can' => fn() => function_exists('contract_rule_editable') && contract_rule_editable(),
+                'save' => fn($post) => function_exists('contract_rule_save') ? contract_rule_save($post) : [],
+                'facts' => setupqa_sales_contract_facts(),
+                'questions' => [
+                    [
+                        'key' => 'contract_open_signatures',
+                        'ask' => 'How many approvals does a new contract need before it opens?',
+                        'why' => 'Until a contract is open, no work can be raised against it. A later change to an open contract (value, dates, quantities, billing terms) follows the same answer.',
+                        'options' => ['2' => 'Two — a first signature, then a final approval', '1' => 'One — a single approval', '0' => 'None — it opens as soon as it is registered'],
+                        'default' => '2',
+                    ],
+                    [
+                        'key' => 'contract_same_person',
+                        'ask' => 'With two approvals, may one person give both?',
+                        'why' => 'Two different people is the safer answer. A very small company, where one person holds both jobs, may need "yes".',
+                        'options' => ['no' => 'No — two different people', 'yes' => 'Yes — one person may give both'],
+                        'default' => 'no',
+                        'only_when' => ['contract_open_signatures', '2'],
+                    ],
+                ],
+                'editor' => 'contract_signers',
+                'link' => null,
+            ],
+            [
+                'tab' => 'deals',
                 'title' => 'Approving a deal as it moves stage',
-                'facts' => setupqa_sales_gate_facts(),
+                'facts' => array_merge(setupqa_sales_gate_facts(), [$O['deals']]),
                 'questions' => [],
                 'link' => ['/stage-gates', 'Add or change the rules for deal stages'],
             ],
             [
-                'title' => 'Other approvals in Sales',
-                'facts' => setupqa_sales_other_approvals(),
+                'tab' => 'leads',
+                'title' => 'Leads — marking lost, giving to someone else, reopening',
+                'facts' => [$O['leads']],
                 'questions' => [],
                 'link' => null,
             ],
             [
+                'tab' => 'quote',
                 'title' => 'Reviewing the request before it is approved (contract review)',
                 'facts' => [],
                 'questions' => [
@@ -157,10 +232,12 @@ function setupqa_sales_set() {
                 'link' => ['/preorder-checklist', 'Change the checklist points'],
             ],
             [
+                'tab' => 'quote',
                 'title' => 'Already set by your company\'s rules',
                 'facts' => [
                     'Approval values are measured on the ' . $L . ' before tax.',
                     'Any change to the commercial terms or the terms & conditions cancels an approval — the ' . $L . ' goes back to draft and is approved again.',
+                    $O['quote'],
                     'The person assigned to a ' . $L . ' records the customer\'s answer — accepted or lost.',
                     'A customer who is blacklisted, inactive, on hold or blocked gets nothing new — only payment reminders — until someone clears it.',
                 ],
@@ -179,19 +256,45 @@ function setupqa_sales_gate_facts() {
     return array_map('gate_explain', $rows);
 }
 
-// Every other approval in Sales, with who gives it. These follow the company's
-// decided rules (docs/02-permission-matrix.md 19e, 19f; D-11 B) and have no
-// setting, so they are stated rather than asked.
-function setupqa_sales_other_approvals() {
+// Every other approval in Sales, with who gives it. Leads, deals and project
+// costing follow the company's decided rules (docs/02-permission-matrix.md 19e,
+// 19f; D-11 B) and have no setting, so they are stated rather than asked. Opening
+// a contract IS a setting (owner, 13 Nov 2026) — its sentence is the rule in force.
+function setupqa_sales_other_approvals_by_tab() {
     $q = function_exists('Tl') ? Tl('quote') : 'quotation';
     return [
-        'Leads: only the person responsible marks a lead lost, with a reason and remarks. Giving a lead that already has an owner to someone else waits for a manager\'s approval — the owner\'s reporting manager, or a sales manager over that branch. A manager may reopen a lost lead, with a reason that is kept.',
-        'Deals (opportunities): only the stage rules above. A manager may reopen a closed deal, with a reason that is kept — unless it has already become an order or contract.',
-        'Project costing (man-month work): tagged with its enquiry or lead, and approved through the same levels as a ' . (function_exists('Tl') ? Tl('quote') : 'quotation') . ' of that value — never by the person who prepared it.',
-        ucfirst($q) . 's: the levels above' . (function_exists('crm_approval_mode') && crm_approval_mode() === 'together' ? ', all at the same time.' : ', in order — level 1 first, then level 2, and so on.')
+        'leads' => 'Leads: only the person responsible marks a lead lost, with a reason and remarks. Giving a lead that already has an owner to someone else waits for a manager\'s approval — the owner\'s reporting manager, or a sales manager over that branch. A manager may reopen a lost lead, with a reason that is kept.',
+        'deals' => 'Deals (opportunities): only the stage rules above. A manager may reopen a closed deal, with a reason that is kept — unless it has already become an order or contract.',
+        'costing' => 'Project costing (man-month work): tagged with its enquiry or lead, and approved through the same levels as a ' . $q . ' of that value — never by the person who prepared it.',
+        'quote' => ucfirst($q) . 's: the levels above' . (function_exists('crm_approval_mode') && crm_approval_mode() === 'together' ? ', all at the same time.' : ', in order — level 1 first, then level 2, and so on.')
             . ' A ' . $q . ' made from an approved project costing, at the costing\'s prices, is not approved a second time. With no levels at all, no approval is needed.',
-        'Opening a contract, and any later change to its value, dates or quantities: two different people — endorsed by an Operation Manager, Business Unit Head, Business Director or a branch user-manager, then approved by a Branch Manager or Branch Application Manager.',
+        'contract' => 'Opening a contract: ' . (function_exists('contract_rule_sentence') ? contract_rule_sentence() : 'two signatures') . '.'
+            . (function_exists('contract_rule_sentence') ? ' A later change to an open contract\'s value, dates or quantities: ' . contract_rule_sentence(true) . '.' : ''),
     ];
+}
+function setupqa_sales_other_approvals() { return array_values(setupqa_sales_other_approvals_by_tab()); }
+
+// The contract rule as it stands, in sentences — with a warning when a signature
+// has nobody to give it, so it is fixed here and not discovered on a won order.
+function setupqa_sales_contract_facts() {
+    if (!function_exists('contract_open_rule')) return [];
+    $rule = contract_open_rule(); $n = (int)$rule['signatures'];
+    $out = ['Today: ' . contract_rule_sentence() . '.'];
+    if ($n === 0) $out[] = 'A later change to an open contract still takes one approval, from ' . contract_sig_label(2, $rule) . ' — it rewrites a contract that is already in force.';
+    foreach ($n === 2 ? [1, 2] : [2] as $i)
+        if (!contract_sig_people($i, null, 0, $rule))
+            $out[] = '⚠ Nobody can give the ' . ($i === 1 ? 'first signature' : 'final approval') . ' yet — no active person is a ' . contract_sig_label($i, $rule) . '. Until someone is, only the Master Admin can sign.';
+    if (!$rule['sig'][1]['standard'] || !$rule['sig'][2]['standard'] || setting_get('contract_open_signatures', '') !== '') $out[] = 'This is your company\'s own rule. The standard one is: two signatures — first Operation Manager, Business Unit Head, Admin, Business Director or anyone who manages a branch\'s users, then Branch Manager or Branch Application Manager, two different people.';
+    return $out;
+}
+
+// What the "who gives each signature" editor needs.
+function setupqa_contract_signers_data() {
+    $rule = function_exists('contract_open_rule') ? contract_open_rule() : null;
+    $roles = function_exists('roles_all') ? roles_all() : ORG_ROLES; unset($roles['INSPECTOR'], $roles['MASTER_ADMIN']);
+    $can = function_exists('contract_rule_editable') && contract_rule_editable();
+    return ['rule' => $rule, 'roles' => $roles, 'can' => $can,
+            'users' => $can ? (ops_all("SELECT id, first_name, last_name, username FROM users WHERE is_active=1 AND COALESCE(is_superuser,0)=0 ORDER BY first_name, username") ?: []) : []];
 }
 
 // What the in-place level editor on Set up Sales needs. Editing needs the same

@@ -432,8 +432,9 @@ none is typed, the client's branch, and who asked for it recorded. No new status
 stateDiagram-v2
   [*] --> PENDING : quote-contract registers a NEW number · crm.contract.register/master (crm.php:1866, guard 1830)
   [*] --> OPEN : re-use existing OPEN number (rate-contract draw-down) · crm.php:1861-1863
-  PENDING --> PENDING : endorse (records manager) · can_endorse_contract_open (contracts.php:643-653)
-  PENDING --> OPEN : approve · can_approve_contract_open, endorsed first, approver≠endorser (contracts.php:660-672)
+  [*] --> OPEN : registered by a company whose rule asks for NO approval · contract_after_register (owner, 13 Nov 2026)
+  PENDING --> PENDING : first signature (only when the company asks for two) · can_endorse_contract_open
+  PENDING --> OPEN : final approval · can_approve_contract_open; with two signatures: first one given, and a different person unless the company allows one person to give both
   PENDING --> REJECTED : reject · endorse OR approve rights (contracts.php:679-683)
   OPEN --> CLOSED : idle auto-close cron (≥ idle days) · system, no user (contracts.php:543-546)
   REJECTED --> PENDING : reopen · crm.contract.register/master (contracts.php:689-692)
@@ -441,10 +442,23 @@ stateDiagram-v2
   OPEN --> [*]
 ```
 
-- `can_endorse_contract_open()` (`contracts.php:473-477`): master, or OPERATION_MANAGER /
-  SBU_HEAD / ADMIN / BUSINESS_DIRECTOR, or `users.manage.branch`.
-- `can_approve_contract_open()` (`contracts.php:478-481`): master, or BRANCH_MANAGER /
-  BRANCH_APP_MANAGER.
+- **Who signs is each company's own rule (owner, 13 Nov 2026)** — `contract_open_rule()`, set under
+  Admin → Approvals → Sales → Contract: two approvals, one, or none; the roles and/or one named
+  person for each; whether one person may give both. No status was added. The only new entry is
+  "registered straight to OPEN" for a company that asks for no approval, which the owner approved
+  ("none, one or two — Yes").
+- The STANDARD rule (a company that never answers) is what the code used to fix:
+  `can_endorse_contract_open()` — master, or OPERATION_MANAGER / SBU_HEAD / ADMIN /
+  BUSINESS_DIRECTOR, or `users.manage.branch`; `can_approve_contract_open()` — master, or
+  BRANCH_MANAGER / BRANCH_APP_MANAGER; two different people.
+- **One button per viewer** (`contract_open_stage()`, drawn by `views/ops/_contract_sign.php` on the
+  quotation, the contract page and Contract openings): the signature that is theirs to give now.
+  Someone who could give either signature but not both is treated as the final approver and is
+  offered the first signature only as a quiet second choice (or as the main one when nobody else
+  could give it). Everyone reads who it waits for, by name; when nobody holds a signature it says
+  so and where to set it. A won quotation reads "contract … is waiting for approval" until it opens.
+- An amendment to an OPEN contract follows the same rule (`contract_amend_stage()`); where the
+  company asks for no approval to open, an amendment still takes the one final approval.
 - Each action guards `status==='PENDING'` (endorse 645, approve 662, reject 681); reopen is
   the deliberate from-closed/rejected path — **enforced since 20 Oct 2026**: a reopen of an OPEN
   or PENDING contract is refused (it used to wipe both signatures of an open contract, SA-19).
@@ -464,8 +478,8 @@ re-works out what is due on the contract's jobs. One amendment waits at a time. 
 ```mermaid
 stateDiagram-v2
   [*] --> PENDING : contract-edit on an OPEN contract with commercial changes + a reason · crm.contract.register/master
-  PENDING --> PENDING : endorse · can_endorse_contract_open
-  PENDING --> APPROVED : approve · can_approve_contract_open, endorsed first, approver ≠ endorser (unless master) — the new figures replace the old, in one transaction
+  PENDING --> PENDING : first signature (only when the company's rule asks for two) · can_endorse_contract_open
+  PENDING --> APPROVED : final approval · can_approve_contract_open; with two: first signature given, a different person unless the company allows one (or master) — the new figures replace the old, in one transaction
   PENDING --> REJECTED : reject, with a reason · endorse OR approve rights — the contract keeps its figures
   APPROVED --> [*]
   REJECTED --> [*]

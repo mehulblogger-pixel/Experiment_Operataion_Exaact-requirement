@@ -541,8 +541,8 @@ function ops_milestones($route, $method) {
                 db()->prepare("INSERT INTO contract_amendments (contract_id,status,old_values,new_values,reason,requested_by,requested_by_id,requested_at) VALUES (?, 'PENDING', ?,?,?,?,?,?)")
                     ->execute([(int)$c['id'], json_encode(['milestones' => $old]), json_encode(['milestones' => $new]), mb_substr($reason, 0, 400),
                                user_name($u), (int)($u['id'] ?? 0) ?: null, date('c')]);
-                ms_log($c, 'Amendment requested to the billing schedule — ' . $reason . '. Pending manager & branch-manager approval.');
-                flash('Amendment requested. It needs a manager\'s endorsement and the branch manager\'s approval; until then the current schedule stays in force.', 'warning');
+                ms_log($c, 'Amendment requested to the billing schedule — ' . $reason . '. ' . ucfirst(contract_rule_sentence(true)) . '.');
+                flash('Amendment requested. It needs ' . contract_rule_sentence(true) . '; until then the current schedule stays in force.', 'warning');
                 redirect('/contract?id=' . (int)$c['id'] . '#amendments');
             }
             ms_contract_replace_planned((int)$c['id'], $rows, $ret, $base);

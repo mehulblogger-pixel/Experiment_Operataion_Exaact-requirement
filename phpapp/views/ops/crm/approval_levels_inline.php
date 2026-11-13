@@ -11,18 +11,18 @@
 //  allowed, so each card's inputs name their own form with the `form`
 //  attribute, and those forms are printed after the answers form ($mode =
 //  'forms'). They post to the rule routes the separate screen has always used
-//  (same permission, same checks) with back=sales-setup, which returns here.
+//  (same permission, same checks) with back=sales-setup (or back=sales-approvals), which returns here.
 $L = setupqa_quote_levels_data();
 $mode = $mode ?? 'rows';
 $rows = $L['rows'];
 if ($mode === 'forms') {
     if (!$L['can']) return;
     foreach ($rows as $r): ?>
-      <form method="post" id="ql-<?= (int) $r['id'] ?>" action="/quote-approval-rule-edit?id=<?= (int) $r['id'] ?>&amp;back=sales-setup"></form>
-      <form method="post" id="qld-<?= (int) $r['id'] ?>" action="/quote-approval-rule-delete?id=<?= (int) $r['id'] ?>&amp;back=sales-setup"
+      <form method="post" id="ql-<?= (int) $r['id'] ?>" action="/quote-approval-rule-edit?id=<?= (int) $r['id'] ?>&amp;back=<?= e($levelsBack ?? 'sales-setup') ?>"></form>
+      <form method="post" id="qld-<?= (int) $r['id'] ?>" action="/quote-approval-rule-delete?id=<?= (int) $r['id'] ?>&amp;back=<?= e($levelsBack ?? 'sales-setup') ?>"
             onsubmit="return confirm('Remove this approval level? Quotations already approved keep their approval.')"></form>
     <?php endforeach; ?>
-    <form method="post" id="ql-new" action="/quote-approval-rule-new?back=sales-setup"></form>
+    <form method="post" id="ql-new" action="/quote-approval-rule-new?back=<?= e($levelsBack ?? 'sales-setup') ?>"></form>
     <?php return;
 }
 

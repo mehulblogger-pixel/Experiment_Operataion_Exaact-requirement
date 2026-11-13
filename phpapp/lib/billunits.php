@@ -906,9 +906,9 @@ function billunit_contract_terms_request(array $c, $t, $p, $reason) {
                        function_exists('user_name') ? user_name($u) : '', (int)($u['id'] ?? 0) ?: null, date('c')]);
         $am = contract_pending_amendment($id);
         $qid = function_exists('contract_quote_id') ? contract_quote_id($c) : 0;
-        if ($qid && function_exists('crm_log_change')) crm_log_change($qid, 'Contract ' . $c['contract_number'] . ' amendment requested — ' . contract_amendment_summary($am) . ' — ' . $reason . '. Pending manager & branch-manager approval.');
+        if ($qid && function_exists('crm_log_change')) crm_log_change($qid, 'Contract ' . $c['contract_number'] . ' amendment requested — ' . contract_amendment_summary($am) . ' — ' . $reason . '. ' . ucfirst(contract_rule_sentence(true)) . '.');
         return ['kind' => 'amendment', 'level' => 'warning',
-                'msg' => 'Amendment requested — ' . contract_amendment_summary($am) . '. It needs a manager\'s endorsement and the branch manager\'s approval; until then the current billing terms stay in force.'];
+                'msg' => 'Amendment requested — ' . contract_amendment_summary($am) . '. It needs ' . contract_rule_sentence(true) . '; until then the current billing terms stay in force.'];
     }
     billunit_contract_terms_apply($c, $t, $p);
     // A contract still awaiting its signatures: an endorsement given for other
@@ -919,7 +919,7 @@ function billunit_contract_terms_request(array $c, $t, $p, $reason) {
         $unendorsed = true;
     }
     return ['kind' => 'saved', 'level' => 'success',
-            'msg' => 'Billing terms saved for contract ' . $c['contract_number'] . '.' . ($unendorsed ? ' The manager\'s endorsement was withdrawn — it was given for the earlier terms; it needs endorsing again.' : '')];
+            'msg' => 'Billing terms saved for contract ' . $c['contract_number'] . '.' . ($unendorsed ? ' The first signature was withdrawn — it was given for the earlier terms; it needs signing again.' : '')];
 }
 
 // Write a contract's billing terms and re-work out what is due on its jobs —

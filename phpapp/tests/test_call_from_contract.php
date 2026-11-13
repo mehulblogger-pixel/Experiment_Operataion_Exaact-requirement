@@ -32,8 +32,10 @@ $pbP = crm_quote_playbook(['id' => 0, 'status' => 'ACCEPTED', 'contract_number' 
 $orderP = $stepBy($pbP, 'order');
 t_ok($orderP['href'] === '' && $orderP['cta'] === '',
     'a not-yet-open (PENDING) contract offers no raise-call action');
-t_ok(strpos((string)$orderP['line'], 'endorsed and approved') !== false,
-    'the step explains the contract must be endorsed and approved first');
+//  "endorsed and approved" was the one fixed rule; the company now sets its own (13 Nov 2026),
+//  so the step says what is true under any of them: it must be approved — opened — first.
+t_ok(strpos((string)$orderP['line'], 'must be approved (opened)') !== false,
+    'the step explains the contract must be approved (opened) first');
 
 // Accepted but NO contract yet → no raise-call link; the contract must be registered first.
 $pb2 = crm_quote_playbook(['id' => 0, 'status' => 'ACCEPTED', 'contract_number' => '']);

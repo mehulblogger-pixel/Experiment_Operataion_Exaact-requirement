@@ -60,10 +60,16 @@ $pdo->prepare("INSERT INTO vouchers (inspector_id,month,status,created_at)
 $tasks2 = ops_pending_tasks();
 $byLabel2 = []; foreach ($tasks2 as $t) $byLabel2[$t['label']] = (int)$t['n'];
 t_ok(($byLabel2['quotes to approve'] ?? 0) >= 1, 'quotations awaiting my approval show as a task');
-if (function_exists('can_endorse_contract_open') && can_endorse_contract_open())
-    t_ok(($byLabel2['contracts to endorse'] ?? 0) >= 1, 'a contract awaiting my endorsement shows as a task');
-if (function_exists('can_approve_contract_open') && can_approve_contract_open())
-    t_ok(($byLabel2['contracts to approve'] ?? 0) >= 1, 'a contract awaiting my approval shows as a task');
+//  Each person is counted what is theirs to sign NOW (owner, 13 Nov 2026 — the rule is the
+//  company's own). The Master Admin can open either contract outright, so both count as "to approve".
+if (function_exists('is_master') && is_master())
+    t_ok(($byLabel2['contracts to approve'] ?? 0) >= 2, 'the Master Admin can open both waiting contracts — both show as tasks');
+else {
+    if (function_exists('can_endorse_contract_open') && can_endorse_contract_open() && !can_approve_contract_open())
+        t_ok(($byLabel2['contracts to endorse'] ?? 0) >= 1, 'a contract awaiting my first signature shows as a task');
+    if (function_exists('can_approve_contract_open') && can_approve_contract_open())
+        t_ok(($byLabel2['contracts to approve'] ?? 0) >= 1, 'a contract awaiting my approval shows as a task');
+}
 if (is_coordinator_level())
     t_ok(($byLabel2['vouchers to approve'] ?? 0) >= 1, 'a submitted voucher shows for a manager to approve');
 

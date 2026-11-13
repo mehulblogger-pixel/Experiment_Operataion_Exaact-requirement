@@ -15,6 +15,7 @@ flowchart TD
 
 - **Landing:** `/` dashboard (ops emphasis). Does the full coordinator operational flow (raise call, allocate, close — see `coordinator.md`) plus management actions.
 - **Endorses** contract openings (`can_endorse_contract_open()`, `contracts.php:473-477`) → handoff to the Branch Manager to approve.
+- **The signatures are each company's own rule (owner, 13 Nov 2026).** What is described here is the standard rule. A company can change how many approvals a contract needs (two, one, none) and who gives each under **Admin → Approvals → Sales → Contract**. On the screen you are offered the one signature that is yours to give now, and you read — by name — who it is waiting for otherwise.
 - **Approves reports** (`workforce.report.approve`) and can **finalise/issue** (`idems.finalize`) — subject to approver≠issuer (`idems.php:4460`).
 - Sees profitability (`data.profitability`) and revenue, **not** salary or credit.
 - **Must never:** manage users/settings; see salary/credit figures.

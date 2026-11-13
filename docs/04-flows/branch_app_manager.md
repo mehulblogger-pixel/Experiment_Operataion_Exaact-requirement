@@ -18,4 +18,5 @@ flowchart TD
 - **Cannot:** run inspections or approve/issue reports (read-only on IDEMS; no `idems.finalize`).
 - **Reporting rail (R8 fixed):** the role now holds `mod.idems.view` (read-only), so the Reporting module and its config screens appear on the rail — no longer only via Admin tiles.
 - **Handoffs:** approves an endorsed contract → floats the order to Operations.
+- **The signatures are each company's own rule (owner, 13 Nov 2026).** What is described here is the standard rule. A company can change how many approvals a contract needs (two, one, none) and who gives each under **Admin → Approvals → Sales → Contract**. On the screen you are offered the one signature that is yours to give now, and you read — by name — who it is waiting for otherwise.
 - Most common task = maintain masters / add a login (a few clicks per record).

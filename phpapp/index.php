@@ -1754,7 +1754,10 @@ if ($route === 'partner-add' && $method === 'POST') {
             // branch manager who approve it are found from these, as on the CRM path.
             try { $pdo->prepare("UPDATE partner_contracts SET branch_id=?, requested_by=?, requested_by_id=?, requested_at=? WHERE id=?")
                       ->execute([$ctBranch, user_name(current_user()), (int)(current_user()['id'] ?? 0) ?: null, date('c'), $newId]); } catch (Throwable $e) {}
-            if (function_exists('act_log')) try { act_log('CONTRACT', $newId, 'CREATE', 'Contract ' . $b['contract_number'] . ' recorded for ' . partner_name($p) . ' from the client record — awaiting endorsement', []); } catch (Throwable $e) {}
+            //  The company's own rule (Admin → Approvals → Sales → Contract): with no
+            //  signature asked for, it is open now; otherwise it waits for them.
+            $ctNow = function_exists('contract_after_register') ? contract_after_register($newId, (int)($b['quotation_id'] ?? 0)) : 'PENDING';
+            if (function_exists('act_log')) try { act_log('CONTRACT', $newId, 'CREATE', 'Contract ' . $b['contract_number'] . ' recorded for ' . partner_name($p) . ' from the client record — ' . ($ctNow === 'OPEN' ? 'open (no approval asked for)' : 'waiting for approval'), []); } catch (Throwable $e) {}
         }
         // Field #1 — a registration may arrive with its scanned document. Store it
         // on the new row (base64 in-row, like a lead/quote file); over 8 MB is skipped
@@ -1791,11 +1794,11 @@ if ($route === 'partner-add' && $method === 'POST') {
             $qid = (int)($b['quotation_id'] ?? 0);
             if ($qid && contract_link_quotation($newId, $qid)) {
                 $qn = ops_val("SELECT quote_no FROM quotations WHERE id=?", [$qid]);
-                flash('Contract ' . $b['contract_number'] . ' registered (awaiting endorsement), and ' . ($qn ?: Tl('quote')) . ' now carries this contract number.');
+                flash('Contract ' . $b['contract_number'] . ' ' . contract_registered_words($newId) . ' ' . ucfirst((string)($qn ?: Tl('quote'))) . ' now carries this contract number.');
                 redirect("/partner?id={$p['id']}&tab=$ctTab");
             }
         }
-        flash($kind === 'contract' ? 'Contract ' . $b['contract_number'] . ' registered — it is awaiting endorsement, then approval, before it goes live.' : 'Added.');
+        flash($kind === 'contract' ? 'Contract ' . $b['contract_number'] . ' ' . contract_registered_words($newId) : 'Added.');
         if ($kind === 'contract') $tab = $ctTab;
         if ($kind === 'contact' && function_exists('partner_contact_clash')) {
             $clash = partner_contact_clash(trim((string) ($b['mobile'] ?? '')) !== '' ? $b['mobile'] : ($b['phone'] ?? ''), $b['email'] ?? '', (int) $p['id']);

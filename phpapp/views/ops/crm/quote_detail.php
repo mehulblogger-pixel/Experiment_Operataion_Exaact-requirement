@@ -56,7 +56,15 @@
     case 'PENDING_APPROVAL': $nbTitle = 'Waiting for approval' . (!empty($pendingWith) ? ' — with ' . $pendingWith : '') . '.'; $nbNext = 'They approve it, or send it back with a comment.'; break;
     case 'APPROVED': $nbTitle = 'Approved and ready to go out.'; $nbNext = 'Next: send it to the ' . Tl('client') . '.'; break;
     case 'SENT': $nbTitle = 'Sent to the ' . Tl('client') . (trim((string)($q['sent_at'] ?? '')) !== '' ? ' on ' . fdate(substr((string)$q['sent_at'], 0, 10)) : '') . '.'; $nbNext = 'Waiting for their answer — mark it accepted, or lost.'; break;
-    case 'ACCEPTED': $nbTitle = 'Accepted 🎉 — they said yes.'; $nbNext = trim((string)($q['contract_number'] ?? '')) === '' ? 'Next: register the contract number. Inspection calls are then raised from the contract.' : 'Contract registered — raise inspection ' . Tlp('call') . ' from it whenever the work comes in, as many as needed.'; break;
+    case 'ACCEPTED': $nbTitle = 'Accepted 🎉 — they said yes.';
+      //  A registered contract is not an open one: until its signatures are in, say
+      //  who it waits for instead of "raise calls from it" (owner, 13 Nov 2026).
+      $nbOs = !empty($contractRow) ? strtoupper((string)($contractRow['open_status'] ?? '') ?: 'OPEN') : '';
+      if (trim((string)($q['contract_number'] ?? '')) === '') $nbNext = 'Next: register the contract number. Inspection calls are then raised from the contract.';
+      elseif ($nbOs === 'PENDING') { $nbTitle = 'Accepted 🎉 — contract ' . $q['contract_number'] . ' is waiting for approval.'; $nbNext = contract_waiting_words($contractRow); }
+      elseif ($nbOs === 'REJECTED') { $nbTitle = 'Accepted — but opening contract ' . $q['contract_number'] . ' was rejected.'; $nbNext = 'See the reason under Contract below; register it again when it is put right.'; }
+      else $nbNext = 'Contract ' . ($nbOs === 'CLOSED' ? 'closed' : 'open') . ' — ' . ($nbOs === 'CLOSED' ? 'no new ' . Tlp('call') . ' can be raised from it.' : 'raise inspection ' . Tlp('call') . ' from it whenever the work comes in, as many as needed.');
+      break;
     case 'REJECTED': $nbTitle = 'Sent back by ' . ($q['rejected_by'] ?: 'the approver') . '.'; $nbNext = 'Correct it and submit again, or raise a revision.'; break;
     case 'LOST': $nbTitle = 'Closed — not accepted.'; break;
     case 'EXPIRED': $nbTitle = 'Expired — its validity has passed.'; $nbNext = 'Raise a revision to re-issue it.'; break;
@@ -473,7 +481,10 @@
         $msMode = 'quote'; $msBase = ms_quote_base($q); $msRows = ms_with_amounts(ms_rows_quote((int)$q['id']), $msBase);
         $msRet = (float)($q['ms_retention_pct'] ?? 0); $msCanEdit = ms_can_edit_quote($q);
         $msAction = '/quote-milestones'; $msHidden = ['quote_id' => (int)$q['id']]; $msShowMoney = true;
-        if ($msRows || $msCanEdit) include __DIR__ . '/../_milestones.php';
+        //  Drawn in its OWN scope: the piece has working names of its own ($st, $r, $i …)
+        //  and, included bare, its "$st" replaced this page's status — which hid the
+        //  whole "Won — contract registration" panel on any quotation with a schedule.
+        if ($msRows || $msCanEdit) (static function (array $__page) { extract($__page); include __DIR__ . '/../_milestones.php'; })(get_defined_vars());
       endif; ?>
 
 <?php if (!empty($orderCalls)):
@@ -543,8 +554,8 @@
       <tr><td class="muted">Contract number</td><td><b><?= e($q['contract_number']) ?></b>
         <?php if ($cr): ?> <span class="pill" style="background:<?= $osColors[$os] ?? '#64748b' ?>;color:#fff"><?= e($osLabel) ?></span><?php endif; ?></td></tr>
       <?php if ($cr && trim((string)$cr['requested_by'])!==''): ?><tr><td class="muted">Requested</td><td><?= e($cr['requested_by']) ?><?= $cr['requested_at']?' · '.e(substr($cr['requested_at'],0,10)):'' ?></td></tr><?php endif; ?>
-      <?php if ($cr && trim((string)$cr['mgr_endorsed_at'])!==''): ?><tr><td class="muted">Endorsed (manager)</td><td><?= e($cr['mgr_endorsed_by']) ?> · <?= e(substr($cr['mgr_endorsed_at'],0,10)) ?></td></tr><?php endif; ?>
-      <?php if ($cr && trim((string)$cr['bm_approved_at'])!==''): ?><tr><td class="muted">Approved (branch mgr)</td><td><?= e($cr['bm_approved_by']) ?> · <?= e(substr($cr['bm_approved_at'],0,10)) ?></td></tr><?php endif; ?>
+      <?php if ($cr && trim((string)$cr['mgr_endorsed_at'])!==''): ?><tr><td class="muted">First signature</td><td><?= e($cr['mgr_endorsed_by']) ?> · <?= e(substr($cr['mgr_endorsed_at'],0,10)) ?></td></tr><?php endif; ?>
+      <?php if ($cr && trim((string)$cr['bm_approved_at'])!==''): ?><tr><td class="muted">Final approval</td><td><?= e($cr['bm_approved_by']) ?> · <?= e(substr($cr['bm_approved_at'],0,10)) ?></td></tr><?php endif; ?>
       <?php if ($cr && trim((string)$cr['close_reason'])!==''): ?><tr><td class="muted">Note</td><td><?= e($cr['close_reason']) ?></td></tr><?php endif; ?>
     </table>
 
@@ -560,32 +571,9 @@
 
     <?php if ($os === 'PENDING'): ?>
       <div class="panel" style="margin-top:8px;border-left:3px solid #b45309">
-        <b>Opening approval</b> — a manager endorses, then the branch manager approves. Both steps are written into the history below with who and when.
-        <?php $endorsed = trim((string)$cr['mgr_endorsed_at'])!==''; ?>
-        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <?php if ($canEndorseContract && !$endorsed): ?>
-            <form method="post" action="/contract-open" style="display:flex;gap:6px;align-items:center">
-              <input type="hidden" name="id" value="<?= (int)$cr['id'] ?>"><input type="hidden" name="do" value="endorse">
-              <input class="form-control" name="note" placeholder="note (optional)" style="width:180px">
-              <button class="btn small" type="submit">Endorse (manager)</button>
-            </form>
-          <?php elseif ($endorsed): ?>
-            <span class="pill" style="background:#15803d;color:#fff">Manager endorsed</span>
-          <?php endif; ?>
-          <?php if ($canApproveContract): ?>
-            <form method="post" action="/contract-open" style="display:inline">
-              <input type="hidden" name="id" value="<?= (int)$cr['id'] ?>"><input type="hidden" name="do" value="approve">
-              <button class="btn small" type="submit"<?= (!$endorsed && !is_master())?' disabled title="A manager must endorse it first"':'' ?>>Approve &amp; open (branch manager)</button>
-            </form>
-          <?php endif; ?>
-          <?php if ($canEndorseContract || $canApproveContract): ?>
-            <form method="post" action="/contract-open" style="display:inline" onsubmit="return confirm('Reject opening this contract number?')">
-              <input type="hidden" name="id" value="<?= (int)$cr['id'] ?>"><input type="hidden" name="do" value="reject">
-              <button class="btn small danger" type="submit">Reject</button>
-            </form>
-          <?php endif; ?>
-        </div>
-        <p class="sub" style="margin:8px 0 0">The order is <strong>held from operations</strong> until this is approved.<?php if (!$canEndorseContract && !$canApproveContract): ?> You do not have rights to approve — it is with a manager and the branch manager.<?php endif; ?></p>
+        <b>Contract waiting for approval.</b> Each step is written into the history below with who and when.
+        <?php $sg = contract_open_stage($cr); $sgId = (int)$cr['id']; $sgKind = 'open'; include __DIR__ . '/../_contract_sign.php'; ?>
+        <p class="sub" style="margin:8px 0 0">The order is <strong>held from operations</strong> until the contract is open.</p>
       </div>
     <?php elseif ($os === 'OPEN'): ?>
       <p class="sub" style="margin:8px 0 0">The <strong>handover to operations</strong> — <?= e(Tl('client')) ?>, <?= e(Tl('quote')) ?> and contract number, contacts, what was sold, the order lines and the commercial conditions — has gone to the delivery team, so they can raise <?= e(Tlp('call')) ?> against it without asking Sales for anything. It is saved in the system either way; it is also e-mailed once SMTP is set up in Settings.</p>
@@ -593,7 +581,7 @@
     <?php elseif ($os === 'CLOSED' || $os === 'REJECTED'): ?>
       <p class="sub" style="margin:8px 0 0">This contract is <?= $os==='CLOSED' ? ('closed'.($cr['auto_closed']?' automatically after being idle':'')) : 'not opened (opening was rejected)' ?>. <?= e($cr['close_reason']) ?></p>
       <?php if ($canContract): ?>
-        <form method="post" action="/contract-open" style="margin-top:8px" onsubmit="return confirm('Request re-opening this contract? It will need manager and branch-manager approval again.')">
+        <form method="post" action="/contract-open" style="margin-top:8px" onsubmit="return confirm('Request re-opening this contract? It goes through your company\'s contract approval again.')">
           <input type="hidden" name="id" value="<?= (int)$cr['id'] ?>"><input type="hidden" name="do" value="reopen">
           <button class="btn small secondary" type="submit"><?= $os==='CLOSED'?'Request re-opening':'Request opening again' ?></button>
         </form>
@@ -661,7 +649,7 @@
     ?>
     <p class="sub">One click registers it. The number is generated, and the value, dates and branch come across from
       <?= !empty($pf['po_number']) ? 'the ' . e(Tl('client')) . '&rsquo;s purchase order' : 'this ' . e(Tl('quote')) ?> —
-      nothing is re-typed. It is registered as <b>pending</b>: a manager endorses and the branch manager approves before the order floats to operations.</p>
+      nothing is re-typed. Your company's rule for opening it: <b><?= e(contract_rule_sentence()) ?></b>. The order floats to operations once it is open.</p>
 
     <?php if ($existing): ?>
       <?php // The duplicate warning, up front. Most double-registrations happen

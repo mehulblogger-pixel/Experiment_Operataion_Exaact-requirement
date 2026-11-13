@@ -566,7 +566,7 @@ function crm_quote_playbook($q) {
         'done'=>$raised,
         'line'=>$raised ? ('The ' . $callWordP . ' are being raised against the contract — operations has it.')
               : ($contractOpen ? ('Operations raise the ' . $callWordP . ' from the contract — as many as the work needs, whenever they come in.')
-                 : ($hasContract ? ('The contract must be endorsed and approved (opened) before ' . $callWordP . ' can be raised.')
+                 : ($hasContract ? ('The contract must be approved (opened) before ' . $callWordP . ' can be raised.')
                     : ($accepted ? ('Register the contract number first; the ' . $callWordP . ' are then raised once it is opened.')
                        : 'Comes after it is accepted.'))),
         'href'=>($contractOpen && $canRaiseCall) ? '/call-new?contract=' . urlencode($cnum) : '',
@@ -1013,6 +1013,7 @@ function crm_add_group_contract($quoteId, $partnerId, array $b = []) {
             ->execute([$partnerId, $no, (string)($q['subject'] ?? ''), (float)($b['value'] ?? 0), (string)($b['start_date'] ?? ''), (string)($b['end_date'] ?? ''),
                        'Group contract under quotation ' . $q['quote_no'] . ' — same rates', $branchId, (int)$quoteId, $me, $meId, date('c')]);
         $cid = (int)db()->lastInsertId();
+        if (function_exists('contract_after_register')) contract_after_register($cid, (int)$quoteId);
     }
     if (function_exists('crm_log_change')) crm_log_change((int)$quoteId, 'Group contract ' . $no . ' registered for a related company under this quotation.');
     return ['ok' => true, 'contract_id' => $cid, 'contract_no' => $no, 'warn' => $dup['warn']];
@@ -2958,7 +2959,10 @@ function ops_crm_quotes($route, $method) {
                                'From quotation ' . $q['quote_no'] . (!empty($pf['po_number']) ? ', PO ' . $pf['po_number'] : ''),
                                $branchId, $me, $meId, date('c')]);
                 $contractId = (int)$pdo->lastInsertId();
-                $isNew = true; $openStatus = 'PENDING';
+                //  The company's own rule decides whether it waits for signatures
+                //  (Admin → Approvals → Sales → Contract). With none, it is open now.
+                $openStatus = function_exists('contract_after_register') ? contract_after_register($contractId, (int)$q['id']) : 'PENDING';
+                $isNew = $openStatus === 'PENDING';
             }
         }
         // Point 3 — the order the contract was read from is attached to it, so the
@@ -2976,8 +2980,8 @@ function ops_crm_quotes($route, $method) {
         if ($isNew) {
             // Held for approval — record it in the quotation thread, do not float yet.
             crm_log_change($q['id'], 'Contract ' . $contractNo . ' requested by ' . user_name(current_user())
-                . ' — pending manager & branch-manager approval before the order floats to operations.');
-            flash('Contract ' . $contractNo . ' registered and awaiting approval — a manager must endorse it and the branch manager approve it before it opens and floats to operations.', 'warning');
+                . ' — ' . contract_rule_sentence() . ', before the order floats to operations.');
+            flash('Contract ' . $contractNo . ' ' . contract_registered_words($contractId) . ' The order goes to operations once it is open.', 'warning');
             redirect('/quote?id=' . $q['id']);
         }
         // Existing OPEN contract (rate-contract draw-down) — float straight away.
@@ -2996,7 +3000,7 @@ function ops_crm_quotes($route, $method) {
         $r = crm_add_group_contract($qid, (int)($_POST['partner_id'] ?? 0), $_POST);
         if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/quote?id=' . $qid . '#contract'); }
         foreach (($r['warn'] ?? []) as $w) flash($w, 'warning');
-        flash('Group contract ' . $r['contract_no'] . ' registered and awaiting approval — it opens after a manager endorses and the branch manager approves, and then its ' . Tlp('call') . ' are raised from it.', 'warning');
+        flash('Group contract ' . $r['contract_no'] . ' ' . contract_registered_words((int)$r['contract_id']) . ' Its ' . Tlp('call') . ' are raised from it once it is open.', 'warning');
         redirect('/quote?id=' . $qid . '#contract');
     }
     if ($route === 'quote-float' && $method === 'POST') {
@@ -4220,7 +4224,8 @@ function ops_crm_approval_rules($route, $method) {
     }
     // Set up Sales edits the levels in place, so a change made there returns
     // there. Only that one address is honoured — never a free-form redirect.
-    $back = (($_GET['back'] ?? $_POST['back'] ?? '') === 'sales-setup') ? '/sales-setup#levels' : '/quote-approval-rules';
+    $backKey = (string)($_GET['back'] ?? $_POST['back'] ?? '');
+    $back = $backKey === 'sales-setup' ? '/sales-setup#levels' : ($backKey === 'sales-approvals' ? '/sales-approvals?tab=quote#levels' : '/quote-approval-rules');
     if ($route === 'quote-approval-rule-delete' && $method === 'POST') {
         $pdo->prepare("DELETE FROM quote_approval_rules WHERE id=?")->execute([(int)($_GET['id'] ?? 0)]);
         flash('Approval level removed.'); redirect($back);

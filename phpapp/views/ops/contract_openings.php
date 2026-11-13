@@ -1,6 +1,6 @@
 <div class="master-head">
   <div><h1>Contract openings</h1>
-    <p class="sub" style="margin:2px 0 0">Won orders waiting for their contract number to be opened. A manager <b>endorses</b>, then the branch manager <b>approves</b> — then the order floats to operations.</p></div>
+    <p class="sub" style="margin:2px 0 0">Won orders waiting for their contract number to be opened. Your company's rule: <?= e($ruleWords ?? contract_rule_sentence()) ?>. Once open, the order floats to operations.</p></div>
 </div>
 
 <?php if (!$rows): ?>
@@ -15,7 +15,8 @@
         <tbody>
         <?php foreach ($rows as $c):
           $endorsed = trim((string)($c['mgr_endorsed_at'] ?? '')) !== '';
-          $step = $endorsed ? 'Awaiting branch-manager approval' : 'Awaiting manager endorsement';
+          $sg = contract_open_stage($c);
+          $step = $sg['need'] === 'first' ? 'Waiting for the first signature' : ($sg['signatures'] === 2 ? 'Waiting for the final approval' : 'Waiting for approval');
           $desc = trim((string)($c['quote_subject'] ?? ''));
         ?>
           <tr>
@@ -25,40 +26,11 @@
             <td class="muted" style="font-size:13px"><?= e($desc !== '' ? $desc : '—') ?></td>
             <td class="muted" style="font-size:12.5px"><?= e($c['requested_by'] ?: '—') ?><?= !empty($c['requested_at']) ? '<br>' . e(fdate(substr((string)$c['requested_at'],0,10))) : '' ?></td>
             <td><span class="pill <?= $endorsed ? 'p-info' : 'p-warn' ?>" style="font-size:11px"><?= e($step) ?></span>
-              <?php if ($endorsed): ?><br><span class="muted" style="font-size:11px">endorsed by <?= e($c['mgr_endorsed_by']) ?></span><?php endif; ?>
+              <?php if ($endorsed): ?><br><span class="muted" style="font-size:11px">first signature: <?= e($c['mgr_endorsed_by']) ?></span><?php endif; ?>
               <?php $coordWho = function_exists('call_coordinator_name') ? call_coordinator_name($c) : '';
                     if ($coordWho !== ''): ?><br><span class="muted" style="font-size:11px">👤 <?= e($coordWho) ?> to coordinate</span><?php endif; ?></td>
             <td class="num" style="white-space:nowrap">
-              <div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap">
-                <?php if ($canEndorse && !$endorsed): ?>
-                  <form method="post" action="/contract-open" style="display:inline;display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap">
-                    <input type="hidden" name="id" value="<?= (int)$c['id'] ?>"><input type="hidden" name="do" value="endorse">
-                    <?php // Forward to a coordinator in this office as part of endorsing —
-                          // an office has several, so name the one who will own the calls. ?>
-                    <?php if (!empty($myCoordinators)): ?>
-                      <select name="coordinator_id" class="form-control" style="min-width:150px;font-size:12px" title="Forward to a coordinator in <?= e($myOfficeName ?: T('office')) ?>">
-                        <option value="">— forward to (optional) —</option>
-                        <?php foreach ($myCoordinators as $co): ?>
-                          <option value="<?= (int)$co['id'] ?>"><?= e($co['name']) ?><?= !empty($co['role']) ? ' · ' . e(strtolower(str_replace('_',' ',$co['role']))) : '' ?></option>
-                        <?php endforeach; ?>
-                      </select>
-                    <?php endif; ?>
-                    <button class="btn small" type="submit">Endorse</button>
-                  </form>
-                <?php endif; ?>
-                <?php if ($canApprove): ?>
-                  <form method="post" action="/contract-open" style="display:inline">
-                    <input type="hidden" name="id" value="<?= (int)$c['id'] ?>"><input type="hidden" name="do" value="approve">
-                    <button class="btn small" type="submit"<?= (!$endorsed && !is_master()) ? ' disabled title="A manager must endorse it first"' : '' ?>>Approve &amp; open</button>
-                  </form>
-                <?php endif; ?>
-                <?php if ($canEndorse || $canApprove): ?>
-                  <form method="post" action="/contract-open" style="display:inline" onsubmit="return confirm('Reject opening this contract number?')">
-                    <input type="hidden" name="id" value="<?= (int)$c['id'] ?>"><input type="hidden" name="do" value="reject">
-                    <button class="btn small danger" type="submit">Reject</button>
-                  </form>
-                <?php endif; ?>
-              </div>
+              <?php $sgId = (int)$c['id']; $sgKind = 'open'; $sgCoordinators = $myCoordinators ?? []; $sgOfficeName = $myOfficeName ?? ''; $sgCompact = true; include __DIR__ . '/_contract_sign.php'; ?>
             </td>
           </tr>
         <?php endforeach; ?>
@@ -66,5 +38,7 @@
       </table>
     </div>
   </div>
-  <p class="muted" style="margin-top:10px;font-size:12.5px">The endorser and the approver must be two different people (the Master Admin standing in for a one-person branch is the only exception).</p>
+  <?php $cRule = contract_open_rule(); if ((int)$cRule['signatures'] === 2 && !$cRule['same_person']): ?>
+  <p class="muted" style="margin-top:10px;font-size:12.5px">The two signatures must come from two different people (the Master Admin standing in for a one-person branch is the only exception).</p>
+  <?php endif; ?>
 <?php endif; ?>

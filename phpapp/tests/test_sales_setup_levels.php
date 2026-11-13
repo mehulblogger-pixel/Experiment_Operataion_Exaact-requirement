@@ -31,7 +31,10 @@ $set = setupqa_sales_set();
 $titles = array_column($set['sections'], 'title');
 t_ok(in_array('quote_levels', array_column($set['sections'], 'editor'), true), 'the quotation section carries the in-place level editor');
 t_ok((bool) array_filter($titles, fn($t) => stripos($t, 'deal') !== false), 'deal-stage approvals have their own section');
-t_ok(in_array('Other approvals in Sales', $titles, true), 'every other Sales approval is stated, with who gives it');
+//  Owner, 13 Nov 2026 — each approval has its own section (and its own tab under Admin → Approvals → Sales).
+foreach (['Approving a project costing', 'Opening a contract', 'Leads — marking lost, giving to someone else, reopening'] as $ttl)
+    t_ok(in_array($ttl, $titles, true), 'every other Sales approval is stated in its own section: ' . $ttl);
+t_eq(array_values(array_unique(array_filter(array_column($set['sections'], 'tab')))), ['quote', 'costing', 'contract', 'deals', 'leads'], 'every section belongs to one of the five Sales approval tabs');
 $other = implode(' ', setupqa_sales_other_approvals());
 foreach (['Leads', 'Project costing', 'contract'] as $w) t_ok(stripos($other, $w) !== false, "the other approvals mention $w");
 $unitName = lk_options_or('sbu', OPS_SBUS)['IND'] ?? 'IND';
@@ -39,7 +42,7 @@ t_ok(strpos(implode(' ', setupqa_sales_level_facts()), '(' . $unitName . ' only)
 $view = file_get_contents(__DIR__ . '/../views/ops/crm/approval_levels_inline.php');
 t_ok(strpos($view, 'back=sales-setup') !== false && strpos($view, 'form="') !== false, 'level cards post their own forms and come back to Set up Sales');
 $crm = file_get_contents(__DIR__ . '/../lib/crm.php');
-t_ok(strpos($crm, "=== 'sales-setup') ? '/sales-setup#levels'") !== false, 'back= is honoured for Set up Sales only — never a free redirect');
+t_ok(strpos($crm, "\$backKey === 'sales-setup' ? '/sales-setup#levels' : (\$backKey === 'sales-approvals' ? '/sales-approvals?tab=quote#levels' : '/quote-approval-rules')") !== false, 'back= is honoured for Set up Sales and Sales approvals only — never a free redirect');
 t_ok(strpos($crm, "must be above the \"from\" value") !== false, 'a band whose "up to" is not above "from" is refused');
 $sg = file_get_contents(__DIR__ . '/../views/ops/stage_gates.php');
 t_ok(strpos($sg, '<select class="form-control" name="entity_kind">') === false && strpos($sg, 'Deals (opportunities)') !== false,

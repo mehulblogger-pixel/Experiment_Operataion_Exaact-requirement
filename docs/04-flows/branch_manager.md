@@ -31,6 +31,7 @@ is where its approval queues appear.
 
 **Decision points:**
 - Contract opening: **endorse** vs **approve** vs **reject** (`contracts.php:643-687`); approve → `open_status='OPEN'` and floats the order (`contracts.php:660-677`).
+- **The signatures are each company's own rule (owner, 13 Nov 2026).** What is described here is the standard rule. A company can change how many approvals a contract needs (two, one, none) and who gives each under **Admin → Approvals → Sales → Contract**. On the screen you are offered the one signature that is yours to give now, and you read — by name — who it is waiting for otherwise.
 - Report: approve / send back; issue vs not (approver-may-not-issue, `idems.php:3521-3525`).
 - Job-close manager override for a missing site check-in (`ops.php:5615-5628`).
 

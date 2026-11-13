@@ -819,7 +819,8 @@ function opp_register_contract($oppId, array $b = []) {
         $pdo->prepare("INSERT INTO partner_contracts (partner_id,contract_number,title,value,start_date,end_date,notes,branch_id,open_status,requested_by,requested_by_id,requested_at,is_active) VALUES (?,?,?,?,?,?,?,?, 'PENDING', ?,?,?, 0)")
             ->execute([$cid, $contractNo, (string)$o['name'], (float)$o['value'], (string)($b['start_date'] ?? ''), (string)($b['end_date'] ?? ''),
                        'From opportunity ' . $o['ref'] . ' (won without a quotation)', $branchId, $me, $meId, date('c')]);
-        $contractId = (int)$pdo->lastInsertId(); $openStatus = 'PENDING';
+        $contractId = (int)$pdo->lastInsertId();
+        $openStatus = function_exists('contract_after_register') ? contract_after_register($contractId) : 'PENDING';
     }
     $pdo->prepare("UPDATE opportunities SET contract_id=?, updated_at=? WHERE id=?")->execute([$contractId, date('c'), (int)$o['id']]);
     if (function_exists('act_log')) act_log('OPPORTUNITY', (int)$o['id'], 'SYSTEM',
@@ -1029,7 +1030,7 @@ function ops_opportunities($route, $method) {
             // registered from this deal (if any) so its state can be shown.
             'canRegisterContract' => can('crm.contract.register') || is_master(),
             'contractRow' => !empty($o['contract_id'])
-                ? ops_one("SELECT id, contract_number, open_status FROM partner_contracts WHERE id=?", [(int)$o['contract_id']])
+                ? ops_one("SELECT * FROM partner_contracts WHERE id=?", [(int)$o['contract_id']])
                 : null,
         ]);
         return true;
@@ -1145,7 +1146,7 @@ function ops_opportunities($route, $method) {
         if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/opportunity?id=' . $id); }
         foreach (($r['warn'] ?? []) as $w) flash($w, 'warning');
         if (($r['open_status'] ?? '') === 'PENDING') {
-            flash('Contract ' . $r['contract_no'] . ' registered and awaiting approval — a manager endorses it and the branch manager approves it before it opens and the ' . Tlp('call') . ' can be raised from it.', 'warning');
+            flash('Contract ' . $r['contract_no'] . ' ' . contract_registered_words((int)$r['contract_id']) . ' The ' . Tlp('call') . ' are raised from it once it is open.', 'warning');
         } else {
             flash('Contract ' . $r['contract_no'] . ' registered against an existing open contract — raise the ' . Tlp('call') . ' from it whenever the work comes in.');
         }

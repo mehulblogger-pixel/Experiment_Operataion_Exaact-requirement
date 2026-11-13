@@ -73,6 +73,21 @@ function apsetup_areas() {
             'can'   => (bool) $hiring,
         ],
         [
+            //  Owner, 13 Nov 2026 — every approval in Sales, one tab each: quotation,
+            //  project costing, contract, deal stages, leads. Offered HERE only to
+            //  someone who changes company settings: a quotation approver (a Marketing
+            //  Manager) reaches the same tabs from Sales → Set up Sales, and offering
+            //  them this card would put the whole Admin area in their menu (R11 took
+            //  it out). The screen's own gate is unchanged — the Set up Sales gate.
+            'key'   => 'sales',
+            'label' => 'Sales',
+            'url'   => '/sales-approvals',
+            'icon'  => '🎯',
+            'what'  => 'Who approves a quotation, a project costing, the opening of a contract, a deal '
+                     . 'moving stage and a lead changing hands — one tab each, changed right there.',
+            'can'   => (bool) ($lic('sales') && ($master() || $can('settings.manage'))),
+        ],
+        [
             'key'   => 'quotes',
             'label' => 'Quotes & reports',
             'url'   => '/approval-rules',

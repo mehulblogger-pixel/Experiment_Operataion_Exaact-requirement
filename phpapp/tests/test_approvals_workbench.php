@@ -31,7 +31,10 @@ t_ok(function_exists('ops_approvals_setup'), 'the workbench screen exists');
 //  The fifth, "Review & issue rules", joined on 31 Oct 2026 (MOD-MON): the owner
 //  asked where the approver ≠ issuer switch is and wanted it easy to reach.
 $areas = apsetup_areas();
-t_eq(count($areas), 5, 'five approval areas, which is how many the product has');
+//  The sixth, "Sales", joined on 13 Nov 2026: the owner asked for every Sales approval
+//  (quotation, costing, contract, deal stages, leads) under Admin → Approvals, one tab each.
+t_eq(count($areas), 6, 'six approval areas, which is how many the product has');
+t_ok(in_array('sales', array_column($areas, 'key'), true), 'Sales approvals is one of them');
 $keys = array_map(fn($a) => $a['key'], $areas);
 foreach (['recruitment','quotes','approvermap','issuerules','delegation'] as $k)
     t_ok(in_array($k, $keys, true), "the workbench knows about '$k'");

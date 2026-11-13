@@ -17,7 +17,7 @@ $nlc = count($liveContracts);
 ?>
 <?php if (!is_embed()): ?><div class="master-head"><div><h1>New contract — <?= e(partner_name($p)) ?></h1></div>
   <a class="btn secondary" href="/partner?id=<?= $id ?>&amp;tab=<?= e($back !== '' ? $back : 'contracts') ?>">← Back to <?= e(partner_name($p)) ?></a></div><?php endif; ?>
-<p class="muted" style="margin-top:0">Filled in from <b><?= e(partner_name($p)) ?></b>. It is saved as <b>awaiting endorsement</b> — a manager checks it, then the branch manager approves it, before it goes live.</p>
+<p class="muted" style="margin-top:0">Filled in from <b><?= e(partner_name($p)) ?></b>. Your company's rule for opening a contract: <b><?= e(contract_rule_sentence()) ?></b>.</p>
 <?php if ($nlc): ?>
   <div class="msg msg-warning" style="margin:0 0 12px">
     This <?= e(Tl('client')) ?> already has <?= $nlc ?> live contract<?= $nlc > 1 ? 's' : '' ?>:

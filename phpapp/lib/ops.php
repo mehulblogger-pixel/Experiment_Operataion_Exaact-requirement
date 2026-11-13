@@ -3812,6 +3812,8 @@ function ops_dispatch($route, $method) {
             ops_crm_approval_rules($route, $method); return true;
         case $route === 'sales-setup':
             return ops_setup_questions('sales', $method);
+        case $route === 'sales-approvals':                           // Admin → Approvals → Sales, one tab per approval
+            return ops_sales_approvals($method);
         case $route === 'quote-delegations':
             return ops_quote_delegations($method);
         case $route === 'crm-reports':
@@ -9535,16 +9537,21 @@ function ops_pending_tasks() {
     if (function_exists('quotes_awaiting_contract_count') && (can('crm.contract.register') || is_master()))
         $add(quotes_awaiting_contract_count(), '📄', 'contracts to register', 'accepted quotes waiting for a contract number', '/quotes?mine=contract', 'warn');
 
-    // Contract openings — a manager endorses, then the branch manager approves.
-    // Both act on the dedicated /contract-openings screen, so an endorser who
-    // cannot view quotations still reaches the buttons.
-    if (function_exists('can_endorse_contract_open') && can_endorse_contract_open()) {
-        $n = $cnt("SELECT COUNT(*) FROM partner_contracts WHERE COALESCE(open_status,'')='PENDING' AND COALESCE(mgr_endorsed_at,'')=''");
-        $add($n, '✍', 'contracts to endorse', 'contract openings awaiting your endorsement', '/contract-openings', 'warn');
-    }
-    if (function_exists('can_approve_contract_open') && can_approve_contract_open()) {
-        $n = $cnt("SELECT COUNT(*) FROM partner_contracts WHERE COALESCE(open_status,'')='PENDING' AND COALESCE(mgr_endorsed_at,'')<>'' AND COALESCE(bm_approved_at,'')=''");
-        $add($n, '📝', 'contracts to approve', 'contract openings awaiting your approval', '/contract-openings', 'info');
+    // Contract openings — the company's own rule (Admin → Approvals → Sales → Contract):
+    // two signatures, one, or none. Both act on the dedicated /contract-openings
+    // screen, so a signer who cannot view quotations still reaches the buttons.
+    // Each person is counted only what is theirs to sign NOW (contract_open_stage()),
+    // so the number on the dashboard is the number of buttons on the screen.
+    if (function_exists('contract_open_stage') && (can_endorse_contract_open() || can_approve_contract_open())) {
+        $first = 0; $final = 0;
+        try {
+            foreach (ops_all("SELECT * FROM partner_contracts WHERE COALESCE(open_status,'')='PENDING' AND COALESCE(bm_approved_at,'')=''") ?: [] as $pcRow) {
+                $sgNow = contract_open_stage($pcRow);
+                if ($sgNow['primary'] === 'endorse') $first++; elseif ($sgNow['primary'] === 'approve') $final++;
+            }
+        } catch (Throwable $e) {}
+        $add($first, '✍', 'contracts to endorse', 'contract openings waiting for your first signature', '/contract-openings', 'warn');
+        $add($final, '📝', 'contracts to approve', 'contract openings waiting for your approval', '/contract-openings', 'info');
     }
     // Vouchers submitted for approval — shown to whoever can actually act on a
     // voucher (edit rights or finance), not to every management-level role. A
