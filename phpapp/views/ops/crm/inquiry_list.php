@@ -1,4 +1,5 @@
-<?php $stPill = ['OPEN'=>'p-warn','QUOTED'=>'p-ok','DROPPED'=>'p-mut']; ?>
+<?php $stPill = ['OPEN'=>'p-warn','QUOTED'=>'p-info','WON'=>'p-ok','LOST'=>'p-bad','DROPPED'=>'p-mut'];
+      $stOpts = function_exists('crm_inquiry_status_opts') ? crm_inquiry_status_opts() : INQUIRY_STATUS; $funnel = $funnel ?? []; ?>
 <div class="master-head">
   <div><h1><?= e(T_REG('inquiry')) ?></h1>
     <p class="sub" style="margin:2px 0 0">Received via email / phone — the front of the sales funnel. <?= count($rows) ?> shown.</p></div>
@@ -16,10 +17,25 @@ $dueCount = $dueCount ?? 0; $sla = $sla ?? 7; ?>
 </div>
 <?php endif; ?>
 
+<?php //  Owner, 13 Nov 2026: what became of the enquiries in view — the enquiry-to-order rate.
+      //  The figures follow the year, search and branch shown; each card filters the list.
+  if (!empty($funnel['ALL'])):
+    $fAll = (int)$funnel['ALL']; $fWon = (int)($funnel['WON'] ?? 0); $fLost = (int)($funnel['LOST'] ?? 0);
+    $fQ = (int)($funnel['QUOTED'] ?? 0) + $fWon + $fLost;
+    $pct = fn($a, $b) => $b > 0 ? round($a / $b * 100) . '%' : '—';
+    $href = fn($k) => '/inquiries?st=' . $k . ($q !== '' ? '&q=' . urlencode($q) : '') . (($fy ?? '') !== '' ? '&fy=' . urlencode((string)$fy) : ''); ?>
+<div class="kpi-row" style="margin:12px 0">
+  <a class="kpi" href="/inquiries" style="text-decoration:none;color:inherit"><span class="kic">📨</span><div class="k">Enquiries</div><div class="v"><?= $fAll ?></div><div class="d"><?= (int)($funnel['OPEN'] ?? 0) ?> open, not quoted yet</div></a>
+  <a class="kpi" href="<?= e($href('QUOTED')) ?>" style="text-decoration:none;color:inherit"><span class="kic">📝</span><div class="k">Quoted</div><div class="v"><?= $fQ ?></div><div class="d"><?= $pct($fQ, $fAll) ?> of enquiries · <?= (int)($funnel['QUOTED'] ?? 0) ?> awaiting an answer</div></a>
+  <a class="kpi tone-ok" href="<?= e($href('WON')) ?>" style="text-decoration:none;color:inherit"><span class="kic">🏆</span><div class="k">Won</div><div class="v"><?= $fWon ?></div><div class="d"><?= $pct($fWon, $fAll) ?> of enquiries became orders</div></a>
+  <a class="kpi<?= $fLost ? ' tone-bad' : '' ?>" href="<?= e($href('LOST')) ?>" style="text-decoration:none;color:inherit"><span class="kic">📉</span><div class="k">Lost · Dropped</div><div class="v"><?= $fLost ?> · <?= (int)($funnel['DROPPED'] ?? 0) ?></div><div class="d">Hit rate <?= $pct($fWon, $fWon + $fLost) ?> of decided <?= e(Tlp('quote')) ?></div></a>
+</div>
+<?php endif; ?>
+
 <form method="get" action="/inquiries" class="filter-bar" style="gap:8px;flex-wrap:wrap">
   <input class="form-control" name="q" value="<?= e($q) ?>" placeholder="Search no. / subject / client" style="min-width:220px">
   <select class="form-control" name="st" onchange="this.form.submit()"><option value="">All statuses</option>
-    <?php foreach (lk_options_or('inquiry_status', INQUIRY_STATUS) as $k=>$v): ?><option value="<?= e($k) ?>" <?= $st===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select>
+    <?php foreach ($stOpts as $k=>$v): ?><option value="<?= e($k) ?>" <?= $st===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select>
   <?= fy_select_html($fy ?? current_fy()) ?>
   <button class="btn small" type="submit">Search</button>
   <?php if ($q!==''||$st!==''||($fy ?? current_fy())!==current_fy()): ?><a class="btn small secondary" href="/inquiries">Reset</a><?php endif; ?>
@@ -37,7 +53,7 @@ $dueCount = $dueCount ?? 0; $sla = $sla ?? 7; ?>
       <td><?= e($r['received_date'] ?: '—') ?></td>
       <td><?= e($r['client_disp'] ?: $r['client_name'] ?: '—') ?></td>
       <td><?= e($r['subject'] ?: '—') ?></td>
-      <td><span class="pill <?= $stPill[$r['status']] ?? 'p-mut' ?>"><?= e(lk_options_or('inquiry_status', INQUIRY_STATUS)[$r['status']] ?? $r['status']) ?></span><?php
+      <td><span class="pill <?= $stPill[$r['status']] ?? 'p-mut' ?>"<?= $r['status']==='DROPPED' && !empty($r['drop_reason']) ? ' title="' . e(INQUIRY_DROP_REASONS[$r['drop_reason']] ?? '') . '"' : '' ?>><?= e($stOpts[$r['status']] ?? $r['status']) ?></span><?php
         // Module 19 — an OPEN inquiry past the response service level with no quote.
         if ($r['status']==='OPEN') { $base = trim((string)($r['received_date'] ?? '')) ?: substr((string)($r['created_at'] ?? ''),0,10);
           if ($base!=='') { $age=(int)floor((strtotime(date('Y-m-d'))-strtotime($base))/86400); if ($age > (int)$sla) echo ' <span class="pill p-bad" title="Open '.$age.' days, no quotation">⏳ '.$age.'d</span>'; } } ?></td>
@@ -51,7 +67,7 @@ $dueCount = $dueCount ?? 0; $sla = $sla ?? 7; ?>
       <td class="num" style="white-space:nowrap">
         <?php if (can('mod.inquiries.edit')): ?><a class="btn small secondary" href="/inquiry-edit?id=<?= (int)$r['id'] ?>">Edit</a><?php endif; ?>
         <?php if (can('mod.quotes.edit') && $r['status']!=='DROPPED'): ?><a class="btn small" href="/quote-new?inquiry=<?= (int)$r['id'] ?>">Quote</a><?php endif; ?>
-        <?php if ((is_admin_level() || is_master()) && $r['status']!=='QUOTED'): ?>
+        <?php if ((is_admin_level() || is_master()) && !in_array($r['status'], ['QUOTED','WON','LOST'], true)): ?>
           <form method="post" action="/inquiry-delete" style="display:inline" onsubmit="return confirm('Delete inquiry <?= e($r['inquiry_no']) ?>? This cannot be undone.')">
             <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
             <button class="btn small danger" type="submit">Delete</button></form>

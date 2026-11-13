@@ -64,6 +64,7 @@ const ADS_RETRY_MAX = 6;   // ~6 cron runs before a failure stops retrying and s
 function ads_status_out($kind, $row) {
     if ($kind === 'INQUIRY') {
         $s = strtoupper((string)($row['status'] ?? ''));
+        if ($s === 'WON') return 'customer';            // its quotation was accepted (13 Nov 2026)
         if ($s === 'CONVERTED' || $s === 'QUOTED') return 'qualified';
         if ($s === 'LOST' || $s === 'CLOSED' || $s === 'DROPPED') return 'lost';
         return 'qualified';           // an enquiry has already asked us for something

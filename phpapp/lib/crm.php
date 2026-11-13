@@ -123,7 +123,11 @@ const ORDER_TYPES = ['OPEN' => 'Open order (ARC / call-off)', 'LINE' => 'Line-it
 
 // Inquiry funnel.
 const INQUIRY_SOURCES = ['EMAIL'=>'Email','PHONE'=>'Phone','REFERRAL'=>'Referral','WEBSITE'=>'Website','EXISTING'=>'Existing client','TENDER'=>'Tender / portal','OTHER'=>'Other'];
-const INQUIRY_STATUS  = ['OPEN'=>'Open','QUOTED'=>'Quoted','DROPPED'=>'Dropped'];
+//  Owner, 13 Nov 2026 ("Automatic Won/Lost"): an enquiry follows its quotation —
+//  Quoted while one is out, Won when one is accepted, Lost when they were all lost or
+//  expired. Only Dropped is chosen by hand, with a reason, and only with no quotation.
+const INQUIRY_STATUS  = ['OPEN'=>'Open','QUOTED'=>'Quoted','WON'=>'Won','LOST'=>'Lost','DROPPED'=>'Dropped'];
+const INQUIRY_DROP_REASONS = ['DECLINED'=>'We declined to quote','WITHDRAWN'=>'The client withdrew','DUPLICATE'=>'Duplicate enquiry'];
 
 // Quotation lifecycle (§14 open/pending/closed, plus lost/expired for analytics).
 const QUOTE_STATUS = [
@@ -284,6 +288,11 @@ function crm_migrate() {
         // Blank on older rows and website imports: those stay visible to every
         // branch, as an unassigned lead does, so nothing becomes invisible.
         ensure_column('crm_inquiries', 'office_id', 'INT NULL');
+        // Why an enquiry was closed without a quotation, and by whom (owner, 13 Nov 2026).
+        ensure_column('crm_inquiries', 'drop_reason', "VARCHAR(20) DEFAULT ''");
+        ensure_column('crm_inquiries', 'drop_note', "VARCHAR(300) DEFAULT ''");
+        ensure_column('crm_inquiries', 'dropped_by', "VARCHAR(150) DEFAULT ''");
+        ensure_column('crm_inquiries', 'dropped_at', "VARCHAR(30) DEFAULT ''");
         // Where the quote came from: our own, or a client / tender portal that we
         // still want in the register (§xv).
         ensure_column('quotations', 'origin', "VARCHAR(20) DEFAULT 'OWN'");
@@ -1054,7 +1063,51 @@ function crm_log_change($qid, $summary, $detail = null) {
         db()->prepare("INSERT INTO quote_revisions (quote_id,rev,changed_by,changed_at,summary,snapshot) VALUES (?,?,?,?,?,?)")
             ->execute([$base, (int)$q['rev'], user_name(current_user()), date('c'), $summary, json_encode($snap)]);
     } catch (Throwable $e) {}
+    //  Every change a quotation records is also the moment its enquiry may have moved on.
+    if (!empty($q['inquiry_id'])) crm_inquiry_sync((int)$q['inquiry_id']);
 }
+
+// ---------------------------------------------------------------------------
+//  THE ENQUIRY FOLLOWS ITS QUOTATION (owner, 13 Nov 2026: "Why inquiries does not
+//  have any pipeline or anything either like won or lost?" — answered "Automatic
+//  Won/Lost" and "Only 'Dropped', with a reason"). Nobody sets Quoted, Won or Lost
+//  by hand: they are read from the enquiry's current quotations.
+// ---------------------------------------------------------------------------
+function crm_inquiry_outcome($inqId) {
+    $sts = array_column(ops_all("SELECT status FROM quotations WHERE inquiry_id=? AND COALESCE(is_current,1)=1", [(int)$inqId]) ?: [], 'status');
+    if (!$sts) return null;                                         // no quotation: Open, or Dropped by hand
+    if (in_array('ACCEPTED', $sts, true)) return 'WON';
+    foreach ($sts as $st) if (!in_array($st, ['LOST', 'EXPIRED', 'SUPERSEDED', 'CANCELLED'], true)) return 'QUOTED';
+    return 'LOST';                                                  // every quotation lost or expired
+}
+function crm_inquiry_sync($inqId) {
+    try {
+        $row = ops_one("SELECT id, inquiry_no, status FROM crm_inquiries WHERE id=?", [(int)$inqId]);
+        if (!$row) return '';
+        $want = crm_inquiry_outcome((int)$inqId);
+        $was = (string)$row['status'];
+        if ($want === null) $want = in_array($was, ['QUOTED', 'WON', 'LOST'], true) ? 'OPEN' : ($was ?: 'OPEN');   // its quotation went away
+        if ($want === $was) return $was;
+        db()->prepare("UPDATE crm_inquiries SET status=? WHERE id=?")->execute([$want, (int)$inqId]);
+        if (function_exists('act_log')) act_log('INQUIRY', (int)$inqId, 'SYSTEM',
+            ($row['inquiry_no'] ?? 'Enquiry') . ' is now ' . strtolower(crm_inquiry_status_label($want)) . ' — it follows its ' . Tl('quote'), ['auto' => 1]);
+        return $want;
+    } catch (Throwable $e) { return ''; }
+}
+//  Bring every enquiry with a quotation up to date — for anything recorded before this
+//  existed, or by a path that does not write a quotation's history. Idempotent.
+function crm_inquiries_sync_all() {
+    try {
+        $ids = array_column(ops_all("SELECT DISTINCT i.id FROM crm_inquiries i
+            WHERE i.status IN ('QUOTED','WON','LOST') OR EXISTS (SELECT 1 FROM quotations q WHERE q.inquiry_id=i.id)") ?: [], 'id');
+        foreach ($ids as $id) crm_inquiry_sync((int)$id);
+    } catch (Throwable $e) {}
+}
+//  A company may have renamed the statuses (Admin → lists); new ones still have a name.
+function crm_inquiry_status_opts() {
+    return (function_exists('lk_options_or') ? (lk_options_or('inquiry_status', INQUIRY_STATUS) ?: []) : []) + INQUIRY_STATUS;
+}
+function crm_inquiry_status_label($k) { return crm_inquiry_status_opts()[$k] ?? (string)$k; }
 // Field-by-field difference between two snapshots, in plain English.
 function crm_diff_snapshots($oldSnap, $newSnap) {
     $o = is_array($oldSnap) ? ($oldSnap['header'] ?? []) : [];
@@ -1833,9 +1886,11 @@ function inquiries_due_count($today = null) { return count(inquiries_due($today)
 function ops_crm_inquiries($route, $method) {
     $pdo = db();
     if ($route === 'inquiries') {
+        crm_inquiries_sync_all();
         $q = trim($_GET['q'] ?? ''); $st = $_GET['st'] ?? '';
         $w = ['1=1']; $args = [];
-        if ($st !== '' && isset(lk_options_or('inquiry_status', INQUIRY_STATUS)[$st])) { $w[] = 'i.status=?'; $args[] = $st; }
+        $stW = null;
+        if ($st !== '' && isset(crm_inquiry_status_opts()[$st])) $stW = $st;
         if ($q !== '') { $w[] = '(i.inquiry_no LIKE ? OR i.subject LIKE ? OR i.client_name LIKE ?)'; array_push($args, "%$q%", "%$q%", "%$q%"); }
         $sb = scope_sbus();
         if ($sb !== 'ALL' && is_array($sb) && $sb) { $ph = implode(',', array_fill(0, count($sb), '?')); $w[] = "(i.sbu IN ($ph) OR i.sbu='')"; foreach ($sb as $s) $args[] = $s; }
@@ -1843,6 +1898,12 @@ function ops_crm_inquiries($route, $method) {
         // Financial-year window (defaults to the current FY; "All years" removes it).
         $fy = fy_filter();
         if (!$fy['all']) { $w[] = 'i.created_at >= ?'; $args[] = $fy['from']; $w[] = 'i.created_at < ?'; $args[] = $fy['to_excl']; }
+        //  The outcome of the enquiries in view (this year, this search, this branch) — before the status filter.
+        $funnel = ['ALL' => 0] + array_fill_keys(array_keys(INQUIRY_STATUS), 0);
+        foreach (ops_all("SELECT i.status, COUNT(*) n FROM crm_inquiries i WHERE " . implode(' AND ', $w) . " GROUP BY i.status", $args) ?: [] as $fr) {
+            $funnel[(string)$fr['status']] = ($funnel[(string)$fr['status']] ?? 0) + (int)$fr['n']; $funnel['ALL'] += (int)$fr['n'];
+        }
+        if ($stW !== null) { $w[] = 'i.status=?'; $args[] = $stW; }
         // origin_ref = the lead this inquiry was converted from (if any), so the
         // register shows where it came from.
         //  l.owner_name: an enquiry raised before 12 Nov from a lead whose owner
@@ -1855,13 +1916,15 @@ function ops_crm_inquiries($route, $method) {
                          LEFT JOIN leads l ON l.id=i.lead_id
                          LEFT JOIN users u ON u.id=i.assigned_to
                          WHERE " . implode(' AND ', $w) . " ORDER BY i.id DESC", $args);
-        view('ops/crm/inquiry_list', ['rows' => $rows, 'q' => $q, 'st' => $st, 'fy' => $fy['fy'],
+        view('ops/crm/inquiry_list', ['rows' => $rows, 'q' => $q, 'st' => $st, 'fy' => $fy['fy'], 'funnel' => $funnel,
             'dueCount' => inquiries_due_count(), 'sla' => inquiry_sla_days()]); return;
     }
     if ($route === 'inquiry-new' || $route === 'inquiry-edit') {
         ops_require(can('mod.inquiries.edit'), 'You cannot add or edit inquiries.');
         $inq = null;
-        if ($route === 'inquiry-edit') { $inq = crm_inquiry_get((int)($_GET['id'] ?? 0)); if (!$inq) { http_response_code(404); view('notfound'); return; } }
+        if ($route === 'inquiry-edit') { $inq = crm_inquiry_get((int)($_GET['id'] ?? 0)); if (!$inq) { http_response_code(404); view('notfound'); return; }
+            //  Opened on its own (not from the register): bring its outcome up to date first.
+            if (crm_inquiry_sync((int)$inq['id']) !== (string)$inq['status']) $inq = crm_inquiry_get((int)$inq['id']); }
         if ($inq) ops_require(crm_inquiry_in_scope($inq), 'This ' . Tl('inquiry') . ' belongs to another branch.');
         if ($method === 'POST') {
             $b = $_POST;
@@ -1880,7 +1943,10 @@ function ops_crm_inquiries($route, $method) {
             $cname = $cid ? crm_client_name($cid) : trim($b['client_name'] ?? '');
             $vals = [$cid, $cname, trim($b['contact_name'] ?? ''), trim($b['contact_email'] ?? ''), trim($b['contact_mobile'] ?? ''),
                 trim($b['subject'] ?? ''), trim($b['service_requirement'] ?? ''), $b['sbu'] ?? '', $b['source'] ?? 'EMAIL',
-                $b['received_date'] ?? '', ($b['assigned_to'] ?? '') !== '' ? (int)$b['assigned_to'] : null, $b['status'] ?? 'OPEN', trim($b['notes'] ?? '')];
+                $b['received_date'] ?? '', ($b['assigned_to'] ?? '') !== '' ? (int)$b['assigned_to'] : null,
+                //  The status is not typed (owner, 13 Nov 2026): a new enquiry is Open; an existing one
+                //  keeps its own — Quoted/Won/Lost follow its quotation, Dropped has its own button.
+                $inq ? (string)($inq['status'] ?: 'OPEN') : 'OPEN', trim($b['notes'] ?? '')];
             // An inquiry with no client, no contact and no subject is not a
             // record of anything — it is a blank row somebody has to chase later.
             // So the few things that make it a real enquiry are required. Email
@@ -1896,7 +1962,7 @@ function ops_crm_inquiries($route, $method) {
             if ($need) {
                 view('ops/crm/inquiry_form', ['inq' => ($inq ? array_merge($inq, $b) : $b), 'error' => 'Please add ' . implode('; ', $need) . '.',
                     'clients' => clients_list(), 'sbuOpts' => lk_options_or('sbu', OPS_SBUS),
-                    'sourceOpts' => INQUIRY_SOURCES, 'statusOpts' => INQUIRY_STATUS,
+                    'sourceOpts' => INQUIRY_SOURCES, 'statusOpts' => crm_inquiry_status_opts(),
                     'users' => ops_all("SELECT id, first_name, last_name, username FROM users WHERE is_active=1 ORDER BY first_name, username")]);
                 return;
             }
@@ -1918,9 +1984,37 @@ function ops_crm_inquiries($route, $method) {
         }
         $originRef = ($inq && !empty($inq['lead_id'])) ? (string)ops_val("SELECT ref FROM leads WHERE id=?", [(int)$inq['lead_id']]) : '';
         view('ops/crm/inquiry_form', ['inq' => $inq, 'originRef' => $originRef, 'clients' => clients_list(), 'sbuOpts' => lk_options_or('sbu', OPS_SBUS),
-            'sourceOpts' => INQUIRY_SOURCES, 'statusOpts' => INQUIRY_STATUS,
+            'sourceOpts' => INQUIRY_SOURCES, 'statusOpts' => crm_inquiry_status_opts(),
             'users' => ops_all("SELECT id, first_name, last_name, username FROM users WHERE is_active=1 ORDER BY first_name, username")]);
         return;
+    }
+    //  DROP — closed without a quotation, with a reason (owner, 13 Nov 2026). Who may: whoever
+    //  may already edit enquiries (the dropdown gave them this before). Refused once a quotation
+    //  exists: from then on the enquiry follows that quotation. REOPEN undoes a drop.
+    if (in_array($route, ['inquiry-drop', 'inquiry-reopen'], true) && $method === 'POST') {
+        ops_require(can('mod.inquiries.edit'), 'You cannot change inquiries.');
+        $inq = crm_inquiry_get((int)($_POST['id'] ?? 0));
+        if (!$inq) { flash('That ' . Tl('inquiry') . ' no longer exists.', 'error'); redirect('/inquiries'); }
+        ops_require(crm_inquiry_in_scope($inq), 'This ' . Tl('inquiry') . ' belongs to another branch.');
+        $back = '/inquiry-edit?id=' . (int)$inq['id'];
+        $me = user_name(current_user());
+        if ($route === 'inquiry-drop') {
+            if ((int)ops_val("SELECT COUNT(*) FROM quotations WHERE inquiry_id=?", [(int)$inq['id']]))
+                { flash('A ' . Tl('quote') . ' has been raised for ' . $inq['inquiry_no'] . ', so it follows that ' . Tl('quote') . ' — mark the ' . Tl('quote') . ' lost instead.', 'error'); redirect($back); }
+            if ($inq['status'] === 'DROPPED') { flash($inq['inquiry_no'] . ' is already dropped.', 'warning'); redirect($back); }
+            $why = (string)($_POST['drop_reason'] ?? ''); $note = trim((string)($_POST['drop_note'] ?? ''));
+            if (!isset(INQUIRY_DROP_REASONS[$why])) { flash('Say why it is dropped — pick a reason.', 'error'); redirect($back); }
+            $pdo->prepare("UPDATE crm_inquiries SET status='DROPPED', drop_reason=?, drop_note=?, dropped_by=?, dropped_at=? WHERE id=?")
+                ->execute([$why, substr($note, 0, 300), $me, date('c'), (int)$inq['id']]);
+            if (function_exists('act_log')) act_log('INQUIRY', (int)$inq['id'], 'SYSTEM', $inq['inquiry_no'] . ' dropped by ' . $me . ' — ' . INQUIRY_DROP_REASONS[$why], ['body' => $note, 'auto' => 1]);
+            flash($inq['inquiry_no'] . ' dropped — ' . strtolower(INQUIRY_DROP_REASONS[$why]) . '.');
+        } else {
+            if ($inq['status'] !== 'DROPPED') { flash($inq['inquiry_no'] . ' is not dropped.', 'warning'); redirect($back); }
+            $pdo->prepare("UPDATE crm_inquiries SET status='OPEN', drop_reason='', drop_note='', dropped_by='', dropped_at='' WHERE id=?")->execute([(int)$inq['id']]);
+            if (function_exists('act_log')) act_log('INQUIRY', (int)$inq['id'], 'SYSTEM', $inq['inquiry_no'] . ' reopened by ' . $me, ['auto' => 1]);
+            flash($inq['inquiry_no'] . ' is open again.');
+        }
+        redirect($back);
     }
     // Deleting an inquiry — administrators only, and never once a quotation has
     // been raised against it (that would orphan the quote and lose the trail).
@@ -1932,7 +2026,7 @@ function ops_crm_inquiries($route, $method) {
         ops_require(crm_inquiry_in_scope($inq), 'This ' . Tl('inquiry') . ' belongs to another branch.');
         $quotes = (int)ops_val("SELECT COUNT(*) FROM quotations WHERE inquiry_id=?", [$id]);
         if ($quotes) {
-            flash('A ' . Tl('quote') . ' has been raised against ' . $inq['inquiry_no'] . ', so it is part of the record and cannot be deleted. Set its status to Dropped instead.', 'error');
+            flash('A ' . Tl('quote') . ' has been raised against ' . $inq['inquiry_no'] . ', so it is part of the record and cannot be deleted. It follows that quotation; mark the quotation lost if the work is not coming.', 'error');
             redirect('/inquiries');
         }
         if (function_exists('act_log')) act_log('INQUIRY', $id, 'DELETED', 'Inquiry ' . $inq['inquiry_no'] . ' deleted.');
@@ -2281,7 +2375,7 @@ function ops_crm_quotes($route, $method) {
                 if ($once !== '') $_SESSION['quote_form_once'][$once] = (int)$id;
                 crm_save_locations($id, $b);
                 crm_save_lines($id, $b); crm_quote_recalc($id); crm_quote_fill_unit_from_lines($id);
-                if ($inqId) $pdo->prepare("UPDATE crm_inquiries SET status='QUOTED' WHERE id=?")->execute([$inqId]);
+                if ($inqId) crm_inquiry_sync((int)$inqId);
                 // Carry the lead's attachments onto the quote, so the customer's
                 // RFQ, specs and correspondence stay for future reference.
                 if ($leadId && function_exists('lead_files_carry_to_quote')) {
@@ -2590,7 +2684,7 @@ function ops_crm_quotes($route, $method) {
             if ($expBefore['expired'])
                 crm_log_change($q['id'], 'Accepted after validity had lapsed on ' . fdate($expBefore['expires_on']) . '.');
             $pdo->prepare("UPDATE quote_followups SET status='SKIPPED' WHERE quote_id=? AND status='PENDING'")->execute([$q['id']]);
-            if ($q['inquiry_id']) $pdo->prepare("UPDATE crm_inquiries SET status='QUOTED' WHERE id=?")->execute([$q['inquiry_id']]);
+            if ($q['inquiry_id']) crm_inquiry_sync((int)$q['inquiry_id']);   // Won — it follows its quotation
             // A won order that exists only as a typed name is the point at which
             // the sales side and the operations side stop being the same system:
             // the client master never hears about it, so the order tab has no

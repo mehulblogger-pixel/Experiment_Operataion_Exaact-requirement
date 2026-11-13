@@ -448,6 +448,24 @@ C('SAL-184', 'Project costing', 'Who prepared, who approved, what is pending —
    ('EDGE · An old page left open, "Create quotation" pressed on a costing that is no longer approved.', 'Refused: "Make the quotation once this costing is approved — submit it for approval first." (The rule at the door was always there — the button now matches it.)')],
   'pc_trail; pc_level_words; pc_waiting_words; views/ops/project_costing.php (.pc-trail; Create quotation only when APPROVED); tests/test_costing_trail.php', live=False)
 
+C('SAL-185', 'Enquiries', 'An enquiry shows what became of it — Open, Quoted, Won, Lost (by itself) or Dropped (by hand, with a reason)', 'scenario', ['best', 'rule', 'edge', 'negative'],
+  'MARKETING_EXECUTIVE', 'Owner, 13 Nov 2026: "Why inquiries does not have any pipeline or anything either like won or lost?" — chose "Automatic Won/Lost" and "Only Dropped, with a reason".',
+  'Signed in as Test Marketing Executive. Two new enquiries (Sales → Inquiries → "+ New inquiry"): A "Pump inspection", B "Valve testing". Test BDM and Test Marketing Manager to send and approve.',
+  [('Open enquiry A ("Edit").', 'There is no Status dropdown any more: "Status: Open — Follows its quote, set by itself." Below the form, "Where it stands: Open — no quote yet." with "Drop this enquiry" folded, and "History of this enquiry".'),
+   ('Back on the register → on A press "Quote" → add a line → save.', 'A reads "Quoted" in the register.'),
+   ('[Marketing Manager] approve it; [BDM] "✉ Send to client" → later "Mark accepted (won)".', 'A reads "Won" — nobody touched the enquiry. Its page: "Won — its quote was accepted." and the quote number with "(accepted / closed-won)". History: "… is now won — it follows its quote".'),
+   ('Raise a quotation for B, send it, then "Mark lost" with a reason.', 'B reads "Lost". (Expired — no answer within its validity — also reads "Lost".)'),
+   ('Raise a second quotation for B and send it.', 'B reads "Quoted" again: one lost quotation does not end it while another is out. If that one is accepted, B reads "Won".'),
+   ('New enquiry C "Lab test — outside scope" → open it → "Drop this enquiry" → Why: "We declined to quote", Note "Not our scope" → "Drop it".', '"… dropped — we declined to quote." Where it stands: "Dropped — closed without a quote. We declined to quote — Not our scope · by <you>, <date>", with "Reopen it". In the register, hovering "Dropped" shows the reason; there is no "Quote" button on it.'),
+   ('"Reopen it" on C.', '"… is open again." Status Open, the reason cleared. The history keeps both steps.'),
+   ('NEGATIVE · Drop without picking a reason.', 'The form will not send; a forced send is refused: "Say why it is dropped — pick a reason."'),
+   ('NEGATIVE · Open A (it has a quotation) and look for "Drop this enquiry".', 'Not offered: "With a quote raised, this follows the quote. If the work is not coming, mark the quote lost." A forced drop is refused the same way.'),
+   ('Look at the four cards at the top of the register (this year).', 'Enquiries (with how many are still open) · Quoted (% of enquiries, how many awaiting an answer) · Won (% of enquiries that became orders) · Lost · Dropped (with the hit rate = won ÷ (won + lost)). Each card opens the list filtered to that status. Change the year or search — the cards follow.'),
+   ('EDGE · An enquiry recorded before this update, still reading "Quoted" although its quotation was accepted.', 'Opening the register (or the enquiry) corrects it to "Won" by itself.'),
+   ('EDGE · The status filter on the register.', 'Lists Open, Quoted, Won, Lost, Dropped. If your company renamed statuses under Admin → lists, your names are kept and Won / Lost still appear.')],
+  'crm_inquiry_outcome; crm_inquiry_sync (crm_log_change hook, register, own page); inquiry-drop / inquiry-reopen; INQUIRY_DROP_REASONS; inquiry_list funnel cards; tests/test_inquiry_outcome.php', live=False)
+
+
 
 C('SAL-176', 'Project costing', 'Costing the other way round — from the rate the client pays to the CTC you can afford', 'scenario', ['best', 'rule', 'edge'],
   'BUSINESS_DEV_MANAGER', 'Owner, 13 Nov 2026: "Yes, both ways, but the screen shall not be very confusing." Often the client names the rate first; the question is then what salary the company can afford at its margin.',

@@ -33,8 +33,11 @@
         <?php foreach ($sbuOpts as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($inq['sbu'] ?? '')===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Source</label>
       <select class="form-control" name="source"><?php foreach ($sourceOpts as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($inq['source'] ?? 'EMAIL')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+    <?php //  Owner, 13 Nov 2026: the status is not typed — Quoted / Won / Lost follow the quotation,
+          //  and Dropped (with a reason) has its own button below the form. ?>
     <div class="ff"><label>Status</label>
-      <select class="form-control" name="status"><?php foreach ($statusOpts as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($inq['status'] ?? 'OPEN')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+      <div class="form-control" style="background:var(--soft);display:flex;align-items:center" aria-readonly="true"><?= e($statusOpts[$inq['status'] ?? 'OPEN'] ?? ($inq['status'] ?? 'Open')) ?></div>
+      <div class="muted" style="font-size:11.5px;margin-top:3px">Follows its <?= e(Tl('quote')) ?> — set by itself.</div></div>
 
     <div class="ff"><label>Assigned to</label>
       <select class="form-control searchable" name="assigned_to"><option value="">—</option>
@@ -49,3 +52,45 @@
     <a class="btn secondary" href="/inquiries">Cancel</a>
   </div>
 </form>
+
+<?php //  WHERE THIS ENQUIRY STANDS (owner, 13 Nov 2026 — "Automatic Won/Lost", "Only 'Dropped', with a reason").
+if ($isEdit):
+  $iSt = (string)($inq['status'] ?: 'OPEN');
+  $iQuotes = ops_all("SELECT id, quote_no, rev, status FROM quotations WHERE inquiry_id=? AND COALESCE(is_current,1)=1 ORDER BY id DESC", [(int)$inq['id']]) ?: [];
+  $canEditInq = can('mod.inquiries.edit');
+  $words = ['OPEN' => 'Open — no ' . Tl('quote') . ' yet.', 'QUOTED' => 'Quoted — a ' . Tl('quote') . ' is out; this follows it.',
+            'WON' => 'Won — its ' . Tl('quote') . ' was accepted.', 'LOST' => 'Lost — its ' . Tl('quote') . ' was lost or expired.',
+            'DROPPED' => 'Dropped — closed without a ' . Tl('quote') . '.']; ?>
+<div class="panel" style="margin-top:16px">
+  <h3 class="tab-sub" style="margin-top:0">Where it stands</h3>
+  <p style="margin:0"><span class="pill <?= ['OPEN'=>'p-warn','QUOTED'=>'p-info','WON'=>'p-ok','LOST'=>'p-bad','DROPPED'=>'p-mut'][$iSt] ?? 'p-mut' ?>"><?= e($statusOpts[$iSt] ?? $iSt) ?></span>
+    <?= e($words[$iSt] ?? '') ?></p>
+  <?php if ($iSt === 'DROPPED'): ?>
+    <p class="muted" style="margin:6px 0 0;font-size:13px"><?= e(INQUIRY_DROP_REASONS[$inq['drop_reason'] ?? ''] ?? 'No reason recorded') ?><?= trim((string)($inq['drop_note'] ?? '')) !== '' ? ' — ' . e($inq['drop_note']) : '' ?><?= !empty($inq['dropped_by']) ? ' · by ' . e($inq['dropped_by']) . (!empty($inq['dropped_at']) ? ', ' . e(fdate(substr((string)$inq['dropped_at'], 0, 10))) : '') : '' ?></p>
+  <?php endif; ?>
+  <?php if ($iQuotes): ?>
+    <p style="margin:8px 0 0;font-size:13px"><?= e(TH('quote')) ?>:
+      <?php foreach ($iQuotes as $i => $iq): ?><?= $i ? ' · ' : '' ?><a href="/quote?id=<?= (int)$iq['id'] ?>"><?= e($iq['quote_no']) ?><?= (int)$iq['rev'] ? ' r' . (int)$iq['rev'] : '' ?></a> <span class="muted">(<?= e(strtolower(QUOTE_STATUS[$iq['status']] ?? $iq['status'])) ?>)</span><?php endforeach; ?></p>
+  <?php endif; ?>
+  <?php if ($canEditInq && !$iQuotes && $iSt !== 'DROPPED'): ?>
+    <details class="fold" style="margin-top:10px">
+      <summary>Drop this <?= e(Tl('inquiry')) ?> <span class="sub">closed without a <?= e(Tl('quote')) ?> — say why</span></summary>
+      <div class="fold-body">
+        <form method="post" action="/inquiry-drop" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+          <input type="hidden" name="id" value="<?= (int)$inq['id'] ?>">
+          <div class="ff"><label for="inq-drop-why">Why</label>
+            <select class="form-control" id="inq-drop-why" name="drop_reason" required><option value="">— pick one —</option>
+              <?php foreach (INQUIRY_DROP_REASONS as $k => $v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
+          <div class="ff" style="flex:1;min-width:200px"><label for="inq-drop-note">Note <span class="muted">optional</span></label><input class="form-control" id="inq-drop-note" name="drop_note" maxlength="300" placeholder="e.g. outside our scope"></div>
+          <button class="btn secondary" type="submit">Drop it</button>
+        </form>
+      </div>
+    </details>
+  <?php elseif ($canEditInq && $iSt === 'DROPPED'): ?>
+    <form method="post" action="/inquiry-reopen" style="margin-top:10px"><input type="hidden" name="id" value="<?= (int)$inq['id'] ?>"><button class="btn secondary small" type="submit">Reopen it</button></form>
+  <?php elseif ($iQuotes): ?>
+    <p class="muted" style="margin:8px 0 0;font-size:12.5px">With a <?= e(Tl('quote')) ?> raised, this follows the <?= e(Tl('quote')) ?>. If the work is not coming, mark the <?= e(Tl('quote')) ?> lost.</p>
+  <?php endif; ?>
+</div>
+<div style="margin-top:16px"><?php if (function_exists('act_render_timeline')) act_render_timeline('INQUIRY', (int)$inq['id'], 'History of this ' . Tl('inquiry')); ?></div>
+<?php endif; ?>

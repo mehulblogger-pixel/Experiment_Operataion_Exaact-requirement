@@ -3456,7 +3456,7 @@ function ops_route_module_map() {
         'adspro-import'=>'leads','adspro-spend'=>'leads','ads-roi'=>'leads',
         'adspro-sync'=>'leads','adspro-backfill'=>'leads',
         'stage-gates'=>'leads','stage-gate-save'=>'leads','stage-gate-delete'=>'leads',
-        'inquiries'=>'inquiries','inquiry-new'=>'inquiries','inquiry-edit'=>'inquiries','inquiry-delete'=>'inquiries',
+        'inquiries'=>'inquiries','inquiry-new'=>'inquiries','inquiry-edit'=>'inquiries','inquiry-delete'=>'inquiries','inquiry-drop'=>'inquiries','inquiry-reopen'=>'inquiries',
         'quotes'=>'quotes','quote'=>'quotes','quote-new'=>'quotes','quote-edit'=>'quotes','quote-revise'=>'quotes','quote-status'=>'quotes','quote-doc'=>'quotes','quote-pdf'=>'quotes','quote-approve'=>'quotes','quote-unapprove'=>'quotes','quote-approval-rules'=>'quotes','quote-contract'=>'quotes','quote-add-contract'=>'quotes','quote-float'=>'quotes','client-quotes'=>'calls','quote-context'=>'calls','quote-client'=>'quotes','quote-files'=>'quotes','quote-file'=>'quotes','quote-file-delete'=>'quotes','quote-unlock'=>'quotes','quote-followup'=>'quotes','quote-external'=>'quotes','quotes-export'=>'quotes','quote-final'=>'quotes','quote-compose'=>'quotes','followup-compose'=>'quotes','quote-preorder-save'=>'quotes','quote-milestones'=>'quotes','preorder-checklist'=>'quotes','sales-setup'=>'quotes','quote-delegations'=>'quotes',
         'attendance-recon'=>'reconcile',
         'availability'=>'jobs','schedule'=>'jobs',
@@ -3800,7 +3800,7 @@ function ops_dispatch($route, $method) {
             return ops_job_bill($route, $method);
         case $route === 'candidates' || $route === 'candidate-new' || $route === 'candidate-edit' || $route === 'candidate' || $route === 'candidate-stage' || $route === 'candidate-joined' || $route === 'candidate-cv' || $route === 'candidate-client' || $route === 'candidate-credential' || $route === 'candidate-commercial' || $route === 'candidate-link-person' || $route === 'candidate-link-pro' || $route === 'candidate-unlink-pro':
             ops_candidates($route, $method); return true;
-        case $route === 'inquiries' || $route === 'inquiry-new' || $route === 'inquiry-edit' || $route === 'inquiry-delete':
+        case $route === 'inquiries' || $route === 'inquiry-new' || $route === 'inquiry-edit' || $route === 'inquiry-delete' || $route === 'inquiry-drop' || $route === 'inquiry-reopen':
             ops_crm_inquiries($route, $method); return true;
         case $route === 'quotes' || $route === 'quote' || $route === 'quote-new' || $route === 'quote-edit' || $route === 'quote-revise' || $route === 'quote-status' || $route === 'quote-doc' || $route === 'quote-pdf' || $route === 'quote-approve' || $route === 'quote-unapprove' || $route === 'quote-contract' || $route === 'quote-add-contract' || $route === 'quote-float' || $route === 'quote-client' || $route === 'partner-address' || $route === 'quote-files' || $route === 'quote-file' || $route === 'quote-file-delete' || $route === 'quote-unlock' || $route === 'quote-followup' || $route === 'quote-external' || $route === 'quotes-export' || $route === 'quote-final' || $route === 'quote-compose' || $route === 'followup-compose' || $route === 'quote-preorder-save':
             ops_crm_quotes($route, $method); return true;

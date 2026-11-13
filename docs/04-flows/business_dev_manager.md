@@ -55,3 +55,9 @@ flowchart TD
   13 Nov 2026): "Unlink" is replaced by "🔒 Stays linked". To change figures after that, raise a
   revision. While the quotation is a draft or in approval, unlinking works as before and is logged.
 - Most common task = create & send a quote (a few clicks through the quote form).
+
+### Enquiries show what became of them (owner, 13 Nov 2026)
+
+The enquiry register now shows each enquiry's outcome — Open, Quoted, Won, Lost (following its
+quotation) or Dropped (by hand, with a reason) — and, at the top, enquiries → quoted → won for the year
+and branch in view, with the hit rate (won ÷ won + lost). Click a card to list those enquiries.

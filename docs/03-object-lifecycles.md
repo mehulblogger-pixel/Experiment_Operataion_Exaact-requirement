@@ -117,6 +117,41 @@ stateDiagram-v2
 
 ---
 
+## Enquiry (`crm_inquiries.status`) — it follows its quotation
+
+Owner, 13 Nov 2026: *"Why inquiries does not have any pipeline or anything either like won or lost?"* —
+answered **"Automatic Won/Lost"** and **"Only 'Dropped', with a reason"**. An enquiry is the register of
+what a customer asked for; it gets **no pipeline of its own** (the lead and the deal have one). Its
+outcome is read from its current quotations (`crm_inquiry_outcome()`), never typed.
+
+```mermaid
+stateDiagram-v2
+  [*] --> OPEN : recorded (by hand, from a won lead, or imported)
+  OPEN --> QUOTED : a quotation is raised for it
+  QUOTED --> WON : one of its current quotations is ACCEPTED
+  QUOTED --> LOST : every current quotation is LOST or EXPIRED
+  LOST --> QUOTED : another quotation is raised and still out
+  WON --> QUOTED : the accepted quotation is no longer current (a later revision is out)
+  QUOTED --> OPEN : its only quotation is removed
+  OPEN --> DROPPED : by hand — reason required; only while it has NO quotation
+  DROPPED --> OPEN : reopened by hand
+```
+
+- **Automatic** (`crm_inquiry_sync()`): runs whenever one of its quotations records a change
+  (`crm_log_change()`), when a quotation is created or accepted, when its own page opens, and for
+  the whole register when the register opens (so older rows are corrected). Each change of outcome
+  is written to the enquiry's history (`activities`, `INQUIRY`).
+- **Dropped** (`POST /inquiry-drop`): reason one of *We declined to quote* · *The client withdrew* ·
+  *Duplicate enquiry* (`INQUIRY_DROP_REASONS`), with an optional note; who and when are stored
+  (`drop_reason`, `drop_note`, `dropped_by`, `dropped_at`). Refused once any quotation exists — the
+  enquiry then follows it; mark the quotation lost instead. **Reopen** (`POST /inquiry-reopen`) undoes
+  a drop. Both are for whoever may already edit enquiries (`mod.inquiries.edit`) inside their branch.
+- **The edit form no longer sets the status.** A new enquiry starts Open; saving keeps its status.
+- **The register** shows what became of the enquiries in view (year, search, branch): enquiries,
+  quoted, won (% of enquiries that became orders), lost · dropped, and the hit rate (won ÷ won + lost).
+- Before 13 Nov 2026 the statuses were Open / Quoted / Dropped, set by a free dropdown, and an
+  enquiry never learned whether its quotation was won.
+
 ## Quotation (`quotations.status`)
 
 `QUOTE_STATUS` (`crm.php:129-138`) — **DRAFT, PENDING_APPROVAL, APPROVED, SENT, REJECTED,
