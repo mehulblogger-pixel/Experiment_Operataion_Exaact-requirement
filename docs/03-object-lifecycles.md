@@ -286,6 +286,13 @@ stateDiagram-v2
   The CTC is rounded down to the rupee so the margin is never under the one asked; the role's fixed
   rate is set to the client's rate. When margin and loadings leave nothing for the pay it says so and
   builds nothing. Same gate (`pc_can_edit`), no new permission, no status.
+- **How the price is built (owner, 13 Nov 2026: "is that considered in our costing or not? … why
+  costing of manpower is not included in it").** The loadings box holds only what is added ON TOP of
+  the manpower cost; the manpower cost itself comes from the roles. "How this price is built"
+  (`pc_buildup()`), at the top of that box, lays the costing's own sum out in rupees: manpower cost
+  (+ one-time costs) + each loading = your cost; + your margin = price before negotiation; +
+  negotiation padding = price quoted. It is the same arithmetic as `pc_line_calc()` added over the
+  roles, so its last line is always the costing's Project revenue. Display only — nothing is stored.
 - **A costing stays with its quotation once the quotation is out (owner, 13 Nov 2026: "Once contract
   is made the costing shall not be unlinked" — "once won and/or has a contract", and from the moment
   it is sent: "that's the perfect thing").** `project-costing-attach` refuses to unlink or move a
@@ -442,6 +449,14 @@ stateDiagram-v2
   OPEN --> [*]
 ```
 
+- **One sale, one contract (owner, 13 Nov 2026).** A deal won because its quotation was accepted is
+  with Accounts *through that quotation*: the contract is registered on the quotation
+  (`quote-contract`), never a second time from the deal. `opp_send_to_accounts()` and
+  `opp_register_contract()` refuse such a deal, it is absent from Accounts' "won deals without a
+  quote" list, and its page shows the quotation and its contract instead of "Send to Accounts". The
+  direct road (won with no accepted quotation → Send to Accounts → Accounts register from
+  `/contracts-to-register`) is unchanged. No status or transition is added — one duplicate entry
+  into PENDING is closed.
 - **Who signs is each company's own rule (owner, 13 Nov 2026)** — `contract_open_rule()`, set under
   Admin → Approvals → Sales → Contract: two approvals, one, or none; the roles and/or one named
   person for each; whether one person may give both. No status was added. The only new entry is

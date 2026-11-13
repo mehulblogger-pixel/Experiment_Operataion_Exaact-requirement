@@ -683,8 +683,48 @@ function opp_order_block($o) {
 // when the customer confirms." contradicted the banner "… said yes" and the
 // button the screen actually offered, "Send to Accounts to register the
 // contract"). A win goes to Accounts first; a direct order is the side path.
+//  THE QUOTATION THAT CARRIES THIS DEAL'S SALE (owner, 13 Nov 2026 — bounce list 2.2).
+//  A deal won because its quotation was accepted goes to Accounts THROUGH that
+//  quotation: Accounts register the contract on the quotation. The deal did not know
+//  this. It went on saying "send it to Accounts", accepted the press, and Accounts were
+//  then asked to register a second contract for the same sale.
+//  Returns the accepted quotation (or one that already has a contract), with the
+//  contract's own state when there is one — or null for a deal with no such quotation.
+function opp_winning_quote($oppId) {
+    $pick = null;
+    foreach (opp_quotes($oppId) ?: [] as $q) {
+        $has = trim((string)($q['contract_number'] ?? '')) !== '';
+        if ($has) { $pick = $q; break; }                                   // a contract already — that settles it
+        if ((string)$q['status'] === 'ACCEPTED' && (!$pick || !empty($q['is_current']))) $pick = $q;
+    }
+    if (!$pick) return null;
+    $pick['contract'] = trim((string)($pick['contract_number'] ?? '')) !== ''
+        ? (opp_try(fn() => ops_one("SELECT pc.* FROM partner_contracts pc JOIN quotations q ON q.contract_id=pc.id WHERE q.id=?", [(int)$pick['id']]), null)
+           ?: opp_try(fn() => ops_one("SELECT * FROM partner_contracts WHERE contract_number=? ORDER BY id DESC LIMIT 1", [(string)$pick['contract_number']]), null) ?: null)
+        : null;
+    $pick['label'] = (string)$pick['quote_no'] . ((int)$pick['rev'] > 0 ? ' r' . (int)$pick['rev'] : '');
+    return $pick;
+}
+//  Why this deal must not be handed to Accounts (or registered) on its own: '' when it may.
+function opp_own_contract_block(array $o) {
+    $w = opp_winning_quote((int)$o['id']);
+    if (!$w) return '';
+    return trim((string)($w['contract_number'] ?? '')) !== ''
+        ? 'This deal was won through ' . Tl('quote') . ' ' . $w['label'] . ', which already has contract ' . $w['contract_number'] . '. One sale, one contract — there is nothing more to register from the deal.'
+        : 'This deal was won through ' . Tl('quote') . ' ' . $w['label'] . ', so it is already with Accounts: they register the contract on that ' . Tl('quote') . '. Sending the deal as well could give one sale two contracts.';
+}
+
 function opp_won_next(array $o) {
     if (!empty($o['call_id'])) return 'The work order is raised — open it from this deal.';
+    //  Won through a quotation: the contract lives on the quotation, not on the deal.
+    if (empty($o['contract_id']) && !empty($o['id']) && ($w = opp_winning_quote((int)$o['id']))) {
+        if (trim((string)($w['contract_number'] ?? '')) === '')
+            return 'It is with Accounts through ' . Tl('quote') . ' ' . $w['label'] . ' — they register the contract there. Nothing more for you to do here.';
+        $wos = strtoupper((string)($w['contract']['open_status'] ?? '') ?: 'OPEN');
+        return 'Contract ' . $w['contract_number'] . ' (from ' . Tl('quote') . ' ' . $w['label'] . ') is '
+             . ($wos === 'OPEN' ? 'open — the orders are raised from it.' : ($wos === 'PENDING' ? 'registered and waiting for approval; then the orders are raised from it.'
+                                                                                            : 'registered but not open (' . strtolower(CONTRACT_OPEN_STATES[$wos] ?? $wos) . ').'));
+    }
     if (!empty($o['contract_id'])) {
         $os = strtoupper((string)(ops_val("SELECT open_status FROM partner_contracts WHERE id=?", [(int)$o['contract_id']]) ?: 'OPEN'));
         return $os === 'OPEN' ? 'The contract is registered and open — the orders are raised from it.'
@@ -776,6 +816,7 @@ function opp_send_to_accounts($oppId) {
     if (empty($o['partner_id'])) return ['err' => 'Add the customer to the master first, so the contract has somewhere to point.'];
     if (!empty($o['call_id'])) return ['err' => 'A work order has already been raised from this deal.'];
     if (!empty($o['contract_id'])) return ['err' => 'A contract has already been registered for this deal.'];
+    if (($why = opp_own_contract_block($o)) !== '') return ['err' => $why];
     db()->prepare("UPDATE opportunities SET sent_to_accounts_at=?, updated_at=? WHERE id=?")
         ->execute([date('c'), date('c'), (int)$o['id']]);
     if (function_exists('act_log')) act_log('OPPORTUNITY', (int)$o['id'], 'SYSTEM',
@@ -794,6 +835,7 @@ function opp_register_contract($oppId, array $b = []) {
     if (($o['status'] ?? '') !== 'WON') return ['err' => 'Only a won deal becomes a contract.'];
     if (empty($o['partner_id'])) return ['err' => 'Add the customer to the master first.'];
     if (!empty($o['contract_id'])) return ['err' => 'A contract has already been registered for this deal.'];
+    if (($why = opp_own_contract_block($o)) !== '') return ['err' => $why];
     // D-12 — no contract for a customer who is blocked.
     if (function_exists('partner_trade_block') && ($tb = partner_trade_block((int)$o['partner_id'])) !== '') return ['err' => $tb];
     $pdo = db();
@@ -834,12 +876,91 @@ function opp_register_contract($oppId, array $b = []) {
 // Finance's queue for the direct-win path (mirrors quotes_awaiting_contract()).
 function opps_awaiting_contract() {
     opp_migrate();
-    return ops_all(
+    $rows = ops_all(
         "SELECT o.*, b.legal_name partner_legal, b.display_name partner_disp
            FROM opportunities o LEFT JOIN business_partners b ON b.id=o.partner_id
           WHERE o.status='WON' AND COALESCE(o.sent_to_accounts_at,'')<>''
             AND COALESCE(o.contract_id,0)=0 AND COALESCE(o.call_id,0)=0
           ORDER BY o.sent_to_accounts_at") ?: [];
+    //  A deal won through a quotation is NOT "without a quote": its contract is
+    //  registered on the quotation, and listing it here asked Accounts for a second
+    //  contract for the same sale (bounce list 2.2, 13 Nov 2026).
+    return array_values(array_filter($rows, fn($o) => !opp_winning_quote((int)$o['id'])));
+}
+
+//  ADD THE CUSTOMER FROM THE WON DEAL (owner, 13 Nov 2026 — bounce list 3.2). A deal
+//  won for a company that is not on the client master said "Add them as a customer
+//  first" and offered no way to do it. This creates the same short customer record a
+//  won lead creates (lead_convert): name, State, the deal's contact — to be completed
+//  before the first work order, as now — with the same duplicate guard. For a deal that
+//  came from a lead, the lead's own conversion remains the way (it also raises the
+//  enquiry); this is for a deal with no lead behind it.
+function opp_add_customer($oppId, array $b = []) {
+    opp_migrate();
+    $o = opp_row($oppId);
+    if (!$o) return ['err' => 'That opportunity no longer exists.'];
+    if (($o['status'] ?? '') !== 'WON') return ['err' => 'The customer is added once the deal is won.'];
+    if (!empty($o['partner_id'])) return ['err' => 'This deal already has its customer.'];
+    if (!empty($o['lead_id'])) return ['err' => 'This deal came from a lead — make the lead a customer, and the deal takes it from there.'];
+    $name = trim((string)($b['company_name'] ?? '')); if ($name === '') $name = trim((string)($o['partner_name'] ?? ''));
+    if ($name === '') return ['err' => 'The customer needs a name.'];
+    $name = mb_substr($name, 0, 200); $state = mb_substr(trim((string)($b['state'] ?? '')), 0, 60);
+    $near = null;
+    if (function_exists('partner_find_or_problem')) {
+        $hit = partner_find_or_problem($name, '', '', '', 0);
+        //  Certainly the same company: stop and name it — pick it from the list instead.
+        if (($hit['confidence'] ?? 'NONE') === 'EXACT') return ['err' => $hit['message']];
+        if (($hit['confidence'] ?? 'NONE') === 'POSSIBLE') $near = $hit['row'];
+    }
+    //  A name that matches one already on file is evidence, not proof. A person is
+    //  standing here with the list of customers right below — so stop ONCE and ask,
+    //  rather than quietly create what may be a second record for the same company.
+    if ($near && empty($b['confirm_new']))
+        return ['err' => 'A customer with this name is already on file: ' . trim((string)($near['code'] ?? '')) . ' — ' . (string)($near['legal_name'] ?? '')
+                       . '. If it is the same company, pick it from the list below. If it really is a different company, tick "It is a different company" and press again.',
+                'near' => $near];
+    $pdo = db(); $own = !$pdo->inTransaction(); if ($own) $pdo->beginTransaction();
+    try {
+        $code = 'C-' . strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $name), 0, 8)) . '-'
+              . str_pad((string)((int)ops_val("SELECT COUNT(*) FROM business_partners") + 1), 4, '0', STR_PAD_LEFT);
+        $pdo->prepare("INSERT INTO business_partners (code,legal_name,display_name,is_client,is_vendor,status,state,created_at) VALUES (?,?,?,1,0,'ACTIVE',?,?)")
+            ->execute([$code, $name, $name, $state, date('c')]);
+        $pid = (int)$pdo->lastInsertId();
+        //  Two people pressing at once: only the first one's customer is kept.
+        $claim = $pdo->prepare("UPDATE opportunities SET partner_id=?, partner_name=?, updated_at=? WHERE id=? AND COALESCE(partner_id,0)=0");
+        $claim->execute([$pid, $name, date('c'), (int)$o['id']]);
+        if ($claim->rowCount() !== 1) { if ($own) $pdo->rollBack(); return ['err' => 'Someone else has just set the customer on this deal.']; }
+        if (trim((string)($o['contact_name'] ?? '')) !== '') {
+            try { $pdo->prepare("INSERT INTO partner_contacts (partner_id,name,email,mobile,is_primary) VALUES (?,?,?,?,1)")
+                      ->execute([$pid, $o['contact_name'], (string)($o['contact_email'] ?? ''), (string)($o['contact_phone'] ?? '')]); }
+            catch (Throwable $e) { /* contact shape differs on an older install */ }
+        }
+        if ($own) $pdo->commit();
+    } catch (Throwable $e) { if ($own && $pdo->inTransaction()) $pdo->rollBack(); throw $e; }
+    if (function_exists('partner_audit_created'))
+        partner_audit_created($pid, 'Created from won deal ' . (string)$o['ref']
+            . ($near ? '. It looks similar to ' . trim((string)($near['code'] ?? '')) . ' — ' . (string)($near['legal_name'] ?? '') . ', which was already on file' : ''));
+    if (function_exists('act_log')) act_log('OPPORTUNITY', (int)$o['id'], 'SYSTEM', $name . ' added to the client master from this deal (' . $code . ')', ['auto' => 1, 'partner_id' => $pid]);
+    return ['ok' => true, 'partner_id' => $pid, 'code' => $code, 'name' => $name, 'near' => $near];
+}
+
+//  ACCOUNTS' OWN SCREEN FOR WON DEALS (owner, 13 Nov 2026 — bounce list 3.1). The
+//  dashboard offered Accounts "Register" on a won deal and sent them to the deal page,
+//  which the standard Finance login may not open ("Sales & CRM — restricted"). The
+//  registration now happens here, on a screen behind the right Accounts already hold
+//  (crm.contract.register) — it shows only what the dashboard already showed them about
+//  the deal (reference, name, customer, value) and the one form. No new permission.
+function ops_contracts_to_register($method) {
+    ops_require(can('crm.contract.register') || is_master(), 'Only Accounts / back-office register contracts.');
+    opp_migrate();
+    $deals = array_values(array_filter(opps_awaiting_contract(), fn($o) => !function_exists('scope_office_allows') || scope_office_allows($o['office_id'] ?? null)));
+    $quotes = function_exists('quotes_awaiting_contract') ? (quotes_awaiting_contract() ?: []) : [];
+    view('ops/contracts_to_register', [
+        'deals' => $deals, 'quotes' => $quotes,
+        'offices' => function_exists('offices_list') ? (offices_list() ?: []) : [],
+        'ruleWords' => function_exists('contract_rule_sentence') ? contract_rule_sentence() : '',
+    ]);
+    return true;
 }
 
 // Generate a quotation-of-record from a deal — so even an order won WITHOUT a
@@ -1030,12 +1151,38 @@ function ops_opportunities($route, $method) {
             // Direct-win → contract path: who may register, and the contract already
             // registered from this deal (if any) so its state can be shown.
             'canRegisterContract' => can('crm.contract.register') || is_master(),
+            'winQuote' => opp_winning_quote((int)$o['id']),
+            'canAddCustomer' => function_exists('leads_can_edit') && leads_can_edit(),
             'contractRow' => !empty($o['contract_id'])
                 ? ops_one("SELECT * FROM partner_contracts WHERE id=?", [(int)$o['contract_id']])
                 : null,
         ]);
         return true;
     }
+
+    //  THIS DOOR COMES BEFORE "can you change a deal?" — on purpose. Registering the
+    //  contract is Accounts' act, guarded by its own right (crm.contract.register), and
+    //  Accounts do not edit deals. It used to sit below that check, so the standard
+    //  Finance login was turned away with "You cannot change an opportunity" — found by
+    //  walking it as Finance on the practice copy, 13 Nov 2026.
+    // Accounts register the contract straight from the won deal (no quotation).
+    if ($route === 'opportunity-contract' && $method === 'POST') {
+        $id = (int)($_POST['id'] ?? 0);
+        ops_require(can('crm.contract.register') || is_master(), 'Only Accounts / back-office can register the contract.');
+        //  Pressed on Accounts' own list → back to that list (that one address only).
+        //  Accounts may not be able to open the deal page at all.
+        $oppBack = (($_POST['from'] ?? '') === 'list') ? '/contracts-to-register' : '/opportunity?id=' . $id;
+        $r = opp_register_contract($id, $_POST);
+        if (!empty($r['err'])) { flash($r['err'], 'error'); redirect($oppBack); }
+        foreach (($r['warn'] ?? []) as $w) flash($w, 'warning');
+        if (($r['open_status'] ?? '') === 'PENDING') {
+            flash('Contract ' . $r['contract_no'] . ' ' . contract_registered_words((int)$r['contract_id']) . ' The ' . Tlp('call') . ' are raised from it once it is open.', 'warning');
+        } else {
+            flash('Contract ' . $r['contract_no'] . ' ' . (function_exists('contract_registered_words') ? contract_registered_words((int)$r['contract_id']) : 'registered.') . ' Raise the ' . Tlp('call') . ' from it whenever the work comes in.');
+        }
+        redirect($oppBack);
+    }
+
 
     ops_require($canEdit, 'You cannot change an opportunity.');
 
@@ -1139,19 +1286,16 @@ function ops_opportunities($route, $method) {
         redirect('/quote-edit?id=' . $r['quote_id']);
     }
 
-    // Accounts register the contract straight from the won deal (no quotation).
-    if ($route === 'opportunity-contract' && $method === 'POST') {
+    //  Add the customer to the master from a won deal that has no lead behind it.
+    //  The same people who may make a lead a customer — nobody new.
+    if ($route === 'opportunity-add-customer' && $method === 'POST') {
         $id = (int)($_POST['id'] ?? 0);
-        ops_require(can('crm.contract.register') || is_master(), 'Only Accounts / back-office can register the contract.');
-        $r = opp_register_contract($id, $_POST);
-        if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/opportunity?id=' . $id); }
-        foreach (($r['warn'] ?? []) as $w) flash($w, 'warning');
-        if (($r['open_status'] ?? '') === 'PENDING') {
-            flash('Contract ' . $r['contract_no'] . ' ' . contract_registered_words((int)$r['contract_id']) . ' The ' . Tlp('call') . ' are raised from it once it is open.', 'warning');
-        } else {
-            flash('Contract ' . $r['contract_no'] . ' registered against an existing open contract — raise the ' . Tlp('call') . ' from it whenever the work comes in.');
-        }
-        redirect('/opportunity?id=' . $id);
+        ops_require(function_exists('leads_can_edit') && leads_can_edit(), 'Only someone who works leads and deals can add the customer.');
+        $r = opp_add_customer($id, $_POST);
+        if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/opportunity?id=' . $id . (!empty($r['near']) ? '&samename=1' : '') . '#opp=actions'); }
+        flash($r['name'] . ' is now a customer (' . $r['code'] . '). Next: send the deal to Accounts to register the contract. The customer record is short — GSTIN or PAN, address and e-mail are completed before the first ' . Tl('call') . '.'
+            . (!empty($r['near']) ? ' You confirmed it is a different company from ' . trim((string)($r['near']['legal_name'] ?? '')) . ', already on file — that is recorded on the new customer.' : ''));
+        redirect('/opportunity?id=' . $id . '#opp=actions');
     }
 
     if ($route === 'opportunity-from-lead' && $method === 'POST') {

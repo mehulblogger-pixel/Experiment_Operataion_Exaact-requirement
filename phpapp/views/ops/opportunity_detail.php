@@ -285,6 +285,22 @@
       <?php if (empty($o['partner_id']) && !empty($o['lead_id'])): ?>
         <a href="/lead?id=<?= (int)$o['lead_id'] ?>"><b>Convert the lead</b></a> — it makes the customer and fills this in.
       <?php endif; ?>
+      <?php // Owner, 13 Nov 2026 (bounce list 3.2): it said "Add them as a customer first" and
+            // offered no way to do it. One short form, right here — the same short record a
+            // won lead creates. A deal that came from a lead keeps "Convert the lead" above.
+            if (empty($o['partner_id']) && empty($o['lead_id']) && !empty($canAddCustomer)): ?>
+        <form method="post" action="/opportunity-add-customer" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+          <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
+          <div class="ff" style="flex:2;min-width:200px"><label for="opp-newcust">Customer name</label>
+            <input class="form-control" id="opp-newcust" name="company_name" maxlength="200" required value="<?= e($o['partner_name']) ?>"></div>
+          <div class="ff" style="flex:1;min-width:140px"><label for="opp-newstate">State <span class="muted">(for tax)</span></label>
+            <input class="form-control" id="opp-newstate" name="state" maxlength="60" placeholder="e.g. Gujarat"></div>
+          <?php if (($_GET['samename'] ?? '') === '1'): ?>
+            <label class="ff-check" style="flex-basis:100%"><input type="checkbox" name="confirm_new" value="1" required> It is a different company from the one already on file with this name</label>
+          <?php endif; ?>
+          <button class="btn small">＋ Add as a customer</button>
+        </form>
+      <?php endif; ?>
       <?php if (empty($o['partner_id']) && $canEdit && !empty($clients)): ?>
         <form method="post" action="/opportunity-edit" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:end">
           <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
@@ -301,11 +317,34 @@
     </div>
   <?php else: ?>
     <?php // Won, customer on file, no call and no contract yet. ?>
-    <?php if (!empty($o['sent_to_accounts_at'])): ?>
+    <?php // Owner, 13 Nov 2026 (bounce list 2.2): a deal won THROUGH A QUOTATION goes to
+          // Accounts through that quotation — the contract is registered there. The deal
+          // used to go on offering "Send to Accounts", and one sale could get two contracts.
+          if (!empty($winQuote)):
+            $wqC = $winQuote['contract'] ?? null; $wqNo = trim((string)($winQuote['contract_number'] ?? ''));
+            $wqOs = $wqC ? strtoupper((string)($wqC['open_status'] ?? '') ?: 'OPEN') : ''; ?>
+      <div class="panel" data-tab="Actions" style="margin-top:16px;border-left:3px solid var(--ok)">
+        <b style="color:var(--ok)">✓ Won through <?= e(Tl('quote')) ?> <?= e($winQuote['label']) ?></b>
+        <p style="font-size:13.5px;margin:6px 0 0">
+          <?php if ($wqNo === ''): ?>
+            It is with Accounts — they register the contract on that <?= e(Tl('quote')) ?>. There is nothing to send from the deal.
+          <?php elseif ($wqOs === 'PENDING' && $wqC): ?>
+            Contract <b><?= e($wqNo) ?></b> is registered and waiting for approval. <?= e(contract_waiting_words($wqC)) ?>
+          <?php elseif ($wqOs === 'OPEN' || !$wqC): ?>
+            Contract <b><?= e($wqNo) ?></b> is open — the <?= e(Tlp('call')) ?> are raised from it.
+          <?php else: ?>
+            Contract <b><?= e($wqNo) ?></b> — <?= e(strtolower(CONTRACT_OPEN_STATES[$wqOs] ?? $wqOs)) ?>.
+          <?php endif; ?>
+        </p>
+        <?php if (can('mod.quotes.view') || is_master()): ?>
+          <div style="margin-top:8px"><a class="btn small secondary" href="/quote?id=<?= (int)$winQuote['id'] ?>#contract">Open <?= e(Tl('quote')) ?> <?= e($winQuote['label']) ?></a></div>
+        <?php endif; ?>
+      </div>
+    <?php elseif (!empty($o['sent_to_accounts_at'])): ?>
       <div class="panel" data-tab="Actions" style="margin-top:16px;border-left:3px solid var(--ok)">
         <b style="color:var(--ok)">✓ Handed to Accounts — awaiting contract registration</b>
         <p class="muted" style="font-size:13px;margin:6px 0 0">Sent on <?= e(fdate(substr((string)$o['sent_to_accounts_at'], 0, 10))) ?>.
-          Accounts register the contract, a manager approves it, then Operations raise the <?= e(Tlp('call')) ?> from it.
+          Accounts register the contract, it is approved under your company's rule, then Operations raise the <?= e(Tlp('call')) ?> from it.
           <?php if (!$canRegisterContract): ?>There is nothing more for Sales to do here.<?php endif; ?></p>
         <?php if ($canRegisterContract): ?>
           <form method="post" action="/opportunity-contract" style="margin-top:12px">
@@ -333,9 +372,9 @@
           <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
           <b>Won directly, or an order received without a quotation?</b>
           <p class="muted" style="font-size:13px;margin:6px 0 10px">
-            Send it to <b>Accounts</b> to register the contract — no quotation needed. Accounts register it, a manager
-            approves it, then Operations raise the <?= e(Tlp('call')) ?> from the contract. This is the same governed path
-            a quoted win takes, so the sale still passes through Finance.</p>
+            Send it to <b>Accounts</b> to register the contract — no quotation needed. Accounts register it, it is
+            approved under your company's rule, then Operations raise the <?= e(Tlp('call')) ?> from the contract. This is the
+            same governed path a quoted win takes, so the sale still passes through Finance.</p>
           <button class="btn">Send to Accounts to register the contract</button>
         </form>
       </div>

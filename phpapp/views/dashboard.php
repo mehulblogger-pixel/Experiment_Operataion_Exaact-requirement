@@ -491,7 +491,7 @@
           <?= count($noContractDeals) === 1 ? 'is' : 'are' ?> waiting for a contract</b>
         <p class="sub" style="margin:6px 0 8px">
           <?= $canRegisterContract
-              ? 'Won directly / an order received without a ' . e(Tl('quote')) . '. Open the deal and register the contract. Your company\'s rule for opening it: ' . e(function_exists('contract_rule_sentence') ? contract_rule_sentence() : 'it is then approved') . '.'
+              ? 'Won directly / an order received without a ' . e(Tl('quote')) . '. Press Register — it is done on your own screen, no need to open the deal. Your company\'s rule for opening the contract: ' . e(function_exists('contract_rule_sentence') ? contract_rule_sentence() : 'it is then approved') . '.'
               : 'Handed to Accounts to register the contract.' ?>
         </p>
         <table class="dt">
@@ -499,10 +499,10 @@
           <tbody>
           <?php foreach (array_slice($noContractDeals, 0, 8) as $nd): ?>
             <tr>
-              <td><a href="/opportunity?id=<?= (int)$nd['id'] ?>"><b><?= e($nd['ref']) ?></b></a> <?= e($nd['name']) ?></td>
+              <td><b><?= e($nd['ref']) ?></b> <?= e($nd['name']) ?></td>
               <td><?= e($nd['partner_disp'] ?: $nd['partner_legal'] ?: $nd['partner_name'] ?: '—') ?></td>
               <td class="num"><?= (float)$nd['value'] ? e(fmoney($nd['value'])) : '—' ?></td>
-              <td class="num"><?php if ($canRegisterContract): ?><a class="btn small" href="/opportunity?id=<?= (int)$nd['id'] ?>">Register</a><?php endif; ?></td>
+              <td class="num"><?php if ($canRegisterContract): ?><a class="btn small" href="/contracts-to-register#deal-<?= (int)$nd['id'] ?>">Register</a><?php endif; ?></td>
             </tr>
           <?php endforeach; ?>
           </tbody>

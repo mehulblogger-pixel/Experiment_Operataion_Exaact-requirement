@@ -3426,7 +3426,7 @@ function ops_route_module_map() {
         'leads'=>'leads','lead'=>'leads','lead-new'=>'leads','lead-edit'=>'leads','lead-move'=>'leads','lead-convert'=>'leads','leads-bulk'=>'leads','lead-delete'=>'leads','lead-contact'=>'leads','lead-files'=>'leads','lead-file'=>'leads','lead-file-delete'=>'leads',
         'opportunities'=>'leads','opportunity'=>'leads','opportunity-new'=>'leads','opportunity-edit'=>'leads','opportunity-delete'=>'leads',
         'opportunity-move'=>'leads','opportunity-reopen'=>'leads','lead-reopen'=>'leads','opportunity-quote'=>'leads','opportunity-from-lead'=>'leads',
-        'opportunity-raise-order'=>'leads','opportunity-send-to-accounts'=>'leads','opportunity-contract'=>'quotes','opportunity-generate-quote'=>'leads',
+        'opportunity-raise-order'=>'leads','opportunity-send-to-accounts'=>'leads','opportunity-contract'=>'quotes','contracts-to-register'=>'quotes','opportunity-add-customer'=>'leads','opportunity-generate-quote'=>'leads',
         'pipelines'=>'leads','pipeline'=>'leads','pipeline-new'=>'leads','pipeline-save'=>'leads',
         'pipeline-stage-add'=>'leads','pipeline-stage-delete'=>'leads','pipeline-default'=>'leads',
         'industry'=>'settings','industry-apply'=>'settings',
@@ -4338,6 +4338,8 @@ function ops_dispatch($route, $method) {
             return ops_stage_gates($route, $method);
         case $route === 'crm-dashboard':
             return ops_crmdash($route, $method);
+        case $route === 'contracts-to-register':                      // Accounts' own screen for won deals (no deal page needed)
+            return ops_contracts_to_register($method);
         case $route === 'opportunities' || strncmp($route, 'opportunity', 11) === 0:
             return ops_opportunities($route, $method);
         case $route === 'leads' || strncmp($route, 'lead', 4) === 0:
@@ -9536,6 +9538,11 @@ function ops_pending_tasks() {
     // contract (Finance / admin).
     if (function_exists('quotes_awaiting_contract_count') && (can('crm.contract.register') || is_master()))
         $add(quotes_awaiting_contract_count(), '📄', 'contracts to register', 'accepted quotes waiting for a contract number', '/quotes?mine=contract', 'warn');
+    //  Won deals handed to Accounts (no quotation) — registered on Accounts' own screen.
+    if (function_exists('opps_awaiting_contract') && (can('crm.contract.register') || is_master())) {
+        $dealsToReg = 0; try { $dealsToReg = count(opps_awaiting_contract()); } catch (Throwable $e) {}
+        $add($dealsToReg, '🤝', 'won deals to register', 'won deals handed to Accounts, waiting for a contract number', '/contracts-to-register', 'warn');
+    }
 
     // Contract openings — the company's own rule (Admin → Approvals → Sales → Contract):
     // two signatures, one, or none. Both act on the dedicated /contract-openings

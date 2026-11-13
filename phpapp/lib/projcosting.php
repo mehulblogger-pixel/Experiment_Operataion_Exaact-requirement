@@ -1021,6 +1021,51 @@ function pc_heads_from_ctc($ctc) {
                     . rtrim(rtrim(number_format(comp_basic_pct(), 2), '0'), '.') . '% of the CTC. Change any head; the totals follow.'];
 }
 
+//  HOW THE PRICE IS BUILT, IN RUPEES (owner, 13 Nov 2026: looking at the box of
+//  percentages — "is that considered in our costing or not? If yes then where, and
+//  why costing of manpower is not included in it"). The loadings ARE in every
+//  figure on the page, but the box showed only percentages: never the manpower cost
+//  they sit on, never the rupees they add. This is the same sum pc_line_calc()
+//  does, added up over the roles and laid out as a ladder:
+//      manpower cost (+ one-time costs) + each loading = your cost
+//      + your margin = price before negotiation + negotiation padding = price quoted
+//  Each loading's rupees are exact, not an estimate: a loading is its % of the same
+//  base on every role (the manpower cost, or the rate when "applied on the rate").
+//  Returns null when the costing has no role yet.
+function pc_buildup($id) {
+    $h = pc_get($id); if (!$h) return null;
+    $lines = pc_lines($id); if (!$lines) return null;
+    $onRate = strtoupper((string)($h['load_on'] ?? 'COST')) === 'RATE';
+    $pcts = ['overhead_pct' => 'Overhead', 'insurance_pct' => 'Insurance', 'baddebt_pct' => 'Bad debt', 'contingency_pct' => 'Contingency'];
+    $man = 0.0; $once = 0.0; $cost = 0.0; $atRate = 0.0; $quoted = 0.0; $base = 0.0;
+    foreach ($lines as $ln) {
+        $c = pc_line_calc($ln, $h); $q = (float)$c['qty'];
+        $man += $c['direct'] * $q; $once += $c['oneoff_total']; $cost += $c['cost'];
+        $atRate += $c['rate'] * $q; $quoted += $c['revenue'];
+        $base += ($onRate ? $c['rate'] : $c['direct']) * $q;
+    }
+    $rows = [['kind' => 'start', 'label' => 'Manpower cost — all roles above', 'amount' => $man, 'note' => 'salary, statutory and other heads × the quantity']];
+    if ($once > 0) $rows[] = ['kind' => 'add', 'label' => 'One-time costs', 'amount' => $once, 'note' => 'counted once for each person; no loading on them'];
+    $loadSum = 0.0;
+    foreach ($pcts as $k => $label) {
+        $p = (float)($h[$k] ?? 0); if ($p == 0) continue;
+        $amt = $base * $p / 100; $loadSum += $amt;
+        $rows[] = ['kind' => 'add', 'label' => $label . ' ' . rtrim(rtrim(number_format($p, 2), '0'), '.') . '%', 'amount' => $amt,
+                   'note' => $onRate ? 'of the rate' : 'of the manpower cost'];
+    }
+    //  Whatever is left between the ladder and the costing's own total is rounding
+    //  (each role is rounded to the paisa) — fold it into the total, never invent a line.
+    $rows[] = ['kind' => 'total', 'label' => 'Your cost', 'amount' => $cost, 'note' => 'the "Project cost" at the top'];
+    $rows[] = ['kind' => 'add', 'label' => 'Your margin', 'amount' => $atRate - $cost, 'note' => $atRate > 0 ? rtrim(rtrim(number_format(($atRate - $cost) / $atRate * 100, 1), '0'), '.') . '% of the price before negotiation' : ''];
+    $neg = (float)($h['negotiation_pct'] ?? 0);
+    if ($neg != 0) {
+        $rows[] = ['kind' => 'total', 'label' => 'Price before negotiation', 'amount' => $atRate, 'note' => ''];
+        $rows[] = ['kind' => 'add', 'label' => 'Negotiation padding ' . rtrim(rtrim(number_format($neg, 2), '0'), '.') . '%', 'amount' => $quoted - $atRate, 'note' => 'room to come down; it is price, not cost'];
+    }
+    $rows[] = ['kind' => 'grand', 'label' => 'Price quoted to the ' . Tl('client'), 'amount' => $quoted, 'note' => 'the "Project revenue" at the top'];
+    return ['rows' => $rows, 'on_rate' => $onRate, 'manpower' => $man, 'cost' => $cost, 'quoted' => $quoted, 'loadings' => $loadSum];
+}
+
 //  THE OTHER WAY ROUND — from the rate the client pays (owner, 13 Nov 2026:
 //  "Yes, both ways, but the screen shall not be very confusing"). Given the rate
 //  for one unit of the sheet (a man-month, a man-day, or the lump sum) and the

@@ -824,7 +824,7 @@ function contract_sig_label($i, $rule = null) {
 function contract_sig_names($i, $c = null, $exceptId = 0, $rule = null) {
     $rule = $rule ?: contract_open_rule();
     $p = contract_sig_people($i, $c, $exceptId, $rule);
-    if (!$p) return 'nobody yet — no active person is a ' . contract_sig_label($i, $rule) . '. Set it under Admin → Approvals → Sales → Contract (the Master Admin can sign meanwhile)';
+    if (!$p) return 'nobody yet — no active person holds it (' . contract_sig_label($i, $rule) . '). Set it under Admin → Approvals → Sales → Contract (the Master Admin can sign meanwhile)';
     $names = array_map('user_name', array_slice($p, 0, 3));
     return implode(', ', $names) . (count($p) > 3 ? ' and ' . (count($p) - 3) . ' more' : '');
 }

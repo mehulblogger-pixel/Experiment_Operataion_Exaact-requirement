@@ -283,7 +283,7 @@ function setupqa_sales_contract_facts() {
     if ($n === 0) $out[] = 'A later change to an open contract still takes one approval, from ' . contract_sig_label(2, $rule) . ' — it rewrites a contract that is already in force.';
     foreach ($n === 2 ? [1, 2] : [2] as $i)
         if (!contract_sig_people($i, null, 0, $rule))
-            $out[] = '⚠ Nobody can give the ' . ($i === 1 ? 'first signature' : 'final approval') . ' yet — no active person is a ' . contract_sig_label($i, $rule) . '. Until someone is, only the Master Admin can sign.';
+            $out[] = '⚠ Nobody can give the ' . ($i === 1 ? 'first signature' : 'final approval') . ' yet — no active person holds it (' . contract_sig_label($i, $rule) . '). Until someone is, only the Master Admin can sign.';
     if (!$rule['sig'][1]['standard'] || !$rule['sig'][2]['standard'] || setting_get('contract_open_signatures', '') !== '') $out[] = 'This is your company\'s own rule. The standard one is: two signatures — first Operation Manager, Business Unit Head, Admin, Business Director or anyone who manages a branch\'s users, then Branch Manager or Branch Application Manager, two different people.';
     return $out;
 }

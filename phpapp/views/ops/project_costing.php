@@ -45,6 +45,14 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
      squeezed the Submit / Approve / Make-a-quotation buttons out of sight. */
   .pc .pc-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
   .pc .lockmsg{background:var(--warn-soft,#fdf1e3);border:1px solid var(--line);border-radius:9px;padding:8px 12px;font-size:12.5px;margin:10px 0}
+  .pc .pcbu{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:0 0 14px;background:color-mix(in srgb,var(--brand,#0f5f5a) 4%,var(--card,#fff))}
+  .pc .pcbu-t{font-weight:700;font-size:13.5px}
+  .pc .pcbu-tb{width:100%;border-collapse:collapse;font-size:13px}
+  .pc .pcbu-tb td{padding:4px 0;vertical-align:baseline}
+  .pc .pcbu-tb .num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;padding-left:10px}
+  .pc .pcbu-s{width:16px;color:var(--muted);font-weight:700}
+  .pc .pcbu-total td,.pc .pcbu-grand td{border-top:1px solid var(--line);font-weight:700}
+  .pc .pcbu-grand td{border-top:2px solid var(--brand,#0f5f5a)}
   .pc .wide-scroll{overflow-x:auto}   /* a role with many heads scrolls inside its own card — it never pushes past the page */
   @media(max-width:1000px){.pc .kpis{grid-template-columns:repeat(2,1fr)}}
 </style>
@@ -588,6 +596,27 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
 <div class="g2" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start">
   <div class="panel">
     <h3 class="tab-sub" style="margin-top:0">Loadings, basis &amp; details</h3>
+    <?php // Owner, 13 Nov 2026: "is that considered in our costing or not? … why costing of
+          // manpower is not included in it". The percentages below are added ON TOP of the
+          // manpower cost of the roles above — so say so, and show the rupees.
+          $bu = function_exists('pc_buildup') ? pc_buildup((int)$h['id']) : null; ?>
+    <div class="pcbu" aria-label="How this price is built">
+      <div class="pcbu-t">How this price is built</div>
+      <?php if (!$bu): ?>
+        <p class="muted" style="margin:4px 0 0;font-size:13px">The percentages below are added on top of the <b>manpower cost</b>, which comes from the roles (“＋ Add a role” above). Add a role and the rupees appear here.</p>
+      <?php else: ?>
+        <p class="muted" style="margin:2px 0 8px;font-size:12.5px">Manpower cost comes from the roles above. The percentages below are added on top of it<?= $bu['on_rate'] ? ' (worked on the rate, as set in “Loadings applied on”)' : '' ?>.</p>
+        <table class="pcbu-tb">
+          <?php foreach ($bu['rows'] as $r): ?>
+            <tr class="pcbu-<?= $e($r['kind']) ?>">
+              <td class="pcbu-s"><?= $r['kind'] === 'add' ? '+' : ($r['kind'] === 'start' ? '' : '=') ?></td>
+              <td><?= $e($r['label']) ?><?php if ($r['note'] !== ''): ?> <span class="muted">— <?= $e($r['note']) ?></span><?php endif; ?></td>
+              <td class="num"><?= $e(fmoney($r['amount'])) ?></td>
+            </tr>
+          <?php endforeach; ?>
+        </table>
+      <?php endif; ?>
+    </div>
     <?php if ($canEdit): ?>
     <form method="post" action="/project-costing-save" id="pcSettings">
       <input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="id" value="<?= (int)$h['id'] ?>">
