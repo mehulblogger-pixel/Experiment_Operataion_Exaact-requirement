@@ -289,6 +289,7 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
   .che .totals{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:10px}
   .che .totals div{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;font-weight:700}
   .che .totals b{display:block;font-size:16px;color:var(--ink);text-transform:none;letter-spacing:0;font-variant-numeric:tabular-nums}
+  .che .totals .pv-m{display:block;font-size:12px;font-weight:600;color:var(--muted);text-transform:none;letter-spacing:0;font-variant-numeric:tabular-nums;margin-top:2px}
   .che .errs{display:none;margin:8px 0}
   .che .empty{border:1px dashed var(--line);border-radius:10px;padding:16px;text-align:center;color:var(--muted);font-size:13px}
   @media(max-width:1180px){
@@ -360,7 +361,13 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
       <div class="ff"><label for="pc_rate">…or fixed rate<?= $e($rateLabel) ?> <span class="muted">override</span></label><input class="form-control" type="number" step="0.01" min="0" id="pc_rate" name="rate_manual" value="<?= $num0('rate_manual') ?>" placeholder="overrides margin"></div>
     </div>
     <div class="totals" aria-live="polite">
-      <div>Salary<b id="pv_pay">—</b></div><div>Direct cost<b id="pv_direct">—</b></div><div>Loaded cost<b id="pv_loaded">—</b></div>
+      <?php //  Owner, 13 Nov 2026 (SAL-176): on a per-man-day costing "CTC is man-day only instead of man-month".
+            //  A day sheet works in man-days, but a salary is thought of by the month — so a day figure
+            //  also shows what it comes to in a month, at the working days typed on the page. ?>
+      <?php $perDay = $basis === 'DAILY'; ?>
+      <div>Salary<?= $perDay ? ' /man-day' : '' ?><b id="pv_pay">—</b><?php if ($perDay): ?><small class="pv-m" id="pv_pay_m"></small><?php endif; ?></div>
+      <div>Direct cost<?= $perDay ? ' /man-day' : '' ?><b id="pv_direct">—</b><?php if ($perDay): ?><small class="pv-m" id="pv_direct_m"></small><?php endif; ?></div>
+      <div>Loaded cost<?= $perDay ? ' /man-day' : '' ?><b id="pv_loaded">—</b></div>
       <div>One-time / person<b id="pv_once">—</b></div><div>Rate<?= $e($rateLabel) ?><b id="pv_rate">—</b></div><div>Revenue<b id="pv_rev">—</b></div><div>Margin<b id="pv_marg">—</b></div>
     </div>
     <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
@@ -516,6 +523,10 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
       set('pv_pay',j.pay?money(j.pay):'—'); set('pv_direct',j.direct?money(j.direct):'—'); set('pv_loaded',j.loaded?money(j.loaded):'—');
       set('pv_once',j.once?money(j.once):'—'); set('pv_rate',j.rate?money(j.rate):'—'); set('pv_rev',j.revenue?money(j.revenue):'—');
       set('pv_marg',j.revenue?(+j.margin).toFixed(1)+'%':'—');
+      //  A day sheet: the same figure for a month, at the working days on the page.
+      var dpmEl=document.getElementById('ch_dpm'), dpm=dpmEl?parseFloat(dpmEl.value):0;
+      [['pv_pay_m',j.pay],['pv_direct_m',j.direct]].forEach(function(x){ var el=document.getElementById(x[0]); if(!el) return;
+        el.textContent=(x[1]&&dpm>0)?'= '+money(Math.round(x[1]*dpm))+' a month':''; el.title=dpm>0?'At '+dpm+' working days in a month':''; });
     }).catch(function(){});
   }
   //  EITHER BUTTON SAVES THE WHOLE PAGE (owner, 13 Nov 2026: "It said costing is

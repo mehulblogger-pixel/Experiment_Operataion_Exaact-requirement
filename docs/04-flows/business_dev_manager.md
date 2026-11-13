@@ -45,6 +45,8 @@ flowchart TD
   you the CTC you can afford and fills in its break-up. Only the box for your choice is shown. The
   page remembers the question you last chose (in this browser), so "Save settings" no longer flips it
   back to "I know the CTC" — a client's rate typed into the CTC box is priced as a salary (SAL-176).
+  On a costing priced per man-day the CTC is still a month's; the heads and figures are per man-day,
+  and the strip shows the month beside the salary and direct cost (at the working days on the page).
 - **A costing stays with its quotation once the quotation is sent, won or has a contract** (owner,
   13 Nov 2026): "Unlink" is replaced by "🔒 Stays linked". To change figures after that, raise a
   revision. While the quotation is a draft or in approval, unlinking works as before and is logged.

@@ -70,6 +70,15 @@ try {
     t_ok(strpos($v, 'data-ctc-mode="rate" hidden') !== false && strpos($v, "l.hidden=l.getAttribute('data-ctc-mode')!==m") !== false, 'only the chosen direction\'s box is shown — never both');
     t_ok(strpos($v, "localStorage.setItem('pc_ctc_mode',m)") !== false && strpos($v, "localStorage.getItem('pc_ctc_mode')") !== false,
         'the question last chosen is remembered — "Save settings" reloads the page and used to flip it back to "I know the CTC"');
+    //  Owner, 13 Nov 2026 (SAL-176 11 & 12): "CTC is man-day only instead of man-month".
+    t_ok(strpos($v, "\$perDay = \$basis === 'DAILY'") !== false && strpos($v, 'id="pv_pay_m"') !== false && strpos($v, 'id="pv_direct_m"') !== false,
+        'a per-man-day costing shows the month beside the day salary and direct cost (only on a day sheet)');
+    t_ok(strpos($v, "money(Math.round(x[1]*dpm))+' a month'") !== false, '…worked at the "Working days in a month" typed on the page');
+    $day = pc_ctc_from_rate(2800, 22, ['basis' => 'DAILY', 'overhead_pct' => 7.5, 'insurance_pct' => 0.5, 'contingency_pct' => 0.5, 'load_on' => 'COST'], 26);
+    $back = pc_line_calc(['heads' => json_encode(['PERSONNEL' => $day['ctc'] / 26]), 'target_margin' => 22, 'boq_qty' => 1], ['basis' => 'DAILY', 'overhead_pct' => 7.5, 'insurance_pct' => 0.5, 'contingency_pct' => 0.5, 'load_on' => 'COST']);
+    t_ok($day['ctc'] == 52335.0 && abs($back['proposed'] - 2800) < 1, 'SAL-176 step 11–12 figures: ₹2,800 a man-day at 22% → CTC ₹52,335 a month; back the other way → ₹' . $back['proposed'] . ' a man-day');
+    $back5 = pc_line_calc(['heads' => json_encode(['PERSONNEL' => $day['ctc'] / 26]), 'target_margin' => 22, 'boq_qty' => 1], ['basis' => 'DAILY', 'overhead_pct' => 7.5, 'insurance_pct' => 0.5, 'contingency_pct' => 0.5, 'negotiation_pct' => 5, 'load_on' => 'COST']);
+    t_ok(abs($back5['proposed'] - 2940) < 1, '…with 5% negotiation the CTC question adds the padding on top: ₹' . $back5['proposed'] . ' (= ₹2,800 + 5%) — the edge step explains it');
     t_ok(substr_count($v, "try{ localStorage") >= 1 && strpos($v, "}catch(e){}") !== false, '…and the page still works where the browser keeps nothing (private window): it opens on "I know the CTC"');
     $lib = (string)file_get_contents(__DIR__ . '/../lib/projcosting.php');
     t_ok(strpos($lib, "(\$_POST['mode'] ?? '') === 'rate'") !== false && strpos($lib, "if (!pc_can_edit())") !== false, 'the same endpoint, behind the same "can edit costings" gate');

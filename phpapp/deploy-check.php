@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'bea68f4 · 2026-11-13 09:24 UTC · 718 files';
+$RELEASE = 'f3576fd · 2026-11-13 09:54 UTC · 718 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -585,7 +585,7 @@ $EXPECT  = [
     'views/ops/product_package.php' => ['s'=>4732,'h'=>'a87a7a169d94fe14'],
     'views/ops/profitability_detail.php' => ['s'=>10185,'h'=>'f49f71530b916b7e'],
     'views/ops/profitability_list.php' => ['s'=>9655,'h'=>'8fed2c9925d511dc'],
-    'views/ops/project_costing.php' => ['s'=>66787,'h'=>'ab275bdcb6dbc356'],
+    'views/ops/project_costing.php' => ['s'=>68043,'h'=>'4258dde4243ee354'],
     'views/ops/project_costing_print.php' => ['s'=>8615,'h'=>'2e727aa195a39a28'],
     'views/ops/project_costings.php' => ['s'=>7268,'h'=>'d7beebe3f25879f4'],
     'views/ops/raise_call.php' => ['s'=>6269,'h'=>'c0673d9af4c3cce6'],
