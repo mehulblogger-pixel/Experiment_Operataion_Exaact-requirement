@@ -548,11 +548,21 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
     var cRate=document.getElementById('ch_ctc_rate'), cCtc=document.getElementById('ch_ctc');
     var mode=function(){ var m=document.querySelector('input[name=ch_ctc_mode]:checked'); return m?m.value:'ctc'; };
     //  One question decides which box is shown — never both (owner: "the screen shall not be very confusing").
-    [].forEach.call(document.querySelectorAll('input[name=ch_ctc_mode]'),function(rd){ rd.addEventListener('change',function(){
-      var m=mode(); [].forEach.call(document.querySelectorAll('#ch_ctcq [data-ctc-mode]'),function(l){ l.hidden=l.getAttribute('data-ctc-mode')!==m; });
+    var showMode=function(m){
+      [].forEach.call(document.querySelectorAll('#ch_ctcq [data-ctc-mode]'),function(l){ l.hidden=l.getAttribute('data-ctc-mode')!==m; });
       var hint=cNote.querySelector('[data-ctc-hint]'); if(hint) hint.textContent=cNote.getAttribute('data-'+m);
+    };
+    [].forEach.call(document.querySelectorAll('input[name=ch_ctc_mode]'),function(rd){ rd.addEventListener('change',function(){
+      var m=mode(); showMode(m);
+      try{ localStorage.setItem('pc_ctc_mode',m); }catch(e){}
       (m==='rate'?cRate:cCtc).focus();
     }); });
+    //  Remember the last question chosen (owner, 13 Nov 2026, SAL-176): "Save settings" reloads the
+    //  page, which used to flip back to "I know the CTC" — a client's rate of 66,000 then went into
+    //  the CTC box and a 95% margin priced the person at ₹15,10,740 a month. This browser only;
+    //  without storage the page simply opens on "I know the CTC", as before.
+    try{ var saved=localStorage.getItem('pc_ctc_mode'); var sr=saved&&document.querySelector('input[name=ch_ctc_mode][value="'+saved+'"]');
+         if(sr && !sr.checked){ sr.checked=true; showMode(saved); } }catch(e){}
     var bad=function(msg,el){ cNote.className='ctcq-n bad'; cNote.textContent=msg; if(el) el.focus(); };
     var build=function(){
       var m=mode(), fd=new FormData(); fd.set('_csrf',f.querySelector('[name=_csrf]').value); fd.set('costing_id',f.querySelector('[name=costing_id]').value);

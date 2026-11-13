@@ -42,7 +42,9 @@ flowchart TD
   margin. Any head can still be changed. Either Save on the page keeps both the role and the settings.
 - **…or from the rate the client pays** (owner, 13 Nov 2026): the same Quick start asks "I know the
   CTC" or "I know the rate the client pays". Choose the second, type the rate and the margin: it tells
-  you the CTC you can afford and fills in its break-up. Only the box for your choice is shown.
+  you the CTC you can afford and fills in its break-up. Only the box for your choice is shown. The
+  page remembers the question you last chose (in this browser), so "Save settings" no longer flips it
+  back to "I know the CTC" — a client's rate typed into the CTC box is priced as a salary (SAL-176).
 - **A costing stays with its quotation once the quotation is sent, won or has a contract** (owner,
   13 Nov 2026): "Unlink" is replaced by "🔒 Stays linked". To change figures after that, raise a
   revision. While the quotation is a draft or in approval, unlinking works as before and is logged.

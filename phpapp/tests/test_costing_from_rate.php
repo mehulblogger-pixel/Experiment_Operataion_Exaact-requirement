@@ -55,11 +55,22 @@ try {
     t_ok(!empty(pc_ctc_from_rate(66000, 100, $base)['err']) && !empty(pc_ctc_from_rate(66000, -1, $base)['err']), 'a margin of 100% or below zero is refused');
     $none = pc_ctc_from_rate(66000, 95, ['overhead_pct' => 8, 'load_on' => 'RATE'] + $base);
     t_ok(!empty($none['err']) && strpos($none['err'], 'nothing is left') !== false, 'margin plus loadings eat the whole rate — it says nothing is left for the pay, and what to change');
+    //  Owner, 13 Nov 2026 (SAL-176 step 8): "No such red line observed … 66000 and margin 95% showed a month rate of 1510740".
+    //  Two different sums, both right — the test step must say which one it means.
+    $h9 = ['overhead_pct' => 8, 'insurance_pct' => 0.5, 'baddebt_pct' => 0, 'contingency_pct' => 0.5, 'negotiation_pct' => 5, 'basis' => 'LONG'];
+    t_ok(!empty(pc_ctc_from_rate(66000, 95, ['load_on' => 'RATE'] + $h9)['err']), 'the owner\'s settings, loadings on the RATE: 95% + 9% is more than the whole rate — the red line');
+    $onCost = pc_ctc_from_rate(66000, 95, ['load_on' => 'COST'] + $h9);
+    t_eq($onCost['ctc'] ?? null, 3027.0, '…loadings on the COST: 5% of the rate is left, less 9% loadings — a CTC of ₹3,027, no red line (the sum works, however small)');
+    $c66 = pc_line_calc(['heads' => json_encode(['PERSONNEL' => 66000]), 'target_margin' => 95, 'boq_qty' => 1], ['load_on' => 'COST'] + $h9);
+    t_eq($c66['proposed'], 1510740.0, '…and 66,000 typed as the CTC (the other question) at 95%: 66,000 + 9% = 71,940, ÷ 5% = 14,38,800, + 5% negotiation = 15,10,740 — the figure the owner saw');
 
     t_section('Costing — from the rate: the screen asks one question');
     $v = (string)file_get_contents(__DIR__ . '/../views/ops/project_costing.php');
     t_ok(strpos($v, 'I know the CTC') !== false && strpos($v, "I know the rate the <?= \$e(Tl('client')) ?> pays") !== false, 'Quick start asks: "I know the CTC" or "I know the rate the client pays"');
     t_ok(strpos($v, 'data-ctc-mode="rate" hidden') !== false && strpos($v, "l.hidden=l.getAttribute('data-ctc-mode')!==m") !== false, 'only the chosen direction\'s box is shown — never both');
+    t_ok(strpos($v, "localStorage.setItem('pc_ctc_mode',m)") !== false && strpos($v, "localStorage.getItem('pc_ctc_mode')") !== false,
+        'the question last chosen is remembered — "Save settings" reloads the page and used to flip it back to "I know the CTC"');
+    t_ok(substr_count($v, "try{ localStorage") >= 1 && strpos($v, "}catch(e){}") !== false, '…and the page still works where the browser keeps nothing (private window): it opens on "I know the CTC"');
     $lib = (string)file_get_contents(__DIR__ . '/../lib/projcosting.php');
     t_ok(strpos($lib, "(\$_POST['mode'] ?? '') === 'rate'") !== false && strpos($lib, "if (!pc_can_edit())") !== false, 'the same endpoint, behind the same "can edit costings" gate');
 } finally {
