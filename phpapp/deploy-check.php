@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'a543c62 · 2026-11-13 05:22 UTC · 717 files';
+$RELEASE = '9a52b1e · 2026-11-13 05:42 UTC · 717 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -112,7 +112,7 @@ $EXPECT  = [
     'lib/connect_taxonomy.php' => ['s'=>9836,'h'=>'3757c0d0d7daeb05'],
     'lib/connect_trust.php' => ['s'=>7228,'h'=>'27ac2d7be0dd9e28'],
     'lib/connect_verify.php' => ['s'=>20687,'h'=>'ea42fc218233bb53'],
-    'lib/contracts.php' => ['s'=>130299,'h'=>'6b918f5f77f9fe76'],
+    'lib/contracts.php' => ['s'=>130578,'h'=>'c7e33f306ad903c4'],
     'lib/controldocs.php' => ['s'=>15272,'h'=>'e99fcf054f6e6b1e'],
     'lib/costing.php' => ['s'=>60974,'h'=>'a8ecf706366db1cf'],
     'lib/costing_heads.php' => ['s'=>40228,'h'=>'ad47bc7f437ba37f'],
@@ -178,7 +178,7 @@ $EXPECT  = [
     'lib/nextaction.php' => ['s'=>15255,'h'=>'85f9797146341fa6'],
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>4308,'h'=>'1c5b3e553b964601'],
-    'lib/opportunities.php' => ['s'=>71379,'h'=>'b91583f46ecfd4d3'],
+    'lib/opportunities.php' => ['s'=>71567,'h'=>'eaf9da76187c22a8'],
     'lib/ops.php' => ['s'=>747008,'h'=>'cad4035a68fbd502'],
     'lib/orgadmin.php' => ['s'=>78177,'h'=>'70dca6bf71230d17'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
@@ -313,7 +313,7 @@ $EXPECT  = [
     'tools/trace-audit.php' => ['s'=>2789,'h'=>'d95c97624d3d470e'],
     'tools/trace-thread.php' => ['s'=>4962,'h'=>'cb20d74d1a6eb46e'],
     'views/admin.php' => ['s'=>1090,'h'=>'aeb34e3396fd4ac5'],
-    'views/dashboard.php' => ['s'=>49286,'h'=>'29ae0ed9d6928512'],
+    'views/dashboard.php' => ['s'=>49373,'h'=>'22a96b0dc11f73d2'],
     'views/detail.php' => ['s'=>30850,'h'=>'49e3c4812fb0f418'],
     'views/forgot_password.php' => ['s'=>2716,'h'=>'c041f8176182b36c'],
     'views/form.php' => ['s'=>27096,'h'=>'a7bfacfbbb03806b'],
@@ -328,7 +328,7 @@ $EXPECT  = [
     'views/ops/_allocation_panel.php' => ['s'=>9018,'h'=>'76426e99a74cf039'],
     'views/ops/_billto.php' => ['s'=>3566,'h'=>'32adc002a4740d69'],
     'views/ops/_company_payments.php' => ['s'=>10431,'h'=>'0d7ae716158ca539'],
-    'views/ops/_contract_sign.php' => ['s'=>4261,'h'=>'14fd7d522c8c08cf'],
+    'views/ops/_contract_sign.php' => ['s'=>4653,'h'=>'de84716682202d86'],
     'views/ops/_contract_signers.php' => ['s'=>3018,'h'=>'3990db07da17f16a'],
     'views/ops/_cx_closing.php' => ['s'=>2657,'h'=>'1e9ba6fc2b35547f'],
     'views/ops/_deputation_panel.php' => ['s'=>13672,'h'=>'46545d4243390803'],

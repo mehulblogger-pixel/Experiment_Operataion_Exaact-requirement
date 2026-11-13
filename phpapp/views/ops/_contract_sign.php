@@ -14,9 +14,13 @@
 $sgKind = $sgKind ?? 'open'; $sgAmend = $sgKind === 'amend';
 $sgDo = fn($a) => $sgAmend ? 'amend-' . $a : $a;
 $sgCoordinators = $sgCoordinators ?? []; $sgCompact = !empty($sgCompact);
-$sgEndorseForm = function ($primary) use ($sgId, $sgDo, $sgAmend, $sgCoordinators, $sgOfficeName, $sgCompact) { ?>
+//  Pressed in the "Contract openings" queue → come back to the queue. It used to
+//  send the signer to the quotation, which an Operation Manager may not open: they
+//  signed, and landed on "Sales & CRM — restricted" (found walking the flow, 13 Nov 2026).
+$sgFrom = $sgCompact ? '<input type="hidden" name="from" value="queue">' : '';
+$sgEndorseForm = function ($primary) use ($sgId, $sgDo, $sgAmend, $sgCoordinators, $sgOfficeName, $sgCompact, $sgFrom) { ?>
   <form method="post" action="/contract-open" style="display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap">
-    <input type="hidden" name="id" value="<?= (int)$sgId ?>"><input type="hidden" name="do" value="<?= e($sgDo('endorse')) ?>">
+    <input type="hidden" name="id" value="<?= (int)$sgId ?>"><input type="hidden" name="do" value="<?= e($sgDo('endorse')) ?>"><?= $sgFrom ?>
     <?php if (!$sgAmend && $sgCoordinators): ?>
       <select name="coordinator_id" class="form-control" style="min-width:150px;font-size:12px" title="Forward to a coordinator in <?= e(($sgOfficeName ?? '') ?: T('office')) ?>" aria-label="Forward to a coordinator (optional)">
         <option value="">— forward to (optional) —</option>
@@ -36,7 +40,7 @@ $sgEndorseForm = function ($primary) use ($sgId, $sgDo, $sgAmend, $sgCoordinator
     <?php if ($sg['primary'] === 'endorse') $sgEndorseForm(true); ?>
     <?php if ($sg['primary'] === 'approve'): ?>
       <form method="post" action="/contract-open" style="display:inline">
-        <input type="hidden" name="id" value="<?= (int)$sgId ?>"><input type="hidden" name="do" value="<?= e($sgDo('approve')) ?>">
+        <input type="hidden" name="id" value="<?= (int)$sgId ?>"><input type="hidden" name="do" value="<?= e($sgDo('approve')) ?>"><?= $sgFrom ?>
         <button class="btn small" type="submit"><?= $sgAmend ? 'Approve the amendment' : 'Approve &amp; open the contract' ?></button>
       </form>
     <?php endif; ?>
@@ -47,7 +51,7 @@ $sgEndorseForm = function ($primary) use ($sgId, $sgDo, $sgAmend, $sgCoordinator
           <input class="form-control" name="note" required placeholder="Why it is rejected" aria-label="Why it is rejected" style="width:200px"><button class="btn small secondary">Reject</button></form>
       <?php else: ?>
         <form method="post" action="/contract-open" style="display:inline" onsubmit="return confirm('Reject opening this contract number?')">
-          <input type="hidden" name="id" value="<?= (int)$sgId ?>"><input type="hidden" name="do" value="reject">
+          <input type="hidden" name="id" value="<?= (int)$sgId ?>"><input type="hidden" name="do" value="reject"><?= $sgFrom ?>
           <button class="btn small danger" type="submit">Reject</button>
         </form>
       <?php endif; ?>

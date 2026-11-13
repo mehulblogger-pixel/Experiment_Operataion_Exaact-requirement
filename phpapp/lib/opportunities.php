@@ -688,7 +688,8 @@ function opp_won_next(array $o) {
     if (!empty($o['contract_id'])) {
         $os = strtoupper((string)(ops_val("SELECT open_status FROM partner_contracts WHERE id=?", [(int)$o['contract_id']]) ?: 'OPEN'));
         return $os === 'OPEN' ? 'The contract is registered and open — the orders are raised from it.'
-                              : 'The contract is registered and waiting for its two signatures; then the orders are raised from it.';
+                              : ($os === 'PENDING' ? 'The contract is registered and waiting for approval; then the orders are raised from it.'
+                                                   : 'The contract is registered but not open (' . strtolower(CONTRACT_OPEN_STATES[$os] ?? $os) . ') — see it under Actions.');
     }
     if (trim((string)($o['sent_to_accounts_at'] ?? '')) !== '') return 'It is with Accounts to register the contract — nothing more for you to do here.';
     if (empty($o['partner_id'])) return 'Next: add the customer to the master (Actions tab), then send it to Accounts to register the contract.';

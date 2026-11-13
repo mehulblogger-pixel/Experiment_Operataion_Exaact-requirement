@@ -491,7 +491,7 @@
           <?= count($noContractDeals) === 1 ? 'is' : 'are' ?> waiting for a contract</b>
         <p class="sub" style="margin:6px 0 8px">
           <?= $canRegisterContract
-              ? 'Won directly / an order received without a ' . e(Tl('quote')) . '. Open the deal and register the contract — it then endorses, approves and opens to operations.'
+              ? 'Won directly / an order received without a ' . e(Tl('quote')) . '. Open the deal and register the contract. Your company\'s rule for opening it: ' . e(function_exists('contract_rule_sentence') ? contract_rule_sentence() : 'it is then approved') . '.'
               : 'Handed to Accounts to register the contract.' ?>
         </p>
         <table class="dt">

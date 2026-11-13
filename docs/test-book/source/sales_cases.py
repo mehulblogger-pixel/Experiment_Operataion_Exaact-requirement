@@ -1031,6 +1031,84 @@ C('SAL-157', 'Company types', 'Large multi-branch company: branch walls and dire
 # ════════════════════════════════════════════════════════════════════════════
 # S15 — Sales from start to end (the module's own flow)
 # ════════════════════════════════════════════════════════════════════════════
+# ---- Owner, 13 Nov 2026: "we need one more complete flow starting from lead to contract won,
+#      opportunity to contract won and deal to contract won till contract number generation …
+#      with individual and detailed edge cases and all probability, as the flow seems to be very
+#      round round making the user move from one pillar to another."
+#      Each of the three was WALKED on the practice copy as the people named, 13 Nov 2026; the
+#      screens, buttons and messages below are what was seen. Steps marked "⚠ Known today" are
+#      rough spots found on that walk — they are on the simplification list waiting for the
+#      owner's decision, and are written here as they behave NOW so a tester is not surprised.
+C('SAL-180', 'Sales flow', 'Journey 1 — Lead → quotation → accepted → contract number (no deal)', 'flow', ['best', 'rule', 'edge'],
+  'several', 'The shortest road from a first enquiry to an open contract. Five people touch it: the salesperson, the approver, a senior who sends, Accounts, and the contract signers. Standard contract rule (two signatures).',
+  'Test users: Marketing Executive, Marketing Manager (approves ₹1–25 lakh), Finance, Operation Manager, Branch Manager. Contract rule not changed.',
+  [('[Marketing Executive] Left menu → Sales → Leads → "+ New lead": Company "Flow One Fabricators", Contact, Phone, What they want, Value 6,00,000 → "Create it".', 'Lead page. "Lead L-… created." Three steps across the top: 1 Talk to them · 2 Send a quote · 3 Their answer. One main button: "📞 Log your first contact".'),
+   ('[Marketing Executive] "📞 Log your first contact" → fill "With whom" and a note → "Save this contact".', 'Step 1 is ticked. The main button is now "Make the quote →".'),
+   ('[Marketing Executive] "Make the quote →".', 'New quote form with the customer, contact and subject already filled from the lead. Six parts: Client & header · Offices · Sites · Commercials · Line items · Terms.'),
+   ('[Marketing Executive] Line items: "Inspection of pressure vessels", 60 Man-day × ₹10,000 → save.', '"Q-… created. It is saved on the lead too — Back takes you to the lead." Trail: Home › Sales › Leads › L-… · Flow One Fabricators › Quote. Totals ₹6,00,000 + GST ₹1,08,000 = ₹7,08,000.'),
+   ('[Marketing Executive] "Submit for approval".', '"Submitted for approval — 1 step(s). Now with <Marketing Manager\'s name> (Marketing Manager)." The top line reads "Waiting for approval — with …".'),
+   ('[Marketing Manager] Dashboard → "quotes to approve" → Quote register "Awaiting your approval" → open Q-… → "Approve".', '"All approvals complete — quote approved and ready to send."'),
+   ('[Marketing Executive] Open the lead.', '"Your quote Q-… is approved — ready to send to them." with "Open quote Q-… →".'),
+   ('[Marketing Executive] Open the quotation.', '⚠ Known today: the top line says "Next: send it to the client", but there is no Send button — a Marketing Executive may not send a quotation (permission matrix), and the page does not say who does.'),
+   ('[Marketing Manager or BDM] Open the quotation → "✉ Send to client".', '"Marked sent and follow-ups scheduled…". Top line: "Sent to the client on <date>. Waiting for their answer — mark it accepted, or lost." The page shows "🔒 Locked … raise a revision".'),
+   ('[Marketing Executive — the person the quotation is assigned to] "Mark accepted (won)".', '"quote marked accepted. Flow One Fabricators is now linked to the client master…". Top line: "Accepted 🎉 — they said yes. Next: register the contract number." Contract panel: "Awaiting Accounts to register the client & contract number."'),
+   ('[Marketing Executive] Open the lead.', '"🎉 Won — Flow One Fabricators is now a customer." It closed by itself — nothing was pressed on the lead.'),
+   ('[Finance] Dashboard → "contracts to register" → Quote register "To register a contract" → open Q-….', 'An amber box: "⚠ Contract number is yet to be created — This is yours to do" with "Register it now".'),
+   ('[Finance] "Register it now" → "✓ Register the contract & request opening".', 'The number is generated (e.g. AHM/C/2026-27/00001). "Contract … registered — it is waiting for approval. Waiting for the first signature — <names>. Then the final approval — <names>. The order goes to operations once it is open." Top line: "Accepted 🎉 — contract … is waiting for approval."'),
+   ('[Operation Manager] Dashboard → "contracts to endorse" → Contract openings → on that row "Give the first signature".', 'Stays on Contract openings. "First signature given. Waiting for the final approval — <Branch Managers by name>."'),
+   ('[Branch Manager] Dashboard → "contracts to approve" → on that row "Approve & open the contract".', 'Stays on Contract openings. "Contract … opened and floated to operations."'),
+   ('[Marketing Executive] Open the quotation.', 'Top line: "Accepted 🎉 — they said yes. Contract open — raise … from it whenever the work comes in." Contract panel: the number, "Open / in force", who asked, first signature, final approval.'),
+   ('EDGE · [Marketing Manager] Reject instead of approving, with a comment.', 'The quotation is "Sent back by …"; the preparer corrects it and presses "↻ Submit for approval again". Rejecting without a comment is refused.'),
+   ('EDGE · [Finance] Open the quotation BEFORE it is accepted.', 'No registration is offered: the step reads "Register the contract number — Comes after it is accepted."'),
+   ('EDGE · [Operation Manager] Try to open the quotation itself.', '"Sales & CRM — restricted" — an Operation Manager signs from Contract openings and does not need the quotation.'),
+   ('EDGE · [Branch Manager] Open Contract openings BEFORE the first signature.', 'No main button on that row: "Waiting for the first signature — …" and "You give the final approval, after the first signature." (SAL-179).'),
+   ('EDGE · The customer says no.', '"Mark lost" on the quotation, with a reason → the quotation closes as lost.'),
+   ('EDGE · The company\'s contract rule is "One approval" or "None".', 'One: only the final approval is asked. None: the contract is open the moment Accounts registers it (SAL-178, SAL-179).'),
+   ('EDGE · The price must change after it was sent.', '"Raise a revision" — same quote number, next revision, approved and sent again; its costing stays linked (SAL-177).')],
+  'walked on the practice copy 13 Nov 2026 as r_marketing_executive, r_marketing_manager, r_finance, r_operation_manager, r_branch_manager', live=False)
+
+C('SAL-181', 'Sales flow', 'Journey 2 — Lead → deal → quotation → won → contract number', 'flow', ['best', 'rule', 'edge'],
+  'several', 'The same business worked as a deal (opportunity) in the pipeline. It crosses more screens than Journey 1 — this is the journey the owner called "round round".',
+  'Test users: BDM, Marketing Manager, Finance, Operation Manager, Branch Manager. Contract rule not changed.',
+  [('[BDM] Sales → Leads → "+ New lead": "Flow Two Refinery", value 9,00,000 → "Create it".', 'Lead page, three steps, "📞 Log your first contact".'),
+   ('[BDM] "More — change stage, mark lost…" → "Work this as a deal →".', 'Deal page: "Opportunity opened from the lead. The lead stays as the record of where it came from." The strip at the top shows LEAD L-… and OPPORTUNITY OPP-…. "This deal is at Qualified."'),
+   ('[BDM] Tab "Quotes".', 'A yellow note: "Link the customer to raise a quotation. This deal has a customer name but is not yet tied to a customer record… Convert the lead creates the customer and fills this in automatically — or pick one already on the master." "＋ Create a new quotation" is greyed.'),
+   ('[BDM] Press "Convert the lead" in that note.', '⚠ Known today: it opens the LEAD page, not a convert screen. There: "More…" → "Won →".'),
+   ('[BDM] "Won →" → State "Gujarat" → "Yes — make them a customer".', '"Done — Flow Two Refinery is now a customer, and an inquiry is raised for what they want." ⚠ Known today: the lead now reads "🎉 Won" although the deal is still at Qualified and nothing has been sold yet; an enquiry has also been created.'),
+   ('[BDM] Go back to the deal (Sales → Opportunities → OPP-…) → tab "Quotes" → "＋ Create a new quotation".', '"Quotation Q-… drafted from this deal — add the line items and submit it for approval." Back button reads "← Opportunity".'),
+   ('[BDM] "Edit" → Line items: 90 Man-day × ₹10,000 → save → "Submit for approval".', '"Quote saved." then "Submitted for approval — 1 step(s). Now with <name> (Marketing Manager)."'),
+   ('[Marketing Manager] Approve (dashboard → "quotes to approve").', 'Approved.'),
+   ('[BDM] Open the deal while the quotation is approved.', '⚠ Known today: the deal still reads "This deal is at Qualified. No next step noted" — it does not say its quotation is approved and ready to send (a lead does).'),
+   ('[BDM] Open the quotation → "✉ Send to client" → later "Mark accepted (won)".', '"…The deal is now won in the sales pipeline." Top line: "Accepted 🎉 — they said yes. Next: register the contract number."'),
+   ('[BDM] Open the deal.', '"Won — Flow Two Refinery said yes. 🎉" ⚠ Known today: it adds "Next: on the Actions tab, send it to Accounts to register the contract" — but the accepted quotation is already in Accounts\' list. Do NOT press it (see the edge below).'),
+   ('[Finance] Dashboard → "contracts to register" → Q-… → "Register it now" → "✓ Register the contract & request opening".', 'Contract number generated; "… waiting for approval. Waiting for the first signature — …".'),
+   ('[Operation Manager] then [Branch Manager] sign from Contract openings.', 'Contract OPEN; "… opened and floated to operations."'),
+   ('EDGE · ⚠ Known today · [BDM] On the won deal press "Send to Accounts to register the contract" although the quotation already has its contract.', 'It is accepted: "Sent to Accounts…". Finance\'s dashboard then lists this deal under "won deals without a quote are waiting for a contract" — for business that already HAS a contract. Registering it would create a second contract for the same sale. Report it; do not register.'),
+   ('EDGE · ⚠ Known today · Open the deal\'s quotation later from Sales → Quotes.', 'Its trail reads Home › Sales › CRM — Quotations › Quote and Back goes to the register — not to the deal it belongs to (a lead\'s quotation goes back to its lead).'),
+   ('EDGE · [BDM] On the deal\'s Quotes tab pick an existing customer instead ("Set the customer").', '"Saved." and "＋ Create a new quotation" turns on — no need to touch the lead. Only works when the customer is already on the master.'),
+   ('EDGE · The deal has two buttons: "＋ Create a new quotation" and "＋ Generate quotation".', 'Create: a normal draft from the deal. Generate: a quotation-of-record for a deal that was won without one; it is greyed once the deal has a quotation.'),
+   ('EDGE · The customer says no.', 'Mark the quotation lost; move the deal to "Lost — closes it as lost" with a reason.')],
+  'walked on the practice copy 13 Nov 2026 as r_business_dev_manager, r_marketing_manager, r_finance, r_operation_manager, r_branch_manager', live=False)
+
+C('SAL-182', 'Sales flow', 'Journey 3 — Deal with no lead → won without a quotation → Accounts → contract number', 'flow', ['best', 'rule', 'edge', 'negative'],
+  'several', 'A customer sends a purchase order without asking for a quotation. The deal is opened directly, marked won, and handed to Accounts.',
+  'Test users: BDM, Finance, an administrator, Operation Manager, Branch Manager. One customer already on the client master. Contract rule not changed.',
+  [('[BDM] Sales → Opportunities → "+ New opportunity": Name "Kiln shell inspection — PO received", Customer (typed), Value 3,00,000 → "Open the opportunity".', '"Opportunity OPP-… opened." "This deal is at Qualified." ⚠ Known today: a yellow note "Link the customer to raise a quotation" shows even though no quotation is wanted.'),
+   ('[BDM] "Move it on" → stage "Won (100%) — closes it as a sale" → "Move it".', '"Won — <customer> said yes. Next: add the customer to the master (Actions tab), then send it to Accounts to register the contract."'),
+   ('[BDM] Read the yellow box on the deal.', '"It has no customer on the master yet, so an order has nowhere to point. Add them as a customer first." ⚠ Known today: there is no button to add a new customer from here — only "Or pick one already on the master" + "Set the customer". A brand-new customer must first be added under Directory → Client register by someone who may.'),
+   ('[BDM] Pick the customer already on the master → "Set the customer".', '"Saved." The top line: "Next: on the Actions tab, send it to Accounts to register the contract."'),
+   ('[BDM] Tab "Actions" → "Send to Accounts to register the contract".', '"Sent to Accounts — they will register the contract for this deal, and the order opens to operations once it is approved. Nothing more for Sales to do here."'),
+   ('[Finance] Dashboard → panel "N won deals without a quote are waiting for a contract" → "Register" on this deal.', '⚠ Known today (a defect, top of the simplification list): the standard Finance login lands on "Sales & CRM — restricted" — Finance may register contracts but may not open a deal, and the registration form lives on the deal.'),
+   ('[Administrator, or a Finance login that can also open deals] Open the deal → tab "Actions" → "Register the contract" (number generated automatically).', '"Contract AHM/C/2026-27/0000N registered — it is waiting for approval. Waiting for the first signature — <names>. Then the final approval — <names>. The work orders are raised from it once it is open." The deal reads "The contract is registered and waiting for approval; then the orders are raised from it."'),
+   ('[Operation Manager] then [Branch Manager] sign from Contract openings.', 'Contract OPEN. The deal reads "The contract is registered and open — the orders are raised from it." It has left Finance\'s "won deals" panel.'),
+   ('EDGE · Register the same deal a second time.', 'Refused — a deal cannot be registered to a second contract.'),
+   ('EDGE · Type a contract number that another customer already uses.', 'Refused — a number identifies one contract.'),
+   ('EDGE · [BDM] Try "Send to Accounts" before a customer is set.', 'The button is not offered until the customer is on the master.'),
+   ('EDGE · A one-off job with no contract.', 'On the won deal, "Or raise a work order directly — a one-off with no contract — set the rate on the order" (folded). The deal then reads "The work order is raised — open it from this deal."'),
+   ('EDGE · Traceability wanted later.', '"＋ Generate quotation" on the won deal drafts a quotation-of-record for it (one only).'),
+   ('EDGE · The company\'s contract rule is "None".', 'The contract is open the moment it is registered; no signer is asked (SAL-179).')],
+  'walked on the practice copy 13 Nov 2026 as r_business_dev_manager, r_finance, admin', live=False)
+
 C('SAL-160', 'Sales flow', 'Lead to opened contract — every hand-off, every number carried over', 'flow', ['best'],
   'several', 'The whole Sales module in one run; any break here stops revenue.',
   'Profile A; test users; checklist required; approval levels.',

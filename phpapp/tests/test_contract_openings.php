@@ -30,6 +30,10 @@ try {
     $h = $render([$base]);
     t_ok(strpos($h, 'CON/TEST/1') !== false, 'the pending contract is listed');
     t_ok(strpos($h, 'Give the first signature') !== false, 'the manager sees "Give the first signature"');
+    //  Rendered, not just written: the first-signature form is drawn by a small function of its own,
+    //  and the "came from the queue" marker once failed to reach it — the signer was sent to a
+    //  quotation they could not open.
+    t_ok(preg_match('~name="do" value="endorse"><input type="hidden" name="from" value="queue">~', $h) === 1, 'the first-signature button in the queue carries "from the queue", so the signer returns to the queue');
     t_ok(strpos($h, 'Approve &amp; open') === false, 'someone who gives only the first signature does not see Approve');
     t_ok(strpos($h, 'Waiting for the first signature') !== false, 'the step reads "Waiting for the first signature"');
     t_ok(strpos($h, 'Your company&#039;s rule: two signatures') !== false || strpos($h, "Your company's rule: two signatures") !== false, 'the screen states the company\'s rule, not a fixed sentence');
@@ -39,6 +43,7 @@ try {
     $as($bm);
     $h2 = $render([$endorsed]);
     t_ok(strpos($h2, 'Approve &amp; open the contract') !== false, 'the Branch Manager sees "Approve & open the contract"');
+    t_ok(preg_match('~name="do" value="approve"><input type="hidden" name="from" value="queue">~', $h2) === 1, '…and so does the approval button');
     t_ok(strpos($h2, 'disabled') === false, 'approve is enabled once the first signature is in');
     t_ok(strpos($h2, 'Waiting for the final approval') !== false, 'the step reads "Waiting for the final approval"');
     t_ok(strpos($h2, 'first signature: Omkar Tester') !== false, 'and says who gave the first signature');

@@ -205,6 +205,13 @@ try {
     $probe = (static function (array $__page) { extract($__page); $st = 'changed inside'; return $st; });
     $st = 'ACCEPTED'; $probe(get_defined_vars());
     t_eq($st, 'ACCEPTED', 'a name changed inside such a piece does not change the page\'s own');
+    //  Found walking the flow: an Operation Manager signed in the queue and was sent to the
+    //  quotation, which they may not open — "Sales & CRM — restricted" after a good signature.
+    $sign = (string) file_get_contents($root . '/views/ops/_contract_sign.php');
+    t_ok(strpos($sign, "\$sgFrom = \$sgCompact ? '<input type=\"hidden\" name=\"from\" value=\"queue\">' : '';") !== false && substr_count($sign, '<?= $sgFrom ?>') === 3,
+        'every button pressed in the Contract openings queue says it came from the queue');
+    t_ok(strpos((string) file_get_contents($root . '/lib/contracts.php'), "if ((\$_POST['from'] ?? '') === 'queue') \$back = '/contract-openings';") !== false,
+        '…and the signer comes back to the queue (that one address only — never a free redirect)');
     $lib = (string) file_get_contents($root . '/lib/contracts.php');
     t_ok(strpos($lib, 'now with the branch manager for approval') === false && strpos($lib, 'Only the branch manager can approve') === false, 'no message names a fixed role any more');
     $areas = array_column(apsetup_areas(), null, 'key');

@@ -1142,6 +1142,10 @@ function ops_contract_open($route, $method) {
     if (!$c) { flash('That contract no longer exists.', 'error'); redirect('/quotes'); }
     $qid = contract_quote_id($c);
     $back = $qid ? ('/quote?id=' . $qid) : ('/partner?id=' . (int)$c['partner_id'] . '&tab=contracts');
+    //  Signed from the "Contract openings" queue → back to the queue (only that one
+    //  address is honoured). A signer who works from the queue may not be able to
+    //  open the quotation at all.
+    if (($_POST['from'] ?? '') === 'queue') $back = '/contract-openings';
     $do = $_POST['do'] ?? '';
     $note = trim($_POST['note'] ?? '');
     $me = user_name(current_user());
