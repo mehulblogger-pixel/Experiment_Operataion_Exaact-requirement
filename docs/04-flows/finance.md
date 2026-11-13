@@ -76,3 +76,13 @@ invoice carries the full milestone value and its GST. With retention, it shows "
 payable when … is reached" and "Payable now". Receivables does not age or chase the retention
 until that milestone is reached. Finance does not mark milestones reached. Finance may change an
 open contract's schedule only by amendment (two signatures).
+
+### Registering from a won quotation — one press (owner, 13 Nov 2026)
+
+Open a won quotation (dashboard task or **Contracts to register**). The amber box at the top has
+**✓ Register the contract — next number**: one press registers it and tells you who signs next.
+When the client already has another contract, the box takes you to the panel instead, so you can
+check before adding a second one. The playbook lower down no longer repeats a "Register contract"
+button. You are not offered a link to the deal or the lead the quotation came from — Accounts may
+not open the sales pipeline, so the reference is shown as plain text and Back goes to the quotation
+register. Same right as before (`crm.contract.register`), same approval afterwards.

@@ -457,6 +457,23 @@ stateDiagram-v2
   direct road (won with no accepted quotation → Send to Accounts → Accounts register from
   `/contracts-to-register`) is unchanged. No status or transition is added — one duplicate entry
   into PENDING is closed.
+- **A deal may quote before its customer is on the master (owner, 13 Nov 2026).** `opp_create_quote()`
+  no longer requires `opportunities.partner_id`: the quotation is drafted in the customer name typed
+  on the deal (`quotations.client_id` NULL), exactly as a quotation made from a lead always was. The
+  customer record is created at the same moment as before — when the quotation is ACCEPTED
+  (`quote_land_on_client()`), which also puts the customer on the deal and wins it. A deal with no
+  customer name at all is still refused. No status or transition is added, to the deal, the
+  quotation or the customer; a prospect is simply no longer put on the client master before they
+  have said yes. An open deal's top line now follows its newest quotation (`opp_quote_now()`:
+  being prepared / waiting for approval / approved / sent) — a reading of the quotation's existing
+  status, not a new one.
+- **An opened contract is announced to operations (owner, 13 Nov 2026).** A contract that is OPEN
+  through approval (`opened_at` set), active, and has no work order under its number is listed for
+  the people who raise work orders (`contracts_awaiting_first_call()`), on the dashboard and at the
+  top of "Raise a work order". It leaves the list when its first work order is raised. Nothing
+  about the contract changes — this only reports it. *Open question for the owner, recorded rather
+  than guessed:* whether a contract should also leave this list after some time with no work order
+  (no period has been authorised, so none is applied).
 - **Who signs is each company's own rule (owner, 13 Nov 2026)** — `contract_open_rule()`, set under
   Admin → Approvals → Sales → Contract: two approvals, one, or none; the roles and/or one named
   person for each; whether one person may give both. No status was added. The only new entry is

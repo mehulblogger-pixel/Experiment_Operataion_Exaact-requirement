@@ -14,4 +14,5 @@ flowchart TD
 - **Can:** create/edit inquiries & quotes, manage follow-ups; view orders/sales-reports/clients.
 - **Cannot:** send or approve quotes, touch operations or money, manage users.
 - **Handoff:** a drafted quote is sent/approved by a senior sales role, then registered by Finance.
+- **Who takes the next step is named (owner, 13 Nov 2026):** an approved quotation no longer tells you "Next: send it to the client" — you may not send. It says who does, by name (the people of your branch first), so you can tell them it is ready. A won quotation says it is with Accounts, by name, and that nothing more is yours to do. The "Actions" box is not drawn when it would hold nothing for you to press. The strip at the top shows the lead a quotation was made from, and there is one way back — to that lead.
 - Most common task = draft a quote (through the quote form).

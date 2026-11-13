@@ -5458,7 +5458,10 @@ function ops_raise_call() {
             $contracts[] = $r;
         }
     }
-    view('ops/raise_call', ['clients' => clients_list(), 'clientId' => $clientId, 'client' => $client, 'contracts' => $contracts]);
+    view('ops/raise_call', ['clients' => clients_list(), 'clientId' => $clientId, 'client' => $client, 'contracts' => $contracts,
+        //  Contracts just opened with no work order yet — offered first, so the coordinator
+        //  does not have to know the client's name to find the new work (bounce list 1.6).
+        'fresh' => (!$clientId && function_exists('contracts_awaiting_first_call')) ? contracts_awaiting_first_call() : []]);
 }
 
 function ops_calls($route, $method) {
@@ -9538,6 +9541,14 @@ function ops_pending_tasks() {
     // contract (Finance / admin).
     if (function_exists('quotes_awaiting_contract_count') && (can('crm.contract.register') || is_master()))
         $add(quotes_awaiting_contract_count(), '📄', 'contracts to register', 'accepted quotes waiting for a contract number', '/quotes?mine=contract', 'warn');
+    //  A contract opened, and nobody has raised its first work order: the coordinator's
+    //  cue (it used to arrive by e-mail only). One contract → straight to its form.
+    if (function_exists('contracts_awaiting_first_call') && (can('ops.call.create') || is_master())) {
+        $freshC = contracts_awaiting_first_call();
+        $add(count($freshC), '📂', count($freshC) === 1 ? 'contract opened — raise the ' . Tl('call') : 'contracts opened — raise the ' . Tlp('call'),
+             'opened contracts with no ' . Tl('call') . ' raised yet',
+             count($freshC) === 1 ? '/call-new?contract_id=' . (int)$freshC[0]['id'] . '&contract=' . urlencode((string)$freshC[0]['contract_number']) : '/raise-call', 'info');
+    }
     //  Won deals handed to Accounts (no quotation) — registered on Accounts' own screen.
     if (function_exists('opps_awaiting_contract') && (can('crm.contract.register') || is_master())) {
         $dealsToReg = 0; try { $dealsToReg = count(opps_awaiting_contract()); } catch (Throwable $e) {}

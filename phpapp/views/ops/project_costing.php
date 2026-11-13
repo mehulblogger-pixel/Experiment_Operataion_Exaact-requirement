@@ -31,12 +31,12 @@ if (!$shownHeads) $shownHeads = [];
 $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
 ?>
 <style>
-  .pc .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:12px 0}
-  .pc .kpi{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:12px;padding:12px 14px}
-  .pc .kpi .l{font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);font-weight:700}
-  .pc .kpi .v{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:3px}
-  .pc .kpi.ok{border-left-color:var(--ok)} .pc .kpi.ok .v{color:var(--ok)}
-  .pc .kpi.bad{border-left-color:var(--bad)} .pc .kpi.bad .v{color:var(--bad)}
+  /* The four cards at the top are the application's STANDARD KPI card (.kpi-row / .kpi in
+     app.css) — no card styles of this page's own. It used to carry its own, which fought
+     the standard one: grey label text on the coloured band (unreadable), the band boxed
+     inside the card, a stray left stripe (owner, 13 Nov 2026: "is that OK and in line
+     with other KPI cards across the application?" — it was not). */
+  .pc .kpi-row{margin:12px 0}
   .pc table.grid{font-size:12.5px} .pc table.grid th{white-space:nowrap}
   .pc .num{text-align:right;font-variant-numeric:tabular-nums}
   .pc .hh input{width:100%;padding:6px 7px;border:1px solid var(--line);border-radius:7px;font-size:12.5px;box-sizing:border-box}
@@ -54,7 +54,6 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
   .pc .pcbu-total td,.pc .pcbu-grand td{border-top:1px solid var(--line);font-weight:700}
   .pc .pcbu-grand td{border-top:2px solid var(--brand,#0f5f5a)}
   .pc .wide-scroll{overflow-x:auto}   /* a role with many heads scrolls inside its own card — it never pushes past the page */
-  @media(max-width:1000px){.pc .kpis{grid-template-columns:repeat(2,1fr)}}
 </style>
 
 <div class="pc">
@@ -74,11 +73,11 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
 <?php if ($h['status']==='REJECTED' && !empty($h['reject_note'])): ?><div class="lockmsg" style="background:var(--bad-soft,#fdecec)">↩ Sent back: <?= $e($h['reject_note']) ?></div><?php endif; ?>
 
 <!-- Project rollup -->
-<div class="kpis">
-  <div class="kpi"><div class="l">Project revenue</div><div class="v"><?= fmoney_short($T['revenue']) ?></div></div>
-  <div class="kpi"><div class="l">Project cost</div><div class="v"><?= fmoney_short($T['cost']) ?></div></div>
-  <div class="kpi <?= $T['profit']>=0?'ok':'bad' ?>"><div class="l">Project profit</div><div class="v"><?= fmoney_short($T['profit']) ?></div></div>
-  <div class="kpi <?= $T['margin']>=0?'ok':'bad' ?>"><div class="l">Margin</div><div class="v"><?= number_format($T['margin'],1) ?>%</div></div>
+<div class="kpi-row">
+  <div class="kpi"><span class="kic">🧾</span><div class="k">Project revenue</div><div class="v"><?= fmoney_short($T['revenue']) ?></div><div class="d">Price quoted to the <?= $e(Tl('client')) ?></div></div>
+  <div class="kpi"><span class="kic">🧮</span><div class="k">Project cost</div><div class="v"><?= fmoney_short($T['cost']) ?></div><div class="d">Manpower + loadings</div></div>
+  <div class="kpi <?= $T['profit']>=0?'tone-ok':'tone-bad' ?>"><span class="kic">💰</span><div class="k">Project profit</div><div class="v"><?= fmoney_short($T['profit']) ?></div><div class="d">Revenue − cost</div></div>
+  <div class="kpi <?= $T['margin']>=0?'tone-ok':'tone-bad' ?>"><span class="kic">📈</span><div class="k">Margin</div><div class="v"><?= number_format($T['margin'],1) ?>%</div><div class="d">Profit as a share of revenue</div></div>
 </div>
 
 <?php // Why the figures can read ₹0. The totals are built up from the team roles

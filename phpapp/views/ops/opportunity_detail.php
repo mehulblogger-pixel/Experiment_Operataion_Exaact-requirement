@@ -85,8 +85,12 @@
     <?php endif; ?>
   <?php else: ?>
     <div class="step">This deal is at <b><?= e($curStageName ?: '—') ?></b>.<?php if ($stalled): ?> <span class="pill p-bad" style="font-size:11.5px"><?= (int)$days ?> days here — overdue</span><?php endif; ?></div>
+    <?php if (!empty($quoteNow) && !in_array($quoteNow['status'], ['LOST', 'EXPIRED'], true)): ?>
+      <p class="next"><?= e($quoteNow['text']) ?> <a href="/quote?id=<?= (int)$quoteNow['id'] ?>"><b>Open <?= e(Tl('quote')) ?> <?= e($quoteNow['label']) ?> →</b></a></p>
+    <?php endif; ?>
     <p class="next"><?php if (trim((string)$o['next_action']) !== ''): ?>
         <b>Next:</b> <?= e($o['next_action']) ?><?= $o['next_action_on'] ? ' <span class="muted">by ' . e(fdate($o['next_action_on'])) . '</span>' : '' ?>
+      <?php elseif (!empty($quoteNow) && !in_array($quoteNow['status'], ['LOST', 'EXPIRED'], true)): ?>
       <?php else: ?>
         <span class="muted">No next step noted — move it on below, or note the next step in Edit.</span>
       <?php endif; ?></p>
@@ -166,39 +170,38 @@
     <?php if ($canEdit && $open): ?>
       <form method="post" action="/opportunity-new-quote" style="margin:0">
         <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
-        <button class="btn small"<?= empty($o['partner_id']) ? ' disabled title="Add the customer to this deal first"' : '' ?>>＋ Create a new quotation</button>
+        <button class="btn small"<?= (empty($o['partner_id']) && trim((string)$o['partner_name']) === '') ? ' disabled title="Type the customer\'s name on the deal first"' : '' ?>>＋ Create a new quotation</button>
       </form>
     <?php endif; ?>
   </div>
   <p class="muted" style="font-size:13px;margin:8px 0 0">Create a quotation straight from the deal — it carries the customer and the working value, and lands on the quote so you can add line items and submit. (Or attach an existing one below.) Keeping them all here stops the forecast counting the same business more than once.</p>
 
-  <?php // Why the button above is greyed, and how to fix it — right here, so an
-        //   OPEN deal that only has a customer NAME (not a linked customer
-        //   record) can be tied to one and start quoting. Previously this control
-        //   only appeared once the deal was Won, leaving open deals stuck. ?>
+  <?php // Owner, 13 Nov 2026 (bounce list 2.1): a deal no longer needs a customer RECORD
+        //   to quote. The yellow "Link the customer to raise a quotation" stop is gone;
+        //   what is left is a quiet, optional way to tie the deal to a customer who is
+        //   already on the master. ?>
   <?php if ($canEdit && $open && empty($o['partner_id'])): ?>
-    <div class="msg msg-warning" style="margin-top:10px">
-      <strong>Link the customer to raise a quotation.</strong>
-      This deal has a customer name but is not yet tied to a customer record, and a <?= e(Tl('quote')) ?> needs the customer (for billing and GST). Set it below and the button turns on.
-      <?php if (!empty($o['lead_id'])): ?>
-        <div style="margin-top:6px"><a href="/lead?id=<?= (int)$o['lead_id'] ?>"><b>Convert the lead</b></a> creates the customer and fills this in automatically — or pick one already on the master:</div>
-      <?php endif; ?>
-      <?php if (!empty($clients)): ?>
-        <form method="post" action="/opportunity-edit" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:end">
-          <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
-          <div class="ff" style="flex:1;min-width:220px"><label for="opp-cust-open">Customer</label>
-            <select id="opp-cust-open" name="partner_id" class="form-control searchable">
-              <option value="">— pick a customer —</option>
-              <?php foreach ($clients as $c): ?>
-                <option value="<?= (int)$c['id'] ?>"><?= e($c['display_name'] ?: $c['legal_name']) ?></option>
-              <?php endforeach; ?>
-            </select></div>
-          <button class="btn small" type="submit">Set the customer</button>
-        </form>
-      <?php else: ?>
-        <div style="margin-top:8px"><a class="btn small secondary" href="/clients">Add the customer to the master first →</a></div>
-      <?php endif; ?>
-    </div>
+    <p class="muted" style="font-size:13px;margin:10px 0 0">
+      <?= e(trim((string)$o['partner_name']) !== '' ? $o['partner_name'] : 'This customer') ?> is not on the client master yet — that is fine.
+      The <?= e(Tl('quote')) ?> goes out in their name, and they are added to the master by itself when they accept it.</p>
+    <?php if (!empty($clients)): ?>
+      <details class="fold" style="margin-top:8px">
+        <summary>Already a customer? <span class="sub">pick them from the master</span></summary>
+        <div class="fold-body">
+          <form method="post" action="/opportunity-edit" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+            <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
+            <div class="ff" style="flex:1;min-width:220px"><label for="opp-cust-open">Customer</label>
+              <select id="opp-cust-open" name="partner_id" class="form-control searchable">
+                <option value="">— pick a customer —</option>
+                <?php foreach ($clients as $c): ?>
+                  <option value="<?= (int)$c['id'] ?>"><?= e($c['display_name'] ?: $c['legal_name']) ?></option>
+                <?php endforeach; ?>
+              </select></div>
+            <button class="btn small secondary" type="submit">Set the customer</button>
+          </form>
+        </div>
+      </details>
+    <?php endif; ?>
   <?php endif; ?>
   <?php if ($quotes): ?>
     <table class="dt" style="margin-top:10px">
@@ -241,19 +244,16 @@
   <?php // Generate a quotation-of-record even for an order won WITHOUT a quotation, so
         //  the deal always CAN carry one. One is enough — once a quotation is on the
         //  deal the button is greyed out (a second quote-of-record would be noise). ?>
-  <?php if ($canEdit && ($o['status'] ?? '') !== 'LOST' && !empty($o['partner_id'])): ?>
-    <?php if (!$quotes): ?>
+  <?php // Owner, 13 Nov 2026 (bounce list 2.5): "Create a new quotation" and "Generate
+        //  quotation" sat side by side and sounded the same. One at a time: while the deal
+        //  is open you CREATE its quotation (above); "Generate" is only for a deal already
+        //  WON without one, that wants a quotation for the record. ?>
+  <?php if ($canEdit && ($o['status'] ?? '') === 'WON' && !empty($o['partner_id']) && !$quotes): ?>
       <form method="post" action="/opportunity-generate-quote" style="margin-top:12px">
         <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
         <button class="btn small secondary" type="submit">＋ Generate quotation</button>
-        <span class="muted" style="font-size:12px;margin-left:6px">Creates a draft quotation from this deal — a quote-of-record, even for a direct order.</span>
+        <span class="muted" style="font-size:12px;margin-left:6px">This deal was won without a <?= e(Tl('quote')) ?>. This drafts one from it, for the record.</span>
       </form>
-    <?php else: ?>
-      <div style="margin-top:12px">
-        <button class="btn small secondary" type="button" disabled style="opacity:.5;cursor:not-allowed" title="A quotation has already been raised for this deal">＋ Generate quotation</button>
-        <span class="muted" style="font-size:12px;margin-left:6px">A quotation is already on this deal.</span>
-      </div>
-    <?php endif; ?>
   <?php endif; ?>
 </div>
 

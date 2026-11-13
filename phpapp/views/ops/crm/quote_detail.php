@@ -54,13 +54,22 @@
   switch ($st) {
     case 'DRAFT': $nbTitle = 'Still a draft.'; $nbNext = 'Next: submit it for approval when it is ready.'; break;
     case 'PENDING_APPROVAL': $nbTitle = 'Waiting for approval' . (!empty($pendingWith) ? ' — with ' . $pendingWith : '') . '.'; $nbNext = 'They approve it, or send it back with a comment.'; break;
-    case 'APPROVED': $nbTitle = 'Approved and ready to go out.'; $nbNext = 'Next: send it to the ' . Tl('client') . '.'; break;
+    case 'APPROVED': $nbTitle = 'Approved and ready to go out.';
+      //  Someone who may not send must not be told "send it" with no button (bounce list 1.1).
+      if (!empty($canSend)) $nbNext = 'Next: send it to the ' . Tl('client') . '.';
+      else { $nbWho = function_exists('crm_people_who_can') ? crm_people_who_can('crm.quote.send', $q) : '';
+             $nbNext = ($nbWho !== '' ? $nbWho . ' sends' : 'A senior sales colleague sends') . ' it to the ' . Tl('client') . ' — sending is not yours to do. Tell them it is ready.'; }
+      break;
     case 'SENT': $nbTitle = 'Sent to the ' . Tl('client') . (trim((string)($q['sent_at'] ?? '')) !== '' ? ' on ' . fdate(substr((string)$q['sent_at'], 0, 10)) : '') . '.'; $nbNext = 'Waiting for their answer — mark it accepted, or lost.'; break;
     case 'ACCEPTED': $nbTitle = 'Accepted 🎉 — they said yes.';
       //  A registered contract is not an open one: until its signatures are in, say
       //  who it waits for instead of "raise calls from it" (owner, 13 Nov 2026).
       $nbOs = !empty($contractRow) ? strtoupper((string)($contractRow['open_status'] ?? '') ?: 'OPEN') : '';
-      if (trim((string)($q['contract_number'] ?? '')) === '') $nbNext = 'Next: register the contract number. Inspection calls are then raised from the contract.';
+      if (trim((string)($q['contract_number'] ?? '')) === '') {
+        if (!empty($canContract)) $nbNext = 'Next: register the contract number. Inspection ' . Tlp('call') . ' are then raised from the contract.';
+        else { $nbWho = function_exists('crm_people_who_can') ? crm_people_who_can('crm.contract.register', $q) : '';
+               $nbNext = 'With Accounts' . ($nbWho !== '' ? ' (' . $nbWho . ')' : '') . ' to register the contract number. Nothing more for you to do here.'; }
+      }
       elseif ($nbOs === 'PENDING') { $nbTitle = 'Accepted 🎉 — contract ' . $q['contract_number'] . ' is waiting for approval.'; $nbNext = contract_waiting_words($contractRow); }
       elseif ($nbOs === 'REJECTED') { $nbTitle = 'Accepted — but opening contract ' . $q['contract_number'] . ' was rejected.'; $nbNext = 'See the reason under Contract below; register it again when it is put right.'; }
       else $nbNext = 'Contract ' . ($nbOs === 'CLOSED' ? 'closed' : 'open') . ' — ' . ($nbOs === 'CLOSED' ? 'no new ' . Tlp('call') . ' can be raised from it.' : 'raise inspection ' . Tlp('call') . ' from it whenever the work comes in, as many as needed.');
@@ -128,8 +137,22 @@
       showing the contract number as outstanding until it is registered.
     <?php endif; ?>
   </div>
+  <?php // Owner, 13 Nov 2026 (bounce list 1.2): Accounts were prompted three times and the
+        // real button sat on another tab. When there is nothing to check first (this
+        // client has no other contract), ONE press here registers it — the same one-click
+        // registration the Contract panel offers. Otherwise the panel, which shows the
+        // client's other contracts, is the right place to decide.
+        if ($canContract && empty($clientContracts)): ?>
+    <form method="post" action="/quote-contract?id=<?= (int)$q['id'] ?>" style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <input type="hidden" name="auto_contract" value="1">
+      <?php if (!empty($contractPrefill['po_id'])): ?><input type="hidden" name="po_id" value="<?= (int)$contractPrefill['po_id'] ?>"><?php endif; ?>
+      <button class="btn small" type="submit">✓ Register the contract — next number</button>
+      <a href="#contract" style="font-size:12.5px">Check the details, or type the <?= e(Tl('client')) ?>'s own number →</a>
+    </form>
+  <?php else: ?>
   <div style="margin-top:8px"><a class="btn small<?= $canContract ? '' : ' secondary' ?>" href="#contract">
     <?= $canContract ? 'Register it now' : 'See the registration panel' ?></a></div>
+  <?php endif; ?>
 </div>
 <?php endif; ?>
 
@@ -202,9 +225,10 @@
   <?php foreach (($revs ?? []) as $rv) if (!empty($rv['is_current'])): ?><a class="btn small" href="/quote?id=<?= (int)$rv['id'] ?>">Open the current revision →</a><?php endif; ?>
 </div>
 <?php else: ?>
-<!-- Status action bar -->
-<div class="panel" id="actions" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-  <span class="muted"><b>Actions</b> — move this <?= e(Tl('quote')) ?>:</span>
+<!-- Status action bar. Drawn only when it holds something to press: an empty
+     "Actions — move this quote:" box told Accounts and readers there was a step
+     they could not find (bounce list 1.4, 13 Nov 2026). -->
+<?php ob_start(); ?>
   <?php // A rejected quote is not an ending — it goes back round. It must offer
         // the same submit button a draft does, or the only way forward is to
         // raise a whole new revision for what may be a one-word correction. ?>
@@ -245,7 +269,17 @@
   <?php if (!empty($canRevise) && in_array($st, ['SENT','APPROVED','ACCEPTED','LOST','REJECTED','EXPIRED'], true)): ?>
     <button class="btn small secondary" type="button" onclick="document.getElementById('revbox').style.display='block'" style="margin-left:auto">Revise (new rev)</button>
   <?php endif; ?>
+<?php $qActs = trim((string)ob_get_clean());
+      if (strpos($qActs, '<button') !== false || strpos($qActs, '<a ') !== false || strpos($qActs, '<form') !== false): ?>
+<div class="panel" id="actions" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+  <span class="muted"><b>Actions</b> — move this <?= e(Tl('quote')) ?>:</span>
+  <?= $qActs ?>
 </div>
+<?php elseif ($qActs !== ''): ?>
+<div class="panel" id="actions"><?= $qActs ?></div>
+<?php else: // nothing to press — so the "Actions" shortcut above has nowhere to go ?>
+<script>[].forEach.call(document.querySelectorAll('.quote-jump a[href="#actions"]'),function(a){a.hidden=true;});</script>
+<?php endif; ?>
 <?php endif; // current revision ?>
 
 <?php // ---- Project costing linked to this quotation --------------------------

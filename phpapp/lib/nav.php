@@ -388,7 +388,13 @@ function nav_trail($route, $leaf = null) {
     }
     if (($under = nav_under($route)) !== null && $under !== $route) {
         //  The register's own trail, then this record (or this screen) below it.
+        //  Its CANONICAL trail: the screen the visitor happened to arrive from is not a
+        //  second parent. Arriving from the quotation register at a quotation that sits
+        //  under its lead read "Home › Sales › Quotes › Leads › L-… › Quote" — two parents
+        //  (bounce list 1.5, 13 Nov 2026).
+        $navRef = $_SERVER['HTTP_REFERER'] ?? null; unset($_SERVER['HTTP_REFERER']);
         $trail = nav_trail($under);
+        if ($navRef !== null) $_SERVER['HTTP_REFERER'] = $navRef;
         $trail[count($trail) - 1]['url'] = '/' . $under;
         $via = nav_under($route, null, null, true);
         if (is_array($via) && ($via['label'] ?? '') !== '') $trail[] = ['label' => (string) $via['label'], 'url' => (string) ($via['url'] ?? '')];

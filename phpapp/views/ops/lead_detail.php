@@ -67,7 +67,8 @@
     <p class="next">See them in <a href="/client?id=<?= (int)$l['converted_partner_id'] ?>"><b>the customer list</b></a><?php
       $wq = null; foreach (($quotes ?? []) as $qq) if (($qq['status'] ?? '') === 'ACCEPTED') { $wq = $qq; break; }
       if ($wq): ?> · their accepted <?= e(Tl('quote')) ?> <a href="/quote?id=<?= (int)$wq['id'] ?>"><b><?= e($wq['quote_no']) ?></b></a><?php endif;
-      if ($l['converted_inquiry_id']): ?> · <a href="/inquiries">the <?= e(Tl('inquiry')) ?> raised for it</a><?php endif; ?>.
+      if ($l['converted_inquiry_id']): ?> · <a href="/inquiries">the <?= e(Tl('inquiry')) ?> raised for it</a><?php endif;
+      if (!empty($oppId)): ?> · <a href="/opportunity?id=<?= (int)$oppId ?>"><b>its deal</b></a><?php endif; ?>.
       The work carries on from the customer and the <?= e(Tl('quote')) ?>; this lead stays as the record of how it was won.</p>
   <?php elseif ($l['status'] === 'LOST'): ?>
     <div class="step">Closed — this one did not happen.</div>

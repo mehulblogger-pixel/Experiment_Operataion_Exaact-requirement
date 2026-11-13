@@ -111,3 +111,12 @@ Branch / Operation Manager — presses **"✓ Mark reached"** when a stage is do
 (never in the future), what proves it, and optionally a proof file. That makes the milestone ready to bill for Finance. A mistaken mark can be undone, with a reason, until it is on an
 invoice. Same right as closing a job (`ops.job.close`), within their own branch. See
 `docs/03-object-lifecycles.md`, "Billing milestone".
+
+### A contract has been opened — raise the work order (owner, 13 Nov 2026)
+
+When a contract is approved and opened, it now reaches you: the dashboard shows
+**"contract opened — raise the work order"** (one contract: the button opens the work-order form
+filled in from it; several: it opens the list), and **Raise a work order** (`/raise-call`) lists
+"Newly opened — no work order raised yet" at the top, one **▶ Raise work order** press each. A
+contract leaves the list when its first work order is raised. Only contracts inside your branch
+scope are shown, and only to people who may already raise a work order (`ops.call.create`).

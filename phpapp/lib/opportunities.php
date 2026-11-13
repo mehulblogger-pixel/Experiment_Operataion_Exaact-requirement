@@ -604,17 +604,25 @@ function opp_create_quote($oppId) {
     opp_migrate();
     $o = opp_row($oppId);
     if (!$o) return ['err' => 'That opportunity no longer exists.'];
-    if (empty($o['partner_id']))
-        return ['err' => 'Add the customer to this deal first — a quotation needs a client on the master.'];
+    //  Owner, 13 Nov 2026 (bounce list 2.1): a deal could not quote until it had a customer
+    //  RECORD, and for a new prospect the only way to get one was to mark its lead "won"
+    //  before anything was sold. A quotation made straight from a lead never needed that:
+    //  it carries the typed name, and the customer record is created by itself at the
+    //  moment the quotation is accepted (quote_land_on_client), which also puts it on the
+    //  deal. A deal now works the same way — one rule for both roads.
+    $pid = (int)($o['partner_id'] ?? 0);
+    $clientName = $pid ? (string) ops_val("SELECT COALESCE(display_name, legal_name) FROM business_partners WHERE id=?", [$pid])
+                       : trim((string)($o['partner_name'] ?? ''));
+    if ($clientName === '')
+        return ['err' => 'Type the customer\'s name on the deal first (Actions → Edit the details) — the ' . Tl('quote') . ' is addressed to them.'];
     try {
         $no = ops_next_code('quotations', 'quote_no', 'Q');
         $val = (float)($o['value'] ?? 0);
-        $clientName = (string) ops_val("SELECT COALESCE(display_name, legal_name) FROM business_partners WHERE id=?", [(int)$o['partner_id']]);
         db()->prepare("INSERT INTO quotations
             (quote_no, rev, is_current, client_id, client_name, office_id, subject, site_location,
              currency, validity_days, subtotal, gst_pct, gst_amount, total_amount, status, created_by, created_at)
             VALUES (?,0,1,?,?,?,?, '', 'INR',30, ?,0,0,?, 'DRAFT', ?,?)")
-          ->execute([$no, (int)$o['partner_id'], $clientName, (int)($o['office_id'] ?? 0) ?: null,
+          ->execute([$no, $pid ?: null, $clientName, (int)($o['office_id'] ?? 0) ?: null,
                      trim((string)$o['name']) ?: ('Deal ' . (string)$o['ref']), $val, $val,
                      function_exists('user_name') ? user_name(current_user()) : '', date('c')]);
         $qid = (int)db()->lastInsertId();
@@ -705,6 +713,25 @@ function opp_winning_quote($oppId) {
     $pick['label'] = (string)$pick['quote_no'] . ((int)$pick['rev'] > 0 ? ' r' . (int)$pick['rev'] : '');
     return $pick;
 }
+//  WHERE THE DEAL'S QUOTATION STANDS, in one line (bounce list 2.3). An open deal went on
+//  reading "No next step noted" while its quotation was approved and waiting to be sent;
+//  a lead already says "Your quote Q-… is approved — ready to send". Same words here.
+//  Returns ['id','label','status','text'] for the newest live quotation, or null.
+function opp_quote_now($oppId) {
+    $live = null;
+    foreach (opp_quotes($oppId) ?: [] as $q) {
+        if (isset($q['is_current']) && !(int)$q['is_current']) continue;        // an earlier revision
+        if (!$live || (int)$q['id'] > (int)$live['id']) $live = $q;
+    }
+    if (!$live) return null;
+    $say = ['DRAFT' => 'is being prepared — finish it and submit it for approval', 'PENDING_APPROVAL' => 'is waiting for approval',
+            'APPROVED' => 'is approved — ready to send to them', 'SENT' => 'is sent — waiting for their answer',
+            'REJECTED' => 'was sent back by the approver — correct it and submit again', 'ACCEPTED' => 'is accepted',
+            'LOST' => 'was not accepted', 'EXPIRED' => 'has expired — raise a revision to send a fresh one'];
+    $st = (string)$live['status']; $label = (string)$live['quote_no'] . ((int)$live['rev'] > 0 ? ' r' . (int)$live['rev'] : '');
+    return ['id' => (int)$live['id'], 'label' => $label, 'status' => $st, 'text' => ucfirst(Tl('quote')) . ' ' . $label . ' ' . ($say[$st] ?? strtolower($st)) . '.'];
+}
+
 //  Why this deal must not be handed to Accounts (or registered) on its own: '' when it may.
 function opp_own_contract_block(array $o) {
     $w = opp_winning_quote((int)$o['id']);
@@ -731,7 +758,12 @@ function opp_won_next(array $o) {
                               : ($os === 'PENDING' ? 'The contract is registered and waiting for approval; then the orders are raised from it.'
                                                    : 'The contract is registered but not open (' . strtolower(CONTRACT_OPEN_STATES[$os] ?? $os) . ') — see it under Actions.');
     }
-    if (trim((string)($o['sent_to_accounts_at'] ?? '')) !== '') return 'It is with Accounts to register the contract — nothing more for you to do here.';
+    if (trim((string)($o['sent_to_accounts_at'] ?? '')) !== '')
+        //  Said to whoever is reading: the person who registers contracts must not be told
+        //  "nothing more for you to do" on the very deal that is waiting for them (3.4).
+        return (function_exists('can') && (can('crm.contract.register') || is_master()))
+            ? 'Yours to do — register the contract (Actions tab here, or your "Contracts to register" list).'
+            : 'It is with Accounts to register the contract — nothing more for you to do here.';
     if (empty($o['partner_id'])) return 'Next: add the customer to the master (Actions tab), then send it to Accounts to register the contract.';
     return 'Next: on the Actions tab, send it to Accounts to register the contract.';
 }
@@ -1152,6 +1184,7 @@ function ops_opportunities($route, $method) {
             // registered from this deal (if any) so its state can be shown.
             'canRegisterContract' => can('crm.contract.register') || is_master(),
             'winQuote' => opp_winning_quote((int)$o['id']),
+            'quoteNow' => opp_quote_now((int)$o['id']),
             'canAddCustomer' => function_exists('leads_can_edit') && leads_can_edit(),
             'contractRow' => !empty($o['contract_id'])
                 ? ops_one("SELECT * FROM partner_contracts WHERE id=?", [(int)$o['contract_id']])

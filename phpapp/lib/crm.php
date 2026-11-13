@@ -551,7 +551,11 @@ function crm_quote_playbook($q) {
         'done'=>$accepted && $hasContract,
         'line'=>($accepted && $hasContract) ? ('Contract ' . $q['contract_number'] . ' registered.')
               : ($accepted ? 'Register the ' . $cl . ' and enter the contract number.' : 'Comes after it is accepted.'),
-        'href'=>'#contract', 'cta'=>'Register contract'];
+        //  No button here (owner, 13 Nov 2026): a draft offered "Register contract" long
+        //  before it could be, and a won one asked Accounts three times over. The one
+        //  prompt is the amber box at the top of the page; the Contract link still goes
+        //  to the panel once there is something to see.
+        'href'=>'', 'cta'=>''];
     // The quotation's journey ENDS at the contract number. Inspection / deputation
     // calls are a separate, repeatable step raised FROM the contract — often on a
     // later day, because acceptance is given to the quote, not to a call. So this
@@ -1216,10 +1220,65 @@ function crm_rule_is_unit($r) {
 //  The lead a quotation was made from, as a trail step back to it — or null
 //  when it was not made from a lead, the lead is gone, or this person cannot
 //  open leads. Used by the quotation page so Back returns to the lead.
+//  The deal a quotation was made from — for the trail and Back. Only when the viewer
+//  can open deals; a quotation made from a lead keeps its lead (above).
+//  May this visitor open a lead or a deal page at all? Both belong to the Leads &
+//  pipeline module — the same right the page's own door checks (ops_module_gate).
+//  It decides nothing new: it only stops a link being drawn that would be refused.
+function crm_sales_record_openable() {
+    return function_exists('can') && can('mod.leads.view');
+}
+function crm_quote_deal_link(array $q) {
+    if (!empty($q['lead_id'])) return null;
+    if (function_exists('ops_module_gate') && !ops_module_gate('opportunities', true)) return null;
+    //  Only for somebody who can open the deal. Accounts open a won quotation to
+    //  register its contract but may not open deals — offered the link, they landed
+    //  on a refusal (found walking as Finance, 13 Nov 2026). Their quotation keeps its
+    //  usual place under the quotation register.
+    if (!crm_sales_record_openable()) return null;
+    try {
+        $base = (int)(($q['parent_id'] ?? 0) ?: $q['id']);
+        $o = ops_one("SELECT o.id, o.ref, o.name, o.office_id FROM opportunity_quotes oq JOIN opportunities o ON o.id=oq.opportunity_id
+                      WHERE oq.quotation_id IN (?,?) ORDER BY oq.id DESC LIMIT 1", [(int)$q['id'], $base]);
+    } catch (Throwable $e) { return null; }
+    if (!$o) return null;
+    if (function_exists('scope_office_allows') && !scope_office_allows($o['office_id'])) return null;
+    return ['label' => trim((string)$o['ref'] . ((string)$o['name'] !== '' ? ' · ' . $o['name'] : '')), 'url' => '/opportunity?id=' . (int)$o['id']];
+}
+
+//  WHO DOES THE NEXT STEP, BY NAME (bounce list 1.1 and 1.3, 13 Nov 2026). An approved
+//  quotation told a Marketing Executive "Next: send it to the client" with no Send button
+//  — they may not send — and never said who does. A won one told the salesperson "Next:
+//  register the contract number", which is Accounts' job. This names the people who hold
+//  the right, the quotation's own branch first; nobody gains anything by being named.
+function crm_people_who_can($perm, $q = null, $limit = 3) {
+    $out = [];
+    try {
+        $office = !empty($q['office_id']) ? (int)$q['office_id'] : null; $sbu = (string)($q['sbu'] ?? '');
+        $near = []; $far = [];
+        foreach (ops_all("SELECT * FROM users WHERE is_active=1 AND COALESCE(is_superuser,0)=0 AND role<>'MASTER_ADMIN' ORDER BY first_name, username") ?: [] as $u) {
+            $perms = function_exists('user_effective_perms') ? user_effective_perms($u) : [];
+            if (!in_array($perm, $perms, true)) continue;
+            $u['_admin'] = in_array('settings.manage', $perms, true) ? 1 : 0;
+            $covers = !function_exists('user_scope_covers') || user_scope_covers($u, $office, $sbu);
+            if ($covers) $near[] = $u; else $far[] = $u;
+        }
+        $out = $near ?: $far;                                   // people who cover this branch; else anyone who holds the right
+        //  The people whose job it is come first. An administrator can do nearly
+        //  everything, so naming them first sends a salesperson to the wrong desk.
+        usort($out, fn($a, $b) => $a['_admin'] <=> $b['_admin']);
+    } catch (Throwable $e) { return ''; }
+    if (!$out) return '';
+    $names = array_map('user_name', array_slice($out, 0, $limit));
+    $last = array_pop($names);
+    return ($names ? implode(', ', $names) . ' or ' : '') . $last . (count($out) > $limit ? ' (or ' . (count($out) - $limit) . ' more)' : '');
+}
+
 function crm_quote_lead_link(array $q) {
     $lid = (int) ($q['lead_id'] ?? 0);
     if (!$lid || !function_exists('lead_row')) return null;
     if (function_exists('ops_module_gate') && !ops_module_gate('leads', true)) return null;
+    if (!crm_sales_record_openable()) return null;      // no link to a page that would refuse them
     $l = ops_one("SELECT id, ref, company_name FROM leads WHERE id=?", [$lid]);
     if (!$l) return null;
     $label = trim((string) $l['ref'] . ((string) $l['company_name'] !== '' ? ' · ' . $l['company_name'] : ''));
@@ -2305,6 +2364,9 @@ function ops_crm_quotes($route, $method) {
         //  Quotes and does not return to the lead". It now sits UNDER its lead:
         //  Home › Sales › Leads › L-0012 · Acme › Q-…, and Back goes to the lead.
         if (function_exists('nav_under') && ($ql = crm_quote_lead_link($q))) nav_under('quote', 'leads', $ql);
+        //  …and one made from a DEAL sits under its deal (bounce list 2.4, 13 Nov 2026):
+        //  Back used to leave the deal behind and land in the quotation register.
+        elseif (function_exists('nav_under') && ($qd = crm_quote_deal_link($q))) nav_under('quote', 'opportunities', $qd);
         view('ops/crm/quote_detail', [
             'q' => $q, 'lines' => crm_quote_lines($q['id']),
             'preorderOn' => preorder_checklist_enabled(), 'preorderItems' => preorder_checklist_items(),

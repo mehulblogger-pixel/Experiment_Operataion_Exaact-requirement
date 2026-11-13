@@ -899,6 +899,28 @@ function contract_after_register($contractId, $quoteId = 0) {
     return 'OPEN';
 }
 
+//  OPENED, AND NO WORK ORDER YET (owner, 13 Nov 2026 — bounce list 1.6). "Opened and
+//  floated to operations" was an e-mail and nothing else: the coordinator's dashboard
+//  went on saying "You're all caught up". These are the contracts that were opened
+//  through approval and have not had a single work order raised under their number —
+//  within the viewer's own branch scope. A contract leaves the list with its first work
+//  order, or when it is closed. No time limit is invented here.
+function contracts_awaiting_first_call() {
+    try {
+        [$w, $a] = function_exists('scope_clause') ? scope_clause('pc.branch_id', 'pc.sbu') : ['1=1', []];
+        return ops_all(
+            "SELECT pc.*, COALESCE(bp.display_name, bp.legal_name) client_name, q.subject quote_subject
+               FROM partner_contracts pc
+               LEFT JOIN business_partners bp ON bp.id = pc.partner_id
+               LEFT JOIN quotations q ON q.id = pc.quotation_id
+              WHERE COALESCE(pc.open_status,'') = 'OPEN' AND COALESCE(pc.is_active,1) = 1
+                AND COALESCE(pc.opened_at,'') <> '' AND COALESCE(pc.contract_number,'') <> ''
+                AND NOT EXISTS (SELECT 1 FROM calls c WHERE c.contract_number = pc.contract_number)
+                AND $w
+              ORDER BY pc.opened_at DESC, pc.id DESC", $a) ?: [];
+    } catch (Throwable $e) { return []; }
+}
+
 //  What to tell whoever just registered a contract: it is open, or who it waits for.
 function contract_registered_words($contractId) {
     $c = ops_one("SELECT * FROM partner_contracts WHERE id=?", [(int)$contractId]);

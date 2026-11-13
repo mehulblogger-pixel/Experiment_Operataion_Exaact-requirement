@@ -7,7 +7,13 @@
 t_section('A won deal says one next step, the same everywhere');
 t_eq(opp_won_next(['partner_id' => 5]), 'Next: on the Actions tab, send it to Accounts to register the contract.', 'won, customer on file: send it to Accounts');
 t_ok(strpos(opp_won_next([]), 'add the customer') !== false, 'won with no customer yet: add the customer first');
+//  Said to whoever is reading (bounce list 3.4, 13 Nov 2026): Sales read "with Accounts —
+//  nothing more for you"; the person who registers contracts reads that it is theirs.
+$wdPrev = $_SESSION ?? []; $_SESSION = []; current_user(true); ua(true);
 t_ok(strpos(opp_won_next(['partner_id' => 5, 'sent_to_accounts_at' => date('c')]), 'with Accounts') !== false, 'already sent: it is with Accounts');
+t_as_admin();
+t_ok(strpos(opp_won_next(['partner_id' => 5, 'sent_to_accounts_at' => date('c')]), 'Yours to do — register the contract') === 0, '…and someone who registers contracts is told it is theirs to do');
+$_SESSION = $wdPrev; current_user(true); ua(true);
 t_ok(strpos(opp_won_next(['partner_id' => 5, 'call_id' => 9]), 'work order is raised') !== false, 'an order raised: says so');
 $src = (string)file_get_contents(__DIR__ . '/../lib/opportunities.php') . file_get_contents(__DIR__ . '/../views/ops/opportunity_detail.php');
 t_ok(strpos($src, 'Raise the order when the customer confirms') === false, 'the contradicting message is gone');

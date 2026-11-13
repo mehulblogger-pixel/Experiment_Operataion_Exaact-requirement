@@ -3,6 +3,25 @@
     <p class="sub" style="margin:2px 0 0">Pick the <?= e(Tl('client')) ?>, then the contract the work is under — the <?= e(Tl('call')) ?> fills itself in from there.</p></div>
 </div>
 
+<?php // Owner, 13 Nov 2026 (bounce list 1.6): contracts that were just opened and have no
+      // work order yet, offered first — one press each. ?>
+<?php if (!empty($fresh)): ?>
+<div class="panel" style="margin-top:14px;border-left:3px solid var(--info,#2563eb)">
+  <b>Newly opened — no <?= e(Tl('call')) ?> raised yet</b>
+  <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+    <?php foreach (array_slice($fresh, 0, 12) as $fc): $fdesc = trim((string)($fc['quote_subject'] ?? '')) ?: trim((string)($fc['title'] ?? '')); ?>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <div style="flex:1 1 220px;min-width:0"><b><?= e($fc['contract_number']) ?></b> · <?= e($fc['client_name'] ?: '—') ?>
+          <?php if ($fdesc !== ''): ?><div class="muted" style="font-size:13px"><?= e($fdesc) ?></div><?php endif; ?>
+          <div class="muted" style="font-size:12px">opened <?= e(fdate(substr((string)$fc['opened_at'], 0, 10))) ?></div></div>
+        <a class="btn small" style="white-space:nowrap" href="/call-new?contract_id=<?= (int)$fc['id'] ?>&amp;contract=<?= e(urlencode((string)$fc['contract_number'])) ?>">▶ Raise <?= e(Tl('call')) ?></a>
+      </div>
+    <?php endforeach; ?>
+    <?php if (count($fresh) > 12): ?><p class="muted" style="margin:0;font-size:12.5px">+<?= count($fresh) - 12 ?> more — pick the <?= e(Tl('client')) ?> below.</p><?php endif; ?>
+  </div>
+</div>
+<?php endif; ?>
+
 <!-- Step 1 — the client -->
 <form method="get" action="/raise-call" class="panel" style="margin-top:14px">
   <label style="font-weight:600;display:block">1 · <?= e(T('client')) ?></label>

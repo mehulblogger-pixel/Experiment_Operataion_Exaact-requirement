@@ -26,7 +26,16 @@ t_ok(strpos((string)$quote['subject'], 'Annual vessel inspection') !== false, 't
 $linked = opp_quotes($oid);
 t_ok(count($linked) === 1 && (int)$linked[0]['id'] === (int)$q['id'], 'the quotation is attached to the deal');
 
-// An opportunity with no customer on the master is refused with a clear reason.
+// Owner, 13 Nov 2026 (bounce list 2.1): a deal with only a customer NAME may quote —
+// as a lead always could. It used to be refused ("a quotation needs a client on the
+// master"), and the only way round was to mark the lead won before anything was sold.
 $r2 = opp_create(['name' => 'Loose lead', 'partner_name' => 'Someone not on the master yet']);
 $q2 = opp_create_quote((int)$r2['id']);
-t_ok(!empty($q2['err']), 'a deal with no client on the master is refused, not fatal');
+t_ok(empty($q2['err']) && !empty($q2['id']), 'a deal with only a customer name gets its quotation' . (!empty($q2['err']) ? ': ' . $q2['err'] : ''));
+$qq2 = ops_one("SELECT client_id, client_name, status FROM quotations WHERE id=?", [(int)($q2['id'] ?? 0)]);
+t_eq([(int)($qq2['client_id'] ?: 0), (string)($qq2['client_name'] ?? ''), (string)($qq2['status'] ?? '')], [0, 'Someone not on the master yet', 'DRAFT'],
+    '…addressed to the typed name, with no customer record yet (it is created when the quotation is accepted)');
+// A deal with neither a customer nor a name has nobody to address it to.
+db()->prepare("INSERT INTO opportunities (ref, name, partner_name, status, created_at) VALUES (?, 'Nameless deal', '', 'OPEN', ?)")->execute(['OCQ-NN-' . getmypid(), date('c')]);
+$q3 = opp_create_quote((int)db()->lastInsertId());
+t_ok(!empty($q3['err']), 'a deal with no customer name at all is still refused, not fatal');

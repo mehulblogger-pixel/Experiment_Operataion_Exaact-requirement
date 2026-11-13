@@ -105,11 +105,15 @@ function chain_root($kind, $id) {
             case 'QUOTE':
                 // Follow a revision back to the original first, so rev 3 and the
                 // original show the same thread rather than two half-threads.
-                $q = chain_one("SELECT parent_id, inquiry_id FROM quotations WHERE id=?", [$id]);
+                $q = chain_one("SELECT parent_id, inquiry_id, lead_id FROM quotations WHERE id=?", [$id]);
                 if ($q && $q['parent_id']) { $id = (int)$q['parent_id']; continue 2; }
                 $oq = chain_one("SELECT opportunity_id FROM opportunity_quotes WHERE quotation_id=? LIMIT 1", [$id]);
                 if ($oq && $oq['opportunity_id']) { $kind = 'OPPORTUNITY'; $id = (int)$oq['opportunity_id']; continue 2; }
                 if ($q && $q['inquiry_id']) { $kind = 'INQUIRY'; $id = (int)$q['inquiry_id']; continue 2; }
+                //  A quotation made straight from a lead (no deal, no enquiry yet) starts at
+                //  that lead. The strip showed "Lead —" on it, though the page's own trail
+                //  named the lead (bounce list 1.4, 13 Nov 2026).
+                if ($q && !empty($q['lead_id'])) return ['LEAD', (int)$q['lead_id']];
                 return ['QUOTE', $id];
             case 'INQUIRY':
                 $o = chain_one("SELECT id FROM opportunities WHERE inquiry_id=? LIMIT 1", [$id]);
@@ -146,6 +150,11 @@ function chain_from($kind, $id) {
             $o = chain_one("SELECT o.*, s.name stage_name FROM opportunities o LEFT JOIN pipeline_stages s ON s.id=o.stage_id WHERE o.lead_id=? LIMIT 1", [(int)$l['id']]);
             if ($o) { $kind = 'OPPORTUNITY'; $id = (int)$o['id']; }
             elseif ($l['converted_inquiry_id']) { $kind = 'INQUIRY'; $id = (int)$l['converted_inquiry_id']; }
+            else {
+                //  …and walking down from such a lead finds its own quotations.
+                $quotes = chain_all("SELECT * FROM quotations WHERE lead_id=? ORDER BY quote_no, rev, id", [(int)$l['id']]);
+                if ($quotes) { $kind = 'QUOTE'; $id = (int)$quotes[0]['id']; }
+            }
         }
     }
     if ($kind === 'OPPORTUNITY') {
@@ -321,10 +330,16 @@ function chain_strip($kind, $id, $hereKind = '', $hereId = 0) {
         $isHere = ($key === $hereKind) && (int)($first['id'] ?? 0) === $hereId;
         $more = count($rows) > 1 ? ' +' . (count($rows) - 1) : '';
         $href = !empty($first['_href']) ? (string)$first['_href'] : ($url . (int)$first['id']);
-        $h .= '<a class="chain-step' . ($isHere ? ' chain-here' : '') . '" href="' . e($href) . '"'
-           . ' title="' . e($label . ' — ' . $state) . '">'
-           . '<span class="chain-ic">' . $icon . '</span><span class="chain-lb">' . e($label) . '</span>'
-           . '<span class="chain-v">' . e($ref) . e($more) . '</span></a>';
+        //  A lead or a deal is a link only for somebody who can open it. Accounts see
+        //  where a won quotation came from, but may not open the sales pipeline — the
+        //  tile stays, as plain text, rather than leading to a refusal.
+        $plain = in_array($key, ['LEAD', 'OPPORTUNITY'], true) && function_exists('can') && !can('mod.leads.view');
+        $inner = '<span class="chain-ic">' . $icon . '</span><span class="chain-lb">' . e($label) . '</span>'
+               . '<span class="chain-v">' . e($ref) . e($more) . '</span>';
+        $h .= $plain
+            ? '<span class="chain-step" title="' . e($label . ' — ' . $state) . '">' . $inner . '</span>'
+            : '<a class="chain-step' . ($isHere ? ' chain-here' : '') . '" href="' . e($href) . '"'
+              . ' title="' . e($label . ' — ' . $state) . '">' . $inner . '</a>';
     }
     $h .= '<a class="chain-step chain-all" href="' . e('/trace?kind=' . urlencode($hereKind) . '&id=' . $hereId) . '">'
        . '<span class="chain-ic">⇢</span><span class="chain-lb">Whole thread</span><span class="chain-v">open</span></a>';

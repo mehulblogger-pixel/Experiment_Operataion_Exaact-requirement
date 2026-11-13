@@ -40,5 +40,8 @@ t_ok(strpos($ops, "'opportunity-generate-quote'=>'leads'") !== false, 'the gener
 $view = file_get_contents(__DIR__ . '/../views/ops/opportunity_detail.php');
 t_ok(strpos($view, '/opportunity-generate-quote') !== false && strpos($view, '＋ Generate quotation') !== false,
     'the deal offers "Generate quotation"');
-t_ok(strpos($view, 'disabled style="opacity:.5;cursor:not-allowed"') !== false && strpos($view, 'A quotation is already on this deal') !== false,
-    'the button is greyed out once a quotation exists');
+//  Owner, 13 Nov 2026 (bounce list 2.5): "Create a new quotation" and "Generate quotation" sat
+//  side by side. Generate is now offered only on a deal WON without a quotation — and simply
+//  not drawn once one exists (it used to be drawn greyed out).
+t_ok(strpos($view, "(\$o['status'] ?? '') === 'WON' && !empty(\$o['partner_id']) && !\$quotes") !== false && strpos($view, 'A quotation is already on this deal') === false,
+    '"Generate quotation" shows only on a won deal with no quotation — never beside "Create a new quotation"');
