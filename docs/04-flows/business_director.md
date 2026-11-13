@@ -18,3 +18,12 @@ flowchart TD
 - **Cannot (by default):** edit operational records, manage users, change **system settings** (no `settings.manage` — the settings tile is hidden, `areas.php:213`), or see identity documents.
 - **Handoffs:** primarily a reader; endorsing a contract hands off to the Branch Manager.
 - Most common task = read dashboards (0-click landing) and drill into figures.
+
+### Approving a project costing — the trail (owner, 13 Nov 2026)
+
+On a costing waiting for you, the band at the top says what it waits for, by name. The Approval box
+shows who prepared it, who submitted it and each level with who signed and when; your signature (with
+its reference, if you type one) and any send-back with its reason are recorded there and in "History
+of this costing". "Create quotation" is not offered after your signature unless every level has
+signed — with "all levels at the same time" the others still sign. Nothing about who approves changed.
+

@@ -289,11 +289,42 @@ function pc_sign_level($h, $ref = '') {
     $id = (int)$h['id']; $lvl = pc_my_level($h) ?: pc_current_level($id); $me = current_user();
     if ($lvl) db()->prepare("UPDATE project_costing_approvals SET status='APPROVED', acted_by=?, acted_at=?, remarks=? WHERE costing_id=? AND level=? AND status='PENDING'")
         ->execute([user_name($me), date('c'), substr(trim((string)$ref), 0, 400), $id, $lvl]);
-    if (pc_current_level($id)) return 'NEXT';
+    $refTxt = trim((string)$ref) !== '' ? ' · ref ' . trim((string)$ref) : '';
+    if (pc_current_level($id)) {
+        pc_trail($id, 'Level ' . $lvl . ' approved by ' . user_name($me) . $refTxt, pc_waiting_words(pc_get($id)));
+        return 'NEXT';
+    }
     db()->prepare("UPDATE project_costings SET status='APPROVED', approved_by=?, approved_at=?, approval_ref=?, updated_at=? WHERE id=?")
         ->execute([user_name($me), date('c'), trim((string)$ref), date('c'), $id]);
+    pc_trail($id, ($lvl ? 'Level ' . $lvl . ' approved by ' . user_name($me) . $refTxt . ' — ' : '') . 'costing fully approved', 'A quotation can now be made from it.');
     return 'APPROVED';
 }
+//  THE COSTING'S TRAIL (owner, 13 Nov 2026: "we must have a trail that who has created the
+//  costing, who has approved and what is pending"). Every step is written to the costing's own
+//  history: created, submitted (and to whom), each level signed, sent back (with the reason),
+//  reopened, quotation made. A resubmission rebuilds the levels, so earlier rounds live here
+//  and nowhere else. Recording only — it decides nothing and changes no approval rule.
+function pc_trail($id, $subject, $body = '') {
+    if (!function_exists('act_log')) return;
+    try { act_log('PROJECT_COSTING', (int)$id, 'SYSTEM', $subject, ['body' => (string)$body, 'auto' => 1]); } catch (Throwable $e) {}
+}
+//  "Level 2 — Marketing Manager (Asha Rao, Vikram Shah)": who a level waits for, in words.
+function pc_level_words($step, $h, $limit = 3) {
+    $who = array_map('user_name', array_slice(pc_step_people($step, $h), 0, $limit));
+    $name = !empty($step['approver_user_id']) ? '' : ((string)($step['approver_role'] ?? '') !== '' ? (ORG_ROLES[$step['approver_role']] ?? $step['approver_role']) : 'anyone who may approve');
+    return 'Level ' . (int)$step['level'] . ' — ' . ($name !== '' ? $name . ($who ? ' (' . implode(', ', $who) . ')' : '') : ($who ? implode(', ', $who) : 'nobody active holds it'));
+}
+//  What the costing is waiting for now, in one line ('' when nothing is pending).
+function pc_waiting_words($h) {
+    $st = (string)($h['status'] ?? '');
+    if ($st === 'DRAFT')    return 'Not submitted yet — ' . ($h['created_by'] ?: 'its author') . ' submits it for approval when it is ready.';
+    if ($st === 'REJECTED') return 'Sent back — it is changed and submitted again before a quotation can be made.';
+    if ($st !== 'SUBMITTED') return '';
+    $open = pc_open_levels((int)$h['id']); $out = [];
+    foreach (pc_steps((int)$h['id']) as $s) if ($s['status'] === 'PENDING' && in_array((int)$s['level'], $open, true)) $out[] = pc_level_words($s, $h);
+    return $out ? 'Waiting for ' . implode('; ', $out) . '.' : 'Waiting for approval.';
+}
+
 // Costings waiting at a level the person signed in may sign (for Approvals).
 function pc_waiting_on_me() {
     if (!pc_modules_live()) return [];
@@ -1150,6 +1181,7 @@ function ops_projcosting($route, $method) {
         $pdo->prepare("UPDATE project_costings SET inquiry_id=?, lead_id=?, sbu=? WHERE id=?")
             ->execute([$inq ?: null, ($lead ?: (int)($src['lead_id'] ?? 0)) ?: null, substr($sbu, 0, 20), $id]);
         $seeded = (int)($_POST['quote_id'] ?? 0) ? pc_seed_from_quote($id, (int)$_POST['quote_id']) : 0;
+        pc_trail($id, 'Costing ' . $code . ' created by ' . user_name(current_user()));
         flash($seeded ? "$code created from the quotation — its $seeded line" . ($seeded === 1 ? '' : 's') . " are in, at the quoted rate and quantity. Add each role's cost heads to see the margin at that price."
                       : "$code created — add the team roles and their cost heads.");
         redirect('/project-costing?id=' . $id);
@@ -1343,6 +1375,9 @@ function ops_projcosting($route, $method) {
                     ops_mail($ap['email'], 'Approval needed: costing ' . $h2['code'], "Hello,\n\nProject costing {$h2['code']} — {$h2['title']} is waiting for your approval (level {$s['level']}).\nOpen it in " . (function_exists('app_name') ? app_name() : 'the application') . " to approve it or send it back with a reason.\n", '', 'COSTING_APPROVAL');
             }
             $together = function_exists('crm_approval_mode') && crm_approval_mode() === 'together';
+            $lv = []; foreach (pc_steps($id) as $s) $lv[] = pc_level_words($s, $h2);
+            pc_trail($id, 'Submitted for approval by ' . user_name(current_user()) . ' — ' . $n . ' level' . ($n === 1 ? '' : 's') . ($n > 1 ? ($together ? ', all at the same time' : ', in order') : ''),
+                implode("\n", $lv));
             flash('Costing submitted for approval — ' . $n . ' level' . ($n === 1 ? '' : 's') . ' to pass' . ($n > 1 ? ($together ? ', all at the same time.' : ', in order.') : '.'));
         } elseif ($route === 'project-costing-approve') {
             $r = pc_sign_level($h, (string)($_POST['approval_ref'] ?? ''));
@@ -1362,6 +1397,7 @@ function ops_projcosting($route, $method) {
                 ->execute([user_name(current_user()), date('c'), substr(trim((string)($_POST['reject_note'] ?? '')), 0, 400), $id, $lvl]);
             $pdo->prepare("UPDATE project_costings SET status='REJECTED', reject_note=?, updated_at=? WHERE id=?")
                 ->execute([trim((string)($_POST['reject_note'] ?? '')), date('c'), $id]);
+            pc_trail($id, ($lvl ? 'Level ' . $lvl . ': s' : 'S') . 'ent back by ' . user_name(current_user()), 'Reason: ' . trim((string)($_POST['reject_note'] ?? '')));
             flash('Sent back with comments.', 'warning');
         } else { // reopen to draft — an approval is for the figures approved, so it goes
             ops_require(pc_can_edit(), 'You cannot reopen this.');
@@ -1369,6 +1405,7 @@ function ops_projcosting($route, $method) {
             $pdo->prepare("UPDATE project_costings SET status='DRAFT', approved_by='', approved_at='', approval_ref='', updated_at=? WHERE id=?")->execute([date('c'), $id]);
             if ($h['status'] === 'APPROVED' && !empty($h['quote_id']) && function_exists('crm_log_change'))
                 crm_log_change((int)$h['quote_id'], 'Costing ' . $h['code'] . ' was reopened by ' . user_name(current_user()) . ' — its approval was withdrawn.');
+            pc_trail($id, 'Reopened as draft by ' . user_name(current_user()) . ($h['status'] === 'APPROVED' ? ' — its approval was withdrawn' : ($h['status'] === 'SUBMITTED' ? ' — taken back out of approval' : '')));
             flash($h['status'] === 'APPROVED' ? 'Reopened as draft — its approval was withdrawn; submit it again when it is ready.' : 'Reopened as draft.');
         }
         redirect('/project-costing?id=' . $id);
@@ -1418,7 +1455,7 @@ function ops_projcosting($route, $method) {
             redirect('/project-costing?id=' . $id);
         }
         $r = pc_make_quote($roll);
-        if (!empty($r['id'])) { flash('Quotation ' . $r['no'] . ' drafted from this costing — review and send.'); redirect('/quote?id=' . $r['id']); }
+        if (!empty($r['id'])) { pc_trail($id, 'Quotation ' . $r['no'] . ' made from this costing by ' . user_name(current_user())); flash('Quotation ' . $r['no'] . ' drafted from this costing — review and send.'); redirect('/quote?id=' . $r['id']); }
         flash($r['err'] ?? 'Could not create the quotation.', 'error'); redirect('/project-costing?id=' . $id);
     }
 

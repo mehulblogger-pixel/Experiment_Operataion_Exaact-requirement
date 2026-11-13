@@ -18,3 +18,12 @@ flowchart TD
 - **Handoff:** accepted quote → Finance's "contracts to register".
 - **Quirk:** the Admin area appears for this role **only** because of the templates tile — no user/settings access. See `99-gaps-and-risks.md`.
 - Most common task = approve a quotation (open quote → Approve, ~2 clicks).
+
+### Approving a project costing — the trail (owner, 13 Nov 2026)
+
+On a costing waiting for you, the band at the top says what it waits for, by name. The Approval box
+shows who prepared it, who submitted it and each level with who signed and when; your signature (with
+its reference, if you type one) and any send-back with its reason are recorded there and in "History
+of this costing". "Create quotation" is not offered after your signature unless every level has
+signed — with "all levels at the same time" the others still sign. Nothing about who approves changed.
+

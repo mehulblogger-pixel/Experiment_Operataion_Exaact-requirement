@@ -254,6 +254,18 @@ stateDiagram-v2
   REJECTED --> DRAFT : reopen
 ```
 
+- **Every move is written down, and "Create quotation" waits for APPROVED (owner, 13 Nov 2026:
+  "we must have a trail that who has created the costing, who has approved and what is pending").**
+  Each move above is recorded on the costing's own history (`pc_trail()` → `activities`,
+  `PROJECT_COSTING`): created, submitted (with every level and who it waits for), each level signed
+  (by whom, with its reference), sent back (by whom, and the reason), reopened, and the quotation
+  made from it (by whom). A resubmission rebuilds the levels, so earlier rounds survive only there.
+  The page shows the trail — prepared, submitted, each level, fully approved, quotation — and what it
+  waits for now, by name; the full history is at its foot. "Create quotation" is drawn only when the
+  costing is APPROVED; before that the page says what it waits for. (The route already refused a
+  quotation from anything but an APPROVED costing — the button merely matched it.) No status or
+  transition is added; with "all levels at the same time" (Set up Sales) the levels still sign together.
+
 - **Tagged and levelled (owner, 20 Oct 2026):** *"tagged with that inquiry or lead … approval level as
   of quotation shall be applicable."* A new costing must be tagged with what it prices — an enquiry or
   a lead (which fill in customer, branch, business unit and title), or the deal, quotation or

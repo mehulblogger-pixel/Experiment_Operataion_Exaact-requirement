@@ -70,6 +70,7 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
 </div>
 
 <?php if ($locked): ?><div class="lockmsg">🔒 This costing is <b><?= $e(PC_STATUS[$h['status']] ?? $h['status']) ?></b> and read-only.<?php if ($h['status']==='APPROVED' && !empty($h['approved_by'])): ?> Approved by <?= $e($h['approved_by']) ?><?= !empty($h['approval_ref']) ? ' · ref '.$e($h['approval_ref']) : '' ?>.<?php endif; ?><?php if ($canEdit===false && (pc_can_edit())): ?> <form method="post" action="/project-costing-reopen" style="display:inline"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="id" value="<?= (int)$h['id'] ?>"><button class="btn btn-ghost" style="padding:4px 10px">Reopen as draft</button></form><?php endif; ?></div><?php endif; ?>
+<?php if ($h['status']==='SUBMITTED' && function_exists('pc_waiting_words')): ?><div class="lockmsg" style="background:var(--warn-soft,#fff6e5)">⏳ <?= $e(pc_waiting_words($h)) ?></div><?php endif; ?>
 <?php if ($h['status']==='REJECTED' && !empty($h['reject_note'])): ?><div class="lockmsg" style="background:var(--bad-soft,#fdecec)">↩ Sent back: <?= $e($h['reject_note']) ?></div><?php endif; ?>
 
 <!-- Project rollup -->
@@ -146,9 +147,13 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
       <?php if (!empty($h['quote_id'])): ?>
         <a class="btn secondary" href="/quote?id=<?= (int)$h['quote_id'] ?>">📝 View linked quotation</a>
         <span class="muted" style="font-size:12px">A quotation was generated from this costing.</span>
-      <?php else: ?>
+      <?php elseif ($h['status'] === 'APPROVED'): ?>
         <form method="post" action="/project-costing-to-quote"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="id" value="<?= (int)$h['id'] ?>"><button class="btn primary">📝 Create quotation</button></form>
         <span class="muted" style="font-size:12px">One quote line per role, priced at the proposed rate × <?= $e(strtolower($qtyLabel)) ?>.</span>
+      <?php else: //  Owner, 13 Nov 2026: the button showed at every stage — after each level's signature,
+                  //  to the author and every approver — and was refused when pressed. It is offered only
+                  //  once the costing is fully approved; until then, what it waits for. ?>
+        <span class="muted" style="font-size:13px">📝 <b>Create quotation</b> is offered once this costing is fully approved. <?= $e(function_exists('pc_waiting_words') ? pc_waiting_words($h) : '') ?></span>
       <?php endif; ?>
     <?php endif; ?>
     <?php if (!empty($h['opportunity_id'])): ?><a class="btn secondary" href="/opportunity?id=<?= (int)$h['opportunity_id'] ?>">💡 Linked deal</a><?php endif; ?>
@@ -691,17 +696,52 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
       <?php endif; ?>
       <?php if ($h['status']==='DRAFT' && empty($lines)): ?><span class="muted" style="font-size:12.5px">Add at least one role before submitting.</span><?php endif; ?>
     </div>
-    <?php if ($pcSteps): ?>
-      <ol style="margin:10px 0 0;padding-left:20px;font-size:13px;line-height:1.6">
-        <?php foreach ($pcSteps as $s):
-          $who = function_exists('pc_step_people') ? array_map('user_name', array_slice(pc_step_people($s, $h), 0, 3)) : [];
-          $tag = $s['status'] === 'APPROVED' ? '✓ approved by ' . $s['acted_by'] : ($s['status'] === 'REJECTED' ? '↩ sent back by ' . $s['acted_by'] : (in_array((int)$s['level'], $pcOpen, true) ? 'waiting' : 'after the level before'));
-          $name = !empty($s['approver_user_id']) ? '' : ((string)$s['approver_role'] !== '' ? (ORG_ROLES[$s['approver_role']] ?? $s['approver_role']) : 'anyone who may approve'); ?>
-          <li><b>Level <?= (int)$s['level'] ?></b> — <?= $e($name !== '' ? $name . ($who ? ' (' . implode(', ', $who) . ')' : '') : implode(', ', $who)) ?> · <span class="<?= $s['status']==='APPROVED' ? '' : 'muted' ?>"><?= $e($tag) ?></span></li>
-        <?php endforeach; ?>
-      </ol>
-    <?php endif; ?>
+    <?php //  THE TRAIL (owner, 13 Nov 2026: "who has created the costing, who has approved and what is
+          //  pending"). Who prepared it, who submitted it, each level with who signed and when, what
+          //  it waits for now, and the quotation made from it. Earlier rounds (sent back, reopened)
+          //  are in "History of this costing" at the foot of the page.
+          $when = fn($t) => trim((string)$t) !== '' ? fdate(substr((string)$t, 0, 10)) . ' ' . substr((string)$t, 11, 5) : '';
+          $subRow = null; $qMade = null;
+          if (function_exists('act_for_entity')) foreach (act_for_entity('PROJECT_COSTING', (int)$h['id'], 50) as $ar) {
+              if (!$subRow && strpos((string)$ar['subject'], 'Submitted for approval') === 0) $subRow = $ar;
+              if (!$qMade && strpos((string)$ar['subject'], ' made from this costing by ') !== false) $qMade = $ar;
+          }
+          $qRow = !empty($h['quote_id']) ? ops_one("SELECT id, quote_no, rev FROM quotations WHERE id=?", [(int)$h['quote_id']]) : null; ?>
+    <style>
+  .pc-trail{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:0;font-size:13px}
+  .pc-trail li{display:grid;grid-template-columns:26px 1fr;gap:8px;padding:7px 0;border-top:1px solid var(--line)}
+  .pc-trail li:first-child{border-top:0}
+  .pc-trail .ic{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:var(--soft);font-size:12px;color:var(--muted)}
+  .pc-trail li.done .ic{background:var(--ok-soft,#e5f4e4);color:var(--ok,#1a7f37)}
+  .pc-trail li.now .ic{background:var(--warn-soft,#fff6e5);color:var(--warn,#b26b00)}
+  .pc-trail li.now{font-weight:600}
+  .pc-trail li.back .ic{background:var(--bad-soft,#fdecec);color:var(--bad,#c62828)}
+  .pc-trail .t{display:block;font-size:11.5px;color:var(--muted);font-weight:400;font-variant-numeric:tabular-nums}
+    </style>
+    <ol class="pc-trail" aria-label="Approval trail">
+      <li class="done"><span class="ic">✎</span><div><b>Prepared</b> by <?= $e($h['created_by'] ?: '—') ?><span class="t"><?= $e($when($h['created_at'] ?? '')) ?></span></div></li>
+      <?php if ($h['status'] !== 'DRAFT' || $pcSteps): ?>
+        <li class="<?= $subRow ? 'done' : '' ?>"><span class="ic">📤</span><div><b>Submitted</b><?= $subRow ? ' by ' . $e($subRow['created_by']) : '' ?><span class="t"><?= $e($subRow ? $when($subRow['occurred_at']) : '') ?></span></div></li>
+      <?php endif; ?>
+      <?php foreach ($pcSteps as $s):
+        $isOpen = $s['status'] === 'PENDING' && in_array((int)$s['level'], $pcOpen, true);
+        $cls = $s['status'] === 'APPROVED' ? 'done' : ($s['status'] === 'REJECTED' ? 'back' : ($isOpen ? 'now' : ''));
+        $ic  = $s['status'] === 'APPROVED' ? '✓' : ($s['status'] === 'REJECTED' ? '↩' : ($isOpen ? '⏳' : '·')); ?>
+        <li class="<?= $cls ?>"><span class="ic"><?= $ic ?></span><div><?= $e(function_exists('pc_level_words') ? pc_level_words($s, $h) : 'Level ' . (int)$s['level']) ?>
+          <?php if ($s['status'] === 'APPROVED'): ?><br><b>Approved</b> by <?= $e($s['acted_by']) ?><?= trim((string)$s['remarks']) !== '' ? ' · ref ' . $e($s['remarks']) : '' ?><span class="t"><?= $e($when($s['acted_at'])) ?></span>
+          <?php elseif ($s['status'] === 'REJECTED'): ?><br><b>Sent back</b> by <?= $e($s['acted_by']) ?><?= trim((string)$s['remarks']) !== '' ? ': ' . $e($s['remarks']) : '' ?><span class="t"><?= $e($when($s['acted_at'])) ?></span>
+          <?php elseif ($isOpen): ?><br><b>Waiting</b> — pending with them now
+          <?php else: ?><br><span class="muted">After the level before</span><?php endif; ?></div></li>
+      <?php endforeach; ?>
+      <?php if ($h['status'] === 'APPROVED'): ?>
+        <li class="done"><span class="ic">✅</span><div><b>Fully approved</b><?= !empty($h['approved_by']) ? ' — last signature ' . $e($h['approved_by']) : '' ?><span class="t"><?= $e($when($h['approved_at'] ?? '')) ?></span></div></li>
+      <?php endif; ?>
+      <li class="<?= $qRow ? 'done' : '' ?>"><span class="ic">📝</span><div><?php if ($qRow): ?><b>Quotation</b> <a href="/quote?id=<?= (int)$qRow['id'] ?>"><?= $e($qRow['quote_no']) ?><?= (int)$qRow['rev'] ? ' r' . (int)$qRow['rev'] : '' ?></a><?= $qMade ? ' made by ' . $e($qMade['created_by']) . '<span class="t">' . $e($when($qMade['occurred_at'])) . '</span>' : '' ?><?php else: ?><span class="muted">Quotation — made once fully approved</span><?php endif; ?></div></li>
+    </ol>
     <p class="sub" style="margin-top:6px">Draft → Submitted → Approved. Submitting sets the approval levels the same way as a quotation of this value and business unit (Set up Sales), and locks the sheet. Levels sign <?= function_exists('crm_approval_mode') && crm_approval_mode() === 'together' ? 'all at the same time' : 'in order' ?>; its author never signs. A quotation is made only from an approved costing, and reopening an approved one withdraws its approval.</p>
   </div>
 </div>
 </div>
+
+<?php //  Every step of this costing, every round (owner, 13 Nov 2026: "we must have a trail"). ?>
+<div style="margin-top:16px"><?php if (function_exists('act_render_timeline')) act_render_timeline('PROJECT_COSTING', (int)$h['id'], 'History of this costing'); ?></div>

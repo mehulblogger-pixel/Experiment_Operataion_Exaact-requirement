@@ -432,6 +432,23 @@ C('SAL-183', 'Project costing', 'How the price is built — the loadings shown i
    ('Look at the four cards at the top (Project revenue · Project cost · Project profit · Margin) beside the cards on the Dashboard.', 'They are the same card: a coloured band with the name in white and an icon, the figure below, and one line saying what it is ("Price quoted to the client", "Manpower + loadings", "Revenue − cost", "Profit as a share of revenue"). Profit and margin are green when positive, red when negative. On a phone they stack one under another. (Fixed 13 Nov 2026 — they had their own look: a grey name on the band and a boxed band.)')],
   'pc_buildup; pc_line_calc; views/ops/project_costing.php uses the standard .kpi-row card', live=False)
 
+C('SAL-184', 'Project costing', 'Who prepared, who approved, what is pending — the costing\'s trail; "Create quotation" only once approved', 'scenario', ['best', 'rule', 'edge'],
+  'several', 'Owner, 13 Nov 2026: "after every approval a create quotation button is there available … including costing creator and costing approver at each stage. We must have a trail that who has created the costing, who has approved and what is pending."',
+  'Test BDM (author), Test Marketing Manager and Test Business Director as approvers. Set up Sales: two levels apply to the costing\'s value, and "All at the same time" is chosen. A Draft costing with one role.',
+  [('[BDM] Open the draft costing → scroll to "Use this costing" and to "Approval".', 'No "Create quotation" button. Instead: "📝 Create quotation is offered once this costing is fully approved. Not submitted yet — …". The Approval box starts the trail: "✎ Prepared by <you> <date time>".'),
+   ('[BDM] "Submit for approval".', '"Costing submitted for approval — 2 levels to pass, all at the same time." A band at the top: "⏳ Waiting for Level 1 — Marketing Manager (<names>); Level 2 — Business Director (<names>)." Trail: "📤 Submitted by <you> <date time>", both levels "⏳ Waiting — pending with them now", "📝 Quotation — made once fully approved".'),
+   ('[Marketing Manager] Open it → "Approve".', '"Your level is signed — still waiting for level 2." No "Create quotation" button for them.'),
+   ('[BDM] and [Marketing Manager] open it again.', 'Still no "Create quotation" for either. Trail: "✓ Level 1 … Approved by <Marketing Manager> <date time>"; Level 2 still "⏳ Waiting". The top band names only the Business Director now.'),
+   ('[Business Director] Type an approval ref "BD-77" → "Approve".', '"Costing approved — a quotation can now be made from it." Trail: "✓ Level 2 … Approved by <Business Director> · ref BD-77 <date time>" and "✅ Fully approved — last signature <Business Director>".'),
+   ('[BDM] Open it → "📝 Create quotation".', 'The quotation opens. Back on the costing the trail ends "📝 Quotation Q-… made by <you> <date time>", and the button has become "View linked quotation".'),
+   ('Scroll to the foot of the costing: "History of this costing".', 'Every step, newest first, with who and when: submitted (with the levels and names), each signature, fully approved, quotation made.'),
+   ('EDGE · [Business Director] Instead of approving, "Send back" with a reason.', 'Trail: "↩ Level 2 … Sent back by <name>: <reason>". The history keeps it. When the author submits again, the new round starts — and the first round, send-back included, stays in "History of this costing".'),
+   ('EDGE · [BDM] "Reopen as draft" on an approved costing.', 'History: "Reopened as draft by <you> — its approval was withdrawn". "Create quotation" disappears again until it is approved again.'),
+   ('EDGE · Set up Sales → "One after another".', 'The trail shows Level 2 as "After the level before" until Level 1 signs; the top band names only Level 1. Everything else as above.'),
+   ('EDGE · An old page left open, "Create quotation" pressed on a costing that is no longer approved.', 'Refused: "Make the quotation once this costing is approved — submit it for approval first." (The rule at the door was always there — the button now matches it.)')],
+  'pc_trail; pc_level_words; pc_waiting_words; views/ops/project_costing.php (.pc-trail; Create quotation only when APPROVED); tests/test_costing_trail.php', live=False)
+
+
 C('SAL-176', 'Project costing', 'Costing the other way round — from the rate the client pays to the CTC you can afford', 'scenario', ['best', 'rule', 'edge'],
   'BUSINESS_DEV_MANAGER', 'Owner, 13 Nov 2026: "Yes, both ways, but the screen shall not be very confusing." Often the client names the rate first; the question is then what salary the company can afford at its margin.',
   'Signed in as Test BDM. A Draft costing (as SAL-050 up to "Create costing"), basis "Long — per man-month".',
