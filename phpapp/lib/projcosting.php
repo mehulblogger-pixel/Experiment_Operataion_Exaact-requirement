@@ -333,14 +333,17 @@ function pc_waiting_words($h) {
 
 //  WHO MAY REOPEN AN APPROVED COSTING (owner, 14 Nov 2026: "Costing once approved shall not be able to
 //  open as a draft by who has prepared it. It shall be only the highest authority who has last approved
-//  it" — and, for when that person is away: "Any one at Z level who is delegated his work or
-//  designation above Z"). Z = whoever gave the last approval. Allowed: Z; anyone who may sign Z's level
-//  (the same approval level, over this costing's branch); anyone Z has delegated quotation approvals to;
-//  anyone above Z in Z's reporting line; the Master Admin. Never the person who prepared it.
+//  it"; for when that person is away: "Any one at Z level who is delegated his work or designation
+//  above Z"; and, seeing the button still offered: "only the highest level approver can open the
+//  costing. No one else"). Z = the approver of the HIGHEST level that approved it. Allowed: Z; someone
+//  Z has delegated quotation approvals to; someone above Z in Z's reporting line. Nobody else — not a
+//  colleague at Z's level without a delegation, not the Master Admin, never the person who prepared it.
 //  (Once its quotation has gone for approval nobody may reopen it — pc_quote_lock_reason.)
 function pc_last_approval($h) {
     $steps = pc_steps((int)$h['id']); $last = null;
     foreach ($steps as $st) if ($st['status'] === 'APPROVED' && (!$last || (int)$st['level'] >= (int)$last['level'])) $last = $st;
+    //  Approved before levels were kept: the one named as having approved it.
+    if (!$last && trim((string)($h['approved_by'] ?? '')) !== '') $last = ['level' => 0, 'acted_by' => (string)$h['approved_by'], 'acted_by_id' => 0, 'status' => 'APPROVED'];
     if (!$last) return null;
     $uid = (int)($last['acted_by_id'] ?? 0);
     if (!$uid && trim((string)$last['acted_by']) !== '')               // signed before ids were kept: find by name
@@ -351,8 +354,7 @@ function pc_reopeners($h) {
     $out = [];                                                          // user id => why
     $la = pc_last_approval($h); if (!$la) return $out;
     $author = (int)($h['created_by_user_id'] ?? 0);
-    if ($la['user_id']) $out[$la['user_id']] = 'gave the last approval';
-    foreach (pc_step_people(['status' => 'PENDING'] + $la['step'], $h) as $u) $out[(int)$u['id']] = $out[(int)$u['id']] ?? 'at the same approval level';
+    if ($la['user_id']) $out[$la['user_id']] = 'gave the highest approval';
     if ($la['user_id'] && function_exists('appr_delegates_of'))
         foreach (appr_delegates_of($la['user_id'], 'QUOTE', $h['office_id'] ?? null) as $d) $out[(int)$d] = $out[(int)$d] ?? 'covering for them';
     if ($la['user_id'] && function_exists('reporting_chain'))
@@ -362,16 +364,14 @@ function pc_reopeners($h) {
 }
 function pc_can_reopen_approved($h) {
     if ((string)($h['status'] ?? '') !== 'APPROVED') return true;
-    if (function_exists('is_master') && is_master()) return true;
     $me = (int)(current_user()['id'] ?? 0);
     if (!$me || $me === (int)($h['created_by_user_id'] ?? 0)) return false;
-    if (!pc_steps((int)$h['id'])) return pc_can_approve();              // approved before levels existed: the old approvers
-    return isset(pc_reopeners($h)[$me]);
+    return isset(pc_reopeners($h)[$me]);                                 // no exception for the Master Admin (14 Nov 2026)
 }
 function pc_reopen_who_words($h) {
     $la = pc_last_approval($h);
     $name = $la && $la['user_id'] ? user_name(ops_one("SELECT * FROM users WHERE id=?", [$la['user_id']]) ?: []) : ($la['step']['acted_by'] ?? 'the last approver');
-    return 'Only ' . ($name ?: 'the person who gave the last approval') . ' — or someone at that approval level, covering for them, or above them — may reopen an approved costing. The person who prepared it may not.';
+    return 'Only ' . ($name ?: 'the highest-level approver') . ', who gave the highest approval, may reopen an approved costing — or, when they are away, the person they delegated their approvals to, or someone above them. Nobody else, including the person who prepared it.';
 }
 //  SENT BACK — who is told (owner, 14 Nov 2026: "If Z rejects then it shall also open as a draft and
 //  notification shall be sent to the Y"; "Dashboard and email"). The preparer, to revise it, and every

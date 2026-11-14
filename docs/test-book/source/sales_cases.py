@@ -497,16 +497,18 @@ C('SAL-187', 'Project costing', 'Settings at the top of the page; each role has 
 
 C('SAL-188', 'Project costing', 'Who may reopen an approved costing; a send-back reaches the preparer and every earlier approver; all approve again', 'scenario', ['rule', 'negative', 'edge'],
   'several', 'Owner, 14 Nov 2026: "Costing once approved shall not be able to open as a draft by who has prepared it. It shall be only the highest authority who has last approved it … If Z rejects then it shall also open as a draft and notification shall be sent to the Y" — "Any one at Z level who is delegated his work or designation above Z" — "Dashboard and email" — "Yes everyone approves again."',
-  'X = Test BDM (prepares). Y = Test Marketing Manager (level 1). Z = Test Branch Manager (level 2), reporting to Test Business Director. Another Branch Manager. Z has delegated quotation approvals to someone (Admin → Approvals → Sales → who covers for an approver). Levels one after another.',
+  'X = Test BDM (prepares). Y = Test Marketing Manager (level 1). Z = Test Branch Manager (level 2), reporting to Test Business Director. Another Branch Manager. The Master Admin. Z has delegated quotation approvals to someone (Admin → Approvals → Sales → who covers for an approver). Levels one after another.',
   [('[X] submit → [Y] approve → [Z] approve (ref "Z-1").', 'Approved. The trail shows each level with who signed.'),
-   ('[X] open the approved costing.', 'No "Reopen as draft". It reads "🔒 Only <Z> — or someone at that approval level, covering for them, or above them — may reopen an approved costing. The person who prepared it may not." A forced reopen is refused with the same words.'),
+   ('[X] open the approved costing.', 'No "Reopen as draft". It reads "🔒 Only <Z>, who gave the highest approval, may reopen an approved costing — or, when they are away, the person they delegated their approvals to, or someone above them. Nobody else, including the person who prepared it." A forced reopen is refused with the same words.'),
    ('[Y] open it.', 'No "Reopen as draft" — Y is a lower level.'),
-   ('[Z], the other Branch Manager, Z\'s delegate, and the Business Director above Z — each in turn.', 'Each sees "Reopen as draft" and may use it. (Once its quotation has gone for approval nobody may reopen it — SAL-186.)'),
+   ('[Z] open it.', '"Reopen as draft" is offered — Z gave the highest approval. (Once its quotation has gone for approval nobody may reopen it — SAL-186.)'),
+   ('NEGATIVE · [the other Branch Manager — same level, no delegation from Z] and [Master Admin] open it.', 'No "Reopen as draft" for either (owner, 14 Nov 2026: "only the highest level approver can open the costing. No one else"). A forced reopen is refused.'),
+   ('EDGE · Z is away: [Z\'s delegate] and [the Business Director above Z in the reporting line].', 'Each may reopen it.'),
    ('[X] submit again → [Y] approve → [Z] "Send back" with reason "Rates too thin".', 'Z reads "Sent back with comments. X, Y have been told." X and Y each get an e-mail "Costing … sent back — to be revised" with the reason; Y\'s says it will come back to every level, theirs included.'),
    ('[X] dashboard.', '"costing sent back — revise it" — it opens the costing, open for X to edit ("↩ Sent back — open for X to revise and submit again; every level then approves it again").'),
    ('[Y] dashboard.', '"costing you approved was sent back" — it stays until X submits again.'),
    ('[X] revise and submit.', 'Both levels wait again — Y approves again, then Z. Y\'s "sent back" notice disappears.'),
-   ('EDGE · Z has left (inactive).', 'Anyone at Z\'s level, Z\'s delegate, someone above Z, or the Master Admin may reopen it.')],
+   ('EDGE · How to tell the test copy has this rule.', 'The line under the costing title reads "PC-… · default Long — per man-month × BOQ" (with "default"). Without "default" the site is still on an update before v46.')],
   'pc_last_approval; pc_reopeners; pc_can_reopen_approved; pc_sendback_people; pc_sent_back_for_me; project_costing_approvals.acted_by_id; tests/test_costing_role_basis_reopen.php', live=False)
 
 

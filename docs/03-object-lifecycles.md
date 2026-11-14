@@ -363,10 +363,12 @@ stateDiagram-v2
   shall not be able to open as a draft by who has prepared it. It shall be only the highest authority
   who has last approved it" — "Any one at Z level who is delegated his work or designation above Z" —
   "If Z rejects … notification shall be sent to the Y" — "Dashboard and email" — "Yes everyone
-  approves again").** `APPROVED → DRAFT` (reopen) is allowed only to whoever gave the last approval
-  (Z, kept by id: `project_costing_approvals.acted_by_id`), anyone who may sign Z's level over this
-  costing, anyone Z has delegated quotation approvals to, anyone above Z in Z's reporting line, and the
-  Master Admin — never the preparer (`pc_can_reopen_approved()`). `SUBMITTED → REJECTED` (send back)
+  approves again").** `APPROVED → DRAFT` (reopen) is allowed only to the approver of the highest level
+  that approved it (Z, kept by id: `project_costing_approvals.acted_by_id`) — and, when Z is away, to
+  someone Z has delegated quotation approvals to or someone above Z in Z's reporting line. Nobody
+  else: not a colleague at Z's level without a delegation, not the Master Admin, never the preparer
+  (`pc_can_reopen_approved()`; owner, 14 Nov 2026: "only the highest level approver can open the
+  costing. No one else"). `SUBMITTED → REJECTED` (send back)
   now tells the preparer (to revise) and every approver who had already signed that round, by e-mail
   and on their dashboard until it is resubmitted (`pc_sendback_people()`, `pc_sent_back_for_me()`).
   A REJECTED costing is open for its preparer to revise, as before; resubmitting rebuilds every level,

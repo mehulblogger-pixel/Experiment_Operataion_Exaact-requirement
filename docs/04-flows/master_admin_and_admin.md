@@ -36,3 +36,10 @@ flowchart TD
 - **Can:** all areas and modules by default; but `is_master()`-only tiles (Roles & permissions, Control panel) are hidden unless also super-user.
 - **Must never:** be assumed unbreakable — a per-user override or role change can strip it (this caused the recent lock-out). Always keep a real `MASTER_ADMIN` as the recovery key.
 - **Recovery (if locked out with no master):** `reset-admin.txt` in the app folder, or `config.local.php` admin password change, or a phpMyAdmin `UPDATE users SET is_superuser=1 …` — see `99-gaps-and-risks.md`.
+
+### Project costing — the Master Admin does not reopen an approved costing (owner, 14 Nov 2026)
+
+"Only the highest level approver can open the costing. No one else." The Master Admin is not offered
+"Reopen as draft" on an approved costing unless they gave its highest approval themselves (or are
+that approver's delegate or above them in the reporting line).
+

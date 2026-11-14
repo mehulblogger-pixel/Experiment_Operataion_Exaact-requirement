@@ -43,7 +43,10 @@ $BOSS = $mkU('Bharat', 'BUSINESS_DIRECTOR');                   // above Z in Z's
 $X = $mkU('Xavier', 'BUSINESS_DEV_MANAGER');                   // prepares
 $Y = $mkU('Yamini', 'MARKETING_MANAGER');                      // level 1
 $Z = $mkU('Zubin', 'BRANCH_MANAGER', $BOSS);                   // level 2, reports to Bharat
-$Z2 = $mkU('Zoya', 'BRANCH_MANAGER');                          // the same level as Z
+$Z2 = $mkU('Zoya', 'BRANCH_MANAGER');                          // the same level as Z, no delegation
+$pdo->prepare("INSERT INTO users (username, first_name, last_name, email, role, is_active, is_superuser, home_office_id) VALUES (?,?,?,?,'MASTER_ADMIN',1,1,?)")
+    ->execute([$tag . '_master', 'Mitra', 'Rbr', 'mitra.' . $tag . '@example.test', $off]);
+$M = (int) $pdo->lastInsertId();                               // the Master Admin
 $D = $mkU('Dinesh', 'MARKETING_EXECUTIVE');                    // Z has delegated quotation approvals to Dinesh
 $O = $mkU('Omkar', 'OPERATION_MANAGER');                       // nobody in particular
 $pdo->prepare("INSERT INTO approval_delegations (delegator_user_id, delegate_user_id, entity, office_id, effective_from, effective_to, reason, active, created_by, created_at)
@@ -118,13 +121,19 @@ try {
         }
         return [$ok, $r];
     };
+    //  Owner, 14 Nov 2026 (seeing the button still offered): "only the highest level approver can open the costing. No one else."
     foreach ([[$X, false, 'X, who prepared it'], [$Y, false, 'Y, a lower level'], [$O, false, 'someone unrelated'],
-              [$Z, true, 'Z, who gave the last approval'], [$Z2, true, 'anyone at Z\'s level'], [$D, true, 'Z\'s delegate'], [$BOSS, true, 'above Z in Z\'s reporting line']] as [$u, $want, $who]) {
+              [$Z2, false, 'a colleague at Z\'s level with no delegation from Z'], [$M, false, 'the Master Admin'],
+              [$Z, true, 'Z, the highest-level approver'], [$D, true, 'Z\'s delegate (Z away)'], [$BOSS, true, 'above Z in Z\'s reporting line (Z away)']] as [$u, $want, $who]) {
         [$ok, $r] = $reopenAs($u);
         t_eq($ok, $want, ($want ? 'may reopen: ' : 'may NOT reopen: ') . $who . ($want ? '' : ' — "' . $said($r) . '"'));
     }
-    $g = $drive($X, 'project-costing', 'GET', ['id' => $cid], [], ['action="/project-costing-reopen"', 'The person who prepared it may not']);
-    t_ok(empty($g['has']['action="/project-costing-reopen"']) && !empty($g['has']['The person who prepared it may not']), 'X sees no "Reopen as draft", and reads who may');
+    $g = $drive($X, 'project-costing', 'GET', ['id' => $cid], [], ['action="/project-costing-reopen"', 'Nobody else, including the person who prepared it']);
+    t_ok(empty($g['has']['action="/project-costing-reopen"']) && !empty($g['has']['Nobody else, including the person who prepared it']), 'X sees no "Reopen as draft", and reads who may');
+    foreach ([[$M, 'the Master Admin'], [$Z2, 'a colleague at Z\'s level']] as [$u, $who]) {
+        $g = $drive($u, 'project-costing', 'GET', ['id' => $cid], [], ['action="/project-costing-reopen"']);
+        t_ok(empty($g['has']['action="/project-costing-reopen"']), $who . ' is not offered "Reopen as draft"');
+    }
     $g = $drive($Z, 'project-costing', 'GET', ['id' => $cid], [], ['action="/project-costing-reopen"']);
     t_ok(!empty($g['has']['action="/project-costing-reopen"']), 'Z sees "Reopen as draft"');
 
