@@ -320,6 +320,24 @@ function pc_level_words($step, $h, $limit = 3) {
     $name = !empty($step['approver_user_id']) ? '' : ((string)($step['approver_role'] ?? '') !== '' ? (ORG_ROLES[$step['approver_role']] ?? $step['approver_role']) : 'anyone who may approve');
     return 'Level ' . (int)$step['level'] . ' — ' . ($name !== '' ? $name . ($who ? ' (' . implode(', ', $who) . ')' : '') : ($who ? implode(', ', $who) : 'nobody active holds it'));
 }
+//  THE LEVELS IT WILL NEED, BEFORE IT IS SUBMITTED (owner, 14 Nov 2026: "Yes, show the levels before
+//  submitting the costing"). The same steps pc_build_approvals() would write — the quotation levels for
+//  this costing's value (before tax) and business unit — worked out without writing anything.
+function pc_preview_levels($h) {
+    $steps = function_exists('crm_quote_rule_steps') ? crm_quote_rule_steps(pc_as_quote($h)) : [];
+    if (!$steps) return [pc_level_words(['level' => 1, 'approver_role' => '', 'approver_user_id' => null, 'status' => 'PENDING'], $h)];
+    $out = [];
+    foreach ($steps as $st) {
+        $role = (string)($st['approver_role'] ?? ''); $uid = ($st['approver_user_id'] ?? null) ?: null;
+        if ($role === 'REPORTS_TO') {
+            $uid = (!empty($h['created_by_user_id']) && function_exists('reporting_manager_at')) ? (reporting_manager_at((int)$h['created_by_user_id'], (int)$st['level']) ?: null) : null;
+            $role = '';
+        }
+        $out[] = pc_level_words(['level' => (int)$st['level'], 'approver_role' => $role, 'approver_user_id' => $uid, 'status' => 'PENDING'], $h);
+    }
+    return $out;
+}
+
 //  What the costing is waiting for now, in one line ('' when nothing is pending).
 function pc_waiting_words($h) {
     $st = (string)($h['status'] ?? '');

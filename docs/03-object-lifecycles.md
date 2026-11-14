@@ -373,6 +373,11 @@ stateDiagram-v2
   and on their dashboard until it is resubmitted (`pc_sendback_people()`, `pc_sent_back_for_me()`).
   A REJECTED costing is open for its preparer to revise, as before; resubmitting rebuilds every level,
   so all approve again. No status or transition is added.
+- **The levels are shown before submitting (owner, 14 Nov 2026: "Yes, show the levels before submitting
+  the costing").** A DRAFT or sent-back costing with roles shows "When submitted it goes to — value ₹…
+  before GST" and the levels with who holds each (`pc_preview_levels()`: the same steps
+  `pc_build_approvals()` writes, worked out without writing). It follows the value as roles change;
+  the levels are fixed at submission. A display only — no status or transition.
 - **Basis per role (owner, 14 Nov 2026: "Basis shall be per role").** Each role carries its own basis
   (`project_costing_lines.basis`: LONG man-month, DAILY man-day, FIXED lump sum); the costing's basis
   is the default for new roles and for roles saved before (blank). A role's cost heads, quantity, rate,

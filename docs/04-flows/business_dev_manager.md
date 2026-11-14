@@ -76,3 +76,5 @@ simply stands on the approved costing. An enquiry's received date cannot be late
 - **Each role has its own basis** — per man-month, per man-day or lump sum — so one costing can hold a man-month team and man-day specialists. The costing's basis is only the default for new roles.
 - **An approved costing is reopened only by the highest-level approver** — or, when they are away, the person they delegated their approvals to, or someone above them. Nobody else: not a colleague at the same level, not the Master Admin, never the person who prepared it.
 - **When a costing is sent back**, the preparer and everyone who had already approved it get an e-mail and a dashboard notice; after it is revised, every level approves it again.
+- **Before you submit a costing** the Approval box shows "When submitted it goes to" — its value before GST and each level with who holds it — so you know who will see it. It follows the value as you change roles.
+

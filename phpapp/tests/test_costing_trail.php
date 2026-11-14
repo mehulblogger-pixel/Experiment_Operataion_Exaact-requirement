@@ -71,7 +71,16 @@ try {
     t_ok(empty($g['has'][$BUTTON]) && !empty($g['has']['is offered once this costing is fully approved']), 'a draft: no "Create quotation" button for its author — the page says when it comes' . $said($g));
     t_ok(!empty($g['has']['Prepared</b> by Bina Pct']), 'the trail starts with who prepared it');
 
+    //  Owner, 14 Nov 2026: "show the levels before submitting the costing".
+    $preview = pc_preview_levels(pc_get($cid));
+    $g = $drive($BDM, 'project-costing', 'GET', ['id' => $cid], [], ['When submitted it goes to', 'all levels at the same time', e($preview[1] ?? 'x')]);
+    t_ok(!empty($g['has']['When submitted it goes to']) && !empty($g['has']['all levels at the same time']) && !empty($g['has'][e($preview[1] ?? 'x')]),
+        'before submitting, the costing shows the levels its value will need, by name, and how they sign: ' . implode(' / ', $preview));
     $s = $drive($BDM, 'project-costing-submit', 'POST', [], ['id' => $cid]);
+    $built = array_map(fn($st) => pc_level_words($st, pc_get($cid)), pc_steps($cid));
+    t_eq($built, $preview, '…and submitting creates exactly those levels — the preview never disagrees with the real thing');
+    $g = $drive($BDM, 'project-costing', 'GET', ['id' => $cid], [], ['When submitted it goes to']);
+    t_ok(empty($g['has']['When submitted it goes to']), 'once submitted, the preview gives way to the trail');
     t_ok(stripos($said($s), 'submitted for approval — 2 levels') !== false, 'the author submits — 2 levels, all at the same time: ' . $said($s));
     t_ok(strpos((string) ($trail()[1] ?? ''), 'Submitted for approval by Bina Pct — 2 levels, all at the same time') === 0, 'the trail records who submitted it, and how the levels sign');
     //  The names are whoever holds each level over this branch (the first three) — on a shared test
