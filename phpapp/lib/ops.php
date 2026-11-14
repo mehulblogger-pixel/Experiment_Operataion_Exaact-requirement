@@ -9502,6 +9502,16 @@ function ops_pending_tasks() {
         } catch (Throwable $e) { /* never let this take My Work down */ }
     }
 
+    // ---- Costings sent back (owner, 14 Nov 2026: "notification shall be sent to the Y"; "Dashboard and email")
+    //  The preparer: to revise it. Everyone who had approved it: it will come back to them. Until resubmitted.
+    if (function_exists('pc_sent_back_for_me')) {
+        $sb = pc_sent_back_for_me();
+        if ($sb['revise'])   $add(count($sb['revise']), '↩', count($sb['revise']) === 1 ? 'costing sent back — revise it' : 'costings sent back — revise them',
+            'sent back by an approver; open, revise and submit again', count($sb['revise']) === 1 ? '/project-costing?id=' . (int)$sb['revise'][0]['id'] : '/project-costings?status=REJECTED', 'bad');
+        if ($sb['approved']) $add(count($sb['approved']), '↩', count($sb['approved']) === 1 ? 'costing you approved was sent back' : 'costings you approved were sent back',
+            'being revised — it comes back to every level, yours included', count($sb['approved']) === 1 ? '/project-costing?id=' . (int)$sb['approved'][0]['id'] : '/project-costings?status=REJECTED', 'info');
+    }
+
     // ---- Approvals waiting on ME -------------------------------------------
     //  Owner, 12 Nov 2026 — "All the pending task like Project costing approval is
     //  not shown on the dashboard of the Branch manager or the approval hierarchy.

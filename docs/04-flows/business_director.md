@@ -27,3 +27,9 @@ its reference, if you type one) and any send-back with its reason are recorded t
 of this costing". "Create quotation" is not offered after your signature unless every level has
 signed — with "all levels at the same time" the others still sign. Nothing about who approves changed.
 
+### Project costing — 14 Nov 2026
+
+- **Settings are at the top** of a costing, four to a row: no scrolling to change Overhead, Negotiation or the default basis.
+- **Each role has its own basis** — per man-month, per man-day or lump sum — so one costing can hold a man-month team and man-day specialists. The costing's basis is only the default for new roles.
+- **An approved costing is reopened only by whoever gave the last approval**, someone at that level, their delegate, or someone above them — never by the person who prepared it.
+- **When a costing is sent back**, the preparer and everyone who had already approved it get an e-mail and a dashboard notice; after it is revised, every level approves it again.

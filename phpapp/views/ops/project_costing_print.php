@@ -42,7 +42,7 @@ $basisName = defined('PC_BASES') ? (PC_BASES[$basis] ?? $basis) : $basis;
 </div>
 
 <h1><?= $e($h['title']) ?></h1>
-<div class="sub"><?= $e($basisName) ?><?= !empty($h['site']) ? ' · '.$e($h['site']) : '' ?></div>
+<div class="sub">Default <?= $e($basisName) ?><?= !empty($h['site']) ? ' · '.$e($h['site']) : '' ?></div>
 
 <table class="meta">
   <tr><td class="k">Client</td><td><?= $e($client['display_name'] ?? $client['legal_name'] ?? '—') ?></td>
@@ -61,15 +61,16 @@ $basisName = defined('PC_BASES') ? (PC_BASES[$basis] ?? $basis) : $basis;
 <table class="grid">
   <thead><tr><th class="l">Role</th>
     <?php foreach ($shown as $hk=>$hl): ?><th title="<?= $e($hl) ?>"><?= $e($hl) ?></th><?php endforeach; ?>
-    <th>Direct/mo</th><th>Loaded/mo</th><th><?= $e($rateLabel) ?></th><th><?= $e($qtyLabel) ?></th><th>Revenue</th></tr></thead>
+    <th>Direct cost</th><th>Loaded cost</th><th>Rate</th><th>Qty</th><th>Revenue</th></tr></thead>
   <tbody>
   <?php $lastGrp = null; $ncol = count($shown) + 6; foreach ($lines as $ln): $c = pc_line_calc($ln, $h); $lh = $c['heads'];
     if (($ln['group_label'] ?? '') !== $lastGrp && ($ln['group_label'] ?? '') !== '') { $lastGrp = $ln['group_label']; echo '<tr class="grp"><td class="l" colspan="'.$ncol.'">'.$e($lastGrp).'</td></tr>'; } ?>
-    <tr><td class="l"><?= $e($ln['role_label']) ?></td>
+    <?php $lb = pc_line_basis($ln, $h); $bw = pc_basis_words($lb); //  each role in its own basis (14 Nov 2026) ?>
+    <tr><td class="l"><?= $e($ln['role_label']) ?><br><span class="muted" style="font-size:9px"><?= $e($lb === 'FIXED' ? 'lump sum' : $bw[0]) ?></span></td>
       <?php foreach ($shown as $hk=>$hl): ?><td><?= isset($lh[$hk]) ? number_format((float)$lh[$hk]) : '—' ?></td><?php endforeach; ?>
       <td><?= number_format($c['direct']) ?></td><td><?= number_format($c['loaded']) ?></td>
-      <td><?= number_format($c['proposed']) ?></td>
-      <td><?= $basis==='FIXED' ? '1' : number_format((float)$ln['boq_qty'], $basis==='DAILY'?0:1) ?></td>
+      <td><?= number_format($c['proposed']) ?><span class="muted" style="font-size:9px"><?= $e($bw[2]) ?></span></td>
+      <td><?= $lb==='FIXED' ? '1' : number_format((float)$ln['boq_qty'], $lb==='DAILY'?0:1) ?> <span class="muted" style="font-size:9px"><?= $e(strtolower($bw[1])) ?></span></td>
       <td><?= number_format($c['revenue']) ?></td></tr>
   <?php endforeach; ?>
   </tbody>
@@ -79,9 +80,9 @@ $basisName = defined('PC_BASES') ? (PC_BASES[$basis] ?? $basis) : $basis;
 </table>
 
 <?php // How each role's heads are worked out, with their remarks (owner, 9 Nov 2026).
-  $unitW = $basis === 'DAILY' ? 'per man-day' : ($basis === 'FIXED' ? 'per person' : 'per man-month');
   foreach ($lines as $ln): if (trim((string)($ln['spec'] ?? '')) === '' || !function_exists('ch_spec_of')) continue;
-    $sp = ch_spec_of($ln, $basis); $ev = ch_evaluate($sp['items'], ch_unit_for_basis($basis), $sp['dpm']);
+    $lb = pc_line_basis($ln, $h); $unitW = pc_basis_words($lb)[0];
+    $sp = ch_spec_of($ln, $lb); $ev = ch_evaluate($sp['items'], ch_unit_for_basis($lb), $sp['dpm']);
     $lbl = array_column($sp['items'], 'label', 'code'); ?>
   <div style="margin-top:14px;page-break-inside:avoid">
     <b><?= $e(trim(((string)$ln['group_label'] !== '' ? $ln['group_label'] . ' / ' : '') . $ln['role_label'])) ?></b>

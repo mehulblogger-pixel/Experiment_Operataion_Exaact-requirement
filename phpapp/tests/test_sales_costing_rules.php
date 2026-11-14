@@ -85,7 +85,7 @@ $r = $drive($MM, 'project-costing-to-quote', 'POST', [], ['id' => $cid]);
 $qid = (int) $pc($cid)['quote_id'];
 t_ok($qid > 0, 'from the approved costing a quotation is drafted: ' . $said($r));
 t_eq((int) ops_val("SELECT owner_id FROM quotations WHERE id=?", [$qid]), $MM, '…and belongs to the person who made it');
-$drive($MM, 'project-costing-reopen', 'POST', [], ['id' => $cid]);
+$drive($BD, 'project-costing-reopen', 'POST', [], ['id' => $cid]);   // 14 Nov 2026: the last approver reopens, not the preparer
 t_eq([$pc($cid)['status'], $pc($cid)['approved_by']], ['DRAFT', ''], 'reopening an approved costing withdraws its approval');
 $r = $drive($MM, 'quote-status', 'POST', ['id' => $qid], ['to' => 'SENT']);
 t_eq($st($qid), 'DRAFT', 'a man-month quotation whose costing is no longer approved cannot go to the customer');

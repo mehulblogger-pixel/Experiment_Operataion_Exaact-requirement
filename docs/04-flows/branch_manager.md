@@ -63,3 +63,10 @@ reads the company figure.
 date. You can reopen it — you hold `workforce.report.approve`, which is what the
 lock asks for — giving a reason and a number of days. A coordinator cannot: if the
 person who missed the deadline can undo it, there is no deadline.
+
+### Project costing — 14 Nov 2026
+
+- **Settings are at the top** of a costing, four to a row: no scrolling to change Overhead, Negotiation or the default basis.
+- **Each role has its own basis** — per man-month, per man-day or lump sum — so one costing can hold a man-month team and man-day specialists. The costing's basis is only the default for new roles.
+- **An approved costing is reopened only by whoever gave the last approval**, someone at that level, their delegate, or someone above them — never by the person who prepared it.
+- **When a costing is sent back**, the preparer and everyone who had already approved it get an e-mail and a dashboard notice; after it is revised, every level approves it again.

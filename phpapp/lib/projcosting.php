@@ -132,7 +132,13 @@ function pc_migrate() {
               ['project_costing_lines','spec',"TEXT"],
               // Owner, 12 Nov 2026 — which approval level a step came from, so a
               // change of approver reaches the costings already waiting.
-              ['project_costing_approvals','rule_id',"INT DEFAULT 0"]] as $c) {
+              ['project_costing_approvals','rule_id',"INT DEFAULT 0"],
+              // Owner, 14 Nov 2026 — "Basis shall be per role": a role's own basis
+              // (LONG / DAILY / FIXED); blank = the costing's default (older roles).
+              ['project_costing_lines','basis',"VARCHAR(16) DEFAULT ''"],
+              // Who signed a level, by id — so the one who gave the last approval (and
+              // those at or above that level) can be found, and told of a send-back.
+              ['project_costing_approvals','acted_by_id',"INT NULL"]] as $c) {
         if (function_exists('ensure_column')) ensure_column($c[0], $c[1], $c[2]);
     }
 }
@@ -287,8 +293,8 @@ function pc_can_act($h) {
 // Sign the level that is mine. Returns 'APPROVED' when nothing is left, else 'NEXT'.
 function pc_sign_level($h, $ref = '') {
     $id = (int)$h['id']; $lvl = pc_my_level($h) ?: pc_current_level($id); $me = current_user();
-    if ($lvl) db()->prepare("UPDATE project_costing_approvals SET status='APPROVED', acted_by=?, acted_at=?, remarks=? WHERE costing_id=? AND level=? AND status='PENDING'")
-        ->execute([user_name($me), date('c'), substr(trim((string)$ref), 0, 400), $id, $lvl]);
+    if ($lvl) db()->prepare("UPDATE project_costing_approvals SET status='APPROVED', acted_by=?, acted_by_id=?, acted_at=?, remarks=? WHERE costing_id=? AND level=? AND status='PENDING'")
+        ->execute([user_name($me), (int)($me['id'] ?? 0) ?: null, date('c'), substr(trim((string)$ref), 0, 400), $id, $lvl]);
     $refTxt = trim((string)$ref) !== '' ? ' · ref ' . trim((string)$ref) : '';
     if (pc_current_level($id)) {
         pc_trail($id, 'Level ' . $lvl . ' approved by ' . user_name($me) . $refTxt, pc_waiting_words(pc_get($id)));
@@ -323,6 +329,73 @@ function pc_waiting_words($h) {
     $open = pc_open_levels((int)$h['id']); $out = [];
     foreach (pc_steps((int)$h['id']) as $s) if ($s['status'] === 'PENDING' && in_array((int)$s['level'], $open, true)) $out[] = pc_level_words($s, $h);
     return $out ? 'Waiting for ' . implode('; ', $out) . '.' : 'Waiting for approval.';
+}
+
+//  WHO MAY REOPEN AN APPROVED COSTING (owner, 14 Nov 2026: "Costing once approved shall not be able to
+//  open as a draft by who has prepared it. It shall be only the highest authority who has last approved
+//  it" — and, for when that person is away: "Any one at Z level who is delegated his work or
+//  designation above Z"). Z = whoever gave the last approval. Allowed: Z; anyone who may sign Z's level
+//  (the same approval level, over this costing's branch); anyone Z has delegated quotation approvals to;
+//  anyone above Z in Z's reporting line; the Master Admin. Never the person who prepared it.
+//  (Once its quotation has gone for approval nobody may reopen it — pc_quote_lock_reason.)
+function pc_last_approval($h) {
+    $steps = pc_steps((int)$h['id']); $last = null;
+    foreach ($steps as $st) if ($st['status'] === 'APPROVED' && (!$last || (int)$st['level'] >= (int)$last['level'])) $last = $st;
+    if (!$last) return null;
+    $uid = (int)($last['acted_by_id'] ?? 0);
+    if (!$uid && trim((string)$last['acted_by']) !== '')               // signed before ids were kept: find by name
+        foreach (ops_all("SELECT * FROM users WHERE is_active=1") ?: [] as $u) if (user_name($u) === (string)$last['acted_by']) { $uid = (int)$u['id']; break; }
+    return ['step' => $last, 'user_id' => $uid];
+}
+function pc_reopeners($h) {
+    $out = [];                                                          // user id => why
+    $la = pc_last_approval($h); if (!$la) return $out;
+    $author = (int)($h['created_by_user_id'] ?? 0);
+    if ($la['user_id']) $out[$la['user_id']] = 'gave the last approval';
+    foreach (pc_step_people(['status' => 'PENDING'] + $la['step'], $h) as $u) $out[(int)$u['id']] = $out[(int)$u['id']] ?? 'at the same approval level';
+    if ($la['user_id'] && function_exists('appr_delegates_of'))
+        foreach (appr_delegates_of($la['user_id'], 'QUOTE', $h['office_id'] ?? null) as $d) $out[(int)$d] = $out[(int)$d] ?? 'covering for them';
+    if ($la['user_id'] && function_exists('reporting_chain'))
+        foreach (reporting_chain($la['user_id']) as $m) if (!empty($m['user_id'])) $out[(int)$m['user_id']] = $out[(int)$m['user_id']] ?? 'above them';
+    unset($out[$author]);
+    return $out;
+}
+function pc_can_reopen_approved($h) {
+    if ((string)($h['status'] ?? '') !== 'APPROVED') return true;
+    if (function_exists('is_master') && is_master()) return true;
+    $me = (int)(current_user()['id'] ?? 0);
+    if (!$me || $me === (int)($h['created_by_user_id'] ?? 0)) return false;
+    if (!pc_steps((int)$h['id'])) return pc_can_approve();              // approved before levels existed: the old approvers
+    return isset(pc_reopeners($h)[$me]);
+}
+function pc_reopen_who_words($h) {
+    $la = pc_last_approval($h);
+    $name = $la && $la['user_id'] ? user_name(ops_one("SELECT * FROM users WHERE id=?", [$la['user_id']]) ?: []) : ($la['step']['acted_by'] ?? 'the last approver');
+    return 'Only ' . ($name ?: 'the person who gave the last approval') . ' — or someone at that approval level, covering for them, or above them — may reopen an approved costing. The person who prepared it may not.';
+}
+//  SENT BACK — who is told (owner, 14 Nov 2026: "If Z rejects then it shall also open as a draft and
+//  notification shall be sent to the Y"; "Dashboard and email"). The preparer, to revise it, and every
+//  approver who had already signed this round, because it will come back to them.
+function pc_sendback_people($h) {
+    $ids = [];
+    if (!empty($h['created_by_user_id'])) $ids[(int)$h['created_by_user_id']] = 'prepared it';
+    foreach (pc_steps((int)$h['id']) as $st) if ($st['status'] === 'APPROVED') {
+        $uid = (int)($st['acted_by_id'] ?? 0);
+        if (!$uid) foreach (ops_all("SELECT * FROM users WHERE is_active=1") ?: [] as $u) if (user_name($u) === (string)$st['acted_by']) { $uid = (int)$u['id']; break; }
+        if ($uid) $ids[$uid] = $ids[$uid] ?? 'approved level ' . (int)$st['level'];
+    }
+    return $ids;
+}
+//  Dashboard: costings sent back that are mine to revise, or that I had approved (until resubmitted).
+function pc_sent_back_for_me() {
+    if (!pc_modules_live()) return ['revise' => [], 'approved' => []];
+    $me = (int)(current_user()['id'] ?? 0); $out = ['revise' => [], 'approved' => []];
+    if (!$me) return $out;
+    foreach (ops_all("SELECT * FROM project_costings WHERE status='REJECTED' ORDER BY updated_at DESC LIMIT 200") ?: [] as $h) {
+        if ((int)($h['created_by_user_id'] ?? 0) === $me) { $out['revise'][] = $h; continue; }
+        if (isset(pc_sendback_people($h)[$me])) $out['approved'][] = $h;
+    }
+    return $out;
 }
 
 // Costings waiting at a level the person signed in may sign (for Approvals).
@@ -389,6 +462,8 @@ function pc_all($limit = 200, array $f = []) {
         $like = '%' . $q . '%'; array_push($sa, $like, $like, $like, $like);
     }
     if (($f['link'] ?? '') === 'none') $sw .= " AND COALESCE(c.quote_id,0)=0";
+    //  One status, e.g. the dashboard's "costings sent back" (14 Nov 2026).
+    if (isset(PC_STATUS[(string)($f['status'] ?? '')])) { $sw .= " AND c.status=?"; $sa[] = (string)$f['status']; }
     return ops_all("SELECT c.*, COALESCE(p.display_name,p.legal_name) client_name, qq.quote_no, qq.rev quote_rev
                     FROM project_costings c LEFT JOIN business_partners p ON p.id=c.client_id
                     LEFT JOIN quotations qq ON qq.id=c.quote_id
@@ -465,8 +540,22 @@ function pc_unlinked($limit = 100, $for = 'quote', $clientId = 0) {
 
 // ---- The maths -------------------------------------------------------------
 // One line's numbers, given the header (for the loading %s and basis).
+//  A ROLE'S OWN BASIS (owner, 14 Nov 2026: "Basis shall be per role — long term deputation, man-day
+//  deputation or short term deputation"). Blank on roles saved before: they follow the costing's default.
+function pc_line_basis($line, $header) {
+    $b = strtoupper((string)($line['basis'] ?? ''));
+    if (isset(PC_BASES[$b])) return $b;
+    $d = strtoupper((string)($header['basis'] ?? 'LONG'));
+    return isset(PC_BASES[$d]) ? $d : 'LONG';
+}
+//  The costing as one role sees it — its own basis in place of the default.
+function pc_hl($header, $line) { $header['basis'] = pc_line_basis($line, $header); return $header; }
+function pc_basis_words($b) {
+    return ['LONG' => ['per man-month', 'Man-months', '/man-month', 'MONTH'], 'DAILY' => ['per man-day', 'Man-days', '/man-day', 'DAY'],
+            'FIXED' => ['per person', 'Units', '/lump', 'MONTH']][$b] ?? ['per man-month', 'Man-months', '/man-month', 'MONTH'];
+}
 function pc_line_calc($line, $header) {
-    $basis = (string)($header['basis'] ?? 'LONG');
+    $basis = pc_line_basis($line, $header);
     $ev = null;
     if (trim((string)($line['spec'] ?? '')) !== '' && function_exists('ch_evaluate')) {
         // A role built from flexible heads: worked out by the heads engine, in
@@ -605,7 +694,7 @@ function pc_make_quote($roll) {
     if (empty($lines)) return ['err' => 'Add at least one role first.'];
     try {
         $no = ops_next_code('quotations', 'quote_no', 'Q');
-        $sub = 0; $unit = pc_unit((string)$h['basis']);
+        $sub = 0;
         foreach ($lines as $ln) { $c = pc_line_calc($ln, $h); $sub += $c['revenue']; }
         $gstPct = 18; $gst = round($sub * $gstPct / 100, 2); $total = $sub + $gst;
         db()->prepare("INSERT INTO quotations (quote_no,rev,is_current,client_id,client_name,office_id,subject,site_location,
@@ -619,10 +708,11 @@ function pc_make_quote($roll) {
         $n = 0;
         foreach ($lines as $ln) {
             $c = pc_line_calc($ln, $h); $n++;
+            $lb = pc_line_basis($ln, $h); $unit = pc_unit($lb);   // each role in its own unit (14 Nov 2026)
             $desc = trim(((string)$ln['group_label'] !== '' ? $ln['group_label'] . ' — ' : '') . (string)$ln['role_label']);
             db()->prepare("INSERT INTO quote_lines (quote_id,line_no,description,order_type,qty,unit,rate,amount)
                            VALUES (?,?,?, 'LINE', ?,?,?,?)")
-                ->execute([$qid, $n, $desc, ($h['basis'] === 'FIXED' ? 1 : (float)$ln['boq_qty']), $unit, $c['proposed'], $c['revenue']]);
+                ->execute([$qid, $n, $desc, ($lb === 'FIXED' ? 1 : (float)$ln['boq_qty']), $unit, $c['proposed'], $c['revenue']]);
         }
         db()->prepare("UPDATE project_costings SET quote_id=? WHERE id=?")->execute([$qid, (int)$h['id']]);
         // The quotation belongs to the same enquiry, lead and business unit as
@@ -702,7 +792,7 @@ function pc_raise_hiring_request($cid, $lineId) {
     if ($left <= 0) return [false, 'All ' . pc_line_people($ln) . ' people for "' . $ln['role_label'] . '" are already asked for.', 0];
     $c = pc_line_calc($ln, $h);
     $q = pc_accepted_quote($h);
-    $basis = (string)$h['basis'];
+    $basis = pc_line_basis($ln, $h);
     $months = $basis === 'LONG' && (float)$ln['boq_qty'] > 0 ? round((float)$ln['boq_qty'] / pc_line_people($ln), 2) : null;
     $headsTxt = [];
     foreach ((array)$c['heads'] as $k => $v) $headsTxt[] = ($c['labels'][$k] ?? $k) . ': ' . number_format((float)$v);
@@ -739,12 +829,12 @@ function pc_requisition_from_hreq($rid, array $hr) {
     $c = pc_line_calc($ln, $h);
     $wage = (float)$c['pay'];          // the salary heads — what the person is paid
     $qty = (int)ops_val("SELECT quantity FROM requisitions WHERE id=?", [(int)$rid]) ?: 1;
-    $b = ['quantity' => $qty, 'billing_rate' => $c['proposed'], 'budgeted_cost' => $c['loaded'], 'rate_basis' => pc_req_basis((string)$h['basis'])];
+    $b = ['quantity' => $qty, 'billing_rate' => $c['proposed'], 'budgeted_cost' => $c['loaded'], 'rate_basis' => pc_req_basis(pc_line_basis($ln, $h))];
     $com = function_exists('req_commercials') ? req_commercials($b) : ['revenue' => 0, 'profit' => 0];
     try {
         db()->prepare("UPDATE requisitions SET costing_line_id=?, billing_rate=?, target_margin=?, budgeted_cost=?, rate_basis=?,
                        sourcing_model=?, cost_wage=?, cost_reimburse=?, cost_oneoff=?, expected_revenue=?, expected_profit=? WHERE id=?")
-            ->execute([$lineId, $c['proposed'], (float)$ln['target_margin'], $c['loaded'], pc_req_basis((string)$h['basis']),
+            ->execute([$lineId, $c['proposed'], (float)$ln['target_margin'], $c['loaded'], pc_req_basis(pc_line_basis($ln, $h)),
                        'OWN_PAYROLL', $wage, max(0, $c['direct'] - $wage), (float)$c['oneoff'],
                        (float)($com['revenue'] ?? 0), (float)($com['profit'] ?? 0), (int)$rid]);
     } catch (Throwable $e) {}
@@ -778,7 +868,7 @@ function pc_make_requisition($cid, $lineId) {
     try {
         $code = ops_next_code('requisitions', 'req_code', 'REQ');
         $b = ['quantity' => $people, 'billing_rate' => $c['proposed'], 'budgeted_cost' => $c['loaded'],
-              'rate_basis' => pc_req_basis((string)$h['basis'])];
+              'rate_basis' => pc_req_basis(pc_line_basis($ln, $h))];
         $com = function_exists('req_commercials') ? req_commercials($b) : ['revenue' => 0, 'profit' => 0, 'months' => 0];
         db()->prepare("INSERT INTO requisitions
             (req_code, office_id, client_id, designation, project_site, req_type, status, quantity,
@@ -788,7 +878,7 @@ function pc_make_requisition($cid, $lineId) {
             VALUES (?,?,?,?,?, 'NEW', 'OPEN', " . (int)$people . ", ?,?,?,?, 'OWN_PAYROLL', ?,?,?, ?,?,?,?,?)")
             ->execute([$code, (int)$h['office_id'] ?: null, (int)$h['client_id'] ?: null,
                 (string)$ln['role_label'], (string)$h['site'],
-                $c['proposed'], pc_req_basis((string)$h['basis']), (float)$ln['target_margin'], $c['loaded'],
+                $c['proposed'], pc_req_basis(pc_line_basis($ln, $h)), (float)$ln['target_margin'], $c['loaded'],
                 $wage, $reimb, (float)$c['oneoff'],
                 $com['revenue'], $com['profit'],
                 'From costing ' . $h['code'] . ' · ' . trim(((string)$ln['group_label'] !== '' ? $ln['group_label'] . ' / ' : '') . $ln['role_label']),
@@ -837,7 +927,7 @@ function pc_cand_check(array $cand, $ctcMonthly = null) {
     $src = 'given';
     if ($ctcMonthly === null) [$ctcMonthly, $src] = pc_cand_actual_ctc($cand);
     $c = pc_line_calc($ln, $h);
-    $basis = (string)$h['basis'];
+    $basis = pc_line_basis($ln, $h);
     $ev = $c['eval'] ?? null;
     $costedPS = $ev ? (float)$ev['by_grp']['PAY'] + (float)$ev['by_grp']['STAT']
                     : (float)($c['heads']['PERSONNEL'] ?? 0) + (float)($c['heads']['STATUTORY'] ?? 0);
@@ -905,10 +995,12 @@ function pc_line_from_post(array $p, array $h) {
         'rate_manual' => max(0, $num('rate_manual')), 'headcount' => max(1, (int)($p['headcount'] ?? 1)),
         'heads' => '{}', 'oneoff' => 0,
         'spec' => json_encode(['v' => 1, 'dpm' => $dpm, 'items' => $items], JSON_UNESCAPED_UNICODE),
+        //  The role's own basis, chosen on the role (14 Nov 2026); else the costing's default.
+        'basis' => isset(PC_BASES[strtoupper((string)($p['line_basis'] ?? ''))]) ? strtoupper((string)$p['line_basis']) : pc_line_basis([], $h),
     ];
     if ($line['role_label'] === '') $errs[] = 'Give the role a name.';
     if ($line['target_margin'] < 0 || $line['target_margin'] >= 100) $errs[] = 'The target margin must be from 0 up to (not including) 100%.';
-    $ev = ch_evaluate($items, ch_unit_for_basis((string)$h['basis']), $dpm);
+    $ev = ch_evaluate($items, ch_unit_for_basis($line['basis']), $dpm);
     foreach ($ev['errors'] as $m) $errs[] = $m;
     return [$line, array_values(array_unique($errs)), $ev];
 }
@@ -1095,18 +1187,18 @@ function pc_role_save(array $h, array $p) {
     if ($errs) {
         // Keep what was typed, so nothing has to be entered twice.
         $_SESSION['pc_line_draft'][$cid] = ['line_id' => $lineId, 'post' => array_intersect_key($p,
-            array_flip(['group_label', 'role_label', 'headcount', 'boq_qty', 'target_margin', 'rate_manual', 'dpm', 'items_json']))];
+            array_flip(['group_label', 'role_label', 'headcount', 'boq_qty', 'target_margin', 'rate_manual', 'dpm', 'items_json', 'line_basis']))];
         return ['errs' => $errs, 'line_id' => $lineId, 'role' => $line['role_label']];
     }
     $c = pc_line_calc($line, $h);
     $args = [$line['group_label'], $line['role_label'], json_encode($c['heads'], JSON_UNESCAPED_UNICODE), $line['boq_qty'],
-             $line['target_margin'], $line['rate_manual'], $c['oneoff'], $line['headcount'], $line['spec']];
+             $line['target_margin'], $line['rate_manual'], $c['oneoff'], $line['headcount'], $line['spec'], $line['basis']];
     if ($lineId) {
-        $pdo->prepare("UPDATE project_costing_lines SET group_label=?, role_label=?, heads=?, boq_qty=?, target_margin=?, rate_manual=?, oneoff=?, headcount=?, spec=? WHERE id=? AND costing_id=?")
+        $pdo->prepare("UPDATE project_costing_lines SET group_label=?, role_label=?, heads=?, boq_qty=?, target_margin=?, rate_manual=?, oneoff=?, headcount=?, spec=?, basis=? WHERE id=? AND costing_id=?")
             ->execute(array_merge($args, [$lineId, $cid]));
     } else {
         $seq = (int)ops_val("SELECT COALESCE(MAX(seq),0)+1 FROM project_costing_lines WHERE costing_id=?", [$cid]);
-        $pdo->prepare("INSERT INTO project_costing_lines (costing_id,seq,group_label,role_label,heads,boq_qty,target_margin,rate_manual,oneoff,headcount,spec,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
+        $pdo->prepare("INSERT INTO project_costing_lines (costing_id,seq,group_label,role_label,heads,boq_qty,target_margin,rate_manual,oneoff,headcount,spec,basis,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")
             ->execute(array_merge([$cid, $seq], $args, [date('c')]));
         $lineId = (int)$pdo->lastInsertId();
     }
@@ -1381,7 +1473,7 @@ function ops_projcosting($route, $method) {
             // From the rate the client pays: work back to the CTC, then build it.
             $h = pc_get((int)($_POST['costing_id'] ?? 0));
             if (!$h) { echo json_encode(['ok' => false, 'err' => 'Costing not found.']); return true; }
-            $b = pc_ctc_from_rate($_POST['rate'] ?? 0, $_POST['margin'] ?? 0, $h, $_POST['dpm'] ?? 0);
+            $b = pc_ctc_from_rate($_POST['rate'] ?? 0, $_POST['margin'] ?? 0, pc_hl($h, ['basis' => (string)($_POST['line_basis'] ?? '')]), $_POST['dpm'] ?? 0);
             if (!empty($b['err'])) { echo json_encode(['ok' => false, 'err' => $b['err']], JSON_UNESCAPED_UNICODE); return true; }
             $r = pc_heads_from_ctc($b['ctc']);
             if (empty($r['err'])) {
@@ -1511,9 +1603,23 @@ function ops_projcosting($route, $method) {
             $pdo->prepare("UPDATE project_costings SET status='REJECTED', reject_note=?, updated_at=? WHERE id=?")
                 ->execute([trim((string)($_POST['reject_note'] ?? '')), date('c'), $id]);
             pc_trail($id, ($lvl ? 'Level ' . $lvl . ': s' : 'S') . 'ent back by ' . user_name(current_user()), 'Reason: ' . trim((string)($_POST['reject_note'] ?? '')));
-            flash('Sent back with comments.', 'warning');
+            //  Tell the preparer (to revise) and everyone who had already approved it (it comes back to them).
+            $told = [];
+            foreach (pc_sendback_people($h) as $uid => $why) {
+                $u = ops_one("SELECT * FROM users WHERE id=? AND is_active=1", [(int)$uid]); if (!$u) continue;
+                $told[] = user_name($u);
+                if (trim((string)($u['email'] ?? '')) !== '' && function_exists('ops_mail'))
+                    ops_mail($u['email'], 'Costing ' . $h['code'] . ' sent back — to be revised',
+                        "Hello,\n\nProject costing {$h['code']} — {$h['title']} was sent back by " . user_name(current_user()) . ($lvl ? " at level $lvl" : '') . ".\n"
+                        . 'Reason: ' . trim((string)($_POST['reject_note'] ?? '')) . "\n\n"
+                        . ($why === 'prepared it' ? "It is open for you to revise and submit again.\n" : "You had approved it ($why). Once it is revised it comes back to every level, yours included.\n"), '', 'COSTING_APPROVAL');
+            }
+            if ($told) pc_trail($id, 'Told of the send-back: ' . implode(', ', $told));
+            flash('Sent back with comments.' . ($told ? ' ' . implode(', ', $told) . ' ' . (count($told) === 1 ? 'has' : 'have') . ' been told.' : ''), 'warning');
         } else { // reopen to draft — an approval is for the figures approved, so it goes
-            ops_require(pc_can_edit(), 'You cannot reopen this.');
+            //  An approved costing: only the last approver's level or above (14 Nov 2026); otherwise the editors, as before.
+            if ($h['status'] === 'APPROVED') ops_require(pc_can_reopen_approved($h), pc_reopen_who_words($h));
+            else ops_require(pc_can_edit(), 'You cannot reopen this.');
             $pdo->prepare("DELETE FROM project_costing_approvals WHERE costing_id=?")->execute([$id]);
             $pdo->prepare("UPDATE project_costings SET status='DRAFT', approved_by='', approved_at='', approval_ref='', updated_at=? WHERE id=?")->execute([date('c'), $id]);
             if ($h['status'] === 'APPROVED' && !empty($h['quote_id']) && function_exists('crm_log_change'))
@@ -1650,7 +1756,7 @@ function ops_projcosting($route, $method) {
     $inqs = ops_all("SELECT i.id, i.inquiry_no, i.client_name, i.subject FROM crm_inquiries i
                      WHERE COALESCE(i.status,'OPEN') <> 'DROPPED' AND $ow ORDER BY i.id DESC LIMIT 300", $oa) ?: [];
     $leads = function_exists('leads_all') ? (leads_try(fn() => leads_all(['status' => 'OPEN'], ' LIMIT 300'), []) ?: []) : [];
-    view('ops/project_costings', ['rows' => pc_all(200, ['q' => (string)($_GET['q'] ?? ''), 'link' => (string)($_GET['link'] ?? '')]),
+    view('ops/project_costings', ['rows' => pc_all(200, ['q' => (string)($_GET['q'] ?? ''), 'link' => (string)($_GET['link'] ?? ''), 'status' => (string)($_GET['status'] ?? '')]),
         'filter' => ['q' => (string)($_GET['q'] ?? ''), 'link' => (string)($_GET['link'] ?? '')],
         'clients' => function_exists('clients_list') ? clients_list() : [],
         'offices' => function_exists('offices_list') ? offices_list() : [],

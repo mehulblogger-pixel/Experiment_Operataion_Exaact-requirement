@@ -120,9 +120,12 @@ try {
 
     //  A costing that is not yet approved still refuses a quotation at the door, whoever asks.
     $pdo->prepare("UPDATE project_costings SET quote_id=NULL WHERE id=?")->execute([$cid]);
+    //  14 Nov 2026: the preparer may not reopen an approved costing; the last approver may.
     $ro = $drive($BDM, 'project-costing-reopen', 'POST', [], ['id' => $cid]);
-    t_ok(stripos($said($ro), 'reopened as draft') !== false, 'the author reopens it: ' . $said($ro));
-    t_ok(in_array('Reopened as draft by Bina Pct — its approval was withdrawn', $trail(), true), 'the trail records who reopened it and that its approval was withdrawn');
+    t_ok(stripos($said($ro), 'reopened as draft') === false && pc_get($cid)['status'] === 'APPROVED', 'its preparer may not reopen it: ' . $said($ro));
+    $ro = $drive($BD, 'project-costing-reopen', 'POST', [], ['id' => $cid]);
+    t_ok(stripos($said($ro), 'reopened as draft') !== false, 'the one who gave the last approval reopens it: ' . $said($ro));
+    t_ok(in_array('Reopened as draft by Dev Pct — its approval was withdrawn', $trail(), true), 'the trail records who reopened it and that its approval was withdrawn');
     $tq = $drive($BDM, 'project-costing-to-quote', 'POST', [], ['id' => $cid]);
     t_ok(stripos($said($tq), 'once this costing is approved') !== false && !(int) ops_val("SELECT quote_id FROM project_costings WHERE id=?", [$cid]),
         'pressed anyway on a draft (an old page): refused — the rule at the door is unchanged');

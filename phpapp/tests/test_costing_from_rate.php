@@ -71,8 +71,8 @@ try {
     t_ok(strpos($v, "localStorage.setItem('pc_ctc_mode',m)") !== false && strpos($v, "localStorage.getItem('pc_ctc_mode')") !== false,
         'the question last chosen is remembered — "Save settings" reloads the page and used to flip it back to "I know the CTC"');
     //  Owner, 13 Nov 2026 (SAL-176 11 & 12): "CTC is man-day only instead of man-month".
-    t_ok(strpos($v, "\$perDay = \$basis === 'DAILY'") !== false && strpos($v, 'id="pv_pay_m"') !== false && strpos($v, 'id="pv_direct_m"') !== false,
-        'a per-man-day costing shows the month beside the day salary and direct cost (only on a day sheet)');
+    t_ok(strpos($v, "\$perDay = \$lb === 'DAILY'") !== false && strpos($v, 'id="pv_pay_m"') !== false && strpos($v, 'id="pv_direct_m"') !== false,
+        'a per-man-day role shows the month beside the day salary and direct cost (only for a man-day role — the basis is per role from 14 Nov 2026)');
     t_ok(strpos($v, "money(Math.round(x[1]*dpm))+' a month'") !== false, '…worked at the "Working days in a month" typed on the page');
     $day = pc_ctc_from_rate(2800, 22, ['basis' => 'DAILY', 'overhead_pct' => 7.5, 'insurance_pct' => 0.5, 'contingency_pct' => 0.5, 'load_on' => 'COST'], 26);
     $back = pc_line_calc(['heads' => json_encode(['PERSONNEL' => $day['ctc'] / 26]), 'target_margin' => 22, 'boq_qty' => 1], ['basis' => 'DAILY', 'overhead_pct' => 7.5, 'insurance_pct' => 0.5, 'contingency_pct' => 0.5, 'load_on' => 'COST']);

@@ -70,3 +70,9 @@ quotation; on the revision's Costing card press **✎ Change the costing for thi
 editable copy ("… (revision 1)") to change and send for approval. A revision made for any other reason
 simply stands on the approved costing. An enquiry's received date cannot be later than today.
 
+### Project costing — 14 Nov 2026
+
+- **Settings are at the top** of a costing, four to a row: no scrolling to change Overhead, Negotiation or the default basis.
+- **Each role has its own basis** — per man-month, per man-day or lump sum — so one costing can hold a man-month team and man-day specialists. The costing's basis is only the default for new roles.
+- **An approved costing is reopened only by whoever gave the last approval**, someone at that level, their delegate, or someone above them — never by the person who prepared it.
+- **When a costing is sent back**, the preparer and everyone who had already approved it get an e-mail and a dashboard notice; after it is revised, every level approves it again.

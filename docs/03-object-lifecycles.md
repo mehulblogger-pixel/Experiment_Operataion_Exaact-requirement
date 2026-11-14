@@ -359,6 +359,23 @@ stateDiagram-v2
   is PENDING_APPROVAL, APPROVED, SENT, ACCEPTED or has a contract: `APPROVED → DRAFT` ("Reopen as
   draft") is refused and not offered, a DRAFT costing cannot be edited (`pc_locked()`), and it cannot be
   unlinked. Before that point nothing changed. The unlink lock of 13 Nov now also starts at approval.
+- **Who may reopen an approved costing, and the send-back (owner, 14 Nov 2026: "Costing once approved
+  shall not be able to open as a draft by who has prepared it. It shall be only the highest authority
+  who has last approved it" — "Any one at Z level who is delegated his work or designation above Z" —
+  "If Z rejects … notification shall be sent to the Y" — "Dashboard and email" — "Yes everyone
+  approves again").** `APPROVED → DRAFT` (reopen) is allowed only to whoever gave the last approval
+  (Z, kept by id: `project_costing_approvals.acted_by_id`), anyone who may sign Z's level over this
+  costing, anyone Z has delegated quotation approvals to, anyone above Z in Z's reporting line, and the
+  Master Admin — never the preparer (`pc_can_reopen_approved()`). `SUBMITTED → REJECTED` (send back)
+  now tells the preparer (to revise) and every approver who had already signed that round, by e-mail
+  and on their dashboard until it is resubmitted (`pc_sendback_people()`, `pc_sent_back_for_me()`).
+  A REJECTED costing is open for its preparer to revise, as before; resubmitting rebuilds every level,
+  so all approve again. No status or transition is added.
+- **Basis per role (owner, 14 Nov 2026: "Basis shall be per role").** Each role carries its own basis
+  (`project_costing_lines.basis`: LONG man-month, DAILY man-day, FIXED lump sum); the costing's basis
+  is the default for new roles and for roles saved before (blank). A role's cost heads, quantity, rate,
+  revenue, quotation line unit, hiring request and requisition all use the role's basis
+  (`pc_line_basis()`). Not a status — no lifecycle change.
 - **A revision gets its own editable costing — on demand (owner, 14 Nov 2026: "once the quote is
   revised for what so ever reason and is required to revise the costing it shall be editable").** A
   revision raised from a quotation whose costing is locked stands on that approved costing (so a

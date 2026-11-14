@@ -9,6 +9,8 @@ $sym = function_exists('cur_sym') ? cur_sym() : '₹';
 $locked = function_exists('pc_locked') && pc_locked($h);
 //  Locked by its quotation (owner, 14 Nov 2026): gone for approval, approved, sent, won or contracted.
 $qLock = function_exists('pc_quote_lock_reason') ? pc_quote_lock_reason($h) : '';
+//  Who may reopen (owner, 14 Nov 2026): an approved costing only by the last approver's level or above.
+$mayReopen = $h['status'] === 'APPROVED' ? (function_exists('pc_can_reopen_approved') && pc_can_reopen_approved($h)) : (function_exists('pc_can_edit') && pc_can_edit());
 $canEdit = function_exists('pc_can_edit') && pc_can_edit() && !$locked;
 // Approving follows the quotation levels (owner, 20 Oct 2026): the person who
 // may sign is the one the CURRENT level waits for, not anyone who may approve.
@@ -61,7 +63,7 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
 <div class="pc">
 <div class="master-head">
   <div><h1 style="margin:0"><?= $e($h['title']) ?> <span class="pill <?= $stTone[$h['status']] ?? 'p-mut' ?>"><?= $e(PC_STATUS[$h['status']] ?? $h['status']) ?></span></h1>
-    <p class="sub" style="margin:2px 0 0"><?= $e($h['code']) ?> · <?= $e(PC_BASES[$basis] ?? $basis) ?><?= !empty($h['site']) ? ' · '.$e($h['site']) : '' ?><?= !empty($h['sbu']) ? ' · ' . $e($sbuOpts[$h['sbu']] ?? $h['sbu']) : '' ?></p>
+    <p class="sub" style="margin:2px 0 0"><?= $e($h['code']) ?> · default <?= $e(PC_BASES[$basis] ?? $basis) ?><?= !empty($h['site']) ? ' · '.$e($h['site']) : '' ?><?= !empty($h['sbu']) ? ' · ' . $e($sbuOpts[$h['sbu']] ?? $h['sbu']) : '' ?></p>
     <p class="sub" style="margin:2px 0 0">For:
       <?php if ($forInq): ?><a href="/inquiry-edit?id=<?= (int)$forInq['id'] ?>">enquiry <?= $e($forInq['inquiry_no']) ?></a><?php endif; ?>
       <?php if ($forInq && $forLead): ?> · <?php endif; ?>
@@ -75,7 +77,7 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
       $revQ = !empty($h['quote_id']) ? ops_one("SELECT q.id, q.quote_no, q.rev FROM quotations q WHERE q.is_current=1 AND q.status IN ('DRAFT','REJECTED') AND (q.id=? OR q.parent_id=(SELECT COALESCE(NULLIF(parent_id,0),id) FROM quotations WHERE id=?) OR q.id=(SELECT COALESCE(NULLIF(parent_id,0),id) FROM quotations WHERE id=?)) ORDER BY q.rev DESC LIMIT 1", [(int)$h['quote_id'], (int)$h['quote_id'], (int)$h['quote_id']]) : null;
       if ($revQ && function_exists('pc_prices_quote') && pc_prices_quote($h, (int)$revQ['id']) && pc_can_edit() && pc_revise_problem((int)$revQ['id']) === ''): ?>
       <form method="post" action="/project-costing-revise" style="display:inline;margin-left:6px"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="quote_id" value="<?= (int)$revQ['id'] ?>"><button class="btn" style="padding:4px 10px">✎ Change the costing for <?= $e($revQ['quote_no']) ?> revision <?= (int)$revQ['rev'] ?></button></form>
-      <?php endif; ?><?php elseif ($canEdit===false && (pc_can_edit())): ?> <form method="post" action="/project-costing-reopen" style="display:inline"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="id" value="<?= (int)$h['id'] ?>"><button class="btn btn-ghost" style="padding:4px 10px">Reopen as draft</button></form><?php endif; ?></div><?php endif; ?>
+      <?php endif; ?><?php elseif ($canEdit===false && $mayReopen): ?> <form method="post" action="/project-costing-reopen" style="display:inline"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="id" value="<?= (int)$h['id'] ?>"><button class="btn btn-ghost" style="padding:4px 10px">Reopen as draft</button></form><?php endif; ?></div><?php endif; ?>
 <?php if ($h['status']==='SUBMITTED' && function_exists('pc_waiting_words')): ?><div class="lockmsg" style="background:var(--warn-soft,#fff6e5)">⏳ <?= $e(pc_waiting_words($h)) ?></div><?php endif; ?>
 <?php if ($h['status']==='REJECTED' && !empty($h['reject_note'])): ?><div class="lockmsg" style="background:var(--bad-soft,#fdecec)">↩ Sent back: <?= $e($h['reject_note']) ?></div><?php endif; ?>
 
@@ -85,6 +87,59 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
   <div class="kpi"><span class="kic">🧮</span><div class="k">Project cost</div><div class="v"><?= fmoney_short($T['cost']) ?></div><div class="d">Manpower + loadings</div></div>
   <div class="kpi <?= $T['profit']>=0?'tone-ok':'tone-bad' ?>"><span class="kic">💰</span><div class="k">Project profit</div><div class="v"><?= fmoney_short($T['profit']) ?></div><div class="d">Revenue − cost</div></div>
   <div class="kpi <?= $T['margin']>=0?'tone-ok':'tone-bad' ?>"><span class="kic">📈</span><div class="k">Margin</div><div class="v"><?= number_format($T['margin'],1) ?>%</div><div class="d">Profit as a share of revenue</div></div>
+</div>
+
+<?php //  SETTINGS AT THE TOP (owner, 14 Nov 2026: "This details on project costing page shall be at the
+      //  top and three to four boxes in one row … reduce the efforts to scroll down the screen to change
+      //  the variables"). Same fields, same save; four to a row on a laptop, two on a tablet, one on a phone.
+      //  Basis here is now the DEFAULT for new roles — each role keeps its own (owner: "Basis shall be per role"). ?>
+<style>
+  .pc-set{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 14px}
+  .pc-set .ff{margin:0;min-width:0}
+  .pc-set .w2{grid-column:span 2}
+  .pc-set .w3{grid-column:span 3}
+  .pc-set .w4{grid-column:1 / -1}
+  .pc-set label{font-size:12px}
+  @media (max-width:980px){.pc-set{grid-template-columns:repeat(2,minmax(0,1fr))}.pc-set .w2,.pc-set .w3{grid-column:1 / -1}}
+  @media (max-width:560px){.pc-set{grid-template-columns:1fr}}
+</style>
+<div class="panel" id="pc-settings-panel">
+  <h3 class="tab-sub" style="margin-top:0">Settings <span class="muted" style="font-weight:400;font-size:12.5px">— loadings, default basis and details</span></h3>
+  <?php if ($canEdit): ?>
+  <form method="post" action="/project-costing-save" id="pcSettings">
+    <input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="id" value="<?= (int)$h['id'] ?>">
+    <div class="pc-set">
+      <div class="ff w2"><label for="pcs-title">Title</label><input class="form-control" id="pcs-title" name="title" value="<?= $e($h['title']) ?>"></div>
+      <div class="ff"><label for="pcs-client">Client</label><select class="form-control" id="pcs-client" name="client_id"><option value="">—</option>
+        <?php foreach ($clients as $c): ?><option value="<?= (int)$c['id'] ?>" <?= (int)$h['client_id']===(int)$c['id']?'selected':'' ?>><?= $e($c['display_name'] ?? $c['legal_name'] ?? ('#'.$c['id'])) ?></option><?php endforeach; ?></select></div>
+      <div class="ff"><label for="pcs-office">Office</label><select class="form-control" id="pcs-office" name="office_id"><option value="">—</option>
+        <?php foreach ($offices as $o): ?><option value="<?= (int)$o['id'] ?>" <?= (int)$h['office_id']===(int)$o['id']?'selected':'' ?>><?= $e($o['name']) ?></option><?php endforeach; ?></select></div>
+      <div class="ff"><label for="pcs-site">Site</label><input class="form-control" id="pcs-site" name="site" value="<?= $e($h['site']) ?>"></div>
+      <div class="ff"><label for="pcs-sbu">Business unit <span class="muted">— which SBU Head approves</span></label><select class="form-control" id="pcs-sbu" name="sbu"><option value="">—</option>
+        <?php foreach ($sbuOpts as $k=>$v): ?><option value="<?= $e($k) ?>" <?= (string)($h['sbu'] ?? '')===(string)$k?'selected':'' ?>><?= $e($v) ?></option><?php endforeach; ?></select></div>
+      <div class="ff"><label for="pcs-basis">Default basis <span class="muted">— for new roles</span></label><select class="form-control" id="pcs-basis" name="basis"><?php foreach (PC_BASES as $k=>$v): ?><option value="<?= $e($k) ?>" <?= $basis===$k?'selected':'' ?>><?= $e($v) ?></option><?php endforeach; ?></select></div>
+      <div class="ff"><label for="pcs-loadon">Loadings applied on</label><select class="form-control" id="pcs-loadon" name="load_on"><option value="COST" <?= strtoupper((string)$h['load_on'])!=='RATE'?'selected':'' ?>>Direct cost (standard)</option><option value="RATE" <?= strtoupper((string)$h['load_on'])==='RATE'?'selected':'' ?>>Sell rate (Excel-style)</option></select></div>
+      <div class="ff"><label for="pcs-oh">Overhead %</label><input class="form-control" id="pcs-oh" type="number" step="0.01" name="overhead_pct" value="<?= $e($h['overhead_pct']) ?>"></div>
+      <div class="ff"><label for="pcs-ins">Insurance %</label><input class="form-control" id="pcs-ins" type="number" step="0.01" name="insurance_pct" value="<?= $e($h['insurance_pct']) ?>"></div>
+      <div class="ff"><label for="pcs-bd">Bad debt %</label><input class="form-control" id="pcs-bd" type="number" step="0.01" name="baddebt_pct" value="<?= $e($h['baddebt_pct']) ?>"></div>
+      <div class="ff"><label for="pcs-cont">Contingency %</label><input class="form-control" id="pcs-cont" type="number" step="0.01" name="contingency_pct" value="<?= $e($h['contingency_pct']) ?>"></div>
+      <div class="ff"><label for="pcs-neg">Negotiation %</label><input class="form-control" id="pcs-neg" type="number" step="0.01" name="negotiation_pct" value="<?= $e($h['negotiation_pct']) ?>"></div>
+      <div class="ff w3"><label for="pcs-notes">Notes</label><input class="form-control" id="pcs-notes" name="notes" value="<?= $e($h['notes']) ?>"></div>
+      <div class="ff w2"><label for="pcs-inc">Inclusions</label><textarea class="form-control" id="pcs-inc" name="inclusions" rows="2"><?= $e($h['inclusions']) ?></textarea></div>
+      <div class="ff w2"><label for="pcs-exc">Exclusions <span class="muted">— "Not included…"</span></label><textarea class="form-control" id="pcs-exc" name="exclusions" rows="2"><?= $e($h['exclusions']) ?></textarea></div>
+    </div>
+    <div style="margin-top:10px"><button class="btn" type="submit">Save settings</button>
+      <span class="muted" style="font-size:12px;margin-left:8px">Also saves a role you are typing below — nothing on this page is lost.</span></div>
+  </form>
+  <?php else: ?>
+    <div class="pc-set" style="font-size:13px">
+      <div><span class="muted">Default basis</span><br><?= $e(PC_BASES[$basis] ?? $basis) ?></div>
+      <div><span class="muted">Loadings on</span><br><?= strtoupper((string)$h['load_on'])==='RATE' ? 'Sell rate' : 'Direct cost' ?></div>
+      <div class="w2"><span class="muted">Loadings</span><br>Overhead <?= $e($h['overhead_pct']) ?>% · Insurance <?= $e($h['insurance_pct']) ?>% · Bad debt <?= $e($h['baddebt_pct']) ?>% · Contingency <?= $e($h['contingency_pct']) ?>% · Negotiation <?= $e($h['negotiation_pct']) ?>%</div>
+      <?php if (!empty($h['inclusions'])): ?><div class="w2"><span class="muted">Inclusions</span><br><?= nl2br($e($h['inclusions'])) ?></div><?php endif; ?>
+      <?php if (!empty($h['exclusions'])): ?><div class="w2"><span class="muted">Exclusions</span><br><?= nl2br($e($h['exclusions'])) ?></div><?php endif; ?>
+    </div>
+  <?php endif; ?>
 </div>
 
 <?php // Why the figures can read ₹0. The totals are built up from the team roles
@@ -110,17 +165,18 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
   <table class="grid">
     <thead><tr><th>Role</th>
       <?php foreach ($shownHeads as $hk=>$hl): ?><th class="num" title="<?= $e($hl) ?>"><?= $e(mb_strimwidth($hl,0,10,'…')) ?></th><?php endforeach; ?>
-      <th class="num">Direct/mo</th><th class="num">Loaded/mo</th><th class="num">Rate<?= $e($rateLabel) ?></th><th class="num"><?= $e($qtyLabel) ?></th><th class="num">Revenue</th><th class="num">Profit</th><th class="num">Margin</th><?php if ($canEdit): ?><th></th><?php endif; ?></tr></thead>
+      <th class="num">Direct cost</th><th class="num">Loaded cost</th><th class="num">Rate</th><th class="num">Qty</th><th class="num">Revenue</th><th class="num">Profit</th><th class="num">Margin</th><?php if ($canEdit): ?><th></th><?php endif; ?></tr></thead>
     <tbody>
     <?php $lastGrp = null; foreach ($lines as $ln): $c = pc_line_calc($ln, $h); $lh = $c['heads'];
       if (($ln['group_label'] ?? '') !== $lastGrp && ($ln['group_label'] ?? '') !== '') { $lastGrp = $ln['group_label']; echo '<tr><td colspan="'.$nCols.'" class="grp">'.$e($lastGrp).'</td></tr>'; } ?>
       <tr>
-        <td><b><?= $e($ln['role_label']) ?></b></td>
+        <?php $lb = pc_line_basis($ln, $h); $bw = pc_basis_words($lb); //  each role in its own basis (14 Nov 2026) ?>
+        <td><b><?= $e($ln['role_label']) ?></b><br><span class="muted" style="font-size:11px"><?= $e($lb === 'FIXED' ? 'lump sum' : $bw[0]) ?></span></td>
         <?php foreach ($shownHeads as $hk=>$hl): ?><td class="num"><?= isset($lh[$hk]) ? number_format((float)$lh[$hk]) : '<span class="muted">—</span>' ?></td><?php endforeach; ?>
-        <td class="num"><?= number_format($c['direct']) ?></td>
-        <td class="num"><?= number_format($c['loaded']) ?></td>
-        <td class="num"><b><?= number_format($c['proposed']) ?></b><?= (float)$ln['target_margin']>0 && (float)$ln['rate_manual']<=0 ? '<br><span class="muted" style="font-size:10px">@'.rtrim(rtrim(number_format((float)$ln['target_margin'],1),'0'),'.').'% marg</span>' : '' ?></td>
-        <td class="num"><?= $basis==='FIXED' ? '1' : number_format((float)$ln['boq_qty'],($basis==='DAILY'?0:1)) ?><?= (float)$ln['oneoff']>0 ? '<br><span class="muted" style="font-size:10px">+'.fmoney_short($ln['oneoff']).' 1-off</span>' : '' ?></td>
+        <td class="num"><?= number_format($c['direct']) ?><span class="muted" style="font-size:10px"><?= $e($bw[2]) ?></span></td>
+        <td class="num"><?= number_format($c['loaded']) ?><span class="muted" style="font-size:10px"><?= $e($bw[2]) ?></span></td>
+        <td class="num"><b><?= number_format($c['proposed']) ?></b><span class="muted" style="font-size:10px"><?= $e($bw[2]) ?></span><?= (float)$ln['target_margin']>0 && (float)$ln['rate_manual']<=0 ? '<br><span class="muted" style="font-size:10px">@'.rtrim(rtrim(number_format((float)$ln['target_margin'],1),'0'),'.').'% marg</span>' : '' ?></td>
+        <td class="num"><?= $lb==='FIXED' ? '1' : number_format((float)$ln['boq_qty'],($lb==='DAILY'?0:1)) ?> <span class="muted" style="font-size:10px"><?= $e(strtolower($bw[1])) ?></span><?= (float)$ln['oneoff']>0 ? '<br><span class="muted" style="font-size:10px">+'.fmoney_short($ln['oneoff']).' 1-off</span>' : '' ?></td>
         <td class="num"><?= fmoney_short($c['revenue']) ?></td>
         <td class="num" style="color:var(--<?= $c['profit']>=0?'ok':'bad' ?>)"><?= fmoney_short($c['profit']) ?></td>
         <td class="num"><?= number_format($c['margin'],1) ?>%</td>
@@ -155,7 +211,7 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
         <span class="muted" style="font-size:12px">A quotation was generated from this costing.</span>
       <?php elseif ($h['status'] === 'APPROVED'): ?>
         <form method="post" action="/project-costing-to-quote"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="id" value="<?= (int)$h['id'] ?>"><button class="btn primary">📝 Create quotation</button></form>
-        <span class="muted" style="font-size:12px">One quote line per role, priced at the proposed rate × <?= $e(strtolower($qtyLabel)) ?>.</span>
+        <span class="muted" style="font-size:12px">One quote line per role, priced at its rate × its quantity (man-months, man-days or one lump sum).</span>
       <?php else: //  Owner, 13 Nov 2026: the button showed at every stage — after each level's signature,
                   //  to the author and every approver — and was refused when pressed. It is offered only
                   //  once the costing is fully approved; until then, what it waits for. ?>
@@ -177,7 +233,7 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
     <p class="sub" style="margin:0 0 8px">Quotation <b><?= $e($accQ['quote_no'] ?? '') ?></b> was accepted by the client. Raise a hiring request for each role — it goes through your hiring-request approvals, and its requisition takes this costing's rate and margin as its budget.</p>
   <?php endif; ?>
   <div class="scroll"><table class="grid" style="font-size:12.5px">
-    <thead><tr><th>Role</th><th class="num">People</th><th class="num">Rate<?= $e($rateLabel) ?></th><th class="num">Loaded/mo</th><th>Raised</th><th>Last candidate vs costing</th><th></th></tr></thead>
+    <thead><tr><th>Role</th><th class="num">People</th><th class="num">Rate</th><th class="num">Loaded cost</th><th>Raised</th><th>Last candidate vs costing</th><th></th></tr></thead>
     <tbody>
     <?php foreach ($lines as $ln): $c = pc_line_calc($ln, $h);
           $ppl = function_exists('pc_line_people') ? pc_line_people($ln) : 1;
@@ -230,17 +286,19 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
   if ($draft) {
     $f = $draft['post']; $initItems = json_decode((string)($f['items_json'] ?? '[]'), true) ?: [];
   } elseif ($editLn) {
-    $sp = ch_spec_of($editLn, $basis); $initItems = $sp['items'];
+    $sp = ch_spec_of($editLn, pc_line_basis($editLn, $h)); $initItems = $sp['items'];
     $f = ['group_label' => $editLn['group_label'], 'role_label' => $editLn['role_label'], 'headcount' => $editLn['headcount'] ?? 1,
           'boq_qty' => $editLn['boq_qty'], 'target_margin' => $editLn['target_margin'], 'rate_manual' => $editLn['rate_manual'], 'dpm' => $sp['dpm']];
   } else {
-    $initItems = []; $f = ['headcount' => 1, 'boq_qty' => $basis === 'FIXED' ? 1 : '', 'dpm' => $dpmDefault];
+    $initItems = []; $f = ['headcount' => 1, 'boq_qty' => pc_line_basis([], $h) === 'FIXED' ? 1 : '', 'dpm' => $dpmDefault];
   }
+  //  The role's own basis (owner, 14 Nov 2026): typed draft, else the role being edited, else the costing's default.
+  $lb = isset(PC_BASES[strtoupper((string)($f['line_basis'] ?? ''))]) ? strtoupper((string)$f['line_basis']) : ($editLn ? pc_line_basis($editLn, $h) : pc_line_basis([], $h));
   $fv = fn($k) => $e($f[$k] ?? '');
   $num0 = fn($k) => (float)($f[$k] ?? 0) == 0 ? '' : $e($f[$k]);
   $libJs = []; foreach ($chLib as $code => $r) { $it = ch_library_item($code); if ($it) $libJs[] = $it + ['statutory' => (int)$r['statutory']]; }
   $tplJs = []; foreach ($chTpls as $t) $tplJs[] = ['id' => (int)$t['id'], 'name' => $t['name'], 'note' => $t['note'], 'items' => ch_template_items((int)$t['id'])];
-  $unitWord = $basis === 'DAILY' ? 'per man-day' : ($basis === 'FIXED' ? 'per person' : 'per man-month');
+  [$unitWord, $qtyLabel, $rateLabel] = pc_basis_words($lb);
 ?>
 <style>
   .che{margin-top:6px}
@@ -300,6 +358,7 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
   .che .totals{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:10px}
   .che .totals div{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;font-weight:700}
   .che .totals b{display:block;font-size:16px;color:var(--ink);text-transform:none;letter-spacing:0;font-variant-numeric:tabular-nums}
+  .che .totals .pv-m[hidden],.che .totals [data-bw][hidden]{display:none}
   .che .totals .pv-m{display:block;font-size:12px;font-weight:600;color:var(--muted);text-transform:none;letter-spacing:0;font-variant-numeric:tabular-nums;margin-top:2px}
   .che .errs{display:none;margin:8px 0}
   .che .empty{border:1px dashed var(--line);border-radius:10px;padding:16px;text-align:center;color:var(--muted);font-size:13px}
@@ -327,6 +386,9 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
       <div class="ff"><label for="ch_grp">Group <span class="muted">optional</span></label><input class="form-control" id="ch_grp" name="group_label" value="<?= $fv('group_label') ?>" placeholder="e.g. Module / Cell"></div>
       <div class="ff ff-wide"><label for="ch_role">Role</label><input class="form-control" id="ch_role" name="role_label" required value="<?= $fv('role_label') ?>" placeholder="e.g. Shift Engineer"></div>
       <div class="ff"><label for="ch_ppl">People <span class="muted">for this role</span></label><input class="form-control" id="ch_ppl" type="number" min="1" step="1" name="headcount" value="<?= $fv('headcount') ?: 1 ?>"></div>
+      <?php //  Each role has its own basis (owner, 14 Nov 2026: "Basis shall be per role"). ?>
+      <div class="ff"><label for="ch_basis">Basis <span class="muted">for this role</span></label><select class="form-control" id="ch_basis" name="line_basis">
+        <?php foreach (PC_BASES as $k => $v): ?><option value="<?= $e($k) ?>" <?= $lb === $k ? 'selected' : '' ?>><?= $e($v) ?></option><?php endforeach; ?></select></div>
       <div class="ff"><label for="ch_dpm">Working days in a month</label><input class="form-control" id="ch_dpm" type="number" min="1" max="31" step="0.5" name="dpm" value="<?= $fv('dpm') ?: $e($dpmDefault) ?>" title="Turns per-day heads into a month, and monthly heads into a day rate"></div>
     </div>
 
@@ -342,7 +404,7 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
       </div>
       <div class="ctcq-f">
         <label data-ctc-mode="ctc">CTC per person, a month (<?= $e($sym) ?>)<input id="ch_ctc" type="number" min="0" step="any" inputmode="decimal" placeholder="e.g. 45000"></label>
-        <label data-ctc-mode="rate" hidden>Rate the <?= $e(Tl('client')) ?> pays, <?= $e($basis === 'FIXED' ? 'for the job' : $unitWord) ?> (<?= $e($sym) ?>)<input id="ch_ctc_rate" type="number" min="0" step="any" inputmode="decimal" placeholder="e.g. 66000"></label>
+        <label data-ctc-mode="rate" hidden>Rate the <?= $e(Tl('client')) ?> pays, <span data-bw="job"><?= $e($lb === 'FIXED' ? 'for the job' : $unitWord) ?></span> (<?= $e($sym) ?>)<input id="ch_ctc_rate" type="number" min="0" step="any" inputmode="decimal" placeholder="e.g. 66000"></label>
         <label>Margin you want (%)<input id="ch_ctc_tm" type="number" min="0" max="99.9" step="0.1" inputmode="decimal" placeholder="e.g. 22" value="<?= $num0('target_margin') ?>"></label>
         <button type="button" class="btn" id="ch_ctc_go">Build the salary break-up</button>
       </div>
@@ -350,7 +412,7 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
     </div>
     <?php endif; ?>
 
-    <p class="sub" style="margin:14px 0 6px">Cost heads — <b><?= $e($sym) ?> <?= $e($unitWord) ?></b>. Each head can be an amount, a % of other heads, quantity × rate or a formula, entered per month, per day, per year or one time. Names can be changed freely — a % keeps pointing at the right head.</p>
+    <p class="sub" style="margin:14px 0 6px">Cost heads — <b><?= $e($sym) ?> <span data-bw="unit"><?= $e($unitWord) ?></span></b>. Each head can be an amount, a % of other heads, quantity × rate or a formula, entered per month, per day, per year or one time. Names can be changed freely — a % keeps pointing at the right head.</p>
     <div class="addbar">
       <?php if ($tplJs): ?><select id="ch_tpl" aria-label="Start from a template"><option value="">Start from a template…</option><?php foreach ($tplJs as $t): ?><option value="<?= (int)$t['id'] ?>"><?= $e($t['name']) ?> (<?= count($t['items']) ?> heads)</option><?php endforeach; ?></select><?php endif; ?>
       <select id="ch_lib" aria-label="Add a head from the library"><option value="">＋ Add a head from the library…</option>
@@ -360,26 +422,26 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
       <button type="button" class="btn secondary" id="ch_blank">＋ Blank head</button>
       <?php if ($chManage): ?><a href="/project-costing-heads" class="muted" style="font-size:12.5px">Manage the library &amp; templates →</a><?php endif; ?>
     </div>
-    <div class="ch-head" aria-hidden="true"><span></span><span>Head</span><span>Group</span><span>How</span><span>Value</span><span>Entered</span><span style="text-align:right"><?= $e($unitWord) ?></span><span></span></div>
+    <div class="ch-head" aria-hidden="true"><span></span><span>Head</span><span>Group</span><span>How</span><span>Value</span><span>Entered</span><span style="text-align:right" data-bw="unit"><?= $e($unitWord) ?></span><span></span></div>
     <div id="ch_rows"></div>
     <div class="empty" id="ch_empty">No heads yet — <?= $tplJs ? 'start from a template, ' : '' ?>add heads from the library, or a blank head.</div>
     <noscript><div class="msg msg-warning">The heads editor needs JavaScript switched on in your browser.</div></noscript>
     <div class="msg msg-error errs" id="ch_errs" role="alert"></div>
 
     <div class="form-grid" style="margin-top:12px">
-      <div class="ff"><label for="pc_boq"><?= $e($qtyLabel) ?> (BOQ) <span class="muted">all people together</span></label><input class="form-control" type="number" step="0.01" min="0" id="pc_boq" name="boq_qty" value="<?= $fv('boq_qty') ?>"></div>
+      <div class="ff"><label for="pc_boq"><span data-bw="qty"><?= $e($qtyLabel) ?></span> (BOQ) <span class="muted">all people together</span></label><input class="form-control" type="number" step="0.01" min="0" id="pc_boq" name="boq_qty" value="<?= $fv('boq_qty') ?>"></div>
       <div class="ff"><label for="pc_tm">Target margin (%) <span class="muted">sets the rate</span></label><input class="form-control" type="number" step="0.1" min="0" max="99.9" id="pc_tm" name="target_margin" value="<?= $num0('target_margin') ?>" placeholder="e.g. 22"></div>
-      <div class="ff"><label for="pc_rate">…or fixed rate<?= $e($rateLabel) ?> <span class="muted">override</span></label><input class="form-control" type="number" step="0.01" min="0" id="pc_rate" name="rate_manual" value="<?= $num0('rate_manual') ?>" placeholder="overrides margin"></div>
+      <div class="ff"><label for="pc_rate">…or fixed rate<span data-bw="rate"><?= $e($rateLabel) ?></span> <span class="muted">override</span></label><input class="form-control" type="number" step="0.01" min="0" id="pc_rate" name="rate_manual" value="<?= $num0('rate_manual') ?>" placeholder="overrides margin"></div>
     </div>
     <div class="totals" aria-live="polite">
       <?php //  Owner, 13 Nov 2026 (SAL-176): on a per-man-day costing "CTC is man-day only instead of man-month".
             //  A day sheet works in man-days, but a salary is thought of by the month — so a day figure
             //  also shows what it comes to in a month, at the working days typed on the page. ?>
-      <?php $perDay = $basis === 'DAILY'; ?>
-      <div>Salary<?= $perDay ? ' /man-day' : '' ?><b id="pv_pay">—</b><?php if ($perDay): ?><small class="pv-m" id="pv_pay_m"></small><?php endif; ?></div>
-      <div>Direct cost<?= $perDay ? ' /man-day' : '' ?><b id="pv_direct">—</b><?php if ($perDay): ?><small class="pv-m" id="pv_direct_m"></small><?php endif; ?></div>
-      <div>Loaded cost<?= $perDay ? ' /man-day' : '' ?><b id="pv_loaded">—</b></div>
-      <div>One-time / person<b id="pv_once">—</b></div><div>Rate<?= $e($rateLabel) ?><b id="pv_rate">—</b></div><div>Revenue<b id="pv_rev">—</b></div><div>Margin<b id="pv_marg">—</b></div>
+      <?php $perDay = $lb === 'DAILY'; //  the month lines are drawn always and shown only for a man-day role ?>
+      <div>Salary<span data-bw="pd"<?= $perDay ? '' : ' hidden' ?>> /man-day</span><b id="pv_pay">—</b><small class="pv-m" id="pv_pay_m"<?= $perDay ? '' : ' hidden' ?>></small></div>
+      <div>Direct cost<span data-bw="pd"<?= $perDay ? '' : ' hidden' ?>> /man-day</span><b id="pv_direct">—</b><small class="pv-m" id="pv_direct_m"<?= $perDay ? '' : ' hidden' ?>></small></div>
+      <div>Loaded cost<span data-bw="pd"<?= $perDay ? '' : ' hidden' ?>> /man-day</span><b id="pv_loaded">—</b></div>
+      <div>One-time / person<b id="pv_once">—</b></div><div>Rate<span data-bw="rate"><?= $e($rateLabel) ?></span><b id="pv_rate">—</b></div><div>Revenue<b id="pv_rev">—</b></div><div>Margin<b id="pv_marg">—</b></div>
     </div>
     <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <button class="btn" type="submit"><?= $editLn ? 'Save role' : 'Add role' ?></button>
@@ -508,13 +570,20 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
   rowsEl.addEventListener('toggle',function(ev){ if(ev.target.classList&&ev.target.classList.contains('ofd')&&ev.target.open) rowsEl.querySelectorAll('.ofd[open]').forEach(function(o){ if(o!==ev.target) o.open=false; }); },true);
   document.addEventListener('click',function(ev){ rowsEl.querySelectorAll('.ofd[open]').forEach(function(o){ if(!o.contains(ev.target)) o.open=false; }); });
   document.addEventListener('keydown',function(ev){ if(ev.key==='Escape') rowsEl.querySelectorAll('.ofd[open]').forEach(function(o){ o.open=false; }); });
-  document.getElementById('ch_blank').addEventListener('click',function(){ add({label:'',type:'AMOUNT',per:'<?= $basis === 'DAILY' ? 'DAY' : 'MONTH' ?>',grp:'COST'}); });
+  document.getElementById('ch_blank').addEventListener('click',function(){ add({label:'',type:'AMOUNT',per:(document.getElementById('ch_basis')||{}).value==='DAILY'?'DAY':'MONTH',grp:'COST'}); });
   document.getElementById('ch_lib').addEventListener('change',function(){ var c=this.value; this.value=''; if(!c) return; for(var k=0;k<LIB.length;k++) if(LIB[k].code===c){ add(LIB[k]); break; } });
   var tpl=document.getElementById('ch_tpl'); if(tpl) tpl.addEventListener('change',function(){
     var id=+this.value; this.value=''; if(!id) return; var t=TPL.filter(function(x){return x.id===id;})[0]; if(!t) return;
     read(); if(rows.length && !confirm('Replace the heads on this role with the template "'+t.name+'"?')) return;
     rows=JSON.parse(JSON.stringify(t.items)); rows.forEach(function(r){ if(r.amount!=null && r.calc==null) r.calc=r.amount?String(r.amount):''; }); render(); });
   ['ch_dpm','pc_boq','pc_tm','pc_rate','ch_ppl'].forEach(function(id){ var el=document.getElementById(id); if(el) el.addEventListener('input',schedule); });
+  //  A role's basis (14 Nov 2026): every label on the role follows it, and the figures are worked again.
+  (function(){ var bs=document.getElementById('ch_basis'); if(!bs) return;
+    var W={LONG:{unit:'per man-month',qty:'Man-months',rate:'/man-month',job:'per man-month'},DAILY:{unit:'per man-day',qty:'Man-days',rate:'/man-day',job:'per man-day'},FIXED:{unit:'per person',qty:'Units',rate:'/lump',job:'for the job'}};
+    var apply=function(){ var w=W[bs.value]||W.LONG;
+      [].forEach.call(document.querySelectorAll('#add-role [data-bw]'),function(el){ var k=el.getAttribute('data-bw'); if(k==='pd'){ el.hidden=bs.value!=='DAILY'; } else if(w[k]) el.textContent=w[k]; });
+      if(bs.value==='FIXED'){ var bq=document.getElementById('pc_boq'); if(bq && bq.value==='') bq.value='1'; } };
+    bs.addEventListener('change',function(){ apply(); schedule(); }); })();
   var timer=null, seq=0;
   function schedule(){ clearTimeout(timer); timer=setTimeout(preview,280); }
   function preview(){
@@ -536,8 +605,9 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
       set('pv_marg',j.revenue?(+j.margin).toFixed(1)+'%':'—');
       //  A day sheet: the same figure for a month, at the working days on the page.
       var dpmEl=document.getElementById('ch_dpm'), dpm=dpmEl?parseFloat(dpmEl.value):0;
-      [['pv_pay_m',j.pay],['pv_direct_m',j.direct]].forEach(function(x){ var el=document.getElementById(x[0]); if(!el) return;
-        el.textContent=(x[1]&&dpm>0)?'= '+money(Math.round(x[1]*dpm))+' a month':''; el.title=dpm>0?'At '+dpm+' working days in a month':''; });
+      var isDay=((document.getElementById('ch_basis')||{}).value==='DAILY');
+      [['pv_pay_m',j.pay],['pv_direct_m',j.direct]].forEach(function(x){ var el=document.getElementById(x[0]); if(!el) return; el.hidden=!isDay;
+        el.textContent=(isDay&&x[1]&&dpm>0)?'= '+money(Math.round(x[1]*dpm))+' a month':''; el.title=dpm>0?'At '+dpm+' working days in a month':''; });
     }).catch(function(){});
   }
   //  EITHER BUTTON SAVES THE WHOLE PAGE (owner, 13 Nov 2026: "It said costing is
@@ -592,7 +662,7 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
         var rt=parseFloat(cRate.value), mg=parseFloat(cTm.value);
         if(!(rt>0)) return bad('Type the rate the client pays first.',cRate);
         if(!(mg>=0)) return bad('Type the margin you want — it decides how much of the rate is left for the person.',cTm);
-        fd.set('mode','rate'); fd.set('rate',rt); fd.set('margin',mg); fd.set('dpm',document.getElementById('ch_dpm').value);
+        fd.set('mode','rate'); fd.set('rate',rt); fd.set('margin',mg); fd.set('dpm',document.getElementById('ch_dpm').value); fd.set('line_basis',(document.getElementById('ch_basis')||{}).value||'');
       } else {
         var v=parseFloat(cCtc.value);
         if(!(v>0)) return bad('Type the CTC first — what one person costs the company a month.',cCtc);
@@ -648,41 +718,6 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
         </table>
       <?php endif; ?>
     </div>
-    <?php if ($canEdit): ?>
-    <form method="post" action="/project-costing-save" id="pcSettings">
-      <input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="id" value="<?= (int)$h['id'] ?>">
-      <div class="form-grid">
-        <div class="ff ff-wide"><label>Title</label><input class="form-control" name="title" value="<?= $e($h['title']) ?>"></div>
-        <div class="ff"><label>Client</label><select class="form-control" name="client_id"><option value="">—</option>
-          <?php foreach ($clients as $c): ?><option value="<?= (int)$c['id'] ?>" <?= (int)$h['client_id']===(int)$c['id']?'selected':'' ?>><?= $e($c['display_name'] ?? $c['legal_name'] ?? ('#'.$c['id'])) ?></option><?php endforeach; ?></select></div>
-        <div class="ff"><label>Office</label><select class="form-control" name="office_id"><option value="">—</option>
-          <?php foreach ($offices as $o): ?><option value="<?= (int)$o['id'] ?>" <?= (int)$h['office_id']===(int)$o['id']?'selected':'' ?>><?= $e($o['name']) ?></option><?php endforeach; ?></select></div>
-        <div class="ff"><label>Site</label><input class="form-control" name="site" value="<?= $e($h['site']) ?>"></div>
-        <div class="ff"><label>Business unit <span class="muted">— decides which SBU Head approves</span></label><select class="form-control" name="sbu"><option value="">—</option>
-          <?php foreach ($sbuOpts as $k=>$v): ?><option value="<?= $e($k) ?>" <?= (string)($h['sbu'] ?? '')===(string)$k?'selected':'' ?>><?= $e($v) ?></option><?php endforeach; ?></select></div>
-        <div class="ff"><label>Basis</label><select class="form-control" name="basis"><?php foreach (PC_BASES as $k=>$v): ?><option value="<?= $e($k) ?>" <?= $basis===$k?'selected':'' ?>><?= $e($v) ?></option><?php endforeach; ?></select></div>
-        <div class="ff"><label>Loadings applied on</label><select class="form-control" name="load_on"><option value="COST" <?= strtoupper((string)$h['load_on'])!=='RATE'?'selected':'' ?>>Direct cost (standard)</option><option value="RATE" <?= strtoupper((string)$h['load_on'])==='RATE'?'selected':'' ?>>Sell rate (Excel-style)</option></select></div>
-        <div class="ff"><label>Overhead %</label><input class="form-control" type="number" step="0.01" name="overhead_pct" value="<?= $e($h['overhead_pct']) ?>"></div>
-        <div class="ff"><label>Insurance %</label><input class="form-control" type="number" step="0.01" name="insurance_pct" value="<?= $e($h['insurance_pct']) ?>"></div>
-        <div class="ff"><label>Bad debt %</label><input class="form-control" type="number" step="0.01" name="baddebt_pct" value="<?= $e($h['baddebt_pct']) ?>"></div>
-        <div class="ff"><label>Contingency %</label><input class="form-control" type="number" step="0.01" name="contingency_pct" value="<?= $e($h['contingency_pct']) ?>"></div>
-        <div class="ff"><label>Negotiation %</label><input class="form-control" type="number" step="0.01" name="negotiation_pct" value="<?= $e($h['negotiation_pct']) ?>"></div>
-      </div>
-      <div class="form-grid" style="margin-top:6px">
-        <div class="ff ff-wide"><label>Inclusions</label><textarea class="form-control" name="inclusions" rows="2"><?= $e($h['inclusions']) ?></textarea></div>
-        <div class="ff ff-wide"><label>Exclusions <span class="muted">— "Not included…"</span></label><textarea class="form-control" name="exclusions" rows="2"><?= $e($h['exclusions']) ?></textarea></div>
-        <div class="ff ff-wide"><label>Notes</label><input class="form-control" name="notes" value="<?= $e($h['notes']) ?>"></div>
-      </div>
-      <div style="margin-top:8px"><button class="btn" type="submit">Save settings</button>
-        <span class="muted" style="font-size:12px;margin-left:8px">Also saves a role you are typing above — nothing on this page is lost.</span></div>
-    </form>
-    <?php else: ?>
-      <div class="kv-grid" style="font-size:13px">
-        <div><span class="muted">Loadings</span> OH <?= $e($h['overhead_pct']) ?>% · Ins <?= $e($h['insurance_pct']) ?>% · BD <?= $e($h['baddebt_pct']) ?>% · Cont <?= $e($h['contingency_pct']) ?>% · Neg <?= $e($h['negotiation_pct']) ?>%</div>
-        <?php if (!empty($h['inclusions'])): ?><div style="margin-top:6px"><span class="muted">Inclusions:</span> <?= nl2br($e($h['inclusions'])) ?></div><?php endif; ?>
-        <?php if (!empty($h['exclusions'])): ?><div style="margin-top:6px"><span class="muted">Exclusions:</span> <?= nl2br($e($h['exclusions'])) ?></div><?php endif; ?>
-      </div>
-    <?php endif; ?>
   </div>
 
   <div class="panel">
@@ -697,10 +732,12 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
         <form method="post" action="/project-costing-approve" style="display:flex;gap:6px;align-items:center"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="id" value="<?= (int)$h['id'] ?>"><input class="form-control" name="approval_ref" placeholder="Approval ref (optional)" style="width:170px"><button class="btn primary">Approve</button></form>
         <form method="post" action="/project-costing-reject" style="display:flex;gap:6px;align-items:center"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="id" value="<?= (int)$h['id'] ?>"><input class="form-control" name="reject_note" placeholder="Reason (needed)" required style="width:150px"><button class="btn btn-ghost">Send back</button></form>
       <?php endif; ?>
-      <?php if (!in_array($h['status'],['DRAFT'],true) && $qLock === '' && function_exists('pc_can_edit') && pc_can_edit()): ?>
+      <?php if (!in_array($h['status'],['DRAFT'],true) && $qLock === '' && $mayReopen): ?>
         <form method="post" action="/project-costing-reopen"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="id" value="<?= (int)$h['id'] ?>"><button class="btn btn-ghost">Reopen as draft</button></form>
       <?php endif; ?>
       <?php if ($h['status']==='DRAFT' && empty($lines)): ?><span class="muted" style="font-size:12.5px">Add at least one role before submitting.</span><?php endif; ?>
+      <?php if ($h['status']==='APPROVED' && $qLock === '' && !$mayReopen && function_exists('pc_reopen_who_words')): ?><span class="muted" style="font-size:12.5px">🔒 <?= $e(pc_reopen_who_words($h)) ?></span><?php endif; ?>
+      <?php if ($h['status']==='REJECTED'): ?><span class="muted" style="font-size:12.5px">↩ Sent back — open for <?= $e($h['created_by'] ?: 'its preparer') ?> to revise and submit again; every level then approves it again.</span><?php endif; ?>
     </div>
     <?php //  THE TRAIL (owner, 13 Nov 2026: "who has created the costing, who has approved and what is
           //  pending"). Who prepared it, who submitted it, each level with who signed and when, what
