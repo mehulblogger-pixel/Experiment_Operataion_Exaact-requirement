@@ -290,9 +290,20 @@
     <a class="btn small secondary" href="/project-costing?id=<?= (int)$pcRow['id'] ?>"><b><?= e($pcRow['code']) ?></b> — <?= e($pcRow['title']) ?></a>
     <span class="muted" style="font-size:12.5px">revenue <?= fmoney_short($pcRow['exp_revenue']) ?> · margin <?= (float)$pcRow['exp_revenue']>0 ? number_format((float)$pcRow['exp_profit']/(float)$pcRow['exp_revenue']*100,1) : '0' ?>%</span>
     <?php // Locked once this quotation is sent, won or has a contract (owner, 13 Nov 2026).
-          $pcLock = function_exists('pc_unlink_block_quote') ? pc_unlink_block_quote((int)$q['id']) : '';
+          $pcLock = function_exists('pc_quote_lock_reason') ? pc_quote_lock_reason($pcRow) : '';
+          //  A revision being prepared whose costing is locked: one press for an editable copy (14 Nov 2026).
+          $pcRevise = function_exists('pc_revise_problem') && function_exists('pc_can_edit') && pc_can_edit() && pc_revise_problem((int)$q['id']) === '';
+          if ($pcRevise): ?>
+      <form method="post" action="/project-costing-revise" style="display:inline"><input type="hidden" name="quote_id" value="<?= (int)$q['id'] ?>">
+        <button class="btn small" title="Makes an editable copy of <?= e($pcRow['code']) ?> for this revision; the original stays as the record of the earlier price">✎ Change the costing for this revision</button></form>
+    <?php endif;
           if ($pcLock !== ''): ?>
-      <span class="muted" style="margin-left:auto;font-size:12.5px" title="<?= e($pcLock) ?>">🔒 Stays linked — this <?= e(Tl('quote')) ?> <?= strpos($pcLock, ' has a contract') !== false ? 'has a contract' : (strpos($pcLock, ' has been won') !== false ? 'has been won' : 'has gone to the ' . e(Tl('client'))) ?></span>
+      <span class="muted" style="margin-left:auto;font-size:12.5px" title="<?= e($pcLock) ?>"><?php
+        //  Whose step locked it: this revision, or an earlier one (14 Nov 2026 — a fresh revision read
+        //  "this quote has gone to the client" when only the earlier revision had).
+        $lockSelf = (int)$q['rev'] > 0 ? strpos($pcLock, '(revision ' . (int)$q['rev'] . ')') !== false : strpos($pcLock, '(revision ') === false;
+        $lockWhat = strpos($pcLock, ' has a contract') !== false ? 'has a contract' : (strpos($pcLock, ' has been won') !== false ? 'has been won'
+                  : (strpos($pcLock, ' has gone to the ') !== false ? 'has gone to the ' . Tl('client') : (strpos($pcLock, ' has been approved') !== false ? 'has been approved' : 'has gone for approval'))); ?>🔒 Locked — <?= $lockSelf ? 'this ' . e(Tl('quote')) : 'an earlier revision' ?> <?= e($lockWhat) ?></span>
     <?php else: ?>
     <form method="post" action="/project-costing-attach" style="display:inline;margin-left:auto" onsubmit="return confirm('Unlink this costing from the quotation? It is not deleted — you can attach it again from here.')">
       <input type="hidden" name="costing_id" value="<?= (int)$pcRow['id'] ?>"><input type="hidden" name="quote_id" value="0"><input type="hidden" name="back" value="<?= e($back) ?>">

@@ -61,3 +61,12 @@ flowchart TD
 The enquiry register now shows each enquiry's outcome — Open, Quoted, Won, Lost (following its
 quotation) or Dropped (by hand, with a reason) — and, at the top, enquiries → quoted → won for the year
 and branch in view, with the hit rate (won ÷ won + lost). Click a card to list those enquiries.
+
+### A costing is locked once its quotation goes for approval (owner, 14 Nov 2026)
+
+From the moment a quotation goes for approval, the costing it was priced from cannot be reopened,
+edited or unlinked — it is the record of that price. To change the figures, raise a revision of the
+quotation; on the revision's Costing card press **✎ Change the costing for this revision**: you get an
+editable copy ("… (revision 1)") to change and send for approval. A revision made for any other reason
+simply stands on the approved costing. An enquiry's received date cannot be later than today.
+

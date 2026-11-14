@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '197108a · 2026-11-13 17:01 UTC · 718 files';
+$RELEASE = '8dbb5cb · 2026-11-14 05:54 UTC · 718 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -37,7 +37,7 @@ $EXPECT  = [
     'lib/activity.php' => ['s'=>45808,'h'=>'e67019b2299e63b6'],
     'lib/adspro.php' => ['s'=>28665,'h'=>'3a35e9b834372419'],
     'lib/adsroi.php' => ['s'=>12887,'h'=>'2418d515c52e3905'],
-    'lib/adssync.php' => ['s'=>28474,'h'=>'a8d1c1c5ac16ae47'],
+    'lib/adssync.php' => ['s'=>28574,'h'=>'19472065bb76a5a6'],
     'lib/advisor.php' => ['s'=>42525,'h'=>'1de07288d04eb86b'],
     'lib/agreement.php' => ['s'=>30404,'h'=>'850a0f08f100b313'],
     'lib/ai.php' => ['s'=>26190,'h'=>'d08483ebea3044a0'],
@@ -118,7 +118,7 @@ $EXPECT  = [
     'lib/costing_heads.php' => ['s'=>40228,'h'=>'ad47bc7f437ba37f'],
     'lib/costrecon.php' => ['s'=>11258,'h'=>'a6af5a16164f3458'],
     'lib/cpanel.php' => ['s'=>8181,'h'=>'9322634c72aed841'],
-    'lib/crm.php' => ['s'=>320141,'h'=>'3b2a3fa0f5c98cda'],
+    'lib/crm.php' => ['s'=>329229,'h'=>'c24bd02d2fda7913'],
     'lib/crmdash.php' => ['s'=>14427,'h'=>'f124694bf443bc02'],
     'lib/customer360.php' => ['s'=>24402,'h'=>'f1d98328a475561b'],
     'lib/customforms.php' => ['s'=>12896,'h'=>'a60a82554280a959'],
@@ -179,7 +179,7 @@ $EXPECT  = [
     'lib/numbering.php' => ['s'=>9214,'h'=>'a00fd93a0150d3bf'],
     'lib/onboarding.php' => ['s'=>4308,'h'=>'1c5b3e553b964601'],
     'lib/opportunities.php' => ['s'=>85673,'h'=>'0d127373eb109e13'],
-    'lib/ops.php' => ['s'=>748776,'h'=>'ba13c0cada15b1e6'],
+    'lib/ops.php' => ['s'=>748894,'h'=>'6ea5d5f4e28ba35f'],
     'lib/orgadmin.php' => ['s'=>78177,'h'=>'70dca6bf71230d17'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
     'lib/owner_home.php' => ['s'=>4387,'h'=>'9ecd071c5bba4b79'],
@@ -194,7 +194,7 @@ $EXPECT  = [
     'lib/position.php' => ['s'=>19441,'h'=>'a0a9d1a9e6a9b10c'],
     'lib/preflight.php' => ['s'=>5451,'h'=>'97e742bbddf7fbd8'],
     'lib/pricing_admin.php' => ['s'=>16307,'h'=>'d7af986c89fc5cfc'],
-    'lib/projcosting.php' => ['s'=>104999,'h'=>'ab853a6801c58923'],
+    'lib/projcosting.php' => ['s'=>116203,'h'=>'76b638529f860a35'],
     'lib/pwreset.php' => ['s'=>9509,'h'=>'50675e1d291df7b0'],
     'lib/qr.php' => ['s'=>17936,'h'=>'4d50b69b53bfa5e2'],
     'lib/qualitycase.php' => ['s'=>6179,'h'=>'280289c99f157cd7'],
@@ -443,9 +443,9 @@ $EXPECT  = [
     'views/ops/crm/approval_levels_inline.php' => ['s'=>6971,'h'=>'926169633cfce5b0'],
     'views/ops/crm/approval_rule_form.php' => ['s'=>3668,'h'=>'0dc628db27deb0a7'],
     'views/ops/crm/approval_rule_list.php' => ['s'=>3304,'h'=>'da79bb76a5dfb4a3'],
-    'views/ops/crm/inquiry_form.php' => ['s'=>4981,'h'=>'036471e837dfefeb'],
-    'views/ops/crm/inquiry_list.php' => ['s'=>5135,'h'=>'2a20fa11bca686b2'],
-    'views/ops/crm/quote_detail.php' => ['s'=>77304,'h'=>'684a4baf55f4df71'],
+    'views/ops/crm/inquiry_form.php' => ['s'=>10092,'h'=>'24595b8340afeed4'],
+    'views/ops/crm/inquiry_list.php' => ['s'=>7240,'h'=>'7f98af7364e5032c'],
+    'views/ops/crm/quote_detail.php' => ['s'=>78559,'h'=>'2dab03abfd43d199'],
     'views/ops/crm/quote_external.php' => ['s'=>8907,'h'=>'7aa7bd1259a0c79d'],
     'views/ops/crm/quote_form.php' => ['s'=>45025,'h'=>'0421cdde3be7f046'],
     'views/ops/crm/quote_list.php' => ['s'=>8038,'h'=>'36be301c9d7ffe37'],
@@ -585,7 +585,7 @@ $EXPECT  = [
     'views/ops/product_package.php' => ['s'=>4732,'h'=>'a87a7a169d94fe14'],
     'views/ops/profitability_detail.php' => ['s'=>10185,'h'=>'f49f71530b916b7e'],
     'views/ops/profitability_list.php' => ['s'=>9655,'h'=>'8fed2c9925d511dc'],
-    'views/ops/project_costing.php' => ['s'=>72509,'h'=>'2be5265697d52b88'],
+    'views/ops/project_costing.php' => ['s'=>73890,'h'=>'0d960eabc7625cc0'],
     'views/ops/project_costing_print.php' => ['s'=>8615,'h'=>'2e727aa195a39a28'],
     'views/ops/project_costings.php' => ['s'=>7268,'h'=>'d7beebe3f25879f4'],
     'views/ops/raise_call.php' => ['s'=>6269,'h'=>'c0673d9af4c3cce6'],

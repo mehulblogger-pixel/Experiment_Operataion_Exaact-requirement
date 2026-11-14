@@ -462,8 +462,26 @@ C('SAL-185', 'Enquiries', 'An enquiry shows what became of it — Open, Quoted, 
    ('NEGATIVE · Open A (it has a quotation) and look for "Drop this enquiry".', 'Not offered: "With a quote raised, this follows the quote. If the work is not coming, mark the quote lost." A forced drop is refused the same way.'),
    ('Look at the four cards at the top of the register (this year).', 'Enquiries (with how many are still open) · Quoted (% of enquiries, how many awaiting an answer) · Won (% of enquiries that became orders) · Lost · Dropped (with the hit rate = won ÷ (won + lost)). Each card opens the list filtered to that status. Change the year or search — the cards follow.'),
    ('EDGE · An enquiry recorded before this update, still reading "Quoted" although its quotation was accepted.', 'Opening the register (or the enquiry) corrects it to "Won" by itself.'),
+   ('NEGATIVE · New enquiry with "Received date" set to tomorrow (owner, 13 Nov 2026).', 'The calendar does not go past today. Typed in anyway, a red "⚠ This date is in the future … it will not be saved" appears under the field at once; pressing "Create inquiry" keeps you on the form: "⚠ The received date … is in the future. An enquiry can only be recorded as received today or earlier — it was not saved." Nothing is recorded. Today or an earlier date saves normally.'),
    ('EDGE · The status filter on the register.', 'Lists Open, Quoted, Won, Lost, Dropped. If your company renamed statuses under Admin → lists, your names are kept and Won / Lost still appear.')],
   'crm_inquiry_outcome; crm_inquiry_sync (crm_log_change hook, register, own page); inquiry-drop / inquiry-reopen; INQUIRY_DROP_REASONS; inquiry_list funnel cards; tests/test_inquiry_outcome.php', live=False)
+
+C('SAL-186', 'Project costing', 'A costing is locked from the moment its quotation goes for approval; a revision gets its own editable copy when the figures must change', 'scenario', ['best', 'rule', 'edge', 'negative'],
+  'BUSINESS_DEV_MANAGER', 'Owner, 14 Nov 2026: "Even when the quote is approved still costing can be unlocked" — chose "Lock from: quote submitted for approval" and "Revision makes a new costing"; then "once the quote is revised for what so ever reason and is required to revise the costing it shall be editable".',
+  'Signed in as Test BDM. An APPROVED costing with one role, and the quotation made from it (Draft). Test Marketing Manager approves quotations.',
+  [('Open the costing while its quotation is still a Draft.', '"Reopen as draft" is offered — nobody has priced from it yet.'),
+   ('Submit the quotation for approval → open the costing.', 'No "Reopen as draft". The band reads "🔒 This costing is Approved and read-only. Q-… has gone for approval. The costing is the record of how that price was worked out, so it is locked. To change the figures, raise a revision of the quote — the revision gets its own copy of this costing, to edit and approve."'),
+   ('[Marketing Manager] approve the quotation → [BDM] open the costing. (The owner\'s case.)', 'Still no "Reopen as draft": "… has been approved. …". The same after "Send", "won" and a contract.'),
+   ('On the quotation press "Revise (new rev)" → type why ("Client asked for two more engineers") → "Create revision".', '"Created revision 01 … It stands on costing PC-… as approved; to change the figures, press "Change the costing for this revision" in its Costing section." No costing is copied by itself — a revision made only to correct an address goes on with the approved costing.'),
+   ('On the revision\'s Costing card press "✎ Change the costing for this revision".', 'You land on a new costing "… (revision 1)", Draft, with every role and setting copied: "Costing PC-… made for Q-… revision 1 — a draft copy. Change the figures, then submit it for approval; the earlier costing stays as it was." Add a role or change a head — it saves.'),
+   ('Open the original costing.', 'Unchanged and still locked — it is the record of the price that went out. Its history: "Copied to PC-… for Q-… revision 1 by <you>". The new one\'s history: "Costing PC-… copied from PC-… by <you> …". The same button is offered on the locked costing itself ("✎ Change the costing for Q-… revision 1") while that revision is being prepared.'),
+   ('Submit the new costing for approval; once approved, submit the revision.', 'A man-month revision now stands on its own approved copy. When the revision goes for approval, its copy locks in turn.'),
+   ('NEGATIVE · Press "Change the costing for this revision" again.', 'Refused: its costing is already editable — open it. No second copy.'),
+   ('NEGATIVE · Open an older revision of the quotation.', 'No "Change the costing" button; a forced press is refused: "This is an older revision — open the current one."'),
+   ('EDGE · A quotation that never went for approval, with an approved costing.', 'No copy button — the costing is not held by the quotation; "Reopen as draft" on the costing is the way.'),
+   ('EDGE · A draft costing whose quotation has gone for approval.', 'Locked too — its roles cannot be changed until a revision gets its own copy.')],
+  'pc_quote_lock_reason; pc_locked; pc_transition_problem (reopen); pc_revise_problem; pc_copy_for_revision; project-costing-revise; crm_quote_costing (the costing that prices this revision); tests/test_costing_lock_revision.php', live=False)
+
 
 
 
@@ -486,19 +504,20 @@ C('SAL-176', 'Project costing', 'Costing the other way round — from the rate t
    ('EDGE · Do the same two steps with Negotiation 5.', 'Rate question: still ₹2,800 (the fixed-rate box shows ₹2,667 and the note explains the 5% padding). CTC question: ₹2,940 — that is ₹2,800 + 5%. They differ on purpose: with "I know the rate" the client\'s rate is final, so the 22% is earned on ₹2,800; with "I know the CTC" the 22% is protected and the 5% padding is added on top, to give away in negotiation.')],
   'pc_ctc_from_rate (pc_line_calc read backwards); pc_heads_from_ctc', live=False)
 
-C('SAL-177', 'Project costing', 'A costing cannot be unlinked once its quotation is sent, won or has a contract', 'scenario', ['rule', 'edge', 'negative'],
+C('SAL-177', 'Project costing', 'A costing cannot be unlinked once its quotation has gone for approval, been approved, sent, won or given a contract', 'scenario', ['rule', 'edge', 'negative'],
   'BUSINESS_DEV_MANAGER', 'Owner, 13 Nov 2026: "Once contract is made the costing shall not be unlinked. At present when I clicked on unlink … it got unlinked." Decided: locked once won and/or contracted, and from the moment the quotation is sent.',
   'Signed in as Test BDM. An APPROVED costing linked to a Draft quotation (SAL-052).',
   [('Open the Draft quotation → its "Project costing" card.', 'An "Unlink" button is offered — the quotation has not gone out yet.'),
    ('Press "Unlink", then link the costing again ("attach existing…").', 'Both work. The quotation\'s History shows a line for the unlink and one for the link.'),
-   ('Take the quotation through approval and press "Send".', 'The card now reads "🔒 Stays linked — this quotation has gone to the client". There is no Unlink button. Hovering over it explains: the costing is the record of how the price was worked out; to change the price, raise a revision.'),
-   ('Mark it Accepted (won).', '"🔒 Stays linked — this quotation has been won".'),
-   ('Register the contract.', '"🔒 Stays linked — this quotation has a contract".'),
+   ('Submit the quotation for approval.', 'From 14 Nov 2026 the lock starts here: the card reads "🔒 Locked — this quotation has gone for approval". There is no Unlink button. Hovering over it explains: the costing is the record of how the price was worked out; to change the figures, raise a revision. (Before 14 Nov the lock started at "Send".)'),
+   ('Approve it, then press "Send".', '"🔒 Locked — this quotation has been approved", then "… has gone to the client".'),
+   ('Mark it Accepted (won).', '"🔒 Locked — this quotation has been won".'),
+   ('Register the contract.', '"🔒 Locked — this quotation has a contract".'),
    ('On a deal with a costing, mark the deal Won (or send it to Accounts).', 'The deal\'s costing card shows "🔒 Stays linked — …" in place of Unlink.'),
    ('(Careful testers) Re-send an old Unlink from a page left open before the quotation was sent.', 'Red message "Not unlinked — Q-… has gone to the client (sent …). The costing is the record of how that price was worked out, so it stays linked…". The costing is still linked.'),
-   ('Raise a revision of a sent quotation and open the new Draft revision.', 'Still "🔒 Stays linked" — a revision is the same quotation re-priced, so the costing stays with it.'),
-   ('Revise a quotation that was never sent, and open the revision.', '"Unlink" is still offered — nothing has gone to the client yet.')],
-  'pc_unlink_block_quote; pc_unlink_block_deal; project-costing-attach', live=False)
+   ('Raise a revision of a sent quotation and open the new Draft revision.', '"🔒 Locked — an earlier revision has gone to the client", with "✎ Change the costing for this revision" beside it (SAL-186).'),
+   ('Revise a quotation that never went for approval, and open the revision.', '"Unlink" is still offered — nothing has gone for approval yet.')],
+  'pc_quote_lock_reason; pc_unlink_block_quote; pc_unlink_block_deal; project-costing-attach', live=False)
 
 C('SAL-051', 'Project costing', 'A costing is approved through the same levels as a quotation — never by its author', 'scenario', ['rule'],
   'several', 'Owner, 20 Oct 2026: "approval level as of quotation shall be applicable." D-11 B: maker and checker are different people.',

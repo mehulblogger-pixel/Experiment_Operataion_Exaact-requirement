@@ -22,7 +22,13 @@
         <?php foreach ($clients as $cl): ?><option value="<?= (int)$cl['id'] ?>" <?= (string)($inq['client_id'] ?? '')===(string)$cl['id']?'selected':'' ?>><?= e($cl['display_name'] ?: $cl['legal_name']) ?></option><?php endforeach; ?>
       </select></div>
     <div class="ff"><label>…or client name (if not yet registered)</label><input class="form-control" name="client_name" value="<?= e($inq['client_name'] ?? '') ?>"></div>
-    <div class="ff"><label>Received date</label><input class="form-control" type="date" name="received_date" value="<?= e($inq['received_date'] ?? date('Y-m-d')) ?>"></div>
+    <?php //  Owner, 13 Nov 2026 (SAL test, step 4): a received date in the future "must show a warning sign
+          //  and shall not be recorded". The browser stops at today; the warning says why; the server refuses. ?>
+    <div class="ff"><label for="inq-recv">Received date</label><input class="form-control" type="date" id="inq-recv" name="received_date" max="<?= e(date('Y-m-d')) ?>" value="<?= e($inq['received_date'] ?? date('Y-m-d')) ?>" aria-describedby="inq-recv-warn">
+      <div id="inq-recv-warn" class="msg msg-error" role="alert" style="display:none;margin-top:6px;padding:6px 10px;font-size:12.5px">⚠ This date is in the future. An <?= e(Tl('inquiry')) ?> can only be recorded as received today or earlier — it will not be saved.</div>
+      <script>(function(){var d=document.getElementById('inq-recv'),w=document.getElementById('inq-recv-warn');if(!d||!w)return;
+        var chk=function(){var bad=d.value!==''&&d.value>d.max;w.style.display=bad?'block':'none';d.setAttribute('aria-invalid',bad?'true':'false');};
+        d.addEventListener('input',chk);d.addEventListener('change',chk);chk();})();</script></div>
 
     <div class="ff"><label>Contact person *</label><input class="form-control" name="contact_name" value="<?= e($inq['contact_name'] ?? '') ?>"></div>
     <div class="ff"><label>Contact email <span class="muted">— email or mobile</span></label><input class="form-control" type="email" name="contact_email" value="<?= e($inq['contact_email'] ?? '') ?>"></div>

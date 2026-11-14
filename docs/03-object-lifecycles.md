@@ -141,6 +141,10 @@ stateDiagram-v2
   (`crm_log_change()`), when a quotation is created or accepted, when its own page opens, and for
   the whole register when the register opens (so older rows are corrected). Each change of outcome
   is written to the enquiry's history (`activities`, `INQUIRY`).
+- **The received date cannot be in the future** (owner, 13 Nov 2026: "Inquiry received date in
+  future must show a warning sign and shall not be recorded"). The form's calendar stops at today and
+  shows a warning sign the moment a later date is typed; the save is refused with the reason, and so
+  is a date that does not exist. Nothing is recorded.
 - **Dropped** (`POST /inquiry-drop`): reason one of *We declined to quote* · *The client withdrew* ·
   *Duplicate enquiry* (`INQUIRY_DROP_REASONS`), with an optional note; who and when are stored
   (`drop_reason`, `drop_note`, `dropped_by`, `dropped_at`). Refused once any quotation exists — the
@@ -348,6 +352,24 @@ stateDiagram-v2
   `pc_unlink_block_deal`). The quotation and deal pages show "🔒 Stays linked — …" in place of
   "Unlink". Before that point unlinking is allowed and logged as before. To change the figures after
   that, raise a revision. This adds no status and no transition; it only closes a door.
+- **Locked from the moment its quotation goes for approval (owner, 14 Nov 2026: "Even when the quote
+  is approved still costing can be unlocked" — chose "Lock from: quote submitted for approval" and
+  "Revision makes a new costing").** A costing prices the revision it is linked to and the later
+  revisions that have no costing of their own (`pc_quote_lock_reason()`). Once any revision it prices
+  is PENDING_APPROVAL, APPROVED, SENT, ACCEPTED or has a contract: `APPROVED → DRAFT` ("Reopen as
+  draft") is refused and not offered, a DRAFT costing cannot be edited (`pc_locked()`), and it cannot be
+  unlinked. Before that point nothing changed. The unlink lock of 13 Nov now also starts at approval.
+- **A revision gets its own editable costing — on demand (owner, 14 Nov 2026: "once the quote is
+  revised for what so ever reason and is required to revise the costing it shall be editable").** A
+  revision raised from a quotation whose costing is locked stands on that approved costing (so a
+  revision for an address change needs nothing more). On a revision still being prepared (DRAFT or
+  sent back, current), "✎ Change the costing for this revision" (`POST /project-costing-revise`,
+  `pc_can_edit()`) copies the costing — every setting and role — as a new DRAFT costing linked to
+  that revision (`pc_copy_for_revision()`), prepared by whoever pressed it. The original stays
+  untouched as the record of the earlier price; both histories record the copy. The revision is then
+  priced by its copy (`crm_quote_costing()`), which goes through approval as any costing and locks in
+  turn when the revision goes for approval. No status or transition is added: the copy is a new
+  costing starting at DRAFT.
 - **Flexible cost heads (owner, 9 Nov 2026):** a role's cost build-up is a list of heads
   (`project_costing_lines.spec`, worked out by `lib/costing_heads.php`) — each an amount (the box is a
   calculator), a % of other heads (with an optional "counted up to" cap on the base and an optional

@@ -15,8 +15,9 @@ try {
         return (int)$pdo->lastInsertId();
     };
     t_eq(pc_unlink_block_quote($mk('DRAFT')), '', 'a draft quotation: the costing may still be unlinked');
-    t_eq(pc_unlink_block_quote($mk('PENDING_APPROVAL')), '', 'waiting for approval: still allowed');
-    t_eq(pc_unlink_block_quote($mk('APPROVED')), '', 'approved but not yet sent: still allowed');
+    //  Owner, 14 Nov 2026 ("Lock from: quote submitted for approval"): the lock now starts here.
+    t_ok(strpos(pc_unlink_block_quote($mk('PENDING_APPROVAL')), 'has gone for approval') !== false, 'waiting for approval: locked (from 14 Nov 2026)');
+    t_ok(strpos(pc_unlink_block_quote($mk('APPROVED')), 'has been approved') !== false, 'approved but not yet sent: locked (from 14 Nov 2026)');
     t_ok(strpos(pc_unlink_block_quote($mk('SENT', date('c'))), 'has gone to the') !== false, 'sent to the customer: locked, and it says why');
     t_ok(strpos(pc_unlink_block_quote($mk('ACCEPTED', date('c'))), 'has been won') !== false, 'won: locked');
     t_ok(strpos(pc_unlink_block_quote($mk('ACCEPTED', date('c'), 'AHM/C/2627/00001')), 'has a contract (AHM/C/2627/00001)') !== false, 'with a contract: locked, naming the contract');
@@ -48,7 +49,8 @@ try {
     $src = (string)file_get_contents(__DIR__ . '/../lib/projcosting.php');
     t_ok(strpos($src, "flash('Not unlinked — ' . \$why, 'error')") !== false, 'the unlink request itself is refused on the server, not just hidden');
     $v = (string)file_get_contents(__DIR__ . '/../views/ops/crm/quote_detail.php') . file_get_contents(__DIR__ . '/../views/ops/opportunity_detail.php');
-    t_eq(substr_count($v, '🔒 Stays linked'), 2, 'the quotation and the deal show "🔒 Stays linked" instead of the Unlink button');
+    //  14 Nov 2026: the quotation's card says "🔒 Locked — this quote / an earlier revision …" (the lock now starts at approval).
+    t_eq([substr_count($v, '🔒 Locked — '), substr_count($v, '🔒 Stays linked')], [1, 1], 'the quotation ("🔒 Locked — …") and the deal ("🔒 Stays linked") show the lock instead of the Unlink button');
 } finally {
     if ($own && $pdo->inTransaction()) $pdo->rollBack();
 }

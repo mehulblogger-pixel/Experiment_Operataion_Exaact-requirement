@@ -24,3 +24,12 @@ it. If you will not quote at all, open the enquiry → **Drop this enquiry** →
 the client withdrew / duplicate) → "Drop it"; "Reopen it" undoes that. An enquiry with a quotation
 cannot be dropped — mark the quotation lost instead. The register's cards show how many were quoted
 and won, and the hit rate.
+
+### A costing is locked once its quotation goes for approval (owner, 14 Nov 2026)
+
+From the moment a quotation goes for approval, the costing it was priced from cannot be reopened,
+edited or unlinked — it is the record of that price. To change the figures, raise a revision of the
+quotation; on the revision's Costing card press **✎ Change the costing for this revision**: you get an
+editable copy ("… (revision 1)") to change and send for approval. A revision made for any other reason
+simply stands on the approved costing. An enquiry's received date cannot be later than today.
+

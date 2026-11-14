@@ -1560,8 +1560,10 @@ function crm_quote_costing($q) {
     if (!$q || !function_exists('pc_migrate')) return null;
     pc_migrate();
     $base = (int)($q['parent_id'] ?? 0) ?: (int)$q['id'];
-    return ops_one("SELECT * FROM project_costings WHERE quote_id IN (SELECT id FROM quotations WHERE id=? OR parent_id=?) ORDER BY id DESC LIMIT 1",
-                   [$base, $base]) ?: null;
+    $all = ops_all("SELECT * FROM project_costings WHERE quote_id IN (SELECT id FROM quotations WHERE id=? OR parent_id=?) ORDER BY id DESC", [$base, $base]) ?: [];
+    //  The one that prices THIS revision — a later revision may have its own copy (14 Nov 2026).
+    if (function_exists('pc_prices_quote')) foreach ($all as $c) if (pc_prices_quote($c, (int)$q['id'])) return $c;
+    return $all[0] ?? null;
 }
 function crm_quote_costing_problem($q) {
     if (!crm_quote_manmonth_needs_costing() || !function_exists('pc_for_quote')) return '';
@@ -1959,8 +1961,16 @@ function ops_crm_inquiries($route, $method) {
                                                                 $need[] = 'a contact e-mail or mobile';
             if (($b['sbu'] ?? '') === '')                        $need[] = 'the ' . Tl('sbu') . ' (business unit)';
             if (trim($b['subject'] ?? '') === '')               $need[] = 'a subject';
-            if ($need) {
-                view('ops/crm/inquiry_form', ['inq' => ($inq ? array_merge($inq, $b) : $b), 'error' => 'Please add ' . implode('; ', $need) . '.',
+            //  Not received yet cannot be recorded (owner, 13 Nov 2026): a date in the future is refused,
+            //  and so is one that is not a date at all.
+            $recv = trim((string)($b['received_date'] ?? ''));
+            $dateErr = '';
+            if ($recv !== '' && (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $recv) || !checkdate((int)substr($recv, 5, 2), (int)substr($recv, 8, 2), (int)substr($recv, 0, 4))))
+                $dateErr = 'The received date is not a real date — pick it from the calendar.';
+            elseif ($recv !== '' && $recv > date('Y-m-d'))
+                $dateErr = '⚠ The received date ' . fdate($recv) . ' is in the future. An ' . Tl('inquiry') . ' can only be recorded as received today or earlier — it was not saved.';
+            if ($need || $dateErr !== '') {
+                view('ops/crm/inquiry_form', ['inq' => ($inq ? array_merge($inq, $b) : $b), 'error' => trim(($need ? 'Please add ' . implode('; ', $need) . '. ' : '') . $dateErr),
                     'clients' => clients_list(), 'sbuOpts' => lk_options_or('sbu', OPS_SBUS),
                     'sourceOpts' => INQUIRY_SOURCES, 'statusOpts' => crm_inquiry_status_opts(),
                     'users' => ops_all("SELECT id, first_name, last_name, username FROM users WHERE is_active=1 ORDER BY first_name, username")]);
@@ -2859,8 +2869,13 @@ function ops_crm_quotes($route, $method) {
         $pdo->prepare("INSERT INTO quote_revisions (quote_id,rev,changed_by,changed_at,summary,snapshot) VALUES (?,?,?,?,?,?)")
             ->execute([$base, $newRev, user_name(current_user()), date('c'), $summary, json_encode($snap)]);
         crm_log_change($nid, 'Revision ' . $newRev . ' created from rev ' . (int)$q['rev'] . ' — ' . $summary);
+        //  Its costing (owner, 14 Nov 2026): the revision stands on the approved costing until someone
+        //  needs to change the figures — then "Change the costing for this revision" makes an editable copy.
+        $pcLocked = ($pcSrc = crm_quote_costing(crm_quote_get($nid))) && function_exists('pc_quote_lock_reason')
+                    && pc_quote_lock_reason($pcSrc) !== '';
         flash('Created revision ' . str_pad((string)$newRev, 2, '0', STR_PAD_LEFT) . ' with '
-            . count($srcLines) . ' line(s) and ' . count($srcLocs) . ' site(s) carried over. Edit it below.');
+            . count($srcLines) . ' line(s) and ' . count($srcLocs) . ' site(s) carried over. Edit it below.'
+            . ($pcLocked ? ' It stands on costing ' . $pcSrc['code'] . ' as approved; to change the figures, press "Change the costing for this revision" in its Costing section.' : ''));
         redirect('/quote-edit?id=' . $nid);
     }
     if ($route === 'quote-doc') {

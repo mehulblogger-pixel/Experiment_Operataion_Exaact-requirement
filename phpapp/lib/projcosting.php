@@ -356,6 +356,7 @@ function pc_transition_problem($h, $route) {
             return '';
         case 'project-costing-reopen':
             if ($st === 'DRAFT') return 'This costing is already a draft.';
+            if (($why = pc_quote_lock_reason($h)) !== '') return 'Not reopened — ' . $why;
             return '';
     }
     return '';
@@ -560,7 +561,10 @@ function pc_restamp($id) {
 }
 
 // A locked (submitted/approved) sheet is read-only until sent back to draft.
-function pc_locked($h) { return in_array((string)($h['status'] ?? 'DRAFT'), ['SUBMITTED', 'APPROVED'], true); }
+function pc_locked($h) {
+    return in_array((string)($h['status'] ?? 'DRAFT'), ['SUBMITTED', 'APPROVED'], true)
+        || pc_quote_lock_reason($h) !== '';          // its quotation has gone for approval or beyond (14 Nov 2026)
+}
 
 // Basis → the unit word a quote line / requirement uses.
 function pc_unit($basis) { return $basis === 'DAILY' ? 'MANDAY' : ($basis === 'FIXED' ? 'LOT' : 'MANMONTH'); }
@@ -931,8 +935,117 @@ function pc_unlink_block_quote($quoteId) {
     foreach ($fam as $q) if ((string)$q['status'] === 'ACCEPTED') return $name($q) . ' has been won — the ' . Tl('client') . ' accepted it.' . $tail;
     foreach ($fam as $q) if ((string)$q['status'] === 'SENT' || trim((string)($q['sent_at'] ?? '')) !== '')
         return $name($q) . ' has gone to the ' . Tl('client') . (trim((string)($q['sent_at'] ?? '')) !== '' ? ' (sent ' . fdate(substr((string)$q['sent_at'], 0, 10)) . ')' : '') . '.' . $tail;
+    //  From 14 Nov 2026 the lock starts when the quotation goes for approval.
+    foreach ($fam as $q) if ((string)$q['status'] === 'APPROVED') return $name($q) . ' has been approved.' . $tail;
+    foreach ($fam as $q) if ((string)$q['status'] === 'PENDING_APPROVAL') return $name($q) . ' has gone for approval.' . $tail;
     return '';
 }
+//  WHICH COSTING PRICES WHICH REVISION, AND IS IT LOCKED (owner, 14 Nov 2026: "Even when the quote
+//  is approved still costing can be unlocked" — answered "Lock from: quote submitted for approval"
+//  and "Revision makes a new costing"). A costing prices the revision it is linked to and the later
+//  revisions that have no costing of their own (and, for a costing stored against a later revision
+//  only, the earlier ones with none). It is locked once any revision it prices has gone for approval,
+//  been approved, sent, won or given a contract — the price stood on these figures. To change them,
+//  raise a revision of the quotation: the revision gets its own copy of the costing, as a draft.
+function pc_quote_lock_reason($h) {
+    $qid = (int)($h['quote_id'] ?? 0); $cid = (int)($h['id'] ?? 0);
+    if (!$qid) return '';
+    try {
+        $one = ops_one("SELECT id, parent_id FROM quotations WHERE id=?", [$qid]);
+        if (!$one) return '';
+        $base = (int)($one['parent_id'] ?: $one['id']);
+        $fam = ops_all("SELECT id, quote_no, rev, status, sent_at, contract_id, contract_number FROM quotations WHERE id=? OR parent_id=? ORDER BY rev, id", [$base, $base]) ?: [];
+        $ids = array_map(fn($r) => (int)$r['id'], $fam);
+        $own = [];                                   // quotation id => the newest costing linked to it
+        foreach (ops_all("SELECT id, quote_id FROM project_costings WHERE quote_id IN (" . implode(',', array_fill(0, count($ids), '?')) . ") ORDER BY id", $ids) ?: [] as $c) $own[(int)$c['quote_id']] = (int)$c['id'];
+        $mine = [];
+        foreach ($fam as $i => $r) {
+            $by = 0;
+            for ($k = $i; $k >= 0 && !$by; $k--) $by = $own[(int)$fam[$k]['id']] ?? 0;          // the costing of this or an earlier revision
+            for ($k = $i + 1; $k < count($fam) && !$by; $k++) $by = $own[(int)$fam[$k]['id']] ?? 0; // else a later one (older data)
+            if ($by === $cid) $mine[] = $r;
+        }
+    } catch (Throwable $e) { return ''; }
+    $tail = ' The costing is the record of how that price was worked out, so it is locked. To change the figures, raise a revision of the '
+          . Tl('quote') . ' — the revision gets its own copy of this costing, to edit and approve.';
+    $name = fn($q) => (string)$q['quote_no'] . ((int)$q['rev'] > 0 ? ' (revision ' . (int)$q['rev'] . ')' : '');
+    foreach ($mine as $q) if ((int)($q['contract_id'] ?? 0) || trim((string)($q['contract_number'] ?? '')) !== '')
+        return $name($q) . ' has a contract' . (trim((string)($q['contract_number'] ?? '')) !== '' ? ' (' . $q['contract_number'] . ')' : '') . '.' . $tail;
+    foreach ($mine as $q) if ((string)$q['status'] === 'ACCEPTED') return $name($q) . ' has been won — the ' . Tl('client') . ' accepted it.' . $tail;
+    foreach ($mine as $q) if ((string)$q['status'] === 'SENT' || trim((string)($q['sent_at'] ?? '')) !== '')
+        return $name($q) . ' has gone to the ' . Tl('client') . (trim((string)($q['sent_at'] ?? '')) !== '' ? ' (sent ' . fdate(substr((string)$q['sent_at'], 0, 10)) . ')' : '') . '.' . $tail;
+    foreach ($mine as $q) if ((string)$q['status'] === 'APPROVED') return $name($q) . ' has been approved.' . $tail;
+    foreach ($mine as $q) if ((string)$q['status'] === 'PENDING_APPROVAL') return $name($q) . ' has gone for approval.' . $tail;
+    return '';
+}
+
+//  A REVISION GETS ITS OWN COSTING (owner, 14 Nov 2026: "once the quote is revised for what so ever
+//  reason and is required to revise the costing it shall be editable"). The costing that priced the
+//  revised quotation is copied — every setting and every role — as a DRAFT linked to the new
+//  revision, so it can be changed and approved; the original stays untouched as the record of the
+//  price that went out. Only when that costing is locked or approved (an editable draft needs no copy).
+function pc_copy_for_revision($fromQuoteId, $newQuoteId) {
+    try {
+        pc_migrate();
+        $src = null;
+        $base = (int) (ops_val("SELECT COALESCE(NULLIF(parent_id,0), id) FROM quotations WHERE id=?", [(int)$fromQuoteId]) ?: 0);
+        if (!$base) return null;
+        //  the costing that prices the revision being revised (the same rule as the lock)
+        foreach (ops_all("SELECT * FROM project_costings WHERE quote_id IN (SELECT id FROM quotations WHERE id=? OR parent_id=?) ORDER BY id DESC", [$base, $base]) ?: [] as $c)
+            if (pc_prices_quote($c, (int)$fromQuoteId)) { $src = $c; break; }
+        if (!$src) return null;
+        if (pc_quote_lock_reason($src) === '') return null;      // not held by its quotation: change it directly
+        $pdo = db(); $me = current_user();
+        $skip = ['id', 'code', 'status', 'quote_id', 'approved_by', 'approved_at', 'approval_ref', 'reject_note', 'created_by', 'created_by_user_id', 'created_at', 'updated_at'];
+        $cols = array_values(array_diff(array_keys($src), $skip));
+        $code = ops_next_code('project_costings', 'code', 'PC');
+        $rev = (int) ops_val("SELECT rev FROM quotations WHERE id=?", [(int)$newQuoteId]);
+        $allCols = array_merge(['code', 'status', 'quote_id', 'created_by', 'created_by_user_id', 'created_at', 'updated_at'], $cols);
+        $vals = array_merge([$code, 'DRAFT', (int)$newQuoteId, user_name($me), (int)($me['id'] ?? 0) ?: null, date('c'), date('c')],
+            array_map(fn($c) => $c === 'title' ? preg_replace('/ \(revision \d+\)$/', '', (string)$src[$c]) . ' (revision ' . $rev . ')' : $src[$c], $cols));
+        $pdo->prepare("INSERT INTO project_costings (" . implode(',', $allCols) . ") VALUES (" . implode(',', array_fill(0, count($allCols), '?')) . ")")->execute($vals);
+        $nid = (int)$pdo->lastInsertId();
+        foreach (ops_all("SELECT * FROM project_costing_lines WHERE costing_id=? ORDER BY id", [(int)$src['id']]) ?: [] as $l) {
+            $lc = array_values(array_diff(array_keys($l), ['id', 'costing_id']));
+            $pdo->prepare("INSERT INTO project_costing_lines (costing_id," . implode(',', $lc) . ") VALUES (?," . implode(',', array_fill(0, count($lc), '?')) . ")")
+                ->execute(array_merge([$nid], array_map(fn($c) => $l[$c], $lc)));
+        }
+        $qno = (string) ops_val("SELECT quote_no FROM quotations WHERE id=?", [(int)$newQuoteId]);
+        pc_trail($nid, 'Costing ' . $code . ' copied from ' . $src['code'] . ' by ' . user_name($me) . ' for ' . $qno . ' revision ' . $rev, 'A draft — change the figures, then submit it for approval.');
+        pc_trail((int)$src['id'], 'Copied to ' . $code . ' for ' . $qno . ' revision ' . $rev . ' by ' . user_name($me) . ' — this costing stays as the record of the earlier price');
+        return ['id' => $nid, 'code' => $code];
+    } catch (Throwable $e) { return null; }
+}
+//  May this revision get an editable copy of its costing? '' = yes; otherwise why not.
+function pc_revise_problem($quoteId) {
+    $q = ops_one("SELECT id, quote_no, rev, status, is_current FROM quotations WHERE id=?", [(int)$quoteId]);
+    if (!$q) return 'Quotation not found.';
+    if (!(int)$q['is_current']) return 'This is an older revision — open the current one.';
+    if (!in_array((string)$q['status'], ['DRAFT', 'REJECTED'], true)) return 'Only a revision still being prepared (a draft, or sent back) can have its costing changed — raise a revision first.';
+    $c = function_exists('crm_quote_costing') ? crm_quote_costing(['id' => (int)$q['id'], 'parent_id' => ops_val("SELECT parent_id FROM quotations WHERE id=?", [(int)$q['id']])]) : null;
+    if (!$c) return 'This quotation has no costing to change.';
+    //  Only a costing held by its quotation (gone for approval or beyond) needs a copy. One that is
+    //  not held is changed directly: a draft is already editable, an approved one is reopened as draft.
+    if (pc_quote_lock_reason($c) === '')
+        return in_array((string)$c['status'], ['SUBMITTED', 'APPROVED'], true)
+            ? 'Its costing ' . $c['code'] . ' is not held by a ' . Tl('quote') . ' that went for approval — open it and use "Reopen as draft".'
+            : 'Its costing ' . $c['code'] . ' is already editable — open it.';
+    return '';
+}
+//  Does this costing price that quotation (by the same rule as the lock)?
+function pc_prices_quote($c, $quoteId) {
+    $one = ops_one("SELECT id, parent_id FROM quotations WHERE id=?", [(int)$quoteId]); if (!$one) return false;
+    $base = (int)($one['parent_id'] ?: $one['id']);
+    $fam = ops_all("SELECT id FROM quotations WHERE id=? OR parent_id=? ORDER BY rev, id", [$base, $base]) ?: [];
+    $ids = array_map(fn($r) => (int)$r['id'], $fam);
+    $own = []; foreach (ops_all("SELECT id, quote_id FROM project_costings WHERE quote_id IN (" . implode(',', array_fill(0, count($ids), '?')) . ") ORDER BY id", $ids) ?: [] as $x) $own[(int)$x['quote_id']] = (int)$x['id'];
+    $i = array_search((int)$quoteId, $ids, true); if ($i === false) return false;
+    $by = 0;
+    for ($k = $i; $k >= 0 && !$by; $k--) $by = $own[$ids[$k]] ?? 0;
+    for ($k = $i + 1; $k < count($ids) && !$by; $k++) $by = $own[$ids[$k]] ?? 0;
+    return $by === (int)$c['id'];
+}
+
 function pc_unlink_block_deal($oppId) {
     $o = $oppId ? ops_one("SELECT * FROM opportunities WHERE id=?", [(int)$oppId]) : null;
     if (!$o) return '';
@@ -1411,6 +1524,24 @@ function ops_projcosting($route, $method) {
         redirect('/project-costing?id=' . $id);
     }
 
+    //  CHANGE THE COSTING FOR A REVISION (owner, 14 Nov 2026: "once the quote is revised … and is
+    //  required to revise the costing it shall be editable"). Offered on a revision still being
+    //  prepared (draft or sent back) whose costing is locked: it copies that costing as an editable
+    //  draft for this revision. The original stays as the record of the earlier price.
+    if ($route === 'project-costing-revise' && $method === 'POST') {
+        $qid = (int)($_POST['quote_id'] ?? 0);
+        $q = $qid ? ops_one("SELECT id, quote_no, rev, status, is_current FROM quotations WHERE id=?", [$qid]) : null;
+        if (!$q) { flash('Quotation not found.', 'error'); redirect('/quotes'); }
+        ops_require(pc_can_edit(), 'You cannot change costings.');
+        $why = pc_revise_problem($qid);
+        if ($why !== '') { flash($why, 'error'); redirect('/quote?id=' . $qid . '#costing'); }
+        $r = pc_copy_for_revision($qid, $qid);
+        if (!$r) { flash('The costing could not be copied.', 'error'); redirect('/quote?id=' . $qid . '#costing'); }
+        if (function_exists('crm_log_change')) crm_log_change($qid, 'Costing ' . $r['code'] . ' copied for this revision by ' . user_name(current_user()) . ' — a draft to change and have approved.');
+        flash('Costing ' . $r['code'] . ' made for ' . $q['quote_no'] . ' revision ' . (int)$q['rev'] . ' — a draft copy. Change the figures, then submit it for approval; the earlier costing stays as it was.');
+        redirect('/project-costing?id=' . $r['id']);
+    }
+
     // ---- Attach / detach a costing to an existing quotation or opportunity ----
     if ($route === 'project-costing-attach' && $method === 'POST') {
         $id = (int)($_POST['costing_id'] ?? 0); $h = pc_get($id);
@@ -1422,7 +1553,7 @@ function ops_projcosting($route, $method) {
         $back = (string)($_POST['back'] ?? '');
         // Removing or moving a link that has become the record of a price (13 Nov 2026).
         $why = '';
-        if ($qid !== null && $was && $qid !== $was) $why = pc_unlink_block_quote($was);
+        if ($qid !== null && $was && $qid !== $was) $why = pc_quote_lock_reason($h);
         if ($why === '' && $oid !== null && $wasOpp && $oid !== $wasOpp) $why = pc_unlink_block_deal($wasOpp);
         if ($why !== '') { flash('Not unlinked — ' . $why, 'error'); redirect($back !== '' ? $back : '/project-costing?id=' . $id); }
         if ($qid !== null) $pdo->prepare("UPDATE project_costings SET quote_id=?, updated_at=? WHERE id=?")->execute([$qid ?: null, date('c'), $id]);

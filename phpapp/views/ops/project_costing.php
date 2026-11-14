@@ -7,6 +7,8 @@ $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
 $csrf = function_exists('csrf_token') ? csrf_token() : '';
 $sym = function_exists('cur_sym') ? cur_sym() : '₹';
 $locked = function_exists('pc_locked') && pc_locked($h);
+//  Locked by its quotation (owner, 14 Nov 2026): gone for approval, approved, sent, won or contracted.
+$qLock = function_exists('pc_quote_lock_reason') ? pc_quote_lock_reason($h) : '';
 $canEdit = function_exists('pc_can_edit') && pc_can_edit() && !$locked;
 // Approving follows the quotation levels (owner, 20 Oct 2026): the person who
 // may sign is the one the CURRENT level waits for, not anyone who may approve.
@@ -69,7 +71,11 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
   <div class="row-actions"><a class="btn secondary" href="/project-costing-print?id=<?= (int)$h['id'] ?>" target="_blank" rel="noopener">🖨 Print / PDF</a></div>
 </div>
 
-<?php if ($locked): ?><div class="lockmsg">🔒 This costing is <b><?= $e(PC_STATUS[$h['status']] ?? $h['status']) ?></b> and read-only.<?php if ($h['status']==='APPROVED' && !empty($h['approved_by'])): ?> Approved by <?= $e($h['approved_by']) ?><?= !empty($h['approval_ref']) ? ' · ref '.$e($h['approval_ref']) : '' ?>.<?php endif; ?><?php if ($canEdit===false && (pc_can_edit())): ?> <form method="post" action="/project-costing-reopen" style="display:inline"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="id" value="<?= (int)$h['id'] ?>"><button class="btn btn-ghost" style="padding:4px 10px">Reopen as draft</button></form><?php endif; ?></div><?php endif; ?>
+<?php if ($locked): ?><div class="lockmsg">🔒 This costing is <b><?= $e(PC_STATUS[$h['status']] ?? $h['status']) ?></b> and read-only<?= $qLock !== '' && !in_array($h['status'], ['SUBMITTED','APPROVED'], true) ? ' — locked by its ' . $e(Tl('quote')) : '' ?>.<?php if ($h['status']==='APPROVED' && !empty($h['approved_by'])): ?> Approved by <?= $e($h['approved_by']) ?><?= !empty($h['approval_ref']) ? ' · ref '.$e($h['approval_ref']) : '' ?>.<?php endif; ?><?php if ($qLock !== ''): ?><br><?= $e($qLock) ?><?php
+      $revQ = !empty($h['quote_id']) ? ops_one("SELECT q.id, q.quote_no, q.rev FROM quotations q WHERE q.is_current=1 AND q.status IN ('DRAFT','REJECTED') AND (q.id=? OR q.parent_id=(SELECT COALESCE(NULLIF(parent_id,0),id) FROM quotations WHERE id=?) OR q.id=(SELECT COALESCE(NULLIF(parent_id,0),id) FROM quotations WHERE id=?)) ORDER BY q.rev DESC LIMIT 1", [(int)$h['quote_id'], (int)$h['quote_id'], (int)$h['quote_id']]) : null;
+      if ($revQ && function_exists('pc_prices_quote') && pc_prices_quote($h, (int)$revQ['id']) && pc_can_edit() && pc_revise_problem((int)$revQ['id']) === ''): ?>
+      <form method="post" action="/project-costing-revise" style="display:inline;margin-left:6px"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="quote_id" value="<?= (int)$revQ['id'] ?>"><button class="btn" style="padding:4px 10px">✎ Change the costing for <?= $e($revQ['quote_no']) ?> revision <?= (int)$revQ['rev'] ?></button></form>
+      <?php endif; ?><?php elseif ($canEdit===false && (pc_can_edit())): ?> <form method="post" action="/project-costing-reopen" style="display:inline"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="id" value="<?= (int)$h['id'] ?>"><button class="btn btn-ghost" style="padding:4px 10px">Reopen as draft</button></form><?php endif; ?></div><?php endif; ?>
 <?php if ($h['status']==='SUBMITTED' && function_exists('pc_waiting_words')): ?><div class="lockmsg" style="background:var(--warn-soft,#fff6e5)">⏳ <?= $e(pc_waiting_words($h)) ?></div><?php endif; ?>
 <?php if ($h['status']==='REJECTED' && !empty($h['reject_note'])): ?><div class="lockmsg" style="background:var(--bad-soft,#fdecec)">↩ Sent back: <?= $e($h['reject_note']) ?></div><?php endif; ?>
 
@@ -691,7 +697,7 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
         <form method="post" action="/project-costing-approve" style="display:flex;gap:6px;align-items:center"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="id" value="<?= (int)$h['id'] ?>"><input class="form-control" name="approval_ref" placeholder="Approval ref (optional)" style="width:170px"><button class="btn primary">Approve</button></form>
         <form method="post" action="/project-costing-reject" style="display:flex;gap:6px;align-items:center"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="id" value="<?= (int)$h['id'] ?>"><input class="form-control" name="reject_note" placeholder="Reason (needed)" required style="width:150px"><button class="btn btn-ghost">Send back</button></form>
       <?php endif; ?>
-      <?php if (!in_array($h['status'],['DRAFT'],true) && function_exists('pc_can_edit') && pc_can_edit()): ?>
+      <?php if (!in_array($h['status'],['DRAFT'],true) && $qLock === '' && function_exists('pc_can_edit') && pc_can_edit()): ?>
         <form method="post" action="/project-costing-reopen"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="id" value="<?= (int)$h['id'] ?>"><button class="btn btn-ghost">Reopen as draft</button></form>
       <?php endif; ?>
       <?php if ($h['status']==='DRAFT' && empty($lines)): ?><span class="muted" style="font-size:12.5px">Add at least one role before submitting.</span><?php endif; ?>
