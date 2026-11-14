@@ -52,19 +52,21 @@ $as = function ($uid) { $_SESSION['uid'] = $uid; current_user(true); ua(true); }
 setting_set('quote_approval_mode', 'order');
 $as($sbu); t_ok(!in_array((int)$q['id'], crm_quote_ids_awaiting_me(), true), 'one after another: level 2 is not asked before level 1');
 setting_set('quote_approval_mode', 'together');
-$as($sbu); t_ok(in_array((int)$q['id'], crm_quote_ids_awaiting_me(), true), 'at the same time: level 2 is asked straight away');
-$as($bm);  t_ok(in_array((int)$q['id'], crm_quote_ids_awaiting_me(), true), '…and so is level 1');
-t_ok(strpos(crm_pending_with($q['id']), 'all at the same time') !== false, 'the quotation says it waits on every level at once');
+//  Owner, 14 Nov 2026: "top management or top approver shall approve the quote at last only whatever
+//  the level setup is" — at the same time, the top level (here level 2, the highest) still signs last.
+$as($sbu); t_ok(!in_array((int)$q['id'], crm_quote_ids_awaiting_me(), true), 'at the same time: the top level (2) is still not asked before the others have signed');
+$as($bm);  t_ok(in_array((int)$q['id'], crm_quote_ids_awaiting_me(), true), '…level 1 is');
+t_ok(strpos(crm_pending_with($q['id']), 'then, last, level 2') !== false, 'the quotation says who signs last: ' . crm_pending_with($q['id']));
 $crm = file_get_contents(__DIR__ . '/../lib/crm.php');
-t_ok(strpos($crm, "crm_approval_mode() === 'order' && (\$_POST['decision'] ?? '') !== 'reject' && (int)\$step['level'] > \$lowest") !== false,
-    'the level-order check applies only when levels approve one after another');
+t_ok(strpos($crm, "!in_array((int)\$step['level'], \$openBefore, true)") !== false,
+    'the approve route checks the level against the levels open now (one rule, appr_open_levels)');
 $keys = array_column(array_merge(...array_column(setupqa_sales_set()['sections'], 'questions')), 'key');
 t_ok(in_array('quote_approval_mode', $keys, true), 'Set up Sales asks how the levels approve');
 
 // Costings follow the same answer.
 $pdo->prepare("UPDATE project_costings SET status='SUBMITTED', quote_id=NULL, created_by_user_id=NULL WHERE id=?")->execute([$pcId]);
 pc_build_approvals(pc_get($pcId));
-$as($sbu); t_ok(pc_can_act(pc_get($pcId)) === (count(pc_steps($pcId)) > 1), 'a costing\'s level 2 may sign at once when levels approve at the same time');
+$as($sbu); t_ok(!pc_can_act(pc_get($pcId)) || count(pc_steps($pcId)) < 2, 'a costing follows the same rule: its top level does not sign before the others');
 
 unset($_SESSION['uid']); current_user(true); ua(true);
 setting_set('quote_approval_mode', $oldMode); setting_set('quote_unmatched_approval', $oldPol);

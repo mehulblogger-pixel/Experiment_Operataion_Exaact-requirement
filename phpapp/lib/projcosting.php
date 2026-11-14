@@ -271,11 +271,20 @@ function pc_step_people($step, $h) {
 }
 // The levels that may sign now: the lowest waiting one, or — when the company
 // chose that all levels sign at the same time (Set up Sales) — every waiting one.
+//  Top management signs last, and nobody before the people who report to them (owner, 14 Nov 2026) —
+//  the one rule the quotation uses (appr_open_levels in lib/crm.php).
 function pc_open_levels($id) {
-    if (function_exists('crm_approval_mode') && crm_approval_mode() === 'together')
-        return array_map('intval', array_column(ops_all("SELECT DISTINCT level FROM project_costing_approvals WHERE costing_id=? AND status='PENDING' ORDER BY level", [(int)$id]) ?: [], 'level'));
+    if (function_exists('appr_open_levels')) {
+        $h = pc_get($id);
+        return $h ? appr_open_levels(pc_steps((int)$id), fn($s) => pc_step_people($s, $h)) : [];
+    }
     $l = pc_current_level($id);
     return $l ? [$l] : [];
+}
+//  The levels that sign last on this costing (top management, else the highest level).
+function pc_last_levels($id) {
+    $h = pc_get($id);
+    return ($h && function_exists('appr_last_levels')) ? appr_last_levels(pc_steps((int)$id), fn($s) => pc_step_people($s, $h)) : [];
 }
 // The lowest open level the person signed in may sign (0 = none).
 function pc_my_level($h) {
@@ -297,7 +306,7 @@ function pc_can_act($h) {
 }
 // Sign the level that is mine. Returns 'APPROVED' when nothing is left, else 'NEXT'.
 function pc_sign_level($h, $ref = '') {
-    $id = (int)$h['id']; $lvl = pc_my_level($h) ?: pc_current_level($id); $me = current_user();
+    $id = (int)$h['id']; $lvl = pc_my_level($h) ?: (pc_open_levels($id)[0] ?? pc_current_level($id)); $me = current_user();
     if ($lvl) db()->prepare("UPDATE project_costing_approvals SET status='APPROVED', acted_by=?, acted_by_id=?, acted_at=?, remarks=? WHERE costing_id=? AND level=? AND status='PENDING'")
         ->execute([user_name($me), (int)($me['id'] ?? 0) ?: null, date('c'), substr(trim((string)$ref), 0, 400), $id, $lvl]);
     $refTxt = trim((string)$ref) !== '' ? ' · ref ' . trim((string)$ref) : '';
@@ -331,15 +340,19 @@ function pc_level_words($step, $h, $limit = 3) {
 function pc_preview_levels($h) {
     $steps = function_exists('crm_quote_rule_steps') ? crm_quote_rule_steps(pc_as_quote($h)) : [];
     if (!$steps) return [pc_level_words(['level' => 1, 'approver_role' => '', 'approver_user_id' => null, 'status' => 'PENDING'], $h)];
-    $out = [];
+    $out = []; $ps = [];
     foreach ($steps as $st) {
         $role = (string)($st['approver_role'] ?? ''); $uid = ($st['approver_user_id'] ?? null) ?: null;
         if ($role === 'REPORTS_TO') {
             $uid = (!empty($h['created_by_user_id']) && function_exists('reporting_manager_at')) ? (reporting_manager_at((int)$h['created_by_user_id'], (int)$st['level']) ?: null) : null;
             $role = '';
         }
-        $out[] = pc_level_words(['level' => (int)$st['level'], 'approver_role' => $role, 'approver_user_id' => $uid, 'status' => 'PENDING'], $h);
+        $ps[] = ['level' => (int)$st['level'], 'approver_role' => $role, 'approver_user_id' => $uid, 'status' => 'PENDING'];
     }
+    //  In the order they will sign: top management last (owner, 14 Nov 2026).
+    $lastL = (count($ps) > 1 && function_exists('appr_last_levels')) ? appr_last_levels($ps, fn($x) => pc_step_people($x, $h)) : [];
+    usort($ps, fn($a, $b) => [in_array($a['level'], $lastL, true) ? 1 : 0, $a['level']] <=> [in_array($b['level'], $lastL, true) ? 1 : 0, $b['level']]);
+    foreach ($ps as $p) $out[] = pc_level_words($p, $h) . (in_array($p['level'], $lastL, true) ? ' — signs last' : '');
     return $out;
 }
 
@@ -349,9 +362,14 @@ function pc_waiting_words($h) {
     if ($st === 'DRAFT')    return 'Not submitted yet — ' . ($h['created_by'] ?: 'its author') . ' submits it for approval when it is ready.';
     if ($st === 'REJECTED') return 'Sent back — it is changed and submitted again before a quotation can be made.';
     if ($st !== 'SUBMITTED') return '';
-    $open = pc_open_levels((int)$h['id']); $out = [];
-    foreach (pc_steps((int)$h['id']) as $s) if ($s['status'] === 'PENDING' && in_array((int)$s['level'], $open, true)) $out[] = pc_level_words($s, $h);
-    return $out ? 'Waiting for ' . implode('; ', $out) . '.' : 'Waiting for approval.';
+    $open = pc_open_levels((int)$h['id']); $out = []; $later = [];
+    $lastL = pc_last_levels((int)$h['id']);
+    foreach (pc_steps((int)$h['id']) as $s) {
+        if ($s['status'] !== 'PENDING') continue;
+        if (in_array((int)$s['level'], $open, true)) $out[] = pc_level_words($s, $h);
+        elseif (in_array((int)$s['level'], $lastL, true)) $later[] = pc_level_words($s, $h);
+    }
+    return $out ? 'Waiting for ' . implode('; ', $out) . ($later ? '; then, last, ' . implode('; ', array_unique($later)) : '') . '.' : 'Waiting for approval.';
 }
 
 //  WHO MAY REOPEN AN APPROVED COSTING (owner, 14 Nov 2026: "Costing once approved shall not be able to
@@ -364,7 +382,11 @@ function pc_waiting_words($h) {
 //  (Once its quotation has gone for approval nobody may reopen it — pc_quote_lock_reason.)
 function pc_last_approval($h) {
     $steps = pc_steps((int)$h['id']); $last = null;
-    foreach ($steps as $st) if ($st['status'] === 'APPROVED' && (!$last || (int)$st['level'] >= (int)$last['level'])) $last = $st;
+    //  The one who signed last: top management when it is in the chain (it signs last — 14 Nov 2026),
+    //  otherwise the highest level.
+    $lastL = pc_last_levels((int)$h['id']);
+    $rank = fn($st) => [in_array((int)$st['level'], $lastL, true) ? 1 : 0, (int)$st['level']];
+    foreach ($steps as $st) if ($st['status'] === 'APPROVED' && (!$last || $rank($st) >= $rank($last))) $last = $st;
     //  Approved before levels were kept: the one named as having approved it.
     if (!$last && trim((string)($h['approved_by'] ?? '')) !== '') $last = ['level' => 0, 'acted_by' => (string)$h['approved_by'], 'acted_by_id' => 0, 'status' => 'APPROVED'];
     if (!$last) return null;
@@ -1707,19 +1729,19 @@ function ops_projcosting($route, $method) {
             }
             $together = function_exists('crm_approval_mode') && crm_approval_mode() === 'together';
             $lv = []; foreach (pc_steps($id) as $s) $lv[] = pc_level_words($s, $h2);
-            pc_trail($id, 'Submitted for approval by ' . user_name(current_user()) . ' — ' . $n . ' level' . ($n === 1 ? '' : 's') . ($n > 1 ? ($together ? ', all at the same time' : ', in order') : ''),
+            pc_trail($id, 'Submitted for approval by ' . user_name(current_user()) . ' — ' . $n . ' level' . ($n === 1 ? '' : 's') . ($n > 1 ? ($together ? ', the others at the same time and the last one after them' : ', in order') : ''),
                 implode("\n", $lv));
-            flash('Costing submitted for approval — ' . $n . ' level' . ($n === 1 ? '' : 's') . ' to pass' . ($n > 1 ? ($together ? ', all at the same time.' : ', in order.') : '.'));
+            flash('Costing submitted for approval — ' . $n . ' level' . ($n === 1 ? '' : 's') . ' to pass' . ($n > 1 ? ($together ? ', the others at the same time and the last one after them.' : ', in order.') : '.'));
         } elseif ($route === 'project-costing-approve') {
+            $openBefore = pc_open_levels($id);
             $r = pc_sign_level($h, (string)($_POST['approval_ref'] ?? ''));
             if ($r === 'APPROVED') flash('Costing approved — a quotation can now be made from it.');
-            elseif (function_exists('crm_approval_mode') && crm_approval_mode() === 'together') {
-                flash('Your level is signed — still waiting for level ' . implode(', ', pc_open_levels($id)) . '.');
-            } else {
-                $h2 = pc_get($id); $lvl = pc_current_level($id);
-                foreach (pc_steps($id) as $s) if ((int)$s['level'] === $lvl)
+            else {
+                //  Tell whoever this signature has just let in (the next level, or top management last).
+                $h2 = pc_get($id); $newly = array_diff(pc_open_levels($id), $openBefore); $lvl = implode(', ', pc_open_levels($id));
+                foreach (pc_steps($id) as $s) if ($s['status'] === 'PENDING' && in_array((int)$s['level'], $newly, true))
                     foreach (pc_step_people($s, $h2) as $ap) if (trim((string)($ap['email'] ?? '')) !== '' && function_exists('ops_mail'))
-                        ops_mail($ap['email'], 'Approval needed: costing ' . $h2['code'], "Hello,\n\nProject costing {$h2['code']} — {$h2['title']} has passed the level below and is waiting for your approval (level $lvl).\n", '', 'COSTING_APPROVAL');
+                        ops_mail($ap['email'], 'Approval needed: costing ' . $h2['code'], "Hello,\n\nProject costing {$h2['code']} — {$h2['title']} has passed the level below and is waiting for your approval (level {$s['level']}).\n", '', 'COSTING_APPROVAL');
                 flash('Your level is signed — it now waits for level ' . $lvl . '.');
             }
         } elseif ($route === 'project-costing-reject') {

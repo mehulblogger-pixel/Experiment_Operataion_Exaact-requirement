@@ -1488,6 +1488,85 @@ function crm_approval_mode() {
     return (string) setting_get('quote_approval_mode', 'order') === 'together' ? 'together' : 'order';
 }
 
+//  TOP MANAGEMENT SIGNS LAST (owner, 14 Nov 2026: "the business director in any case shall approve
+//  the quote at last only after approval of all the other reporting directly or indirectly to him …
+//  top management or top approver shall approve the quote at last only whatever the level setup is").
+//
+//  One rule for every approval chain built from the quotation levels — quotations and project
+//  costings — given the chain's steps and who holds each:
+//   1. The LAST group is the level(s) held by top management (a Business Director — APPR_TOP_ROLES),
+//      wherever the setup put them; with no top management in the chain, the highest level.
+//   2. Every other level signs first: in order (level 1, then 2 …) or all at the same time, as Set up
+//      Sales says. The last group opens only when all of them have signed.
+//   3. At the same time, nobody signs before the people who report to them, directly or indirectly,
+//      and who are also in this chain (reporting line on People). Should that ever leave nobody able
+//      to sign (a crossed setup), everyone in the group may sign — a chain must never stall.
+//  Returns the waiting levels that may sign now. $peopleOf(step) → the users who hold that step.
+const APPR_TOP_ROLES = ['BUSINESS_DIRECTOR'];
+function appr_step_is_top($step, callable $peopleOf) {
+    if (in_array(strtoupper((string)($step['approver_role'] ?? '')), APPR_TOP_ROLES, true)) return true;
+    if (!empty($step['approver_user_id'])) {
+        $r = (string) ops_val("SELECT role FROM users WHERE id=?", [(int)$step['approver_user_id']]);
+        return in_array(strtoupper($r), APPR_TOP_ROLES, true);
+    }
+    return false;
+}
+//  The levels of the chain that sign last (see above).
+function appr_last_levels(array $steps, callable $peopleOf) {
+    $top = [];
+    foreach ($steps as $s) if (appr_step_is_top($s, $peopleOf)) $top[(int)$s['level']] = true;
+    if ($top) return array_keys($top);
+    $max = 0; foreach ($steps as $s) $max = max($max, (int)$s['level']);
+    return $max ? [$max] : [];
+}
+function appr_open_levels(array $steps, callable $peopleOf, $mode = null) {
+    $mode = $mode ?? crm_approval_mode();
+    $pending = [];
+    foreach ($steps as $s) if (strtoupper((string)($s['status'] ?? '')) === 'PENDING') $pending[(int)$s['level']][] = $s;
+    if (!$pending) return [];
+    ksort($pending);
+    $last = appr_last_levels($steps, $peopleOf);
+    $first = array_diff(array_keys($pending), $last);
+    $group = $first ? array_values($first) : array_values(array_intersect(array_keys($pending), $last));
+    sort($group);
+    if ($mode !== 'together') return [$group[0]];
+    if (count($group) < 2) return $group;
+    //  3. the reporting line: a level waits while someone in another waiting level reports to it.
+    $ids = [];
+    foreach ($group as $lvl) { $ids[$lvl] = []; foreach ($pending[$lvl] as $s) foreach ($peopleOf($s) as $u) $ids[$lvl][(int)$u['id']] = true; }
+    $above = [];   // user id → the ids above them in the reporting line
+    $chainOf = function ($uid) use (&$above) {
+        if (!isset($above[$uid])) { $above[$uid] = [];
+            if (function_exists('reporting_chain')) foreach (reporting_chain($uid) as $m) if (!empty($m['user_id'])) $above[$uid][(int)$m['user_id']] = true; }
+        return $above[$uid];
+    };
+    $open = [];
+    foreach ($group as $a) {
+        $waits = false;
+        foreach ($group as $b) {
+            if ($a === $b || $waits) continue;
+            if (array_intersect_key($ids[$a], $ids[$b])) continue;            // the same person holds both: no order between them
+            foreach (array_keys($ids[$b]) as $ub) if (array_intersect_key($chainOf($ub), $ids[$a])) { $waits = true; break; }
+        }
+        if (!$waits) $open[] = $a;
+    }
+    return $open ?: $group;
+}
+//  The levels of a quotation that may sign now.
+function crm_quote_open_levels($qid) {
+    $steps = ops_all("SELECT * FROM quote_approvals WHERE quote_id=? ORDER BY level, id", [(int)$qid]) ?: [];
+    return appr_open_levels($steps, 'crm_step_approvers_direct');
+}
+//  In words, for a waiting chain: who signs last, and why.
+function appr_last_words(array $steps, callable $peopleOf, callable $whoOf) {
+    $pend = array_filter($steps, fn($s) => strtoupper((string)$s['status']) === 'PENDING');
+    if (count(array_unique(array_map(fn($s) => (int)$s['level'], $pend))) < 2) return '';
+    $last = appr_last_levels($steps, $peopleOf);
+    $names = [];
+    foreach ($pend as $s) if (in_array((int)$s['level'], $last, true)) $names[] = 'level ' . (int)$s['level'] . ' — ' . $whoOf($s);
+    return $names ? 'Signs last, once everyone else has: ' . implode('; ', array_unique($names)) . '.' : '';
+}
+
 // D-08 — the person assigned to the quotation (its owner, else whoever raised
 // it) is the one who records the customer's answer.
 function crm_quote_is_mine($q) {
@@ -2482,6 +2561,12 @@ function ops_crm_quotes($route, $method) {
             'approvals' => crm_approvals($q['id']),
             'lostReasons' => lk_options_or('quote_lost_reason', QUOTE_LOST_REASONS),
             'canApprove' => can('crm.quote.approve') || is_master(), 'canSend' => can('crm.quote.send') || is_master(),
+            //  Owner, 14 Nov 2026: "Suppose I cannot submit quote for approval then why I am being shown
+            //  submit quote for approval." The button is drawn only for someone the server lets submit,
+            //  and only when nothing would refuse it — otherwise the page says why, or who does it.
+            'canSubmit' => crm_quote_can_work($q),
+            'submitProblem' => in_array($q['status'], ['DRAFT', 'REJECTED'], true) ? crm_quote_transition_problem($q, 'PENDING_APPROVAL') : '',
+            'sendProblem' => in_array($q['status'], ['DRAFT', 'REJECTED', 'APPROVED'], true) ? crm_quote_transition_problem($q, 'SENT') : '',
             // The owner's rules (20 Oct): approval only where the rules call for it,
             // and the customer's answer recorded by the person assigned.
             'needsApproval' => crm_quote_needs_approval($q), 'canDecide' => crm_quote_can_record_decision($q),
@@ -2499,6 +2584,7 @@ function ops_crm_quotes($route, $method) {
             'canContract' => can('crm.contract.register') || is_master(),
             // §xii — who the approval is actually sitting with, right now.
             'pendingWith' => crm_pending_with($q['id']), 'pendingStep' => crm_pending_step($q['id']),
+            'openLevels' => crm_quote_open_levels($q['id']),
             'stepPeople' => array_map(fn($s) => crm_step_approvers($s), crm_approvals($q['id'])),
             'locs' => crm_quote_locations($q['id']),
             'files' => crm_quote_files($q['id']),
@@ -2594,9 +2680,10 @@ function ops_crm_quotes($route, $method) {
             crm_log_change($q['id'], 'Submitted for approval');
             // §xii — say who it is now sitting with, and tell them.
             $with = crm_pending_with($q['id']);
-            $askNow = crm_approval_mode() === 'together'
-                ? (ops_all("SELECT * FROM quote_approvals WHERE quote_id=? AND status='PENDING' ORDER BY level, id", [$q['id']]) ?: [])
-                : array_filter([crm_pending_step($q['id'])]);
+            //  Only the levels that may sign now are asked — top management last (owner, 14 Nov 2026).
+            $openL = crm_quote_open_levels($q['id']);
+            $askNow = array_values(array_filter(ops_all("SELECT * FROM quote_approvals WHERE quote_id=? AND status='PENDING' ORDER BY level, id", [$q['id']]) ?: [],
+                                                fn($a) => in_array((int)$a['level'], $openL, true)));
             $told = [];
             foreach (array_merge(...array_map('crm_step_approvers', $askNow ?: [[]])) as $ap) {
                 if (isset($told[(int)$ap['id']])) continue; $told[(int)$ap['id']] = true;
@@ -2635,11 +2722,14 @@ function ops_crm_quotes($route, $method) {
                 }
             } catch (Throwable $e) { /* never block marking the quote lost */ }
         } elseif ($to === 'SENT') {
-            [$sent, $msg] = crm_send_quote_email($q);
+            //  Sent by hand from the person's own mailbox (Gmail / Outlook): marked sent, and the
+            //  client is NOT e-mailed a second time (owner, 14 Nov 2026).
+            $byHand = !empty($_POST['by_hand']);
+            [$sent, $msg] = $byHand ? [false, ''] : crm_send_quote_email($q);
             $pdo->prepare("UPDATE quotations SET status='SENT', sent_at=? WHERE id=?")->execute([date('c'), $q['id']]);
             crm_log_change($q['id'], 'Sent to the ' . Tl('client') . ' by ' . $me
                 . ($q['status'] !== 'APPROVED' ? ' — no approval was needed under your approval rules' : '')
-                . ($sent ? ' (e-mailed to ' . $q['contact_email'] . ').' : '.'));
+                . ($sent ? ' (e-mailed to ' . $q['contact_email'] . ').' : ($byHand ? ' — from their own mailbox.' : '.')));
             crm_schedule_followups($q['id']);
             // SYNC — sending the quotation nudges the deal to its "quotation sent"
             // step, but only FORWARD: a deal already further along is never dragged
@@ -2662,7 +2752,8 @@ function ops_crm_quotes($route, $method) {
                     }
                 }
             } catch (Throwable $e) { /* never block sending */ }
-            flash($sent ? ('Quotation e-mailed to ' . $q['contact_email'] . ' and marked sent — follow-ups scheduled.') : ('Marked sent and follow-ups scheduled; ' . $msg), $sent ? 'success' : 'warning');
+            if ($byHand) flash('Marked sent — you sent it from your own mailbox, so nothing was e-mailed from here. Follow-ups scheduled.', 'success');
+            else flash($sent ? ('Quotation e-mailed to ' . $q['contact_email'] . ' and marked sent — follow-ups scheduled.') : ('Marked sent and follow-ups scheduled; ' . $msg), $sent ? 'success' : 'warning');
             redirect('/quote?id=' . $q['id']);
         } elseif ($to === 'ACCEPTED') {
             // Same company, or a different one? When the quotation names its
@@ -2967,9 +3058,13 @@ function ops_crm_quotes($route, $method) {
         // D-05 — levels sign in order. Approvers at the same level may sign in
         // any order; a higher level waits until every lower level has signed —
         // unless the company chose that all levels sign at the same time.
-        $lowest = (int) ops_val("SELECT MIN(level) FROM quote_approvals WHERE quote_id=? AND status='PENDING'", [$q['id']]);
-        if (crm_approval_mode() === 'order' && ($_POST['decision'] ?? '') !== 'reject' && (int)$step['level'] > $lowest) {
-            flash('Level ' . $lowest . ' approves first — this ' . Tl('quote') . ' reaches level ' . (int)$step['level'] . ' when it has.', 'error');
+        //  Top management signs last, and nobody before the people who report to them (owner, 14 Nov 2026).
+        $openBefore = crm_quote_open_levels($q['id']);
+        if (($_POST['decision'] ?? '') !== 'reject' && !in_array((int)$step['level'], $openBefore, true)) {
+            $allSteps = ops_all("SELECT * FROM quote_approvals WHERE quote_id=? ORDER BY level, id", [$q['id']]) ?: [];
+            $isLast = in_array((int)$step['level'], appr_last_levels($allSteps, 'crm_step_approvers_direct'), true);
+            flash($isLast ? 'Level ' . (int)$step['level'] . ' signs last — once every other level has approved. Now with ' . (crm_pending_with($q['id']) ?: 'the levels before it') . '.'
+                          : 'Not yet — this ' . Tl('quote') . ' is now with ' . (crm_pending_with($q['id']) ?: 'the level before') . '. It reaches level ' . (int)$step['level'] . ' when they have signed.', 'error');
             redirect('/quote?id=' . $q['id']);
         }
         // D-11 A — its costing may have been reopened while it waited.
@@ -3007,6 +3102,18 @@ function ops_crm_quotes($route, $method) {
                 flash('All approvals complete — ' . Tl('quote') . ' approved and ready to send.');
             } else {
                 crm_log_change($q['id'], 'Approved at level ' . (int)$step['level'] . ' by ' . $me);
+                //  Tell whoever this signature has just let in (the next level, or top management last).
+                $nowOpen = array_diff(crm_quote_open_levels($q['id']), $openBefore);
+                if ($nowOpen) { $told = [];
+                    foreach (ops_all("SELECT * FROM quote_approvals WHERE quote_id=? AND status='PENDING' ORDER BY level, id", [$q['id']]) ?: [] as $ns) {
+                        if (!in_array((int)$ns['level'], $nowOpen, true)) continue;
+                        foreach (crm_step_approvers($ns) as $ap) {
+                            if (isset($told[(int)$ap['id']]) || trim((string)($ap['email'] ?? '')) === '') continue; $told[(int)$ap['id']] = true;
+                            ops_mail($ap['email'], 'Approval needed: ' . quote_label($q),
+                                "Hello,\n\n" . quote_label($q) . " ({$q['client_name']}, " . fmoney($q['total_amount']) . ") has passed the levels before yours and is waiting for your approval (level {$ns['level']}).\n\n"
+                                . "Open it in " . app_name() . " to approve or reject it with a comment.\n", '', 'QUOTE_APPROVAL');
+                        }
+                    } }
                 $next = crm_pending_with($q['id']);
                 flash('Your approval is recorded. Now with ' . ($next ?: 'the next approver') . '.');
             }
@@ -3034,6 +3141,13 @@ function ops_crm_quotes($route, $method) {
         // Signed at the same time (Set up Sales), a later level did not rely on this one.
         $after = crm_approval_mode() === 'together' ? [] : ops_all("SELECT * FROM quote_approvals WHERE quote_id=? AND status='APPROVED' AND level > ?",
                          [$q['id'], (int)$step['level']]);
+        //  Top management signed last, relying on every other level: theirs is void with it (14 Nov 2026).
+        $lastL = appr_last_levels(ops_all("SELECT * FROM quote_approvals WHERE quote_id=?", [$q['id']]) ?: [], 'crm_step_approvers_direct');
+        if (!in_array((int)$step['level'], $lastL, true)) {
+            $seenA = array_flip(array_map(fn($a) => (int)$a['id'], $after));
+            foreach (ops_all("SELECT * FROM quote_approvals WHERE quote_id=? AND status='APPROVED'", [$q['id']]) ?: [] as $a)
+                if (in_array((int)$a['level'], $lastL, true) && !isset($seenA[(int)$a['id']]) && (int)$a['id'] !== (int)$step['id']) $after[] = $a;
+        }
         foreach ($after as $a)
             $pdo->prepare("UPDATE quote_approvals SET status='PENDING', acted_by='', acted_at='', remarks=? WHERE id=?")
                 ->execute(['Reset — level ' . (int)$step['level'] . ' was taken back by ' . $me, $a['id']]);
@@ -3198,12 +3312,16 @@ function ops_crm_quotes($route, $method) {
     // a Send button, so the client receives it from the person, not the robot.
     if ($route === 'quote-compose') {
         $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
-        ops_require(can('crm.quote.send') || can('crm.quote.create') || is_master(), 'You cannot send ' . Tlp('quote') . '.');
+        //  Sending is crm.quote.send (docs/02: a Marketing Executive "Cannot: send or approve quotes").
+        //  This used to admit anyone who may create a quotation, so an executive was offered "Send from
+        //  my mailbox" beside "sending is not yours to do" (owner, 14 Nov 2026).
+        ops_require(can('crm.quote.send') || is_master(), 'You cannot send ' . Tlp('quote') . '.');
         [$subject, $body] = crm_quote_message($q);
         [$fromEmail, $fromName] = compose_from();
         $to = (string)($q['contact_email'] ?? '');
         $mode = $_GET['mode'] ?? 'eml';
         if ($mode === 'mailto') { redirect(compose_mailto($to, $subject, $body)); }
+        if ($mode === 'gmail')  { crm_log_change($q['id'], 'Opened in Gmail by ' . ($fromName ?: 'the sender') . ' to send by hand'); redirect(compose_gmail($to, $subject, $body)); }
         if ($mode === 'owa')    { redirect(compose_owa($to, $subject, $body)); }
         // Default: a real draft, with the quotation PDF and anything marked to
         // go out with it already attached.
@@ -4067,11 +4185,11 @@ function crm_escalate_quote_approvals($now = null) {
     $now = $now ?? time(); $n = 0;
     $rows = ops_all("SELECT a.* FROM quote_approvals a JOIN quotations q ON q.id=a.quote_id
                      WHERE a.status='PENDING' AND COALESCE(a.escalated_at,'')='' AND q.is_current=1 AND q.status='PENDING_APPROVAL'
-                       AND a.level = (SELECT MIN(a2.level) FROM quote_approvals a2 WHERE a2.quote_id=a.quote_id AND a2.status='PENDING')
                      ORDER BY a.quote_id, a.id") ?: [];
     $done = [];
     foreach ($rows as $st) {
         $qid = (int)$st['quote_id']; $lvl = (int)$st['level'];
+        if (!in_array($lvl, crm_quote_open_levels($qid), true)) continue;   // only the level it is waiting on now
         if (isset($done[$qid . ':' . $lvl])) continue;
         $q = crm_quote_get($qid); if (!$q) continue;
         // When this level started waiting: the last signature below it, else submission.
@@ -4149,19 +4267,27 @@ function crm_step_who($step, $max = 3) {
 }
 // The lowest still-pending level, and who it is with — as a readable phrase.
 function crm_pending_with($qid) {
-    if (crm_approval_mode() === 'together') {
-        $all = ops_all("SELECT * FROM quote_approvals WHERE quote_id=? AND status='PENDING' ORDER BY level, id", [(int)$qid]) ?: [];
-        if (count($all) > 1) {
-            $parts = [];
-            foreach ($all as $s) $parts[] = 'level ' . (int)$s['level'] . ': ' . crm_step_who($s, 2);
-            return implode('; ', $parts) . ' (all at the same time)';
-        }
-    }
-    $step = ops_one("SELECT * FROM quote_approvals WHERE quote_id=? AND status='PENDING' ORDER BY level, id LIMIT 1", [(int)$qid]);
-    return $step ? crm_step_who($step) : '';
+    //  Only the levels that may sign now; top management is named as signing last (14 Nov 2026).
+    $open = crm_quote_open_levels($qid);
+    $now = array_values(array_filter(ops_all("SELECT * FROM quote_approvals WHERE quote_id=? AND status='PENDING' ORDER BY level, id", [(int)$qid]) ?: [],
+                                     fn($s) => in_array((int)$s['level'], $open, true)));
+    if (!$now) return '';
+    if (count($now) > 1) {
+        $parts = [];
+        foreach ($now as $s) $parts[] = 'level ' . (int)$s['level'] . ': ' . crm_step_who($s, 2);
+        $txt = implode('; ', $parts) . ' (at the same time)';
+    } else $txt = crm_step_who($now[0]);
+    $all = ops_all("SELECT * FROM quote_approvals WHERE quote_id=? ORDER BY level, id", [(int)$qid]) ?: [];
+    $lastL = appr_last_levels($all, 'crm_step_approvers_direct');
+    $later = array_filter($all, fn($s) => $s['status'] === 'PENDING' && in_array((int)$s['level'], $lastL, true) && !in_array((int)$s['level'], $open, true));
+    if ($later) $txt .= '; then, last, ' . implode('; ', array_unique(array_map(fn($s) => 'level ' . (int)$s['level'] . ': ' . crm_step_who($s, 2), $later)));
+    return $txt;
 }
 function crm_pending_step($qid) {
-    return ops_one("SELECT * FROM quote_approvals WHERE quote_id=? AND status='PENDING' ORDER BY level, id LIMIT 1", [(int)$qid]);
+    $open = crm_quote_open_levels($qid);
+    foreach (ops_all("SELECT * FROM quote_approvals WHERE quote_id=? AND status='PENDING' ORDER BY level, id", [(int)$qid]) ?: [] as $s)
+        if (in_array((int)$s['level'], $open, true)) return $s;
+    return null;
 }
 // How many quotations are sitting on ME right now for approval — used by the
 // dashboard "Your pending tasks" list. A quote counts when its CURRENT step (the
@@ -4183,10 +4309,13 @@ function crm_quotes_awaiting_me() {
 function crm_quote_ids_awaiting_me() {
     $ids = [];
     $rows = ops_all("SELECT a.*, q.office_id q_office, q.sbu q_sbu FROM quote_approvals a JOIN quotations q ON q.id=a.quote_id
-                     WHERE a.status='PENDING' AND q.is_current=1 AND q.status='PENDING_APPROVAL'
-                       AND (? = 'together' OR a.level = (SELECT MIN(a2.level) FROM quote_approvals a2 WHERE a2.quote_id=a.quote_id AND a2.status='PENDING'))", [crm_approval_mode()]) ?: [];
+                     WHERE a.status='PENDING' AND q.is_current=1 AND q.status='PENDING_APPROVAL'") ?: [];
+    $openOf = [];   // the levels of each quotation that may sign now (top management last)
     foreach ($rows as $st) {
         if (isset($ids[(int)$st['quote_id']])) continue;
+        $qk = (int)$st['quote_id'];
+        if (!isset($openOf[$qk])) $openOf[$qk] = crm_quote_open_levels($qk);
+        if (!in_array((int)$st['level'], $openOf[$qk], true)) continue;
         //  A unit-only level is checked against its own unit (owner, 12 Nov 2026).
         if (function_exists('scope_allows') && !is_master() && !scope_allows($st['q_office'] ?? null, trim((string)($st['sbu'] ?? '')) !== '' ? $st['sbu'] : ($st['q_sbu'] ?? null))) continue;
         if (crm_can_act_approval($st)) $ids[(int)$st['quote_id']] = true;

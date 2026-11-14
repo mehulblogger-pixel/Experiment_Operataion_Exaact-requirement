@@ -96,9 +96,9 @@ C('SAL-007', 'Before you start', 'Approval rules of 21 Oct: no levels = no appro
   [('Set up Sales → note your levels, then Remove every level. As Test BDM make a ₹1,00,000 quotation and press Submit for approval.', '"No approval is needed for this quote — your company has no approval levels. It is ready to send." Status Approved. Put your levels back afterwards (SAL-003).'),
    ('With the levels back: make a project costing from an enquiry (SAL-050), get it approved (SAL-051), "Make a quotation" from it, change nothing, Submit for approval.', '"No approval is needed … it is at the prices of its approved project costing, which the approval levels already signed." Status Approved — no second round.'),
    ('Make another quotation from the same costing; as its creator change one rate, with the note the screen asks for; Submit.', 'It goes to the approval levels like any quotation (the price is no longer the costing\'s).'),
-   ('Set up Sales → "When a quote needs more than one level, how do the levels approve?" → "All at the same time — every level is asked at once" → Save these answers.', 'Saved. The escalation question now notes it is not used in this mode.'),
-   ('As Test BDM submit a ₹6,00,000 quotation (two levels). Sign in as Test MktMgr (level 2) → Approvals.', 'It is listed straight away — level 2 does not wait for level 1. The quotation reads "Now with level 1: …; level 2: … (all at the same time)".'),
-   ('Test MktMgr approves first, then Test BranchMgr.', 'After the second signature: "All approvals complete — quote approved and ready to send."'),
+   ('Set up Sales → "When a quote needs more than one level, how do the levels approve?" → "At the same time — every level but the top one at once; the top one last" → Save these answers.', 'Saved. The escalation question now notes it is used only one after another.'),
+   ('As Test BDM submit a ₹6,00,000 quotation with three levels, the top one a Business Director. Sign in as Test MktMgr (level 2) → Approvals.', 'It is listed straight away — level 2 does not wait for level 1 (unless one reports to the other). The quotation reads "Now with level 1: …; level 2: … (at the same time); then, last, level 3: <Business Director>". (From 14 Nov 2026 top management always signs last — SAL-192.)'),
+   ('Test MktMgr and Test BranchMgr approve, then the Business Director.', 'After the second signature: "All approvals complete — quote approved and ready to send."'),
    ('Switch the answer back to "One after another" and Save.', 'Level 2 is again asked only after level 1 has signed.')],
   'owner 21 Oct 2026; crm_quote_needs_approval(); quote_approval_mode', live=False)
 
@@ -436,7 +436,7 @@ C('SAL-184', 'Project costing', 'Who prepared, who approved, what is pending —
   'several', 'Owner, 13 Nov 2026: "after every approval a create quotation button is there available … including costing creator and costing approver at each stage. We must have a trail that who has created the costing, who has approved and what is pending."',
   'Test BDM (author), Test Marketing Manager and Test Business Director as approvers. Set up Sales: two levels apply to the costing\'s value, and "All at the same time" is chosen. A Draft costing with one role.',
   [('[BDM] Open the draft costing → scroll to "Use this costing" and to "Approval".', 'No "Create quotation" button. Instead: "📝 Create quotation is offered once this costing is fully approved. Not submitted yet — …". The Approval box starts the trail: "✎ Prepared by <you> <date time>".'),
-   ('[BDM] "Submit for approval".', '"Costing submitted for approval — 2 levels to pass, all at the same time." A band at the top: "⏳ Waiting for Level 1 — Marketing Manager (<names>); Level 2 — Business Director (<names>)." Trail: "📤 Submitted by <you> <date time>", both levels "⏳ Waiting — pending with them now", "📝 Quotation — made once fully approved".'),
+   ('[BDM] "Submit for approval".', '"Costing submitted for approval — 2 levels to pass, the others at the same time and the last one after them." A band at the top: "⏳ Waiting for Level 1 — Marketing Manager (<names>); then, last, Level 2 — Business Director (<names>)." (The Business Director signs last — SAL-192.) Trail: "📤 Submitted by <you> <date time>", both levels "⏳ Waiting — pending with them now", "📝 Quotation — made once fully approved".'),
    ('[Marketing Manager] Open it → "Approve".', '"Your level is signed — still waiting for level 2." No "Create quotation" button for them.'),
    ('[BDM] and [Marketing Manager] open it again.', 'Still no "Create quotation" for either. Trail: "✓ Level 1 … Approved by <Marketing Manager> <date time>"; Level 2 still "⏳ Waiting". The top band names only the Business Director now.'),
    ('[Business Director] Type an approval ref "BD-77" → "Approve".', '"Costing approved — a quotation can now be made from it." Trail: "✓ Level 2 … Approved by <Business Director> · ref BD-77 <date time>" and "✅ Fully approved — last signature <Business Director>".'),
@@ -539,6 +539,50 @@ C('SAL-190', 'Project costing', 'Every costing has a number that never changes �
    ('EDGE · A costing with no office.', 'Starts "GEN/PC/…".'),
    ('EDGE · Someone who may revise quotations but does not work on costings revises one.', 'No copy is made for them; the revision\'s Costing card offers "✎ Change the costing for this revision" to a colleague who does.')],
   'pc_new_number; pc_code_for; pc_rev_label; pc_base_of; pc_ref_words; pc_revisions; project_costings.base_code/rev; quote-revise (automatic pc_copy_for_revision); tests/test_costing_margin_number.php; tests/test_costing_lock_revision.php', live=False)
+
+C('SAL-191', 'Quotations', 'A button is shown only to someone it works for: "Submit for approval", "Approve" and the sending buttons', 'scenario', ['rule', 'negative'],
+  'several', 'Owner, 14 Nov 2026: "Suppose I cannot submit quote for approval then why I am being shown submit quote for approval." — and "Send to customer button not found why?"',
+  'A draft quotation prepared by Test BDM (or Test MktExec), with lines. Test Branch Manager. Levels set up so it needs approval.',
+  [('[Branch Manager] open the draft quotation.', 'No "Submit for approval" button and no "Actions" box. The top line reads "Still a draft. Next: <name> prepares it and submits it for approval — that is not yours to do."'),
+   ('[BDM who prepared it] open it.', '"Submit for approval" is there.'),
+   ('[BDM] remove every line (or leave a man-month quotation whose costing is still a draft) and open it again.', 'In place of the button: "⚠ Not ready to submit: …" saying exactly what to fix (e.g. "needs at least one line with a quantity and a rate").'),
+   ('[Marketing Executive] open an approved quotation.', '"Test BDM or Test Marketing Mgr sends it to the customer — sending is not yours to do." No "Send to customer", no "Open in Gmail" / "Outlook (.eml)", no "Three ways to send this" box — a Marketing Executive may not send (permission list: "Cannot: send or approve quotes").'),
+   ('NEGATIVE · [Marketing Executive] type /quote-compose?id=<id> in the address bar.', 'Refused: "You cannot send quotes."')],
+  'crm_quote_can_work; crm_quote_transition_problem (submitProblem/sendProblem); quote-compose gate crm.quote.send; tests/test_quote_owner_14nov.php', live=False)
+
+C('SAL-192', 'Quotations', 'Top management approves last — whatever the level setup; nobody approves before the people who report to them', 'scenario', ['best', 'rule', 'edge', 'negative'],
+  'several', 'Owner, 14 Nov 2026: "the business director in any case shall approve the quote at last only after approval of all the other reporting directly or indirectly to him … top management or top approver shall approve the quote at last only whatever the level setup is. If there is any conflict do let me know."',
+  'Levels as on the test copy: 1 Branch Manager, 2 Marketing Manager, 3 Business Director, 4 SBU Head. Set up Sales → "At the same time". People → reports to: Marketing Mgr → Branch Manager → SBU Head → Business Director.',
+  [('[BDM] submit a quotation.', '"Submitted for approval — 4 step(s). Now with <Marketing Manager>; then, last, level 3: <Business Director>." Only the Marketing Manager is e-mailed.'),
+   ('[Business Director] open it.', 'In the Approval chain, your row has "Reject" but no "Approve": "Approve opens when the levels before yours have signed". No e-mail yet; not on your dashboard.'),
+   ('NEGATIVE · [Business Director] force an approval (old page).', 'Refused: "Level 3 signs last — once every other level has approved. Now with …"'),
+   ('[Marketing Manager] approve.', 'The Branch Manager (whom the MM reports to) is now asked and e-mailed.'),
+   ('[Branch Manager] approve.', 'The SBU Head is asked — though numbered level 4, above the Business Director.'),
+   ('[SBU Head] approve.', 'Now the Business Director is e-mailed and the Approve button appears.'),
+   ('[Business Director] approve.', 'Approved — the Business Director signed last.'),
+   ('Set up Sales → "One after another" and submit another quotation.', 'Order: level 1, 2, 4, then the Business Director (3) last.'),
+   ('EDGE · No Business Director level in the chain.', 'The highest level signs last; the others as Set up Sales says.'),
+   ('EDGE · [SBU Head] take their approval back after the Business Director signed.', 'The Business Director\'s approval is reset with it — it relied on the levels before.'),
+   ('EDGE · A project costing with the same levels.', 'The same order; its "When submitted it goes to" list puts the Business Director at the end, marked "signs last".')],
+  'appr_open_levels; appr_last_levels; APPR_TOP_ROLES; crm_quote_open_levels; pc_open_levels; tests/test_quote_owner_14nov.php; tests/test_quote_approval_owner_21oct.php', live=False)
+
+C('SAL-193', 'Quotations', 'Three ways to send an approved quotation — and what the .eml file is', 'scenario', ['best', 'rule', 'edge'],
+  'BUSINESS_DEV_MANAGER', 'Owner, 14 Nov 2026: "when send from my mail box it downloaded .eml file why? what is use of it."',
+  'Signed in as Test BDM (who may send). An approved quotation with a contact e-mail.',
+  [('Open it.', 'A box "Three ways to send this": 1. Send to customer (the system e-mails it with the PDF from the company mailbox and marks it sent); 2. Open in Gmail; 3. Outlook (.eml) — "double-click it: it opens in Outlook or Windows Mail as a draft … Gmail in a browser cannot open it".'),
+   ('Press "✉️ Open in Gmail".', 'A new tab opens Gmail with a new message to the customer, subject and text written; the quotation PDF downloads at the same time. Attach it (📎) and send.'),
+   ('Back on the quotation: "✓ I have sent it — mark sent" → OK.', '"Marked sent — you sent it from your own mailbox, so nothing was e-mailed from here. Follow-ups scheduled." Status Sent. No second e-mail goes to the customer.'),
+   ('EDGE · On a desktop with Outlook: "📨 Outlook (.eml)".', 'A file Quote-Q-….eml downloads. Double-clicking it opens a draft in Outlook from your own address with the PDF already attached — press Send, then "mark sent".'),
+   ('EDGE · "✉ Send to customer" instead.', 'E-mailed by the system and marked sent in one step — nothing else to do.')],
+  'compose_gmail; quote-compose mode=gmail; quote-status SENT by_hand; views/ops/crm/quote_detail.php (#how-to-send); tests/test_quote_owner_14nov.php', live=False)
+
+C('SAL-194', 'Quotations', 'One Documents button; a jump from "On this quote" lands on its section', 'scenario', ['best'],
+  'BUSINESS_DEV_MANAGER', 'Owner, 14 Nov 2026: "There are two document tabs. When clicked on costing it takes one step down below the costing box."',
+  'A quotation with a linked costing. Laptop and phone.',
+  [('Look at the title row.', 'PDF (for client), Word (editable), Edit (if allowed) — the second "📎 Documents" and the second "← back" button are gone. "📎 Documents" stays in "On this quote"; back stays at the top of the page.'),
+   ('Press "Costing" in "On this quote".', 'The page scrolls so the Project costing box sits just under the top bar, fully visible — on a phone too.'),
+   ('Press "📎 Documents", "Approval chain", "Actions".', 'Each lands with its box in view.')],
+  'views/ops/crm/quote_detail.php (scroll-margin-top; header buttons); tests/test_quote_owner_14nov.php', live=False)
 
 
 
@@ -739,7 +783,7 @@ C('SAL-068', 'Quotes', 'Quotation follow-ups and documents', 'scenario', ['best'
    ('Set its Status Done, Done on today, What was said → "Save follow-ups".', 'Saved.'),
    ('Sites & docs tab → Kind "Purchase order", Files (several at once, 8 MB each), PO number, PO date, tick "Share with the team member on every work…" → Attach.', 'Files listed; the PO number and date are kept.'),
    ('"✉️ Chase".', 'A follow-up e-mail draft opens.'),
-   ('"✉️ Send from my mailbox".', 'A draft opens in your mail program with the PDF attached; you press Send yourself.')],
+   ('On an approved quotation: "✉️ Open in Gmail" or "📨 Outlook (.eml)" (from 14 Nov 2026 — SAL-193).', 'Gmail opens a written message and the PDF downloads to attach; the .eml opens in desktop Outlook with the PDF inside. You press Send yourself, then "✓ I have sent it — mark sent".')],
   'quote-followup; quote-files')
 
 # ════════════════════════════════════════════════════════════════════════════

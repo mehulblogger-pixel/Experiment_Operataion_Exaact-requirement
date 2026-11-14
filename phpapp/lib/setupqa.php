@@ -134,14 +134,14 @@ function setupqa_sales_set() {
                         //  quotations and project costings alike.
                         'key' => 'quote_approval_mode',
                         'ask' => 'When a ' . $L . ' needs more than one level, how do the levels approve?',
-                        'why' => 'One after another: level 1 first, and level 2 is asked only when level 1 has signed. At the same time: every level is asked at once, and it is approved when all have signed. Project costings follow the same answer.',
-                        'options' => ['order' => 'One after another — level 1 first', 'together' => 'All at the same time — every level is asked at once'],
+                        'why' => 'One after another: level 1 first, and level 2 is asked only when level 1 has signed. At the same time: every level is asked at once, and it is approved when all have signed. Either way, top management (a Business Director level — or, without one, the highest level) signs LAST, once every other level has; and nobody signs before the people in the chain who report to them. Project costings follow the same answer.',
+                        'options' => ['order' => 'One after another — level 1 first', 'together' => 'At the same time — every level but the top one at once; the top one last'],
                         'default' => 'order',
                     ],
                     [
                         'key' => 'quote_approval_escalate_days',
                         'ask' => 'If a ' . $L . ' waits too long at one approval level, when should the level above be able to approve it too?',
-                        'why' => 'The person it is waiting for can still approve it; the level above is told and can step in. Checked every night. (Not used when all levels approve at the same time — they are all asked already.)',
+                        'why' => 'The person it is waiting for can still approve it; the level above is told and can step in. Checked every night. (One after another only — at the same time, the levels are all asked already.)',
                         'options' => ['0' => 'Never — it waits for its own approver', '1' => 'After 1 day', '2' => 'After 2 days', '3' => 'After 3 days', '7' => 'After a week'],
                         'default' => '0',
                     ],
@@ -266,7 +266,7 @@ function setupqa_sales_other_approvals_by_tab() {
         'leads' => 'Leads: only the person responsible marks a lead lost, with a reason and remarks. Giving a lead that already has an owner to someone else waits for a manager\'s approval — the owner\'s reporting manager, or a sales manager over that branch. A manager may reopen a lost lead, with a reason that is kept.',
         'deals' => 'Deals (opportunities): only the stage rules above. A manager may reopen a closed deal, with a reason that is kept — unless it has already become an order or contract.',
         'costing' => 'Project costing (man-month work): tagged with its enquiry or lead, and approved through the same levels as a ' . $q . ' of that value — never by the person who prepared it.',
-        'quote' => ucfirst($q) . 's: the levels above' . (function_exists('crm_approval_mode') && crm_approval_mode() === 'together' ? ', all at the same time.' : ', in order — level 1 first, then level 2, and so on.')
+        'quote' => ucfirst($q) . 's: the levels above' . (function_exists('crm_approval_mode') && crm_approval_mode() === 'together' ? ', at the same time — top management last.' : ', in order — level 1 first, then level 2, and so on; top management last.')
             . ' A ' . $q . ' made from an approved project costing, at the costing\'s prices, is not approved a second time. With no levels at all, no approval is needed.',
         'contract' => 'Opening a contract: ' . (function_exists('contract_rule_sentence') ? contract_rule_sentence() : 'two signatures') . '.'
             . (function_exists('contract_rule_sentence') ? ' A later change to an open contract\'s value, dates or quantities: ' . contract_rule_sentence(true) . '.' : ''),

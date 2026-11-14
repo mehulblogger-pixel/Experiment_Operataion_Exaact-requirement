@@ -73,16 +73,17 @@ try {
 
     //  Owner, 14 Nov 2026: "show the levels before submitting the costing".
     $preview = pc_preview_levels(pc_get($cid));
-    $g = $drive($BDM, 'project-costing', 'GET', ['id' => $cid], [], ['When submitted it goes to', 'all levels at the same time', e($preview[1] ?? 'x')]);
-    t_ok(!empty($g['has']['When submitted it goes to']) && !empty($g['has']['all levels at the same time']) && !empty($g['has'][e($preview[1] ?? 'x')]),
+    $g = $drive($BDM, 'project-costing', 'GET', ['id' => $cid], [], ['When submitted it goes to', 'the others at the same time and the last one after them', e($preview[1] ?? 'x')]);
+    t_ok(!empty($g['has']['When submitted it goes to']) && !empty($g['has']['the others at the same time and the last one after them']) && !empty($g['has'][e($preview[1] ?? 'x')]),
         'before submitting, the costing shows the levels its value will need, by name, and how they sign: ' . implode(' / ', $preview));
     $s = $drive($BDM, 'project-costing-submit', 'POST', [], ['id' => $cid]);
     $built = array_map(fn($st) => pc_level_words($st, pc_get($cid)), pc_steps($cid));
-    t_eq($built, $preview, '…and submitting creates exactly those levels — the preview never disagrees with the real thing');
+    t_eq($built, array_map(fn($x) => preg_replace('/ — signs last$/', '', $x), $preview), '…and submitting creates exactly those levels — the preview never disagrees with the real thing');
+    t_ok(str_ends_with((string) ($preview[1] ?? ''), ' — signs last') && strpos((string) $preview[1], 'Business Director') !== false, '…and the preview marks the Business Director as signing last');
     $g = $drive($BDM, 'project-costing', 'GET', ['id' => $cid], [], ['When submitted it goes to']);
     t_ok(empty($g['has']['When submitted it goes to']), 'once submitted, the preview gives way to the trail');
-    t_ok(stripos($said($s), 'submitted for approval — 2 levels') !== false, 'the author submits — 2 levels, all at the same time: ' . $said($s));
-    t_ok(strpos((string) ($trail()[1] ?? ''), 'Submitted for approval by Bina Pct — 2 levels, all at the same time') === 0, 'the trail records who submitted it, and how the levels sign');
+    t_ok(stripos($said($s), 'submitted for approval — 2 levels to pass, the others at the same time and the last one after them') !== false, 'the author submits — 2 levels: ' . $said($s));
+    t_ok(strpos((string) ($trail()[1] ?? ''), 'Submitted for approval by Bina Pct — 2 levels, the others at the same time and the last one after them') === 0, 'the trail records who submitted it, and how the levels sign');
     //  The names are whoever holds each level over this branch (the first three) — on a shared test
     //  database that may include other Marketing Managers, so compare with what the system picks.
     $hNow = pc_get($cid); $want = array_map(fn($st) => pc_level_words($st, $hNow), pc_steps($cid));

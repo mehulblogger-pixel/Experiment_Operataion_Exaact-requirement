@@ -35,3 +35,11 @@ signed — with "all levels at the same time" the others still sign. Nothing abo
 - **When a costing is sent back**, the preparer and everyone who had already approved it get an e-mail and a dashboard notice; after it is revised, every level approves it again.
 - **Margin warning** — a role whose margin is more than 10 points above or below its target margin is flagged in amber at the top of the costing and in its row. You see it when you approve; it is a warning, never a block.
 - **The costing number** reads `BRANCH/PC/year/month/number Rev 00` (e.g. `AHM/PC/2026-27/11/0007 Rev 00`), with the client and quotation beside it. When its quotation is revised, the costing's copy is the next revision (`Rev 01`, `Rev 02` …) and comes to you for approval again; the page links every earlier revision.
+
+### Quotation approvals and sending (owner, 14 Nov 2026)
+
+Top management (the Business Director — or, without one, the highest level) always signs last, after
+every other level; and nobody signs before the people in the chain who report to them. You are e-mailed
+when it is your turn; until then the Approve button is not shown ("Approve opens when the levels before
+yours have signed"). To send an approved quotation: Send to customer, Open in Gmail, or Outlook (.eml) —
+then "✓ I have sent it — mark sent".

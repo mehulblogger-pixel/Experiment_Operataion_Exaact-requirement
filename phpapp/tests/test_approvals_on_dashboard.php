@@ -26,6 +26,9 @@ try {
     $pdo->exec("DELETE FROM quote_approval_rules");
     $ins = $pdo->prepare("INSERT INTO quote_approval_rules (name,match_type,sbu,min_amount,max_amount,level,approver_role,approver_user_id,active,created_at) VALUES (?, 'ANY', '', ?, ?, ?, ?, NULL, 1, ?)");
     $ins->execute(['L1', 0, 500000, 1, 'BRANCH_MANAGER', date('c')]); $ins->execute(['L2', 500000, 0, 2, 'SBU_HEAD', date('c')]);
+    //  Top management signs last whatever the setup (owner, 14 Nov 2026) — a Business Director level on top,
+    //  so levels 1 and 2 are the ones asked at the same time.
+    $ins->execute(['L3', 500000, 0, 3, 'BUSINESS_DIRECTOR', date('c')]);
     $pdo->prepare("INSERT INTO quotations (quote_no, rev, client_name, status, is_current, sbu, subtotal, total_amount, created_at) VALUES (?,0,'C','PENDING_APPROVAL',1,'',600000,708000,?)")->execute([$tag . '-Q', date('c')]);
     $qid = (int) $pdo->lastInsertId(); crm_build_approvals(crm_quote_get($qid));
     $l2 = ops_one("SELECT * FROM quote_approvals WHERE quote_id=? AND level=2", [$qid]);
@@ -33,6 +36,7 @@ try {
     $as($bu);
     t_ok(crm_can_act_approval($l2), 'she may approve level 2 while level 1 is still pending');
     t_ok(in_array($qid, crm_quote_ids_awaiting_me(), true), 'it is in her approvals');
+    t_eq(crm_quote_open_levels($qid), [1, 2], '…levels 1 and 2 at the same time; the Business Director (level 3) is not asked until they have signed');
     $labels = array_column(ops_pending_tasks(), 'label');
     t_ok(in_array('quotes to approve', $labels, true), 'and on her dashboard: "quotes to approve"');
 

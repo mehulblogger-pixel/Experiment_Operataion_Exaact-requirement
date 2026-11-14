@@ -196,6 +196,19 @@ documentation only; the Sales audit (SA-01…SA-06) drove each of those moves
 through the old code. Rule values are measured **before tax** (D-04). Every move
 writes one line in the quotation's history (who, what, why).
 
+- **Who signs when, inside PENDING_APPROVAL (owner, 14 Nov 2026: "top management or top approver shall
+  approve the quote at last only whatever the level setup is").** The levels that may sign now are
+  worked out by one rule (`appr_open_levels()`, also used by project costings): top management (a
+  Business Director level, `APPR_TOP_ROLES`; without one, the highest level) signs last, after every
+  other level; the other levels sign one after another or at the same time as Set up Sales says; at
+  the same time, nobody signs before the people in the chain who report to them (People → reports
+  to), and if a crossed setup would leave nobody able to sign, the whole group may. Only those levels
+  are e-mailed and shown on their dashboard; each signature e-mails the levels it lets in. Taking an
+  approval back also resets top management's later approval. No status or transition is added.
+- **APPROVED → SENT by hand (14 Nov 2026).** Someone with `crm.quote.send` who sends the quotation from
+  their own mailbox ("Open in Gmail" or the Outlook .eml) presses "✓ I have sent it — mark sent": the
+  same APPROVED → SENT move, follow-ups start, and the client is not e-mailed again by the system. Not
+  a new transition.
 - **Immutable once SENT / sent_at set** (`quote_is_locked` `crm.php:959-973`) — not even the
   master edits it; only a revision moves forward (`canRevise` bypasses the lock, `crm.php:1498`).
 - **Validity → EXPIRED** (Module 03): a SENT quote past `sent_at + validity_days` is stamped
@@ -256,6 +269,8 @@ writes one line in the quotation's history (who, what, why).
   all at the same time). At the same time, every level is asked at once and may sign in any order;
   the quotation is APPROVED when all have signed; escalation does not apply (all are asked), and
   taking one approval back does not reset the others. Project costings follow the same answer.
+  *Since 14 Nov 2026, in either answer, top management signs last and nobody signs before the people
+  in the chain who report to them — see "Who signs when" below.*
 - **When no approval is needed** (owner, 21 Oct 2026): a quotation goes DRAFT → APPROVED on submit,
   with the reason in its history, when the company has **no approval levels at all** (*"no approval
   chain → top management is not required"* — it used to wait for "anyone who may approve"), or when

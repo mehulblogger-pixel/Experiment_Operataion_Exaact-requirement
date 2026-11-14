@@ -48,6 +48,15 @@ function compose_owa($to, $subject, $body, $cc = '') {
     return 'https://outlook.office.com/mail/deeplink/compose?' . http_build_query($p);
 }
 
+// A new Gmail message in the browser, addressed and written (owner, 14 Nov 2026: the .eml file
+// "downloaded … why?" — Gmail in a browser cannot open a .eml). A web link cannot carry an
+// attachment, so the page downloads the PDF alongside for the person to attach.
+function compose_gmail($to, $subject, $body, $cc = '') {
+    $p = ['view' => 'cm', 'fs' => '1', 'to' => (string)$to, 'su' => (string)$subject, 'body' => (string)$body];
+    if ($cc !== '') $p['cc'] = $cc;
+    return 'https://mail.google.com/mail/?' . http_build_query($p, '', '&', PHP_QUERY_RFC3986);
+}
+
 // Encode a header value that may contain non-ASCII (names, subjects).
 function compose_hdr($s) {
     $s = (string)$s;

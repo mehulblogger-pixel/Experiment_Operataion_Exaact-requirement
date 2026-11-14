@@ -26,15 +26,21 @@
     <?php endif; ?>
     <a class="btn<?= $st === 'ACCEPTED' ? ' secondary' : '' ?>" href="/quote-pdf?id=<?= (int)$q['id'] ?>">⬇ PDF (for client)</a>
     <a class="btn secondary" href="/quote-doc?id=<?= (int)$q['id'] ?>">Word (editable)</a>
-    <a class="btn secondary" href="#quote-docs" title="Attach the enquiry e-mail, PO, QAP, scope of inspection or any document received">📎 Documents</a>
+    <?php //  "📎 Documents" and "← back" were drawn twice — here and in the row below / the back pill
+          //  above the page (owner, 14 Nov 2026: "There are two document tabs"). Once each now. ?>
     <?php if ($canEdit && in_array($st, ['DRAFT','PENDING_APPROVAL','REJECTED'], true)): ?><a class="btn secondary" href="/quote-edit?id=<?= (int)$q['id'] ?>">Edit</a><?php endif; ?>
-    <a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a>
   </div>
 </div>
 
 <?php // Jump-nav: every section of this quote in one place, so nothing has to be
       // hunted for down the page. Links only to sections that actually exist for
       // this quote; #-links into a tabbed section activate that tab automatically. ?>
+<style>
+  /* A jump from "On this quote" lands with the section's top in view, below the sticky top bar
+     (owner, 14 Nov 2026: "When clicked on costing it takes one step down below the costing box"). */
+  .panel[id], [id="revisions"]{scroll-margin-top:96px}
+  @media (max-width:760px){ .panel[id], [id="revisions"]{scroll-margin-top:124px} }   /* the phone's top bar is taller */
+</style>
 <nav class="quote-jump" aria-label="On this quote" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:12px 0 4px;font-size:13px">
   <span class="muted" style="font-size:12px">On this quote:</span>
   <a class="btn small secondary" href="#actions">Actions</a>
@@ -52,7 +58,11 @@
   // contract, and so on).
   $nbTitle = lk_options_or('quote_status', QUOTE_STATUS)[$st] ?? $st; $nbNext = '';
   switch ($st) {
-    case 'DRAFT': $nbTitle = 'Still a draft.'; $nbNext = 'Next: submit it for approval when it is ready.'; break;
+    case 'DRAFT': $nbTitle = 'Still a draft.';
+      if (!empty($canSubmit)) $nbNext = (($needsApproval ?? true) ? 'Next: submit it for approval when it is ready.' : 'Next: send it to the ' . Tl('client') . ' when it is ready.');
+      else { $nbWho = trim((string)($assignedName ?? '')) !== '' ? (string)$assignedName : (function_exists('crm_people_who_can') ? crm_people_who_can('crm.quote.create', $q) : '');
+             $nbNext = ($nbWho !== '' ? $nbWho . ' prepares it and submits it' : 'The sales colleague preparing it submits it') . ' for approval — that is not yours to do. You will see it here when it comes to you.'; }
+      break;
     case 'PENDING_APPROVAL': $nbTitle = 'Waiting for approval' . (!empty($pendingWith) ? ' — with ' . $pendingWith : '') . '.'; $nbNext = 'They approve it, or send it back with a comment.'; break;
     case 'APPROVED': $nbTitle = 'Approved and ready to go out.';
       //  Someone who may not send must not be told "send it" with no button (bounce list 1.1).
@@ -104,16 +114,19 @@
 </div>
 <?php endif; ?>
 
-<?php if (in_array($st, ['APPROVED','SENT'], true) && !empty($q['contact_email'])): ?>
-<div class="panel" style="background:var(--soft)">
-  <b>Two ways to send this</b>
-  <div class="muted" style="margin-top:4px">
-    <b>Send to <?= e(Tl('client')) ?></b> sends it automatically from the company mailbox.<br>
-    <b>Send from my mailbox</b> downloads the finished message with the PDF already attached; it opens in your
-    Outlook as a draft from <?= e(compose_can_personalise() ? (current_user()['email'] ?? '') : 'your address') ?>,
-    you press Send, and the <?= e(Tl('client')) ?>'s reply comes back to you — it is in your own Sent Items.
+<?php //  HOW TO SEND (owner, 14 Nov 2026: "Send to customer button not found why? and when send from my
+      //  mail box it downloaded .eml file why? what is use of it"). Shown only to someone who may send —
+      //  the matrix gives sending to crm.quote.send — and in plain words, with the three real ways. ?>
+<?php if (in_array($st, ['APPROVED','SENT'], true) && !empty($q['contact_email']) && !empty($canSend)): ?>
+<div class="panel" id="how-to-send" style="background:var(--soft)">
+  <b><?= $st === 'SENT' ? 'Send it again, or chase it' : 'Three ways to send this' ?></b>
+  <div class="muted" style="margin-top:4px;line-height:1.55">
+    <?php if ($st === 'APPROVED'): ?><b>1. ✉ Send to <?= e(Tl('client')) ?></b> — the system e-mails it to <?= e($q['contact_email']) ?> from the company mailbox, with the PDF attached, and marks it sent. Nothing else to do.<br><?php endif; ?>
+    <b><?= $st === 'APPROVED' ? '2. ' : '' ?>Open in Gmail</b> — opens a new Gmail message in a new tab, already addressed and written, and downloads the PDF at the same time: attach the downloaded PDF (📎), press Send. The <?= e(Tl('client')) ?>'s reply comes to you.<br>
+    <b><?= $st === 'APPROVED' ? '3. ' : '' ?>Outlook (.eml file)</b> — downloads one ready e-mail file (it ends in <b>.eml</b>) with the PDF already inside. Double-click it: it opens in Outlook or Windows Mail as a draft from <?= e(compose_can_personalise() ? (current_user()['email'] ?? '') : 'your address') ?> — press Send. It is for desktop Outlook; Gmail in a browser cannot open it, so use “Open in Gmail” there.
+    <?php if ($st === 'APPROVED'): ?><br>After sending it yourself (2 or 3), press <b>“✓ I have sent it — mark sent”</b> so the follow-ups start. The system then does not e-mail the <?= e(Tl('client')) ?> again.<?php endif; ?>
     <?php if (!compose_can_personalise()): ?>
-      <br><span style="color:var(--warn)">Add your e-mail address to your profile first, or the draft will open from the company address.</span>
+      <br><span style="color:var(--warn)">Add your e-mail address to your profile first, or the Outlook draft will open from the company address.</span>
     <?php endif; ?>
   </div>
 </div>
@@ -232,16 +245,21 @@
   <?php // A rejected quote is not an ending — it goes back round. It must offer
         // the same submit button a draft does, or the only way forward is to
         // raise a whole new revision for what may be a one-word correction. ?>
+  <?php $canSubmit = $canSubmit ?? true; $submitProblem = (string)($submitProblem ?? ''); $sendProblem = (string)($sendProblem ?? ''); ?>
   <?php if (($st==='DRAFT' || $st==='REJECTED') && !$needsApproval): ?>
-    <?php if ($canSend): ?><?= $act('SENT','✉ Send to ' . Tl('client')) ?><?php endif; ?>
+    <?php if ($canSend && $sendProblem === ''): ?><?= $act('SENT','✉ Send to ' . Tl('client')) ?><?php elseif ($canSend): ?><span class="q-why" style="font-size:12.5px;color:var(--warn,#9a5b00);background:var(--warn-soft,#fdf1e3);border-radius:8px;padding:4px 10px">⚠ <?= e($sendProblem) ?></span><?php endif; ?>
     <span class="muted" style="font-size:12.5px">No approval needed — your approval rules do not cover this value.</span>
-  <?php elseif ($st==='DRAFT' || $st==='REJECTED'): ?>
-    <?= $act('PENDING_APPROVAL', $st==='REJECTED' ? '↻ Submit for approval again' : 'Submit for approval') ?>
-    <?php if ($st==='REJECTED'): ?>
+  <?php elseif (($st==='DRAFT' || $st==='REJECTED') && $canSubmit): ?>
+    <?php if ($submitProblem === ''): ?>
+      <?= $act('PENDING_APPROVAL', $st==='REJECTED' ? '↻ Submit for approval again' : 'Submit for approval') ?>
+    <?php else: //  a button that would only be refused is not drawn — the reason is, in its place ?>
+      <span class="q-why" style="font-size:12.5px;color:var(--warn,#9a5b00);background:var(--warn-soft,#fdf1e3);border-radius:8px;padding:4px 10px">⚠ Not ready to submit: <?= e($submitProblem) ?></span>
+    <?php endif; ?>
+    <?php if ($st==='REJECTED' && !empty($canEdit)): ?>
       <a class="btn small secondary" href="/quote-edit?id=<?= (int)$q['id'] ?>">Edit first</a>
     <?php endif; ?>
   <?php elseif ($st==='APPROVED'): ?>
-    <?php if ($canSend): ?><?= $act('SENT','✉ Send to ' . Tl('client')) ?><?php endif; ?>
+    <?php if ($canSend && $sendProblem === ''): ?><?= $act('SENT','✉ Send to ' . Tl('client')) ?><?php elseif ($canSend): ?><span class="q-why" style="font-size:12.5px;color:var(--warn,#9a5b00);background:var(--warn-soft,#fdf1e3);border-radius:8px;padding:4px 10px">⚠ <?= e($sendProblem) ?></span><?php endif; ?>
   <?php elseif ($st==='SENT' || $st==='EXPIRED'): ?>
     <?php $pc = $possibleCustomer ?? null; if ($canDecide && $pc): ?>
       <div role="group" aria-label="Same company?" style="flex-basis:100%;padding:10px 12px;border-left:4px solid var(--warn,#b7791f);background:var(--warn-bg,#fffbea);border-radius:8px">
@@ -253,12 +271,18 @@
     <?php else: ?><span class="muted" style="font-size:12.5px"><?= e($assignedName !== '' ? $assignedName . ', who is assigned to this ' . Tl('quote') . ',' : 'The person assigned to this ' . Tl('quote')) ?> records the <?= e(Tl('client')) ?>'s answer.</span><?php endif; ?>
     <a class="btn small secondary" href="/quote-doc?id=<?= (int)$q['id'] ?>">Re-download Word</a>
   <?php endif; ?>
-  <?php if (in_array($st, ['APPROVED','SENT'], true) && !empty($q['contact_email'])): ?>
+  <?php if (in_array($st, ['APPROVED','SENT'], true) && !empty($q['contact_email']) && !empty($canSend)): ?>
     <span style="width:1px;height:22px;background:var(--line)"></span>
+    <a class="btn small secondary" href="/quote-compose?id=<?= (int)$q['id'] ?>&amp;mode=gmail" target="_blank" rel="noopener"
+       onclick="var d=document.createElement('a');d.href='/quote-pdf?id=<?= (int)$q['id'] ?>';d.download='';document.body.appendChild(d);d.click();d.remove();"
+       title="Opens a new Gmail message in a new tab, addressed and written, and downloads the PDF to attach">✉️ Open in Gmail</a>
     <a class="btn small secondary" href="/quote-compose?id=<?= (int)$q['id'] ?>"
-       title="Downloads a draft that opens in your Outlook with the PDF attached — you press Send">✉️ Send from my mailbox</a>
-    <a class="btn small secondary" href="/quote-compose?id=<?= (int)$q['id'] ?>&amp;mode=mailto"
-       title="Opens your default mail app — no attachment (browsers cannot attach files to a mailto link)">Compose without attachment</a>
+       title="Downloads a .eml e-mail file with the PDF inside — double-click it to open it in Outlook as a draft, then press Send">📨 Outlook (.eml)</a>
+    <?php if ($st === 'APPROVED' && ($sendProblem ?? '') === ''): ?>
+      <form method="post" action="/quote-status?id=<?= (int)$q['id'] ?>" style="display:inline" onsubmit="return confirm('Did you send it to the <?= e(Tl('client')) ?> from your own mailbox? It is marked sent and follow-ups start; no e-mail is sent from here.')">
+        <input type="hidden" name="to" value="SENT"><input type="hidden" name="by_hand" value="1">
+        <button class="btn small secondary" type="submit" title="You sent it yourself — mark it sent without e-mailing the client again">✓ I have sent it — mark sent</button></form>
+    <?php endif; ?>
   <?php endif; ?>
   <?php if ($canDecide && in_array($st, ['DRAFT','REJECTED','PENDING_APPROVAL','APPROVED','SENT','EXPIRED'], true)): ?>
     <button class="btn small danger" type="button" onclick="document.getElementById('lostbox').style.display='block'">Mark lost</button>
@@ -383,8 +407,14 @@
             // the Branch Manager does not look as if the unit head was skipped.
         if ($pendingStep && crm_approval_mode() === 'order'):
           $nextNames = [];
-          foreach ($approvals as $ni => $na) {
-            if ($na['status'] !== 'PENDING' || (int)$na['id'] === (int)$pendingStep['id'] || (int)$na['level'] < (int)$pendingStep['level']) continue;
+          //  in the order they will sign: the other levels by number, top management last (14 Nov 2026)
+          $lastLv = function_exists('appr_last_levels') ? appr_last_levels($approvals, 'crm_step_approvers_direct') : [];
+          $seq = array_keys($approvals);
+          usort($seq, fn($x, $y) => [in_array((int)$approvals[$x]['level'], $lastLv, true) ? 1 : 0, (int)$approvals[$x]['level']] <=> [in_array((int)$approvals[$y]['level'], $lastLv, true) ? 1 : 0, (int)$approvals[$y]['level']]);
+          $passed = false;
+          foreach ($seq as $ni) { $na = $approvals[$ni];
+            if ((int)$na['id'] === (int)$pendingStep['id']) { $passed = true; continue; }
+            if ($na['status'] !== 'PENDING' || !$passed || (int)$na['level'] === (int)$pendingStep['level']) continue;
             $np = $stepPeople[$ni] ?? [];
             $nextNames[] = 'level ' . (int)$na['level'] . ' — ' . ($np ? implode(', ', array_map('crm_person_label', array_slice($np, 0, 2))) : (!empty($na['approver_role']) ? (ORG_ROLES[$na['approver_role']] ?? $na['approver_role']) : 'any approver'));
           }
@@ -407,11 +437,14 @@
       <td class="muted"><?= $a['acted_by'] ? e($a['acted_by']).'<br><span style="font-size:11px">'.e(fdate(substr((string)$a['acted_at'],0,10))).'</span>' : '—' ?></td>
       <td class="muted"><?= $a['remarks'] ? e($a['remarks']) : '—' ?></td>
       <td class="num" style="white-space:nowrap">
-        <?php if (crm_can_act_approval($a)): ?>
-        <form method="post" action="/quote-approve?id=<?= (int)$q['id'] ?>" style="display:flex;gap:4px;align-items:center;justify-content:flex-end">
+        <?php if (crm_can_act_approval($a)): $aOpen = in_array((int)$a['level'], $openLevels ?? [(int)$a['level']], true); ?>
+        <form method="post" action="/quote-approve?id=<?= (int)$q['id'] ?>" style="display:flex;gap:4px;align-items:center;justify-content:flex-end;flex-wrap:wrap">
           <input type="hidden" name="step" value="<?= (int)$a['id'] ?>">
           <input class="form-control" name="remarks" placeholder="comment (required to reject)" style="width:190px">
-          <button class="btn small" name="decision" value="approve" type="submit">Approve</button>
+          <?php if ($aOpen): ?><button class="btn small" name="decision" value="approve" type="submit">Approve</button>
+          <?php else: //  not this level's turn yet — no Approve button that would only be refused (owner, 14 Nov 2026) ?>
+            <span class="muted" style="font-size:11.5px;white-space:normal;max-width:180px;text-align:right">Approve opens when the levels before yours have signed</span>
+          <?php endif; ?>
           <button class="btn small danger" name="decision" value="reject" type="submit">Reject</button>
         </form>
         <?php endif; ?>

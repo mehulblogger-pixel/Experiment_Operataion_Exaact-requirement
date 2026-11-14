@@ -756,7 +756,7 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
             if (in_array($h['status'],['DRAFT','REJECTED'],true) && !empty($lines) && function_exists('pc_preview_levels')):
               $pvL = pc_preview_levels($h); $pvTogether = function_exists('crm_approval_mode') && crm_approval_mode() === 'together'; ?>
         <div class="pc-prev" style="flex:1 1 100%;background:var(--soft);border:1px solid var(--line);border-radius:9px;padding:9px 12px;font-size:13px">
-          <b>When submitted it goes to</b> <span class="muted">— value <?= $e(fmoney_short(pc_value($h))) ?> before GST<?= count($pvL) > 1 ? ($pvTogether ? ', all levels at the same time' : ', one level after another') : '' ?></span>
+          <b>When submitted it goes to</b> <span class="muted">— value <?= $e(fmoney_short(pc_value($h))) ?> before GST<?= count($pvL) > 1 ? ($pvTogether ? ', the others at the same time and the last one after them' : ', one level after another') : '' ?></span>
           <ol style="margin:6px 0 0;padding-left:20px;line-height:1.6"><?php foreach ($pvL as $w): ?><li><?= $e($w) ?></li><?php endforeach; ?></ol>
           <span class="muted" style="font-size:11.5px">The levels follow the value: change the roles and this changes with them. They are fixed when you submit.</span>
         </div>
@@ -819,7 +819,7 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
       <?php endif; ?>
       <li class="<?= $qRow ? 'done' : '' ?>"><span class="ic">📝</span><div><?php if ($qRow): ?><b>Quotation</b> <a href="/quote?id=<?= (int)$qRow['id'] ?>"><?= $e($qRow['quote_no']) ?><?= (int)$qRow['rev'] ? ' r' . (int)$qRow['rev'] : '' ?></a><?= $qMade ? ' made by ' . $e($qMade['created_by']) . '<span class="t">' . $e($when($qMade['occurred_at'])) . '</span>' : '' ?><?php else: ?><span class="muted">Quotation — made once fully approved</span><?php endif; ?></div></li>
     </ol>
-    <p class="sub" style="margin-top:6px">Draft → Submitted → Approved. Submitting sets the approval levels the same way as a quotation of this value and business unit (Set up Sales), and locks the sheet. Levels sign <?= function_exists('crm_approval_mode') && crm_approval_mode() === 'together' ? 'all at the same time' : 'in order' ?>; its author never signs. A quotation is made only from an approved costing, and reopening an approved one withdraws its approval.</p>
+    <p class="sub" style="margin-top:6px">Draft → Submitted → Approved. Submitting sets the approval levels the same way as a quotation of this value and business unit (Set up Sales), and locks the sheet. Levels sign <?= function_exists('crm_approval_mode') && crm_approval_mode() === 'together' ? 'at the same time' : 'in order' ?>, top management last; its author never signs. A quotation is made only from an approved costing, and reopening an approved one withdraws its approval.</p>
   </div>
 </div>
 </div>

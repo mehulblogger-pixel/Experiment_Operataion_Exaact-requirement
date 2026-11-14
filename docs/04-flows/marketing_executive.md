@@ -39,3 +39,9 @@ Every costing has a number that never changes — `BRANCH/PC/year/month/number R
 margin is more than 10 points above or below its target margin is flagged in amber, live while you type
 it and at the top of the costing for the approvers; it is a warning, never a block.
 
+### Quotations — what you see (owner, 14 Nov 2026)
+
+You prepare and submit quotations; sending and approving are not yours. On an approved quotation you
+see who sends it, by name — there are no sending buttons for you (no "Send to customer", no Gmail or
+Outlook option). "Submit for approval" appears only when the quotation is ready; when something would
+stop it, the page says what instead of showing a button that fails.

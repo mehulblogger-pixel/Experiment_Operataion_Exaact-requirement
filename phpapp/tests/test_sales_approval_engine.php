@@ -62,7 +62,7 @@ $rule(1, 'BRANCH_MANAGER'); $rule(2, 'MARKETING_MANAGER');
 $q = $quote(); $submit($q);
 $r = $sign($MM, $step($q, 2));
 t_eq((string) $step($q, 2)['status'], 'PENDING', 'level 2 cannot sign before level 1');
-t_ok(strpos($said($r), 'Level 1 approves first') !== false, '…and is told why: ' . $said($r));
+t_ok(strpos($said($r), 'signs last') !== false && strpos($said($r), 'Now with') !== false && strpos($said($r), 'Branch Manager') !== false, '…and is told why, and who it is with: ' . $said($r));
 $sign($BM, $step($q, 1));
 t_eq((string) $step($q, 1)['status'], 'APPROVED', 'level 1 signs');
 $sign($MM, $step($q, 2));

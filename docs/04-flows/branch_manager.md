@@ -72,3 +72,9 @@ person who missed the deadline can undo it, there is no deadline.
 - **When a costing is sent back**, the preparer and everyone who had already approved it get an e-mail and a dashboard notice; after it is revised, every level approves it again.
 - **Margin warning** — a role whose margin is more than 10 points above or below its target margin is flagged in amber at the top of the costing and in its row. You see it when you approve; it is a warning, never a block.
 - **The costing number** reads `BRANCH/PC/year/month/number Rev 00` (e.g. `AHM/PC/2026-27/11/0007 Rev 00`), with the client and quotation beside it. When its quotation is revised, the costing's copy is the next revision (`Rev 01`, `Rev 02` …) and comes to you for approval again; the page links every earlier revision.
+
+### Quotations (owner, 14 Nov 2026)
+
+You approve; preparing and submitting is the sales team's. "Submit for approval" is no longer shown to
+you on a draft — the page names who submits it. You sign when it is your turn (people who report to you
+in the chain sign first; top management last).

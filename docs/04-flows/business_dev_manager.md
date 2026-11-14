@@ -84,3 +84,11 @@ it and at the top of the costing for the approvers; it is a warning, never a blo
 - **When a costing is sent back**, the preparer and everyone who had already approved it get an e-mail and a dashboard notice; after it is revised, every level approves it again.
 - **Before you submit a costing** the Approval box shows "When submitted it goes to" — its value before GST and each level with who holds it — so you know who will see it. It follows the value as you change roles.
 
+### Sending a quotation — three ways (owner, 14 Nov 2026)
+
+On an approved quotation: **✉ Send to customer** (the system e-mails it from the company mailbox with
+the PDF and marks it sent); **✉️ Open in Gmail** (a new Gmail message opens addressed and written, and
+the PDF downloads — attach it, press Send); **📨 Outlook (.eml)** (downloads one e-mail file with the PDF
+inside; double-click it to open it in desktop Outlook — Gmail in a browser cannot open it). After
+sending it yourself, press **✓ I have sent it — mark sent** so follow-ups start; the client is not
+e-mailed twice. Top management (the Business Director) always approves last.
