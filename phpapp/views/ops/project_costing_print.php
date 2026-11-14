@@ -38,7 +38,7 @@ $basisName = defined('PC_BASES') ? (PC_BASES[$basis] ?? $basis) : $basis;
 <?= function_exists('doc_letterhead_html') ? doc_letterhead_html() : '' ?>
 <div class="top">
   <div><div class="muted">Project costing sheet</div></div>
-  <div style="text-align:right"><div><b><?= $e($h['code']) ?></b></div><div class="muted"><?= $e(defined('PC_STATUS') && isset(PC_STATUS[$h['status']]) ? PC_STATUS[$h['status']] : ($h['status'] ?? '')) ?></div></div>
+  <div style="text-align:right"><div><b><?= $e($h['code']) ?></b></div><?php $pr = function_exists('pc_ref_words') ? pc_ref_words($h) : ''; if ($pr !== ''): ?><div class="muted" style="font-size:11px"><?= $e($pr) ?></div><?php endif; ?><div class="muted"><?= $e(defined('PC_STATUS') && isset(PC_STATUS[$h['status']]) ? PC_STATUS[$h['status']] : ($h['status'] ?? '')) ?></div></div>
 </div>
 
 <h1><?= $e($h['title']) ?></h1>

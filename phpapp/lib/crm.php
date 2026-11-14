@@ -2869,13 +2869,22 @@ function ops_crm_quotes($route, $method) {
         $pdo->prepare("INSERT INTO quote_revisions (quote_id,rev,changed_by,changed_at,summary,snapshot) VALUES (?,?,?,?,?,?)")
             ->execute([$base, $newRev, user_name(current_user()), date('c'), $summary, json_encode($snap)]);
         crm_log_change($nid, 'Revision ' . $newRev . ' created from rev ' . (int)$q['rev'] . ' — ' . $summary);
-        //  Its costing (owner, 14 Nov 2026): the revision stands on the approved costing until someone
-        //  needs to change the figures — then "Change the costing for this revision" makes an editable copy.
-        $pcLocked = ($pcSrc = crm_quote_costing(crm_quote_get($nid))) && function_exists('pc_quote_lock_reason')
-                    && pc_quote_lock_reason($pcSrc) !== '';
+        //  Its costing (owner, 14 Nov 2026: "Yes" — the copy is made AUTOMATICALLY, as the costing's
+        //  next revision, Rev 01, 02 …). When the costing that priced the earlier revision is held by
+        //  it (gone for approval or beyond), the new quotation revision gets its own draft copy at once;
+        //  the earlier costing stays untouched as the record of the earlier price. A costing that is
+        //  not held (still a draft) is simply carried — it is changed in place.
+        $pcSrc = crm_quote_costing(crm_quote_get($nid));
+        $pcLocked = $pcSrc && function_exists('pc_quote_lock_reason') && pc_quote_lock_reason($pcSrc) !== '';
+        //  Made only for someone who may already work on costings (pc_can_edit) — nobody gains a right
+        //  through it; otherwise the button stays for a colleague who has that right.
+        $pcNew = $pcLocked && function_exists('pc_copy_for_revision') && function_exists('pc_can_edit') && pc_can_edit()
+               ? pc_copy_for_revision((int)$q['id'], $nid) : null;
+        if ($pcNew) crm_log_change($nid, 'Costing ' . $pcNew['code'] . ' made for this revision from ' . $pcSrc['code'] . ' — a draft, to be changed and approved.');
         flash('Created revision ' . str_pad((string)$newRev, 2, '0', STR_PAD_LEFT) . ' with '
             . count($srcLines) . ' line(s) and ' . count($srcLocs) . ' site(s) carried over. Edit it below.'
-            . ($pcLocked ? ' It stands on costing ' . $pcSrc['code'] . ' as approved; to change the figures, press "Change the costing for this revision" in its Costing section.' : ''));
+            . ($pcNew ? ' Its costing ' . $pcNew['code'] . ' was made from ' . $pcSrc['code'] . ' as a draft — change the figures there and submit it for approval.'
+                      : ($pcLocked ? ' It stands on costing ' . $pcSrc['code'] . ' as approved; to change the figures, press "Change the costing for this revision" in its Costing section.' : '')));
         redirect('/quote-edit?id=' . $nid);
     }
     if ($route === 'quote-doc') {

@@ -57,13 +57,24 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
   .pc .pcbu-s{width:16px;color:var(--muted);font-weight:700}
   .pc .pcbu-total td,.pc .pcbu-grand td{border-top:1px solid var(--line);font-weight:700}
   .pc .pcbu-grand td{border-top:2px solid var(--brand,#0f5f5a)}
+  .pc .pc-mflag{display:inline-block;margin-top:2px;font-size:10.5px;font-weight:700;border-radius:6px;padding:0 5px;white-space:nowrap}
+  .pc .pc-mflag.lo{color:var(--bad,#b42318);background:var(--bad-soft,#fdecec)}
+  .pc .pc-mflag.hi{color:var(--warn,#9a5b00);background:var(--warn-soft,#fdf1e3)}
+  .pc #pv_mwarn[hidden]{display:none}
   .pc .wide-scroll{overflow-x:auto}   /* a role with many heads scrolls inside its own card — it never pushes past the page */
 </style>
 
 <div class="pc">
 <div class="master-head">
   <div><h1 style="margin:0"><?= $e($h['title']) ?> <span class="pill <?= $stTone[$h['status']] ?? 'p-mut' ?>"><?= $e(PC_STATUS[$h['status']] ?? $h['status']) ?></span></h1>
-    <p class="sub" style="margin:2px 0 0"><?= $e($h['code']) ?> · default <?= $e(PC_BASES[$basis] ?? $basis) ?><?= !empty($h['site']) ? ' · '.$e($h['site']) : '' ?><?= !empty($h['sbu']) ? ' · ' . $e($sbuOpts[$h['sbu']] ?? $h['sbu']) : '' ?></p>
+    <?php $pcRef = function_exists('pc_ref_words') ? pc_ref_words($h) : ''; $pcRevs = function_exists('pc_revisions') ? pc_revisions($h) : []; ?>
+    <p class="sub" style="margin:2px 0 0"><b class="pc-no" title="Costing number — branch / PC / financial year / month / running number, then its revision"><?= $e($h['code']) ?></b><?= $pcRef !== '' ? ' · ' . $e($pcRef) : '' ?></p>
+    <?php if (count($pcRevs) > 1): //  every revision of this costing, so the earlier prices are one click away ?>
+    <p class="sub" style="margin:2px 0 0;font-size:12.5px">Revisions:
+      <?php foreach ($pcRevs as $i => $rv): $rl = function_exists('pc_rev_label') ? pc_rev_label((int)$rv['rev']) : ('Rev ' . (int)$rv['rev']); ?><?= $i ? ' · ' : '' ?><?php if ((int)$rv['id'] === (int)$h['id']): ?><b><?= $e($rl) ?></b> <span class="muted">(this one, <?= $e(strtolower(PC_STATUS[$rv['status']] ?? $rv['status'])) ?>)</span><?php else: ?><a href="/project-costing?id=<?= (int)$rv['id'] ?>"><?= $e($rl) ?></a> <span class="muted">(<?= $e(strtolower(PC_STATUS[$rv['status']] ?? $rv['status'])) ?>)</span><?php endif; ?><?php endforeach; ?>
+    </p>
+    <?php endif; ?>
+    <p class="sub" style="margin:2px 0 0">Default <?= $e(PC_BASES[$basis] ?? $basis) ?><?= !empty($h['site']) ? ' · '.$e($h['site']) : '' ?><?= !empty($h['sbu']) ? ' · ' . $e($sbuOpts[$h['sbu']] ?? $h['sbu']) : '' ?></p>
     <p class="sub" style="margin:2px 0 0">For:
       <?php if ($forInq): ?><a href="/inquiry-edit?id=<?= (int)$forInq['id'] ?>">enquiry <?= $e($forInq['inquiry_no']) ?></a><?php endif; ?>
       <?php if ($forInq && $forLead): ?> · <?php endif; ?>
@@ -88,6 +99,20 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
   <div class="kpi <?= $T['profit']>=0?'tone-ok':'tone-bad' ?>"><span class="kic">💰</span><div class="k">Project profit</div><div class="v"><?= fmoney_short($T['profit']) ?></div><div class="d">Revenue − cost</div></div>
   <div class="kpi <?= $T['margin']>=0?'tone-ok':'tone-bad' ?>"><span class="kic">📈</span><div class="k">Margin</div><div class="v"><?= number_format($T['margin'],1) ?>%</div><div class="d">Profit as a share of revenue</div></div>
 </div>
+
+<?php //  MARGIN WARNING (owner, 14 Nov 2026: "warning for both high and low margin … + or - 10%
+      //  … what is set"). Every role whose margin is more than 10 points away from its target, for
+      //  the preparer and for every approver who opens it. A warning — nothing is stopped.
+  $mFlags = function_exists('pc_margin_flags') ? pc_margin_flags($h, $lines) : [];
+  if ($mFlags): ?>
+<div class="msg msg-warning pc-mwarn" role="status" style="margin:0 0 12px">
+  <b>⚠ <?= count($mFlags) ?> role<?= count($mFlags) === 1 ? '' : 's' ?> outside the margin set (± <?= (int)PC_MARGIN_BAND ?> points of the target):</b>
+  <ul style="margin:4px 0 0 18px;padding:0">
+    <?php foreach ($mFlags as $f): ?><li><b><?= $e($f['role']) ?></b> — <?= $e($f['check']['words']) ?></li><?php endforeach; ?>
+  </ul>
+  <?php if ($canEdit): ?><span class="muted" style="font-size:12.5px">Check the cost heads, the fixed rate or the target margin of these roles. You can still save and submit — approvers will see this warning too.</span><?php endif; ?>
+</div>
+<?php endif; ?>
 
 <?php //  SETTINGS AT THE TOP (owner, 14 Nov 2026: "This details on project costing page shall be at the
       //  top and three to four boxes in one row … reduce the efforts to scroll down the screen to change
@@ -179,7 +204,8 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
         <td class="num"><?= $lb==='FIXED' ? '1' : number_format((float)$ln['boq_qty'],($lb==='DAILY'?0:1)) ?> <span class="muted" style="font-size:10px"><?= $e(strtolower($bw[1])) ?></span><?= (float)$ln['oneoff']>0 ? '<br><span class="muted" style="font-size:10px">+'.fmoney_short($ln['oneoff']).' 1-off</span>' : '' ?></td>
         <td class="num"><?= fmoney_short($c['revenue']) ?></td>
         <td class="num" style="color:var(--<?= $c['profit']>=0?'ok':'bad' ?>)"><?= fmoney_short($c['profit']) ?></td>
-        <td class="num"><?= number_format($c['margin'],1) ?>%</td>
+        <?php $mw = function_exists('pc_margin_check') ? pc_margin_check($ln, $h, $c) : null; ?>
+        <td class="num"><?= number_format($c['margin'],1) ?>%<?php if ($mw): ?><br><span class="pc-mflag <?= $mw['side']==='HIGH'?'hi':'lo' ?>" title="<?= $e($mw['words']) ?>">⚠ <?= $mw['side']==='HIGH' ? 'too high' : 'too low' ?></span><?php endif; ?></td>
         <?php if ($canEdit): ?><td class="num" style="white-space:nowrap"><a class="btn btn-ghost" style="padding:2px 8px" href="/project-costing?id=<?= (int)$h['id'] ?>&amp;edit=<?= (int)$ln['id'] ?>#add-role" title="Edit this role's heads">✎ Edit</a> <form method="post" action="/project-costing-line-delete" onsubmit="return confirm('Remove this role?')" style="display:inline"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="costing_id" value="<?= (int)$h['id'] ?>"><input type="hidden" name="line_id" value="<?= (int)$ln['id'] ?>"><button class="btn btn-ghost" style="padding:2px 8px" title="Remove">✕</button></form></td><?php endif; ?>
       </tr>
     <?php endforeach; ?>
@@ -443,6 +469,7 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
       <div>Loaded cost<span data-bw="pd"<?= $perDay ? '' : ' hidden' ?>> /man-day</span><b id="pv_loaded">—</b></div>
       <div>One-time / person<b id="pv_once">—</b></div><div>Rate<span data-bw="rate"><?= $e($rateLabel) ?></span><b id="pv_rate">—</b></div><div>Revenue<b id="pv_rev">—</b></div><div>Margin<b id="pv_marg">—</b></div>
     </div>
+    <div class="msg msg-warning" id="pv_mwarn" role="status" hidden style="margin:8px 0 0;font-size:12.5px"></div>
     <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <button class="btn" type="submit"><?= $editLn ? 'Save role' : 'Add role' ?></button>
       <?php if ($editLn): ?><a class="btn btn-ghost" href="/project-costing?id=<?= (int)$h['id'] ?>">Cancel</a><?php endif; ?>
@@ -603,6 +630,7 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
       set('pv_pay',j.pay?money(j.pay):'—'); set('pv_direct',j.direct?money(j.direct):'—'); set('pv_loaded',j.loaded?money(j.loaded):'—');
       set('pv_once',j.once?money(j.once):'—'); set('pv_rate',j.rate?money(j.rate):'—'); set('pv_rev',j.revenue?money(j.revenue):'—');
       set('pv_marg',j.revenue?(+j.margin).toFixed(1)+'%':'—');
+      var mw=document.getElementById('pv_mwarn'); if(mw){ mw.hidden=!j.margin_warn; mw.textContent=j.margin_warn?'⚠ '+j.margin_warn:''; }
       //  A day sheet: the same figure for a month, at the working days on the page.
       var dpmEl=document.getElementById('ch_dpm'), dpm=dpmEl?parseFloat(dpmEl.value):0;
       var isDay=((document.getElementById('ch_basis')||{}).value==='DAILY');

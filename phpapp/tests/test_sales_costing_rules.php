@@ -146,8 +146,16 @@ t_eq($st($q2), 'SENT', 'arranged: the changed quotation is sent (its costing is 
 $drive($MM, 'quote-revise', 'POST', ['id' => $q2]);
 $rev = (int) ops_val("SELECT id FROM quotations WHERE parent_id=? AND is_current=1", [$q2]);
 t_ok($rev > 0, 'arranged: a revision is raised');
+//  Owner, 14 Nov 2026: the revision gets its own costing automatically — the next Rev, as a draft —
+//  so it goes forward once that copy is approved (and is never refused for "no costing").
+$revPc = (int) ops_val("SELECT id FROM project_costings WHERE quote_id=?", [$rev]);
+t_ok($revPc > 0 && (string) ops_val("SELECT status FROM project_costings WHERE id=?", [$revPc]) === 'DRAFT', 'the revision got its own draft costing, made automatically');
 $r = $drive($MM, 'quote-status', 'POST', ['id' => $rev], ['to' => 'SENT']);
-t_eq($st($rev), 'SENT', 'the revision is not refused for "no costing" — it stands on its quotation\'s costing (' . $said($r) . ')');
+t_ok($st($rev) !== 'SENT' && stripos($said($r), 'still a draft') !== false && stripos($said($r), 'no costing') === false && stripos($said($r), 'make one') === false,
+     'until that copy is approved the revision waits, and says why — not "no costing" (' . $said($r) . ')');
+$pdo->prepare("UPDATE project_costings SET status='APPROVED' WHERE id=?")->execute([$revPc]);
+$r = $drive($MM, 'quote-status', 'POST', ['id' => $rev], ['to' => 'SENT']);
+t_eq($st($rev), 'SENT', 'once its costing is approved, the revision goes forward (' . $said($r) . ')');
 
 setting_set('quote_unmatched_approval', '');
 $r = $drive($MM, 'sales-setup', 'GET', [], [], ['come from an approved project costing']);

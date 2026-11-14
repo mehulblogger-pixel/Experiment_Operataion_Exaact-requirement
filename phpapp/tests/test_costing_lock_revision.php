@@ -75,41 +75,57 @@ try {
     $r = $drive($MM, 'project-costing-attach', 'POST', [], ['costing_id' => $c0, 'quote_id' => 0]);
     t_ok((int) pc_get($c0)['quote_id'] === $q0, 'and it cannot be unlinked from its quotation: ' . $said($r));
 
-    t_section('Costing lock — a revision, and its own editable costing when needed');
+    t_section('Costing lock — a revision gets its own costing automatically, as the next Rev');
+    //  Owner, 14 Nov 2026: "Yes" (made automatically) and "when the costing is revised it must have a
+    //  revision number starting from Rev. 01, 02 etc."
     $setQ($q0, 'SENT', date('c'));
     $before = (int) ops_val("SELECT COUNT(*) FROM project_costings WHERE quote_id IN (SELECT id FROM quotations WHERE quote_no=?)", [$qno]);
     $r = $drive($MM, 'quote-revise', 'POST', ['id' => $q0], ['summary' => 'Address corrected']);
     $q1 = (int) ops_val("SELECT id FROM quotations WHERE quote_no=? AND rev=1", [$qno]); $madeQuotes[] = $q1;
     t_ok($q1 > 0, 'a revision is raised: ' . $said($r));
-    t_eq((int) ops_val("SELECT COUNT(*) FROM project_costings WHERE quote_id IN (SELECT id FROM quotations WHERE quote_no=?)", [$qno]), $before,
-        'no costing is copied by itself — a revision made for another reason stands on the approved costing');
-    t_ok(stripos($said($r), 'Change the costing for this revision') !== false, '…and the message says how to change the figures if needed');
-    t_eq((int) (crm_quote_costing(crm_quote_get($q1))['id'] ?? 0), $c0, 'the revision is priced by the approved costing until then');
-
-    $g1 = $drive($MM, 'quote', 'GET', ['id' => $q1], [], ['Change the costing for this revision']);
-    t_ok(!empty($g1['has']['Change the costing for this revision']), 'the revision\'s page offers "✎ Change the costing for this revision"');
-    $g0 = $drive($MM, 'project-costing', 'GET', ['id' => $c0], [], ['Change the costing for ' . $qno . ' revision 1']);
-    t_ok(!empty($g0['has']['Change the costing for ' . $qno . ' revision 1']), '…and so does the locked costing itself');
-
-    $r = $drive($MM, 'project-costing-revise', 'POST', [], ['quote_id' => $q1]);
-    $c1 = (int) ops_val("SELECT id FROM project_costings WHERE quote_id=? ORDER BY id DESC LIMIT 1", [$q1]); $madeCostings[] = $c1;
-    $n1 = pc_get($c1);
-    t_ok($c1 > 0 && $n1['status'] === 'DRAFT', 'one press makes an editable copy for the revision, as a draft: ' . $said($r));
-    t_ok(!pc_locked($n1), '…which can be changed — it is not locked');
+    $c1 = (int) ops_val("SELECT id FROM project_costings WHERE quote_id=? ORDER BY id DESC LIMIT 1", [$q1]); if ($c1) $madeCostings[] = $c1;
+    t_eq((int) ops_val("SELECT COUNT(*) FROM project_costings WHERE quote_id IN (SELECT id FROM quotations WHERE quote_no=?)", [$qno]), $before + 1,
+        'its costing is copied at once — no button to press');
+    $n1 = $c1 ? pc_get($c1) : [];
+    $base0 = strtoupper($tag) . '-PC';
+    t_eq([(string) ($n1['code'] ?? ''), (string) ($n1['base_code'] ?? ''), (int) ($n1['rev'] ?? -1)], [$base0 . ' Rev 01', $base0, 1],
+        'the copy keeps the costing\'s number and is its Rev 01');
+    t_ok(stripos($said($r), $base0 . ' Rev 01') !== false && stripos($said($r), 'submit it for approval') !== false, '…and the message names it and says what to do: ' . $said($r));
+    t_ok(($n1['status'] ?? '') === 'DRAFT' && !pc_locked($n1), '…a draft that can be changed — it is not locked');
     t_eq((int) ops_val("SELECT COUNT(*) FROM project_costing_lines WHERE costing_id=?", [$c1]), 1, '…with every role carried over');
-    t_eq([(float) $n1['overhead_pct'], (string) $n1['basis']], [8.0, 'LONG'], '…and every setting');
-    t_ok(str_ends_with((string) $n1['title'], '(revision 1)'), '…titled for its revision: ' . $n1['title']);
-    t_eq((int) $n1['created_by_user_id'], $MM, '…prepared by whoever pressed it — so they cannot approve it themselves');
+    t_eq([(float) ($n1['overhead_pct'] ?? 0), (string) ($n1['basis'] ?? '')], [8.0, 'LONG'], '…and every setting');
+    t_eq((string) ($n1['title'] ?? ''), 'Site team', '…under the same title — the revision is in its number, not its name');
+    t_eq((int) ($n1['created_by_user_id'] ?? 0), $MM, '…prepared by whoever revised — so they cannot approve it themselves');
     $o = pc_get($c0);
     t_eq([$o['status'], (int) $o['quote_id']], ['APPROVED', $q0], 'the original stays approved, on the revision that went out — the record of the earlier price');
-    t_eq((int) (crm_quote_costing(crm_quote_get($q1))['id'] ?? 0), $c1, 'the revision is now priced by its own copy');
+    t_eq((int) (crm_quote_costing(crm_quote_get($q1))['id'] ?? 0), $c1, 'the revision is priced by its own copy');
     t_eq((int) (crm_quote_costing(crm_quote_get($q0))['id'] ?? 0), $c0, 'the earlier revision still shows its own costing');
     $trail0 = array_column(ops_all("SELECT subject FROM activities WHERE entity_kind='PROJECT_COSTING' AND entity_id=?", [$c0]) ?: [], 'subject');
     $trail1 = array_column(ops_all("SELECT subject FROM activities WHERE entity_kind='PROJECT_COSTING' AND entity_id=?", [$c1]) ?: [], 'subject');
     t_ok((bool) array_filter($trail0, fn($x) => str_contains($x, 'Copied to ')) && (bool) array_filter($trail1, fn($x) => str_contains($x, ' copied from ')),
         'both costings record the copy in their history');
+    t_eq(array_map(fn($x) => (int) $x['rev'], pc_revisions(pc_get($c1))), [0, 1], 'both are listed as revisions of one costing: Rev 00 and Rev 01');
+    $g1 = $drive($MM, 'project-costing', 'GET', ['id' => $c1], [], ['Revisions:', 'href="/project-costing?id=' . $c0 . '"', $base0 . ' Rev 01']);
+    t_ok(!empty($g1['has']['Revisions:']) && !empty($g1['has']['href="/project-costing?id=' . $c0 . '"']) && !empty($g1['has'][$base0 . ' Rev 01']),
+        'the costing page shows its number and links to the earlier revision');
+    $g1 = $drive($MM, 'quote', 'GET', ['id' => $q1], [], ['Change the costing for this revision']);
+    t_ok(empty($g1['has']['Change the costing for this revision']), 'the revision\'s page no longer needs "Change the costing for this revision"');
     $r = $drive($MM, 'project-costing-revise', 'POST', [], ['quote_id' => $q1]);
-    t_ok(stripos($said($r), 'already editable') !== false, 'pressed again: its costing is already editable — no second copy');
+    t_ok(stripos($said($r), 'already editable') !== false, 'pressed anyway: its costing is already editable — no second copy');
+
+    //  A second revision of the quotation, after the first went for approval: Rev 02.
+    $setQ($q1, 'SENT', date('c')); $pdo->prepare("UPDATE project_costings SET status='APPROVED' WHERE id=?")->execute([$c1]);
+    $r = $drive($MM, 'quote-revise', 'POST', ['id' => $q1], ['summary' => 'Rate change']);
+    $q2 = (int) ops_val("SELECT id FROM quotations WHERE quote_no=? AND rev=2", [$qno]); $madeQuotes[] = $q2;
+    $c2 = (int) ops_val("SELECT id FROM project_costings WHERE quote_id=? ORDER BY id DESC LIMIT 1", [$q2]); if ($c2) $madeCostings[] = $c2;
+    t_eq((string) (pc_get($c2)['code'] ?? ''), $base0 . ' Rev 02', 'the next revision is Rev 02: ' . $said($r));
+    //  A brand-new costing gets the new number: branch / PC / year / month / running number, Rev 00.
+    $pdo->prepare("UPDATE offices SET code=? WHERE id=?")->execute(['CLR', $off]);
+    $nb = pc_new_number($off);
+    $fy = fy_label(current_fy());
+    t_ok((bool) preg_match('#^CLR/PC/' . preg_quote($fy, '#') . '/' . date('m') . '/\d{4}$#', $nb), 'a new costing number reads branch/PC/year/month/number: ' . $nb);
+    t_eq(pc_new_number(0) !== '' && str_starts_with(pc_new_number(0), 'GEN/PC/'), true, 'with no office it starts GEN/PC/');
+    $setQ($q1, 'DRAFT'); $setQ($q2, 'DRAFT');
     $r = $drive($MM, 'project-costing-revise', 'POST', [], ['quote_id' => $q0]);
     t_ok(stripos($said($r), 'older revision') !== false, 'an older revision cannot have its costing changed: ' . $said($r));
 

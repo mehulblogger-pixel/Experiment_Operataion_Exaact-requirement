@@ -383,17 +383,37 @@ stateDiagram-v2
   is the default for new roles and for roles saved before (blank). A role's cost heads, quantity, rate,
   revenue, quotation line unit, hiring request and requisition all use the role's basis
   (`pc_line_basis()`). Not a status — no lifecycle change.
-- **A revision gets its own editable costing — on demand (owner, 14 Nov 2026: "once the quote is
-  revised for what so ever reason and is required to revise the costing it shall be editable").** A
-  revision raised from a quotation whose costing is locked stands on that approved costing (so a
-  revision for an address change needs nothing more). On a revision still being prepared (DRAFT or
-  sent back, current), "✎ Change the costing for this revision" (`POST /project-costing-revise`,
-  `pc_can_edit()`) copies the costing — every setting and role — as a new DRAFT costing linked to
-  that revision (`pc_copy_for_revision()`), prepared by whoever pressed it. The original stays
-  untouched as the record of the earlier price; both histories record the copy. The revision is then
-  priced by its copy (`crm_quote_costing()`), which goes through approval as any costing and locks in
-  turn when the revision goes for approval. No status or transition is added: the copy is a new
-  costing starting at DRAFT.
+- **A revision gets its own costing — automatically, as the costing's next Rev (owner, 14 Nov 2026:
+  "once the quote is revised … it shall be editable"; then "Yes" to making it automatically, and
+  "when the costing is revised it must have a revision number starting from Rev. 01, 02 etc.").**
+  When a quotation is revised (`quote-revise`) and the costing that priced the earlier revision is
+  locked by it (gone for approval or beyond), the costing is copied at once — every setting and role —
+  as a new DRAFT costing linked to the new revision (`pc_copy_for_revision()`), with the **same number
+  and the next revision**: `… Rev 00` → `… Rev 01` → `… Rev 02` (`project_costings.base_code`, `rev`).
+  It is prepared by whoever revised, so they cannot approve it (D-11 B). The original stays untouched
+  as the record of the earlier price; both histories record the copy, and the costing page lists every
+  revision with a link. The revision is priced by its copy (`crm_quote_costing()`), so a man-month
+  revision goes forward once that copy is approved — whatever the revision was for. The copy is made
+  only when the person revising holds the costing edit right (`pc_can_edit()`); otherwise, and for
+  revisions raised before this, "✎ Change the costing for this revision" (`POST /project-costing-revise`)
+  makes it on demand, as before. A costing that is not locked (still a draft) is not copied — it is
+  changed in place. No status or transition is added: the copy is a new costing starting at DRAFT.
+- **The costing number (owner, 14 Nov 2026: "every costing must have a unique number showing quote,
+  client etc. … including the year date and month").** A new costing is numbered
+  `BRANCH/PC/FY/MM/NNNN Rev 00` — e.g. `AHM/PC/2026-27/11/0007 Rev 00`: the office code (GEN when no
+  office), "PC", the financial year, the month it was made, and a running number per branch per
+  financial year (`pc_new_number()`). The number never changes; the client, the quotation (with its
+  revision) and the enquiry are shown beside it on the page and the printed sheet (`pc_ref_words()`)
+  rather than inside it, because a costing is often made before its quotation and its client can be
+  picked later. Costings made before keep their old number (`PC-00012`); their revisions become
+  `PC-00012 Rev 01`, `Rev 02` … Not a status — no lifecycle change.
+- **Margin warning (owner, 14 Nov 2026: "warning for both high and low margin … + or - 10% … what is
+  set").** A role whose margin is more than 10 percentage points above or below its target margin is
+  flagged — on the roles table, in a box at the top of the costing (seen by the preparer and every
+  approver who opens it) and live in the role editor (`pc_margin_check()`, `pc_margin_flags()`,
+  `PC_MARGIN_BAND = 10`). The margin is read at the price **before** the negotiation padding (the
+  padding is there to be given away). A role with no target margin is not checked. A warning only — it
+  never stops a save, a submission or an approval. No status or transition.
 - **Flexible cost heads (owner, 9 Nov 2026):** a role's cost build-up is a list of heads
   (`project_costing_lines.spec`, worked out by `lib/costing_heads.php`) — each an amount (the box is a
   calculator), a % of other heads (with an optional "counted up to" cap on the base and an optional

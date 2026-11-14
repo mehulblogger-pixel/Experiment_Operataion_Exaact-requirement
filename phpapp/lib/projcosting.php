@@ -138,7 +138,12 @@ function pc_migrate() {
               ['project_costing_lines','basis',"VARCHAR(16) DEFAULT ''"],
               // Who signed a level, by id — so the one who gave the last approval (and
               // those at or above that level) can be found, and told of a send-back.
-              ['project_costing_approvals','acted_by_id',"INT NULL"]] as $c) {
+              ['project_costing_approvals','acted_by_id',"INT NULL"],
+              // Owner, 14 Nov 2026 — "every costing must have a unique number … when the costing is
+              // revised it must have a revision number starting from Rev. 01". The number without
+              // its revision (shared by every revision of one costing) and the revision itself.
+              ['project_costings','base_code',"VARCHAR(40) DEFAULT ''"],
+              ['project_costings','rev',"INT DEFAULT 0"]] as $c) {
         if (function_exists('ensure_column')) ensure_column($c[0], $c[1], $c[2]);
     }
 }
@@ -631,6 +636,39 @@ function pc_line_calc($line, $header) {
             'pay' => round($pay, 2), 'labels' => $labels, 'eval' => $ev];
 }
 
+//  MARGIN OUTSIDE THE BAND (owner, 14 Nov 2026: "it must show the warning for both high and low
+//  margin than required. That shall be above + or - 10% … what is set").
+//  "What is set" = the role's target margin. The role's margin is read at its price BEFORE the
+//  negotiation padding — the padding is there to be given away, so counting it would flag every role
+//  on a costing with a large padding. The gap is in percentage points: a 20% target warns below 10%
+//  and above 30%. A warning only — it never stops a save or a submission. No target set = no check.
+const PC_MARGIN_BAND = 10;
+function pc_margin_check($line, $header, $c = null) {
+    $tm = (float)($line['target_margin'] ?? 0);
+    if ($tm <= 0) return null;
+    $c = $c ?: pc_line_calc($line, $header);
+    $baseRev = pc_line_basis($line, $header) === 'FIXED' ? (float)$c['rate'] : (float)$c['rate'] * (float)$c['qty'];
+    if ($baseRev <= 0) return null;
+    $m = round(($baseRev - (float)$c['cost']) / $baseRev * 100, 2);
+    $gap = round($m - $tm, 2);
+    if (abs($gap) <= PC_MARGIN_BAND + 0.005) return null;
+    $p = fn($v) => rtrim(rtrim(number_format($v, 1), '0'), '.') . '%';
+    $side = $gap > 0 ? 'HIGH' : 'LOW';
+    return ['side' => $side, 'margin' => $m, 'target' => $tm, 'gap' => $gap,
+            'words' => ($side === 'HIGH' ? 'Margin too high: ' : 'Margin too low: ') . $p($m) . ' against the ' . $p($tm) . ' set — '
+                     . rtrim(rtrim(number_format(abs($gap), 1), '0'), '.') . ' points ' . ($side === 'HIGH' ? 'above' : 'below')
+                     . ' (allowed: ' . $p(max(0, $tm - PC_MARGIN_BAND)) . ' to ' . $p($tm + PC_MARGIN_BAND) . ', before negotiation padding).'];
+}
+//  Every role on the costing that is outside the band: [[role_label, check], …]
+function pc_margin_flags($h, $lines = null) {
+    $out = [];
+    foreach (($lines ?? pc_lines((int)$h['id'])) as $ln) {
+        $k = pc_margin_check($ln, $h);
+        if ($k) $out[] = ['role' => (string)$ln['role_label'], 'line_id' => (int)($ln['id'] ?? 0), 'check' => $k];
+    }
+    return $out;
+}
+
 // Project rollup: totals + per-head totals across every line.
 function pc_rollup($id) {
     $h = pc_get($id); if (!$h) return null;
@@ -1089,6 +1127,71 @@ function pc_quote_lock_reason($h) {
     return '';
 }
 
+//  THE COSTING NUMBER (owner, 14 Nov 2026: "every costing must have a unique number showing quote,
+//  client etc. … including the year date and month … You can improvise it").
+//
+//      AHM/PC/2026-27/11/0007 Rev 00
+//      │   │  │       │  │    └ revision — Rev 00 when made, Rev 01, 02 … each time it is revised
+//      │   │  │       │  └ running number for that branch in that financial year
+//      │   │  │       └ month it was made
+//      │   │  └ financial year
+//      │   └ "project costing"
+//      └ the branch (office code; GEN when no office is set)
+//
+//  The client and the quotation are shown BESIDE the number (pc_ref_words), not inside it: a number
+//  must never change once it is on paper, and a costing is often made before its quotation exists,
+//  or its client is picked later. Costings made before this keep their old numbers (PC-00012); their
+//  revisions become PC-00012 Rev 01, 02 …
+function pc_new_number($officeId) {
+    $br = 'GEN';
+    if ($officeId) {
+        $o = ops_one("SELECT code FROM offices WHERE id=?", [(int)$officeId]);
+        $c = $o ? strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string)$o['code'])) : '';
+        if ($c !== '') $br = substr($c, 0, 10);
+    }
+    $fy = function_exists('fy_label') && function_exists('current_fy') ? fy_label(current_fy()) : date('Y');
+    $stem = $br . '/PC/' . $fy . '/';
+    //  the running number counts on through the year, whatever the month
+    $max = 0;
+    foreach (ops_all("SELECT base_code FROM project_costings WHERE base_code LIKE ?", [$stem . '%']) ?: [] as $r)
+        if (preg_match('#^' . preg_quote($stem, '#') . '\d{2}/(\d+)$#', (string)$r['base_code'], $m)) $max = max($max, (int)$m[1]);
+    for ($n = $max + 1; $n < $max + 200; $n++) {
+        $base = $stem . date('m') . '/' . str_pad((string)$n, 4, '0', STR_PAD_LEFT);
+        if (!ops_val("SELECT 1 FROM project_costings WHERE base_code=? OR code=? OR code LIKE ? LIMIT 1", [$base, $base, $base . ' Rev %'])) return $base;
+    }
+    return $stem . date('m') . '/' . date('His');
+}
+function pc_rev_label($rev) { return 'Rev ' . str_pad((string)max(0, (int)$rev), 2, '0', STR_PAD_LEFT); }
+function pc_code_for($base, $rev) { return $base . ' ' . pc_rev_label($rev); }
+//  The number every revision of this costing shares (older costings: their own code, less any "Rev nn").
+function pc_base_of($h) {
+    $b = trim((string)($h['base_code'] ?? ''));
+    return $b !== '' ? $b : preg_replace('/ Rev \d+$/', '', (string)($h['code'] ?? ''));
+}
+//  What goes beside the number: the client, the quotation (and its revision) and the enquiry.
+function pc_ref_words($h) {
+    $bits = [];
+    if (!empty($h['client_id'])) {
+        $cn = ops_val("SELECT COALESCE(NULLIF(display_name,''), legal_name) FROM business_partners WHERE id=?", [(int)$h['client_id']]);
+        if ($cn) $bits[] = (string)$cn;
+    }
+    if (!empty($h['quote_id'])) {
+        $q = ops_one("SELECT quote_no, rev FROM quotations WHERE id=?", [(int)$h['quote_id']]);
+        if ($q) $bits[] = Tl('quote') . ' ' . $q['quote_no'] . ((int)$q['rev'] > 0 ? ' rev ' . (int)$q['rev'] : '');
+    }
+    if (!empty($h['inquiry_id'])) {
+        $no = ops_val("SELECT inquiry_no FROM crm_inquiries WHERE id=?", [(int)$h['inquiry_id']]);
+        if ($no) $bits[] = 'enquiry ' . $no;
+    }
+    return implode(' · ', $bits);
+}
+//  Every revision of this costing, oldest first.
+function pc_revisions($h) {
+    $base = pc_base_of($h); if ($base === '') return [];
+    return ops_all("SELECT id, code, rev, status, quote_id, created_at FROM project_costings
+                    WHERE base_code=? OR (COALESCE(base_code,'')='' AND code=?) ORDER BY rev, id", [$base, $base]) ?: [];
+}
+
 //  A REVISION GETS ITS OWN COSTING (owner, 14 Nov 2026: "once the quote is revised for what so ever
 //  reason and is required to revise the costing it shall be editable"). The costing that priced the
 //  revised quotation is copied — every setting and every role — as a DRAFT linked to the new
@@ -1106,13 +1209,16 @@ function pc_copy_for_revision($fromQuoteId, $newQuoteId) {
         if (!$src) return null;
         if (pc_quote_lock_reason($src) === '') return null;      // not held by its quotation: change it directly
         $pdo = db(); $me = current_user();
-        $skip = ['id', 'code', 'status', 'quote_id', 'approved_by', 'approved_at', 'approval_ref', 'reject_note', 'created_by', 'created_by_user_id', 'created_at', 'updated_at'];
+        $skip = ['id', 'code', 'base_code', 'rev', 'status', 'quote_id', 'approved_by', 'approved_at', 'approval_ref', 'reject_note', 'created_by', 'created_by_user_id', 'created_at', 'updated_at'];
         $cols = array_values(array_diff(array_keys($src), $skip));
-        $code = ops_next_code('project_costings', 'code', 'PC');
+        //  the same number, the next revision (owner, 14 Nov 2026: "Rev. 01, 02 etc.")
+        $baseNo = pc_base_of($src);
+        $cRev = 1 + (int) ops_val("SELECT MAX(COALESCE(rev,0)) FROM project_costings WHERE base_code=? OR code=?", [$baseNo, $baseNo]);
+        $code = pc_code_for($baseNo, $cRev);
         $rev = (int) ops_val("SELECT rev FROM quotations WHERE id=?", [(int)$newQuoteId]);
-        $allCols = array_merge(['code', 'status', 'quote_id', 'created_by', 'created_by_user_id', 'created_at', 'updated_at'], $cols);
-        $vals = array_merge([$code, 'DRAFT', (int)$newQuoteId, user_name($me), (int)($me['id'] ?? 0) ?: null, date('c'), date('c')],
-            array_map(fn($c) => $c === 'title' ? preg_replace('/ \(revision \d+\)$/', '', (string)$src[$c]) . ' (revision ' . $rev . ')' : $src[$c], $cols));
+        $allCols = array_merge(['code', 'base_code', 'rev', 'status', 'quote_id', 'created_by', 'created_by_user_id', 'created_at', 'updated_at'], $cols);
+        $vals = array_merge([$code, $baseNo, $cRev, 'DRAFT', (int)$newQuoteId, user_name($me), (int)($me['id'] ?? 0) ?: null, date('c'), date('c')],
+            array_map(fn($c) => $c === 'title' ? preg_replace('/ \(revision \d+\)$/', '', (string)$src[$c]) : $src[$c], $cols));
         $pdo->prepare("INSERT INTO project_costings (" . implode(',', $allCols) . ") VALUES (" . implode(',', array_fill(0, count($allCols), '?')) . ")")->execute($vals);
         $nid = (int)$pdo->lastInsertId();
         foreach (ops_all("SELECT * FROM project_costing_lines WHERE costing_id=? ORDER BY id", [(int)$src['id']]) ?: [] as $l) {
@@ -1388,7 +1494,8 @@ function ops_projcosting($route, $method) {
         if (!empty($src['err'])) { flash($src['err'], 'error'); redirect('/project-costings'); }
         foreach (['client_id', 'office_id'] as $k) if (!(int)($_POST[$k] ?? 0) && !empty($src[$k])) $_POST[$k] = $src[$k];
         if (trim((string)($_POST['title'] ?? '')) === '' && !empty($src['title'])) $_POST['title'] = $src['title'];
-        $code = ops_next_code('project_costings', 'code', 'PC');
+        $baseNo = pc_new_number((int)($_POST['office_id'] ?? 0));
+        $code = pc_code_for($baseNo, 0);
         $pdo->prepare("INSERT INTO project_costings
             (code,title,client_id,office_id,site,basis,overhead_pct,insurance_pct,baddebt_pct,contingency_pct,negotiation_pct,
              status,quote_id,opportunity_id,requisition_id,created_by,created_by_user_id,created_at)
@@ -1401,8 +1508,8 @@ function ops_projcosting($route, $method) {
                 (int)($_POST['requisition_id'] ?? 0) ?: null, user_name(current_user()), (int)(current_user()['id'] ?? 0) ?: null, date('c')]);
         $id = (int)$pdo->lastInsertId();
         $sbu = trim((string)($_POST['sbu'] ?? '')) ?: (string)($src['sbu'] ?? '');
-        $pdo->prepare("UPDATE project_costings SET inquiry_id=?, lead_id=?, sbu=? WHERE id=?")
-            ->execute([$inq ?: null, ($lead ?: (int)($src['lead_id'] ?? 0)) ?: null, substr($sbu, 0, 20), $id]);
+        $pdo->prepare("UPDATE project_costings SET inquiry_id=?, lead_id=?, sbu=?, base_code=?, rev=0 WHERE id=?")
+            ->execute([$inq ?: null, ($lead ?: (int)($src['lead_id'] ?? 0)) ?: null, substr($sbu, 0, 20), $baseNo, $id]);
         $seeded = (int)($_POST['quote_id'] ?? 0) ? pc_seed_from_quote($id, (int)$_POST['quote_id']) : 0;
         pc_trail($id, 'Costing ' . $code . ' created by ' . user_name(current_user()));
         flash($seeded ? "$code created from the quotation — its $seeded line" . ($seeded === 1 ? '' : 's') . " are in, at the quoted rate and quantity. Add each role's cost heads to see the margin at that price."
@@ -1517,7 +1624,8 @@ function ops_projcosting($route, $method) {
         $c = pc_line_calc($line, $h);
         echo json_encode(['ok' => !$errs, 'errors' => $errs, 'rows' => $ev['rows'], 'by_grp' => $ev['by_grp'],
             'direct' => $c['direct'], 'pay' => $c['pay'], 'once' => $c['oneoff'], 'loaded' => $c['loaded'], 'rate' => $c['proposed'],
-            'revenue' => $c['revenue'], 'cost' => $c['cost'], 'profit' => $c['profit'], 'margin' => $c['margin']], JSON_UNESCAPED_UNICODE);
+            'revenue' => $c['revenue'], 'cost' => $c['cost'], 'profit' => $c['profit'], 'margin' => $c['margin'],
+            'margin_warn' => ($mw = pc_margin_check($line, $h, $c)) ? $mw['words'] : '', 'margin_side' => $mw['side'] ?? ''], JSON_UNESCAPED_UNICODE);
         return true;
     }
 

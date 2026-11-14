@@ -66,9 +66,15 @@ and branch in view, with the hit rate (won ÷ won + lost). Click a card to list 
 
 From the moment a quotation goes for approval, the costing it was priced from cannot be reopened,
 edited or unlinked — it is the record of that price. To change the figures, raise a revision of the
-quotation; on the revision's Costing card press **✎ Change the costing for this revision**: you get an
-editable copy ("… (revision 1)") to change and send for approval. A revision made for any other reason
-simply stands on the approved costing. An enquiry's received date cannot be later than today.
+quotation: its costing is copied at once as the costing's next revision (`… Rev 01`, then `Rev 02` …),
+a draft to change and send for approval — whatever the revision was for, the revised quotation goes
+forward once that copy is approved. (If you do not work on costings yourself, a colleague who does
+presses **✎ Change the costing for this revision**.) An enquiry's received date cannot be later than today.
+
+Every costing has a number that never changes — `BRANCH/PC/year/month/number Rev 00`, e.g.
+`AHM/PC/2026-27/11/0007 Rev 00` — with the client, quotation and enquiry shown beside it. A role whose
+margin is more than 10 points above or below its target margin is flagged in amber, live while you type
+it and at the top of the costing for the approvers; it is a warning, never a block.
 
 ### Project costing — 14 Nov 2026
 
