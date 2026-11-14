@@ -767,6 +767,19 @@ function pc_seed_from_quote($costingId, $quoteId) {
 
 // Draft a quotation from a costing: one quote line per role, priced at the
 // proposed rate × BOQ. Links the quote back to the costing. Returns ['id','no'].
+//  The quotation lines a costing prices: one per role, in the role's own unit, at its quoted rate.
+//  One answer for "Create quotation" and for the quote screen's "Take the costing's prices".
+function pc_quote_line_rows($h, $lines = null) {
+    $out = [];
+    foreach (($lines ?? pc_lines((int)$h['id'])) as $ln) {
+        $c = pc_line_calc($ln, $h);
+        $lb = pc_line_basis($ln, $h);                       // each role in its own unit (14 Nov 2026)
+        $out[] = ['desc' => trim(((string)$ln['group_label'] !== '' ? $ln['group_label'] . ' — ' : '') . (string)$ln['role_label']),
+                  'qty' => ($lb === 'FIXED' ? 1 : (float)$ln['boq_qty']), 'unit' => pc_unit($lb),
+                  'rate' => $c['proposed'], 'amount' => $c['revenue']];
+    }
+    return $out;
+}
 function pc_make_quote($roll) {
     $h = $roll['header']; $lines = $roll['lines'];
     if (empty($lines)) return ['err' => 'Add at least one role first.'];
@@ -784,13 +797,11 @@ function pc_make_quote($roll) {
                 $sub, $gstPct, $gst, $total, (int)(current_user()['id'] ?? 0) ?: null, user_name(current_user()), date('c')]);
         $qid = (int)db()->lastInsertId();
         $n = 0;
-        foreach ($lines as $ln) {
-            $c = pc_line_calc($ln, $h); $n++;
-            $lb = pc_line_basis($ln, $h); $unit = pc_unit($lb);   // each role in its own unit (14 Nov 2026)
-            $desc = trim(((string)$ln['group_label'] !== '' ? $ln['group_label'] . ' — ' : '') . (string)$ln['role_label']);
+        foreach (pc_quote_line_rows($h, $lines) as $r) {
+            $n++;
             db()->prepare("INSERT INTO quote_lines (quote_id,line_no,description,order_type,qty,unit,rate,amount)
                            VALUES (?,?,?, 'LINE', ?,?,?,?)")
-                ->execute([$qid, $n, $desc, ($lb === 'FIXED' ? 1 : (float)$ln['boq_qty']), $unit, $c['proposed'], $c['revenue']]);
+                ->execute([$qid, $n, $r['desc'], $r['qty'], $r['unit'], $r['rate'], $r['amount']]);
         }
         db()->prepare("UPDATE project_costings SET quote_id=? WHERE id=?")->execute([$qid, (int)$h['id']]);
         // The quotation belongs to the same enquiry, lead and business unit as

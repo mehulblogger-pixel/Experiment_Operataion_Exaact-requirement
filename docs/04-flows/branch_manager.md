@@ -78,3 +78,7 @@ person who missed the deadline can undo it, there is no deadline.
 You approve; preparing and submitting is the sales team's. "Submit for approval" is no longer shown to
 you on a draft — the page names who submits it. You sign when it is your turn (people who report to you
 in the chain sign first; top management last).
+
+### Assigned work and the costing tab (owner, 14 Nov 2026)
+
+Enquiries and quotations assigned to people who report to you are yours to work on too; others you view.

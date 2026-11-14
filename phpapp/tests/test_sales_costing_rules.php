@@ -131,7 +131,9 @@ t_ok(!empty($r['has']['Say why its prices now differ']) && !empty($r['has']['Why
 $r = $drive($BDM, 'quote-edit', 'POST', ['id' => $q2], $form(['row_version' => $ver(), 'l_rate' => ['55000'],
             'costing_note' => 'I think it is too high']), ['Only the person who made it']);
 t_eq((float) ops_val("SELECT rate FROM quote_lines WHERE quote_id=?", [$q2]), $rate0, 'someone other than its creator cannot change its prices away from the costing, even with a note');
-t_ok(!empty($r['has']['Only the person who made it']), '…and is told that only its creator can');
+//  Since 14 Nov 2026 (option C) a quotation assigned to someone is worked only by them and the people above
+//  them, so a BDM outside the assignee's line is turned away before the price rule — either way, told why.
+t_ok(!empty($r['has']['Only the person who made it']) || stripos($said($r), 'is assigned to') !== false, '…and is told why: ' . $said($r));
 $r = $drive($MM, 'quote-edit', 'POST', ['id' => $q2], $form(['row_version' => $ver(), 'l_rate' => ['55000'],
        'costing_note' => 'Customer agreed 55,000 a month in the meeting of 18 Oct']), []);
 t_eq((float) ops_val("SELECT rate FROM quote_lines WHERE quote_id=?", [$q2]), 55000.0, 'its creator changes the price, with a note');

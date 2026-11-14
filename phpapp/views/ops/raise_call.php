@@ -15,10 +15,34 @@
           <?php if ($fdesc !== ''): ?><div class="muted" style="font-size:13px"><?= e($fdesc) ?></div><?php endif; ?>
           <div class="muted" style="font-size:12px">opened <?= e(fdate(substr((string)$fc['opened_at'], 0, 10))) ?></div></div>
         <a class="btn small" style="white-space:nowrap" href="/call-new?contract_id=<?= (int)$fc['id'] ?>&amp;contract=<?= e(urlencode((string)$fc['contract_number'])) ?>">▶ Raise <?= e(Tl('call')) ?></a>
+        <?php //  Owner, 14 Nov 2026 (option D): "no work yet — remind me on <date>". ?>
+        <details class="fold rc-snooze" style="flex-basis:100%">
+          <summary style="font-size:12.5px">No work yet — remind me later</summary>
+          <form method="post" action="/raise-call" class="fold-body" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+            <input type="hidden" name="do" value="snooze"><input type="hidden" name="contract_id" value="<?= (int)$fc['id'] ?>">
+            <div class="ff" style="margin:0"><label for="rcs-<?= (int)$fc['id'] ?>">Back on this list on</label>
+              <input class="form-control" type="date" id="rcs-<?= (int)$fc['id'] ?>" name="until" required min="<?= e(date('Y-m-d', strtotime('+1 day'))) ?>"<?= trim((string)($fc['end_date'] ?? '')) !== '' ? ' max="' . e(substr((string)$fc['end_date'], 0, 10)) . '"' : '' ?>></div>
+            <div class="ff" style="margin:0;flex:1;min-width:180px"><label for="rcn-<?= (int)$fc['id'] ?>">Note <span class="muted">optional</span></label>
+              <input class="form-control" id="rcn-<?= (int)$fc['id'] ?>" name="note" maxlength="300" placeholder="e.g. client says work starts after the shutdown"></div>
+            <button class="btn small secondary" type="submit">Put aside</button>
+          </form>
+        </details>
       </div>
     <?php endforeach; ?>
     <?php if (count($fresh) > 12): ?><p class="muted" style="margin:0;font-size:12.5px">+<?= count($fresh) - 12 ?> more — pick the <?= e(Tl('client')) ?> below.</p><?php endif; ?>
   </div>
+</div>
+<?php endif; ?>
+<?php //  What is not on the list, and why — so nothing looks lost (owner, 14 Nov 2026, options C + D). ?>
+<?php if (!empty($freshLater) || !empty($freshSnoozed)): ?>
+<div class="panel" style="margin-top:10px;font-size:13px">
+  <?php if (!empty($freshLater)): ?><div><b>Starting later</b> <span class="muted">— each joins the list on its start date</span>
+    <?php foreach (array_slice($freshLater, 0, 8) as $fl): ?><div class="muted"><?= e($fl['contract_number']) ?> · <?= e($fl['client_name'] ?: '—') ?> · starts <?= e(fdate(substr((string)$fl['start_date'], 0, 10))) ?></div><?php endforeach; ?></div><?php endif; ?>
+  <?php if (!empty($freshSnoozed)): ?><div style="margin-top:6px"><b>Put aside</b> <span class="muted">— no work yet</span>
+    <?php foreach (array_slice($freshSnoozed, 0, 8) as $fs): ?>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="muted"><?= e($fs['contract_number']) ?> · <?= e($fs['client_name'] ?: '—') ?> · back on <?= e(fdate((string)$fs['fresh_snooze_until'])) ?><?= trim((string)$fs['fresh_snooze_note']) !== '' ? ' — ' . e($fs['fresh_snooze_note']) : '' ?> (<?= e($fs['fresh_snoozed_by']) ?>)</span>
+        <form method="post" action="/raise-call" style="display:inline"><input type="hidden" name="do" value="snooze"><input type="hidden" name="contract_id" value="<?= (int)$fs['id'] ?>"><input type="hidden" name="until" value=""><button class="btn small btn-ghost" type="submit">Back on the list now</button></form></div>
+    <?php endforeach; ?></div><?php endif; ?>
 </div>
 <?php endif; ?>
 

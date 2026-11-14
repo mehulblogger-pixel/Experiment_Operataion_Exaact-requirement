@@ -280,6 +280,15 @@
   </div>
 
 </section>
+<?php //  THE COSTING, ON THIS SCREEN (owner, SAL-186, 14 Nov 2026: "if revision is raised at any stage, it
+      //  must open the quote … with all the tabs … if there is any change in costing due to revision same
+      //  shall be opened from the same screen no back and forth"). Drawn when the quotation has a costing. ?>
+<?php if ($isEdit && function_exists('crm_quote_costing') && crm_quote_costing($q) && function_exists('pc_can') && pc_can()): ?>
+<section class="fs-pane" data-tab="Costing" id="qe-costing">
+  <h3 class="tab-sub" style="margin-top:0">Costing <span class="muted" style="font-weight:400;font-size:13px">— the project costing behind these prices</span></h3>
+  <?php require __DIR__ . '/_quote_costing_tab.php'; ?>
+</section>
+<?php endif; ?>
 <section class="fs-pane" data-tab="Terms">
   <h3 class="tab-sub" style="margin-top:0">Terms &amp; conditions <span class="muted">— the company default, edit for this <?= e(Tl('quote')) ?> if needed</span></h3>
   <textarea class="form-control" name="terms_conditions" rows="10" style="font-family:inherit"><?= e($terms) ?></textarea>
@@ -698,5 +707,59 @@
   });
   document.getElementById('gst_pct').addEventListener('input', recalc);
   refreshLocPickers(); recalc();
+
+  // ---- the Costing tab: change it in a popup, take its prices — all on this screen (SAL-186) ----
+  var pcHost = document.getElementById('qe-costing');
+  if (pcHost) {
+    var qid = (pcHost.querySelector('#qe-costing-box') || {}).dataset ? pcHost.querySelector('#qe-costing-box').dataset.quote : '';
+    var csrf = (document.querySelector('#qform input[name=_csrf]') || {}).value || '';
+    function pcRefresh(then){
+      fetch('/quote-costing-card?id=' + encodeURIComponent(qid), {credentials:'same-origin'}).then(function(r){ return r.ok ? r.text() : ''; }).then(function(html){
+        if (!html) return;
+        var box = pcHost.querySelector('#qe-costing-box'); if (box) box.outerHTML = html;
+        if (then) then();
+      }).catch(function(){});
+    }
+    document.addEventListener('embed:closed', function(){ pcRefresh(); });
+    document.addEventListener('embed:done', function(){ pcRefresh(); });
+    pcHost.addEventListener('click', function(ev){
+      var cp = ev.target.closest('[data-qe-pc-copy]');
+      if (cp) {
+        ev.preventDefault(); cp.disabled = true;
+        var fd = new FormData(); fd.append('_csrf', csrf); fd.append('quote_id', cp.getAttribute('data-qe-pc-copy'));
+        fetch('/project-costing-revise', {method:'POST', body:fd, credentials:'same-origin'}).then(function(){
+          pcRefresh(function(){ var b = pcHost.querySelector('[data-embed]'); if (b) b.click(); });
+        }).catch(function(){ cp.disabled = false; });
+        return;
+      }
+      if (!ev.target.closest('#qe-pc-take')) return;
+      ev.preventDefault();
+      fetch('/quote-costing-lines?id=' + encodeURIComponent(qid), {credentials:'same-origin'}).then(function(r){ return r.json(); }).then(function(j){
+        if (!j || !j.ok || !j.lines) return;
+        var rows = function(){ return Array.prototype.slice.call(tbody.querySelectorAll('.lrow')); };
+        var norm = function(t){ return String(t || '').trim().toLowerCase(); };
+        var done = 0, added = 0, used = [];
+        j.lines.forEach(function(L){
+          //  the line for this role: the same description, else the first empty line, else a new one
+          var tr = rows().filter(function(r){ return used.indexOf(r) < 0 && norm(r.querySelector('[name="l_desc[]"]').value) === norm(L.desc); })[0]
+                || rows().filter(function(r){ return used.indexOf(r) < 0 && !r.querySelector('[name="l_desc[]"]').value && !r.querySelector('.l_rate').value; })[0];
+          if (!tr) { document.getElementById('addrow').click(); tr = rows()[rows().length - 1]; added++; }
+          used.push(tr);
+          tr.querySelector('[name="l_desc[]"]').value = L.desc;
+          tr.querySelector('.l_qty').value = L.qty;
+          tr.querySelector('.l_rate').value = L.rate;
+          var u = tr.querySelector('[name="l_unit[]"]'); if (u && u.querySelector('option[value="' + L.unit + '"]')) u.value = L.unit;
+          done++;
+        });
+        recalc();
+        var other = rows().length - used.length;
+        alert(done + ' line(s) now carry the prices of costing ' + j.code + (added ? ' (' + added + ' added)' : '') + '.'
+          + (other > 0 ? ' ' + other + ' other line(s) were left as they are.' : '')
+          + ' Press "Save" to keep them.');
+        var lt = Array.prototype.filter.call(document.querySelectorAll('.tabbar .tabbtn'), function(b){ return b.textContent.trim().indexOf('Line items') === 0; })[0];
+        if (lt) lt.click();
+      }).catch(function(){});
+    });
+  }
 })();
 </script>

@@ -584,6 +584,43 @@ C('SAL-194', 'Quotations', 'One Documents button; a jump from "On this quote" la
    ('Press "📎 Documents", "Approval chain", "Actions".', 'Each lands with its box in view.')],
   'views/ops/crm/quote_detail.php (scroll-margin-top; header buttons); tests/test_quote_owner_14nov.php', live=False)
 
+C('SAL-195', 'Quotations', 'A revision is worked on one screen — its costing is in a Costing tab, changed in place', 'scenario', ['best', 'rule', 'edge'],
+  'BUSINESS_DEV_MANAGER', 'Owner, SAL-186, 14 Nov 2026: "Revision is really very very complex taking user here and there… if revision is raised at any stage, it must open the quote accordingly with all the tabs… if there is any change in costing due to revision same shall be opened from the same screen no back and forth."',
+  'Signed in as Test BDM. A quotation with an approved man-month costing, sent to the client.',
+  [('On the quotation: "Revise (new rev)" → why "Client asked for two more engineers" → Create revision.', 'You land on "Edit — Q-… Rev 01" with every tab. Message: "… Its costing <number> Rev 01 was made from … Rev 00 as a draft — change it in the Costing tab here, then submit it for approval."'),
+   ('Open the "Costing" tab.', 'The revision\'s costing number (… Rev 01), Draft, revenue / cost / margin, and its roles with quantity, unit, rate and amount.'),
+   ('"✎ Change the costing".', 'The costing opens OVER the quotation (no new page, no menu inside). Change a role\'s quantity to 18, or Negotiation %, and press Save — the box stays open on the costing with your change.'),
+   ('Submit the costing for approval inside the box, then close it (×).', 'Back on the quotation\'s Costing tab — which now shows the new figures and status. Nothing you typed on the quotation was lost.'),
+   ('"⇣ Take the costing\'s prices into the line items".', 'A message: "N line(s) now carry the prices of costing … Press Save to keep them." The Line items tab opens with the roles, quantities and rates filled; lines that are not in the costing are left as they are.'),
+   ('Save the quotation.', 'Saved; no "why the prices differ" note is needed — they are the costing\'s prices.'),
+   ('EDGE · A quotation whose costing is approved and not held by it.', 'The tab shows "Open the costing" (read-only in the box).'),
+   ('EDGE · A revision raised by someone who does not work on costings.', 'The tab shows "✎ Make this revision\'s costing" — pressed by a colleague who does, it makes the copy and opens it in the box.')],
+  'views/ops/crm/_quote_costing_tab.php; quote-costing-card; quote-costing-lines; pc_quote_line_rows; is_embed_stay (helpers.php); tests/test_sal186_assign_fresh.php', live=False)
+
+C('SAL-196', 'Quotations', 'Back and the breadcrumb return to the record you came from — no "Not found"', 'scenario', ['negative'],
+  'BUSINESS_DEV_MANAGER', 'Owner, SAL-186, 14 Nov 2026: "When from Project costing we click on quote in breadcrumb or project costing it shows page not found why??"',
+  'A quotation with a linked costing.',
+  [('On the quotation press its costing (Costing card) → on the costing press "Quote" in the breadcrumb (Home › Sales › Quote › Project costing).', 'You are back on that quotation (the address ends ?id=…) — not "Not found".'),
+   ('From the costing open its quotation, then press "Project costing" in that page\'s breadcrumb.', 'Back on that costing.')],
+  'nav_arrival_step keeps the query (lib/nav.php); tests/test_sal186_assign_fresh.php', live=False)
+
+C('SAL-197', 'Enquiries', 'The enquiry register\'s button follows where the enquiry stands', 'scenario', ['rule'],
+  'MARKETING_EXECUTIVE', 'Owner, 14 Nov 2026: "One the quote is submitted why we have quote button there." — agreed: Open → Quote; Quoted → open it + "+ another"; Won → open it; Lost → Quote again.',
+  'Enquiries in each state: Open (no quotation), Quoted, Won, Lost, Dropped.',
+  [('Sales → Inquiries.', 'Open: "Quote". Quoted: "Open Q-…" and a small "+ another". Won: "Open Q-…" only. Lost: "Quote again". Dropped: no quote button.'),
+   ('On a Quoted enquiry press "+ another".', 'It asks first: "Make a second, separate quote for this enquiry? To change the one already made, open it and press Revise instead."')],
+  'views/ops/crm/inquiry_list.php; tests/test_sal186_assign_fresh.php', live=False)
+
+C('SAL-198', 'Enquiries', 'Assigned work: the assignee and the people above them work on it; others view', 'scenario', ['rule', 'negative', 'edge'],
+  'several', 'Owner, 14 Nov 2026 (option C): "The assigned person and the people they report to can work on it other can view is ok."',
+  'An enquiry assigned to Test MktExec, who reports to Test MktMgr (People → reports to). Test BDM outside that line.',
+  [('[BDM] open the enquiry.', 'It shows, read-only: "🔒 This enquiry is assigned to <MktExec> — <MktExec> and the people <MktExec> reports to work on it; you can view it." No Save, no Drop, no Quote button on the register.'),
+   ('[MktMgr] open it → make a quotation from it.', 'Allowed. The quotation is assigned to <MktExec>.'),
+   ('[BDM] open that quotation.', 'Viewable; the next-step line says who works on it; no Submit / Edit / Revise / sending buttons. A forced edit is refused with the same words.'),
+   ('[MktExec] open it.', 'Edit, Submit, Revise as usual.'),
+   ('EDGE · Unassigned enquiry, or the assignee left the company.', 'The whole team works on it, as before.')],
+  'crm_assignee_allows; crm_inquiry_can_work; crm_quote_can_work; quote-new owner from enquiry; tests/test_sal186_assign_fresh.php', live=False)
+
 
 
 

@@ -92,3 +92,11 @@ the PDF downloads — attach it, press Send); **📨 Outlook (.eml)** (downloads
 inside; double-click it to open it in desktop Outlook — Gmail in a browser cannot open it). After
 sending it yourself, press **✓ I have sent it — mark sent** so follow-ups start; the client is not
 e-mailed twice. Top management (the Business Director) always approves last.
+
+### Revising a quotation — everything on one screen (owner, SAL-186, 14 Nov 2026)
+
+"Revise" opens the revision with all its tabs, including **Costing**: the revision's own costing (Rev 01 …)
+with its roles and prices. "✎ Change the costing" opens it over the quotation — change roles, rates,
+margins and submit it there; close it to come back, nothing typed on the quotation is lost. "⇣ Take the
+costing's prices into the line items" fills the lines; press Save. Assigned work: an enquiry or quotation
+assigned to someone is worked by them and the people above them — you view the others.

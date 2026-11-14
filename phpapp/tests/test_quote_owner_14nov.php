@@ -139,7 +139,11 @@ try {
         'a Marketing Executive (who may not send) sees who sends it — and no sending buttons or "ways to send" box');
     $r = $drive($MEX, 'quote-compose', 'GET', ['id' => $q3], [], ['You cannot send']);
     t_ok(!empty($r['has']['You cannot send']) || stripos($said($r), 'cannot send') !== false, '…and the mailbox route refuses them too');
-    $sender = in_array('crm.quote.send', role_perms('BUSINESS_DEV_MANAGER') ?: [], true) ? $BDM : $MM;
+    //  The quotation is assigned to Mohan (Marketing Executive), who reports to Meera — so Meera sends it
+    //  (option C, 14 Nov 2026); Bala (BDM), outside Mohan's reporting line, only views it.
+    $sender = $MM;
+    $g = $drive($BDM, 'quote', 'GET', ['id' => $q3], [], ['is assigned to Mohan Q14', 'Open in Gmail', '✉ Send to']);
+    t_ok(!empty($g['has']['is assigned to Mohan Q14']) && empty($g['has']['Open in Gmail']) && empty($g['has']['✉ Send to']), 'a BDM outside the assignee\'s reporting line sees who works on it — no sending buttons');
     t_ok(in_array('crm.quote.send', role_perms(ops_val("SELECT role FROM users WHERE id=?", [$sender])) ?: [], true), 'ARMING · the sender holds the send right');
     t_ok(!in_array('crm.quote.send', role_perms('MARKETING_EXECUTIVE') ?: [], true), 'ARMING · a Marketing Executive does not (docs/02: "Cannot: send or approve quotes")');
     $g = $drive($sender, 'quote', 'GET', ['id' => $q3], [], ['Three ways to send this', '✉ Send to', 'Open in Gmail', 'Outlook (.eml)', 'I have sent it — mark sent', '.eml']);

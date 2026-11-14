@@ -63,6 +63,7 @@
       else { $nbWho = trim((string)($assignedName ?? '')) !== '' ? (string)$assignedName : (function_exists('crm_people_who_can') ? crm_people_who_can('crm.quote.create', $q) : '');
              $nbNext = ($nbWho !== '' ? $nbWho . ' prepares it and submits it' : 'The sales colleague preparing it submits it') . ' for approval — that is not yours to do. You will see it here when it comes to you.'; }
       break;
+    case '__never': break;
     case 'PENDING_APPROVAL': $nbTitle = 'Waiting for approval' . (!empty($pendingWith) ? ' — with ' . $pendingWith : '') . '.'; $nbNext = 'They approve it, or send it back with a comment.'; break;
     case 'APPROVED': $nbTitle = 'Approved and ready to go out.';
       //  Someone who may not send must not be told "send it" with no button (bounce list 1.1).
@@ -88,6 +89,8 @@
     case 'LOST': $nbTitle = 'Closed — not accepted.'; break;
     case 'EXPIRED': $nbTitle = 'Expired — its validity has passed.'; $nbNext = 'Raise a revision to re-issue it.'; break;
   }
+  //  Assigned to someone else (owner, 14 Nov 2026, option C): say who works on it, not what to press.
+  if (!empty($assigneeWords) && in_array($st, ['DRAFT', 'REJECTED', 'APPROVED', 'SENT', 'EXPIRED'], true)) $nbNext = $assigneeWords;
 ?>
 <div class="nowband">
   <div class="step"><?= e($nbTitle) ?></div>

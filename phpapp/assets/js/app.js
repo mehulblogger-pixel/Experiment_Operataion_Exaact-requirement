@@ -1508,6 +1508,9 @@
     if (b) b.parentNode.removeChild(b);
     document.body.style.overflow = '';
     document.removeEventListener('keydown', embedEsc);
+    // A popup the host keeps its typing under (data-embed-keep) and that was simply closed: tell the
+    // host, so it can refresh what the popup changed (the quotation's Costing tab, 14 Nov 2026).
+    if (b && !done && window.__embedKeep) { try { document.dispatchEvent(new CustomEvent('embed:closed')); } catch (_) {} }
     // A save closes AND refreshes the host so the just-added record is on screen.
     if (done) { try { location.reload(); } catch (_) {} }
   }

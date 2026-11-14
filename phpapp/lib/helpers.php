@@ -8,6 +8,10 @@ function e($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 // crucially, a post-save redirect signals the PARENT page to close the popup and refresh — instead of
 // navigating the little iframe. Any existing add/edit screen works in the popup with no change of its own.
 function is_embed() { return (($_GET['embed'] ?? $_POST['_embed'] ?? '') === '1'); }
+//  A popup that STAYS open while its screen is worked in (owner, 14 Nov 2026 — the quotation's costing,
+//  changed role by role without leaving the quotation). Each save reloads the popup on its own screen
+//  instead of closing it; the person closes it when done.
+function is_embed_stay() { return is_embed() && (($_GET['embed_stay'] ?? $_POST['_embed_stay'] ?? '') === '1'); }
 
 /**
  * The tab the person was on when they pressed the button, if any.
@@ -41,6 +45,11 @@ function redirect($path) {
     $path = (string) $path;
     if (strpos($path, '#') === false && ($frag = redirect_tab_fragment()) !== '') $path .= $frag;
 
+    if (function_exists('is_embed_stay') && is_embed_stay() && preg_match('#^/[A-Za-z0-9_-]#', $path)) {
+        [$p0, $frag] = array_pad(explode('#', $path, 2), 2, null);
+        $p0 .= (strpos($p0, '?') === false ? '?' : '&') . 'embed=1&embed_stay=1';
+        header('Location: ' . $p0 . ($frag !== null ? '#' . $frag : '')); exit;
+    }
     if (function_exists('is_embed') && is_embed()) {
         // Inside the popup: tell the host to close + refresh (it knows where we ended up), and fall back to
         // navigating the iframe itself if the message can't be posted (opened outside a modal).
@@ -55,7 +64,23 @@ function redirect($path) {
 // Stamp a hidden _embed flag into every form, so a POST from inside the popup is recognised as embedded even
 // though it posts to its own action URL (which carries no query string). Mirrors csrf_stamp_forms().
 function embed_stamp_forms($html) {
-    return preg_replace('/(<form\b[^>]*>)/i', '$1<input type="hidden" name="_embed" value="1">', (string)$html);
+    $stay = function_exists('is_embed_stay') && is_embed_stay();
+    $html = preg_replace('/(<form\b[^>]*>)/i', '$1<input type="hidden" name="_embed" value="1">' . ($stay ? '<input type="hidden" name="_embed_stay" value="1">' : ''), (string)$html);
+    if ($stay) {
+        //  Inside a staying popup: the costing's own links stay in the popup; every other link of ours
+        //  opens in the whole window, so the popup never grows a second copy of the app.
+        $html = preg_replace_callback('/<a\b([^>]*?)href="(\/[^"]*)"([^>]*)>/i', function ($m) {
+            [$all, $pre, $href, $post] = $m;
+            if (stripos($pre . $post, 'target=') !== false) return $all;
+            if (preg_match('#^/project-costing(\?|$|#)#', $href)) {
+                [$h0, $frag] = array_pad(explode('#', $href, 2), 2, null);
+                $h0 .= (strpos($h0, '?') === false ? '?' : '&') . 'embed=1&amp;embed_stay=1';
+                return '<a' . $pre . 'href="' . $h0 . ($frag !== null ? '#' . $frag : '') . '"' . $post . '>';
+            }
+            return '<a' . $pre . 'href="' . $href . '" target="_top"' . $post . '>';
+        }, $html);
+    }
+    return $html;
 }
 
 // Back to the screen they were on, when a submission is turned away.

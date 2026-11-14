@@ -355,6 +355,11 @@ function nav_arrival_step($route, array $trail, $area) {
     $last = end($trail);
     if ($last && $last['label'] === $label) return null;
 
+    //  …with the record it was showing. The query was dropped, so arriving at a costing from
+    //  /quote?id=11 made "← Quote" and the breadcrumb point at /quote — "Not found" (owner, SAL-186,
+    //  14 Nov 2026). A same-host query string only; anything else is left out.
+    $qs = (string) parse_url($ref, PHP_URL_QUERY);
+    if ($qs !== '' && preg_match('/^[A-Za-z0-9_\-.%=&+]{1,300}$/', $qs)) return ['label' => $label, 'url' => '/' . $came . '?' . $qs];
     return ['label' => $label, 'url' => '/' . $came];
 }
 

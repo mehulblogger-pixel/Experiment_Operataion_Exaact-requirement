@@ -12779,5 +12779,43 @@
    }
   ],
   "ref": "docs/audit-2026-10/workflows/02-MARKETPLACE.md §1 mermaid, S-1, S-2; docs/03-object-lifecycles.md Connect sections"
+ },
+ {
+  "id": "OPS-128",
+  "area": "Operations",
+  "module": "Raise a call",
+  "title": "Newly opened contracts show from their start date to their end date; a coordinator can put one aside until a date",
+  "kind": "scenario",
+  "tags": [
+   "best",
+   "rule",
+   "edge"
+  ],
+  "persona": "COORDINATOR",
+  "why": "Owner, 14 Nov 2026 — options C + D for the coordinator's \"newly opened — no work order yet\" list: show it from the contract's start date until its end date, and let the coordinator put one aside (\"no work yet — remind me on <date>\").",
+  "before": "Three OPEN contracts with no work order: A started last week, B starts in 40 days, C ended yesterday. Signed in as a Coordinator.",
+  "steps": [
+   {
+    "do": "Operations → Raise a call (or the dashboard tile \"contracts opened — raise the call\").",
+    "expect": "\"Newly opened — no call raised yet\" lists A only. Below it, \"Starting later\" lists B with its start date. C is not shown — it ended without work."
+   },
+   {
+    "do": "Under A open \"No work yet — remind me later\" → pick a date 10 days ahead → note \"Work after the shutdown\" → Put aside.",
+    "expect": "\"Put aside — it comes back on the list on <date>.\" A moves to \"Put aside\" with the date, the note and your name; the dashboard count drops by one."
+   },
+   {
+    "do": "Try a date of today, or one after the contract's end date.",
+    "expect": "Refused: \"Pick a date after today.\" / \"The contract ends on … — pick a date before then.\""
+   },
+   {
+    "do": "\"Back on the list now\" beside A.",
+    "expect": "\"Back on the list.\" A is on the list again."
+   },
+   {
+    "do": "EDGE · Wait for the date (or ask an admin to move it).",
+    "expect": "On that date A returns to the list by itself."
+   }
+  ],
+  "ref": "contracts_awaiting_first_call; contract_fresh_snooze; views/ops/raise_call.php; docs/03-object-lifecycles.md (newly opened list); tests/test_sal186_assign_fresh.php"
  }
 ]

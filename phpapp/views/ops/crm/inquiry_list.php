@@ -46,6 +46,12 @@ $dueCount = $dueCount ?? 0; $sla = $sla ?? 7; ?>
   <table class="dt">
     <thead><tr><th>Inquiry</th><th>Received</th><th>Client</th><th>Subject</th><th>Status</th><th>Assigned to</th><th>Branch</th><th><?= e(T('sbu')) ?></th><th>Source</th><th></th></tr></thead>
     <tbody>
+    <?php //  Each enquiry's own current quotation (the accepted one first, then the newest) — for its button.
+      $inqQuotes = [];
+      $ids_ = array_values(array_filter(array_map(fn($x) => (int)$x['id'], $rows)));
+      if ($ids_) foreach (ops_all("SELECT id, quote_no, status, inquiry_id FROM quotations WHERE is_current=1 AND inquiry_id IN (" . implode(',', array_fill(0, count($ids_), '?')) . ")
+                                   ORDER BY CASE WHEN status='ACCEPTED' THEN 0 WHEN status='LOST' THEN 2 ELSE 1 END, id DESC", $ids_) ?: [] as $qq)
+          if (!isset($inqQuotes[(int)$qq['inquiry_id']])) $inqQuotes[(int)$qq['inquiry_id']] = $qq; ?>
     <?php foreach ($rows as $r): ?>
     <tr>
       <td><b><?= e($r['inquiry_no']) ?></b>
@@ -66,7 +72,16 @@ $dueCount = $dueCount ?? 0; $sla = $sla ?? 7; ?>
       <td><?= e(lk_options_or('inquiry_source', INQUIRY_SOURCES)[$r['source']] ?? $r['source']) ?></td>
       <td class="num" style="white-space:nowrap">
         <?php if (can('mod.inquiries.edit')): ?><a class="btn small secondary" href="/inquiry-edit?id=<?= (int)$r['id'] ?>">Edit</a><?php endif; ?>
-        <?php if (can('mod.quotes.edit') && $r['status']!=='DROPPED'): ?><a class="btn small" href="/quote-new?inquiry=<?= (int)$r['id'] ?>">Quote</a><?php endif; ?>
+        <?php //  THE QUOTE BUTTON FOLLOWS WHERE THE ENQUIRY STANDS (owner, 14 Nov 2026: "One the quote is
+              //  submitted why we have quote button there" — chose: Open → Quote; Quoted → open it, plus a
+              //  small "+ another"; Won → open it only; Lost → Quote again; Dropped → nothing).
+          $iq = $inqQuotes[(int)$r['id']] ?? null; $mayQuote = can('mod.quotes.edit') && (!function_exists('crm_inquiry_can_work') || crm_inquiry_can_work($r));
+          $st_ = (string)$r['status']; ?>
+        <?php if ($st_ === 'OPEN' && $mayQuote): ?><a class="btn small" href="/quote-new?inquiry=<?= (int)$r['id'] ?>">Quote</a>
+        <?php elseif (in_array($st_, ['QUOTED', 'WON'], true) && $iq && can('mod.quotes.view')): ?><a class="btn small" href="/quote?id=<?= (int)$iq['id'] ?>" title="Open its <?= e(Tl('quote')) ?>">Open <?= e($iq['quote_no']) ?></a>
+          <?php if ($st_ === 'QUOTED' && $mayQuote): ?><a class="btn small secondary" href="/quote-new?inquiry=<?= (int)$r['id'] ?>" title="A second, separate <?= e(Tl('quote')) ?> for this enquiry (a different scope or option). To change the one sent, open it and Revise." onclick="return confirm('Make a second, separate <?= e(Tl('quote')) ?> for this enquiry? To change the one already made, open it and press Revise instead.')">+ another</a><?php endif; ?>
+        <?php elseif ($st_ === 'LOST' && $mayQuote): ?><a class="btn small secondary" href="/quote-new?inquiry=<?= (int)$r['id'] ?>">Quote again</a>
+        <?php endif; ?>
         <?php if ((is_admin_level() || is_master()) && !in_array($r['status'], ['QUOTED','WON','LOST'], true)): ?>
           <form method="post" action="/inquiry-delete" style="display:inline" onsubmit="return confirm('Delete inquiry <?= e($r['inquiry_no']) ?>? This cannot be undone.')">
             <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">

@@ -1583,8 +1583,28 @@ function crm_quote_can_record_decision($q) {
     return is_master_of('quotes') || crm_quote_is_mine($q);
 }
 // Who may work a quotation forward (submit it): the same people who may edit it.
+//  ASSIGNED WORK (owner, 14 Nov 2026, choosing option C: "The assigned person and the people they report
+//  to can work on it; others can view"). An enquiry or quotation assigned to someone is worked by that
+//  person and anyone above them in their reporting line (People → reports to); everybody else who may
+//  see it can only view it. Nothing assigned, or assigned to someone no longer active: the team, as
+//  before. The master always may. Grants nothing — it only narrows who of those holding the right acts.
+function crm_assignee_allows($assigneeId) {
+    $assigneeId = (int)$assigneeId; $me = (int)(current_user()['id'] ?? 0);
+    if (!$assigneeId || (function_exists('is_master') && is_master()) || $me === $assigneeId) return true;
+    if (!ops_val("SELECT 1 FROM users WHERE id=? AND COALESCE(is_active,1)=1", [$assigneeId])) return true;
+    if (function_exists('reporting_chain')) foreach (reporting_chain($assigneeId) as $m) if ((int)($m['user_id'] ?? 0) === $me) return true;
+    return false;
+}
+function crm_assignee_words($assigneeId, $what) {
+    $u = $assigneeId ? ops_one("SELECT first_name, last_name, username FROM users WHERE id=?", [(int)$assigneeId]) : null;
+    $nm = $u ? (trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')) ?: (string)$u['username']) : 'someone else';
+    return 'This ' . $what . ' is assigned to ' . $nm . ' — ' . $nm . ' and the people ' . $nm . ' reports to work on it; you can view it.';
+}
+function crm_inquiry_can_work($inq) { return crm_assignee_allows((int)($inq['assigned_to'] ?? 0)); }
 function crm_quote_can_work($q) {
-    return can('crm.quote.create') || can('mod.quotes.edit') || is_master_of('quotes') || crm_quote_is_mine($q);
+    if (is_master_of('quotes')) return true;
+    if (!(can('crm.quote.create') || can('mod.quotes.edit') || crm_quote_is_mine($q))) return false;
+    return crm_assignee_allows((int)(crm_quote_owner_user_id($q) ?? 0));
 }
 
 // D-07 — any change to the commercial terms or the terms & conditions cancels
@@ -2007,6 +2027,7 @@ function ops_crm_inquiries($route, $method) {
             //  Opened on its own (not from the register): bring its outcome up to date first.
             if (crm_inquiry_sync((int)$inq['id']) !== (string)$inq['status']) $inq = crm_inquiry_get((int)$inq['id']); }
         if ($inq) ops_require(crm_inquiry_in_scope($inq), 'This ' . Tl('inquiry') . ' belongs to another branch.');
+        if ($method === 'POST' && $inq && !crm_inquiry_can_work($inq)) { flash(crm_assignee_words((int)$inq['assigned_to'], Tl('inquiry')), 'error'); redirect('/inquiry-edit?id=' . (int)$inq['id']); }
         if ($method === 'POST') {
             $b = $_POST;
             $cid = ($b['client_id'] ?? '') !== '' ? (int)$b['client_id'] : null;
@@ -2086,6 +2107,7 @@ function ops_crm_inquiries($route, $method) {
         if (!$inq) { flash('That ' . Tl('inquiry') . ' no longer exists.', 'error'); redirect('/inquiries'); }
         ops_require(crm_inquiry_in_scope($inq), 'This ' . Tl('inquiry') . ' belongs to another branch.');
         $back = '/inquiry-edit?id=' . (int)$inq['id'];
+        if (!crm_inquiry_can_work($inq)) { flash(crm_assignee_words((int)$inq['assigned_to'], Tl('inquiry')), 'error'); redirect($back); }
         $me = user_name(current_user());
         if ($route === 'inquiry-drop') {
             if ((int)ops_val("SELECT COUNT(*) FROM quotations WHERE inquiry_id=?", [(int)$inq['id']]))
@@ -2366,6 +2388,8 @@ function ops_crm_quotes($route, $method) {
         $q = null;
         if ($route === 'quote-edit') {
             $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
+            //  Assigned to someone (owner, 14 Nov 2026, option C): they and the people above them edit it.
+            if (!crm_quote_can_work($q)) { flash(crm_assignee_words((int)crm_quote_owner_user_id($q), Tl('quote')), 'error'); redirect('/quote?id=' . $q['id']); }
             // §xix — an accepted or lost quote is read-only until an unlock is granted.
             if (quote_is_locked($q)) {
                 flash('This ' . Tl('quote') . ' is ' . strtolower(lk_options_or('quote_status', QUOTE_STATUS)[$q['status']] ?? $q['status'])
@@ -2454,10 +2478,16 @@ function ops_crm_quotes($route, $method) {
                 $no = crm_next_quote_no();
                 $inqId = ($b['inquiry_id'] ?? '') !== '' ? (int)$b['inquiry_id'] : null;
                 if ($inqId && !crm_inquiry_in_scope(crm_inquiry_get($inqId))) $inqId = null;
+                //  An assigned enquiry is quoted by its assignee or the people above them (option C), and its
+                //  quotation is assigned to the same person — so the same people work on it.
+                $inqRow = $inqId ? crm_inquiry_get($inqId) : null;
+                if ($inqRow && !crm_inquiry_can_work($inqRow)) { flash(crm_assignee_words((int)$inqRow['assigned_to'], Tl('inquiry')), 'error'); redirect('/inquiry-edit?id=' . (int)$inqId); }
+                $ownerId = ($inqRow && !empty($inqRow['assigned_to']) && ops_val("SELECT 1 FROM users WHERE id=? AND COALESCE(is_active,1)=1", [(int)$inqRow['assigned_to']]))
+                         ? (int)$inqRow['assigned_to'] : (current_user()['id'] ?? null);
                 // The lead this was raised from, so it shows back on that lead.
                 $leadId = ($b['lead_id'] ?? '') !== '' ? (int)$b['lead_id'] : null;
                 $cols = array_merge(['quote_no', 'rev', 'is_current', 'inquiry_id', 'lead_id', 'status', 'owner_id', 'created_by', 'created_at'], array_keys($hdr));
-                $vals = array_merge([$no, 0, 1, $inqId, $leadId, 'DRAFT', current_user()['id'] ?? null, user_name(current_user()), date('c')], array_values($hdr));
+                $vals = array_merge([$no, 0, 1, $inqId, $leadId, 'DRAFT', $ownerId, user_name(current_user()), date('c')], array_values($hdr));
                 $ph = implode(',', array_fill(0, count($cols), '?'));
                 $pdo->prepare("INSERT INTO quotations (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
                 $id = $pdo->lastInsertId();
@@ -2480,6 +2510,7 @@ function ops_crm_quotes($route, $method) {
         if ($refused !== null) { flash($refused, 'error'); [$posted, $pLines, $pLocs] = crm_quote_posted_form($_POST); }
         $preInq = (!$q && ($_GET['inquiry'] ?? '') !== '') ? crm_inquiry_get((int)$_GET['inquiry']) : null;
         if ($preInq && !crm_inquiry_in_scope($preInq)) $preInq = null;   // another branch's enquiry is not quoted from here
+        if ($preInq && !crm_inquiry_can_work($preInq)) { flash(crm_assignee_words((int)$preInq['assigned_to'], Tl('inquiry')), 'error'); redirect('/inquiry-edit?id=' . (int)$preInq['id']); }
         // Quoting straight off a lead. The lead carries the company, the contact
         // and the requirement, so none of it is re-typed; if the lead is linked
         // to a customer on the master, that customer is pre-selected.
@@ -2560,11 +2591,14 @@ function ops_crm_quotes($route, $method) {
             'followups' => ops_all("SELECT * FROM quote_followups WHERE quote_id=? ORDER BY due_date", [$q['id']]),
             'approvals' => crm_approvals($q['id']),
             'lostReasons' => lk_options_or('quote_lost_reason', QUOTE_LOST_REASONS),
-            'canApprove' => can('crm.quote.approve') || is_master(), 'canSend' => can('crm.quote.send') || is_master(),
+            'canApprove' => can('crm.quote.approve') || is_master(), 'canSend' => (can('crm.quote.send') || is_master()) && crm_quote_can_work($q),
             //  Owner, 14 Nov 2026: "Suppose I cannot submit quote for approval then why I am being shown
             //  submit quote for approval." The button is drawn only for someone the server lets submit,
             //  and only when nothing would refuse it — otherwise the page says why, or who does it.
-            'canSubmit' => crm_quote_can_work($q),
+            'canSubmit' => crm_quote_can_work($q), 'canWork' => crm_quote_can_work($q),
+            //  …said only when the assignment is what stops this person (they hold the right otherwise).
+            'assigneeWords' => (!crm_quote_can_work($q) && (can('crm.quote.create') || can('mod.quotes.edit') || crm_quote_is_mine($q)))
+                               ? crm_assignee_words((int)crm_quote_owner_user_id($q), Tl('quote')) : '',
             'submitProblem' => in_array($q['status'], ['DRAFT', 'REJECTED'], true) ? crm_quote_transition_problem($q, 'PENDING_APPROVAL') : '',
             'sendProblem' => in_array($q['status'], ['DRAFT', 'REJECTED', 'APPROVED'], true) ? crm_quote_transition_problem($q, 'SENT') : '',
             // The owner's rules (20 Oct): approval only where the rules call for it,
@@ -2573,11 +2607,11 @@ function ops_crm_quotes($route, $method) {
             'possibleCustomer' => in_array($q['status'], ['SENT', 'EXPIRED'], true) ? crm_quote_possible_customer($q) : null,
             'assignedName' => (function () use ($q) { $u = ($oid = crm_quote_owner_user_id($q)) ? ops_one("SELECT first_name, last_name, username FROM users WHERE id=?", [$oid]) : null;
                                 return $u ? (trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')) ?: (string)$u['username']) : ''; })(),
-            'canEdit' => (can('crm.quote.create') || can('mod.quotes.edit') || is_master_of('quotes')) && !quote_is_locked($q),
+            'canEdit' => (can('crm.quote.create') || can('mod.quotes.edit') || is_master_of('quotes')) && !quote_is_locked($q) && crm_quote_can_work($q),
             // Revising is the way FORWARD from a sent quotation, so it must not
             // be gated on the lock that sending puts in place — that would leave
             // the only correct action greyed out.
-            'canRevise' => can('crm.quote.create') || can('mod.quotes.edit') || is_master_of('quotes'),
+            'canRevise' => (can('crm.quote.create') || can('mod.quotes.edit') || is_master_of('quotes')) && crm_quote_can_work($q),
             'canRetract' => quote_can_retract($q) && quote_my_approved_step($q['id']) !== null,
             'lockReason' => quote_lock_reason($q),
             'locked' => quote_is_locked($q), 'editReq' => quote_edit_request_open($q['id']),
@@ -2662,6 +2696,7 @@ function ops_crm_quotes($route, $method) {
             }
         }
         if ($to === 'SENT') ops_require(can('crm.quote.send') || is_master(), 'You cannot send quotations.');
+        if (in_array($to, ['SENT', 'LOST'], true) && !crm_quote_can_work($q)) { flash(crm_assignee_words((int)crm_quote_owner_user_id($q), Tl('quote')), 'error'); redirect('/quote?id=' . $q['id']); }
         if ($to === 'PENDING_APPROVAL' && !crm_quote_needs_approval($q)) {
             // No rule covers this value and the company said none is needed (D-03):
             // there is nobody to wait for, so it is ready to send.
@@ -2882,6 +2917,7 @@ function ops_crm_quotes($route, $method) {
     if ($route === 'quote-revise' && $method === 'POST') {
         $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
         ops_require(can('crm.quote.create') || can('mod.quotes.edit') || is_master_of('quotes'), 'You cannot revise quotations.');
+        if (!crm_quote_can_work($q)) { flash(crm_assignee_words((int)crm_quote_owner_user_id($q), Tl('quote')), 'error'); redirect('/quote?id=' . $q['id']); }
         $base = (int)($q['parent_id'] ?: $q['id']);
         $summary = trim($_POST['summary'] ?? '') ?: 'Revised';
         $newRev = (int)$q['rev'] + 1;
@@ -2974,8 +3010,8 @@ function ops_crm_quotes($route, $method) {
         if ($pcNew) crm_log_change($nid, 'Costing ' . $pcNew['code'] . ' made for this revision from ' . $pcSrc['code'] . ' — a draft, to be changed and approved.');
         flash('Created revision ' . str_pad((string)$newRev, 2, '0', STR_PAD_LEFT) . ' with '
             . count($srcLines) . ' line(s) and ' . count($srcLocs) . ' site(s) carried over. Edit it below.'
-            . ($pcNew ? ' Its costing ' . $pcNew['code'] . ' was made from ' . $pcSrc['code'] . ' as a draft — change the figures there and submit it for approval.'
-                      : ($pcLocked ? ' It stands on costing ' . $pcSrc['code'] . ' as approved; to change the figures, press "Change the costing for this revision" in its Costing section.' : '')));
+            . ($pcNew ? ' Its costing ' . $pcNew['code'] . ' was made from ' . $pcSrc['code'] . ' as a draft — change it in the Costing tab here, then submit it for approval.'
+                      : ($pcLocked ? ' It stands on costing ' . $pcSrc['code'] . ' as approved; to change the figures, use the Costing tab here.' : ($pcSrc ? ' Its costing ' . $pcSrc['code'] . ' is in the Costing tab here.' : ''))));
         redirect('/quote-edit?id=' . $nid);
     }
     if ($route === 'quote-doc') {
@@ -3310,12 +3346,26 @@ function ops_crm_quotes($route, $method) {
     // Builds the finished message and hands it to the user's mail client. The
     // .eml form carries the quotation PDF and opens in Outlook as a draft with
     // a Send button, so the client receives it from the person, not the robot.
+    //  The quotation's Costing tab, drawn again after its costing popup closes (owner, SAL-186, 14 Nov
+    //  2026: change the costing "from the same screen no back and forth"), and the costing's prices for
+    //  "Take the costing's prices into the line items". Read-only; the same people who may edit it.
+    if ($route === 'quote-costing-card' || $route === 'quote-costing-lines') {
+        ops_require(can('crm.quote.create') || can('mod.quotes.edit') || is_master_of('quotes'), 'You cannot edit quotations.');
+        $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); echo $route === 'quote-costing-lines' ? '{"ok":false}' : ''; return; }
+        if (function_exists('scope_allows') && !is_master() && !scope_allows($q['office_id'] ?? null, $q['sbu'] ?? null)) { http_response_code(403); return; }
+        if ($route === 'quote-costing-card') { header('Content-Type: text/html; charset=utf-8'); require __DIR__ . '/../views/ops/crm/_quote_costing_tab.php'; return; }
+        $pc = crm_quote_costing($q);
+        header('Content-Type: application/json');
+        echo json_encode($pc ? ['ok' => true, 'code' => $pc['code'], 'lines' => pc_quote_line_rows($pc)] : ['ok' => false], JSON_UNESCAPED_UNICODE);
+        return;
+    }
     if ($route === 'quote-compose') {
         $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
         //  Sending is crm.quote.send (docs/02: a Marketing Executive "Cannot: send or approve quotes").
         //  This used to admit anyone who may create a quotation, so an executive was offered "Send from
         //  my mailbox" beside "sending is not yours to do" (owner, 14 Nov 2026).
         ops_require(can('crm.quote.send') || is_master(), 'You cannot send ' . Tlp('quote') . '.');
+        ops_require(crm_quote_can_work($q), crm_assignee_words((int)crm_quote_owner_user_id($q), Tl('quote')));
         [$subject, $body] = crm_quote_message($q);
         [$fromEmail, $fromName] = compose_from();
         $to = (string)($q['contact_email'] ?? '');

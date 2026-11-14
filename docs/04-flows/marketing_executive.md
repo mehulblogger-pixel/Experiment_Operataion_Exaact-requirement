@@ -45,3 +45,10 @@ You prepare and submit quotations; sending and approving are not yours. On an ap
 see who sends it, by name — there are no sending buttons for you (no "Send to customer", no Gmail or
 Outlook option). "Submit for approval" appears only when the quotation is ready; when something would
 stop it, the page says what instead of showing a button that fails.
+
+### Enquiries and quotations assigned to you (owner, 14 Nov 2026)
+
+What is assigned to you is worked by you and the people you report to; colleagues outside your line can
+only view it. A quotation made from your enquiry is assigned to you. On the enquiry register the button
+follows the enquiry: Open → Quote; Quoted → open the quotation (and "+ another" for a separate one); Won →
+open it; Lost → Quote again.

@@ -43,3 +43,9 @@ every other level; and nobody signs before the people in the chain who report to
 when it is your turn; until then the Approve button is not shown ("Approve opens when the levels before
 yours have signed"). To send an approved quotation: Send to customer, Open in Gmail, or Outlook (.eml) —
 then "✓ I have sent it — mark sent".
+
+### Your team's assigned work (owner, 14 Nov 2026)
+
+You may work on every enquiry and quotation assigned to someone who reports to you (directly or through
+others); one assigned outside your line you can view. A revision's costing is changed from the quotation's
+own Costing tab.

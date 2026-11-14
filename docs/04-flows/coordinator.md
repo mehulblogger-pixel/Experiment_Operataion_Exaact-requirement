@@ -120,3 +120,11 @@ filled in from it; several: it opens the list), and **Raise a work order** (`/ra
 "Newly opened — no work order raised yet" at the top, one **▶ Raise work order** press each. A
 contract leaves the list when its first work order is raised. Only contracts inside your branch
 scope are shown, and only to people who may already raise a work order (`ops.call.create`).
+
+### Newly opened contracts — when they show, and putting one aside (owner, 14 Nov 2026)
+
+"Newly opened — no work order raised yet" (Raise a call, and your dashboard) lists a contract from its
+**start date** until its **end date**. One that starts later is listed under "Starting later"; one that
+ended without work drops off. If the client has no work yet, open "No work yet — remind me later", pick the
+date it should come back (and a note if you like) and press "Put aside" — it returns on that date by
+itself, or press "Back on the list now".

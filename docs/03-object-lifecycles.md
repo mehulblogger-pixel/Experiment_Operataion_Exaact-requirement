@@ -209,6 +209,16 @@ writes one line in the quotation's history (who, what, why).
   their own mailbox ("Open in Gmail" or the Outlook .eml) presses "✓ I have sent it — mark sent": the
   same APPROVED → SENT move, follow-ups start, and the client is not e-mailed again by the system. Not
   a new transition.
+- **A revision is worked on one screen (owner, SAL-186, 14 Nov 2026: "if revision is raised at any stage,
+  it must open the quote … with all the tabs … if there is any change in costing due to revision same shall
+  be opened from the same screen no back and forth").** "Revise" opens the revision's edit screen with every
+  tab and a **Costing** tab: the revision's own costing (its automatic copy, `… Rev 01`), its roles and
+  prices, "✎ Change the costing" (the costing opens over the quotation and stays open while it is saved and
+  submitted; closing it refreshes the tab) and "⇣ Take the costing's prices into the line items"
+  (`pc_quote_line_rows()`, the same rule as "Create quotation"; saved with the quotation). No status or
+  transition is added.
+- **Assigned work (option C, 14 Nov 2026)** — who may move an enquiry or quotation is narrowed to its
+  assignee and the people above them; the moves themselves are unchanged (see docs/02).
 - **Immutable once SENT / sent_at set** (`quote_is_locked` `crm.php:959-973`) — not even the
   master edits it; only a revision moves forward (`canRevise` bypasses the lock, `crm.php:1498`).
 - **Validity → EXPIRED** (Module 03): a SENT quote past `sent_at + validity_days` is stamped
@@ -1725,3 +1735,12 @@ Companies console is not affected.
   captured payment found for an order already PAID. Nothing was given for it, so the platform
   owner refunds it in full within 15 days of it arriving — after that only when the owner ticks
   that it was our own error; nothing else changes.
+
+### The coordinator's "newly opened — no work order yet" list (owner, 14 Nov 2026 — options C + D)
+
+An OPEN contract with no work order under its number is on the coordinator's list (Raise a call, and the
+dashboard count) **from its start date until its end date** — an annual or rate contract signed for work
+from a later date waits under "Starting later", and one that ended with no work drops off. A coordinator
+can put one aside — "No work yet — remind me on <date>" (after today, not after the contract's end), with
+an optional note (`partner_contracts.fresh_snooze_until/_note/_by`); it returns by itself on that date, or
+at once with "Back on the list now". Not a contract status — the contract stays OPEN throughout.

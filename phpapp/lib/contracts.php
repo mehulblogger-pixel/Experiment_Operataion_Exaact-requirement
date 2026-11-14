@@ -35,6 +35,11 @@ function contracts_migrate() {
     ensure_column('partner_contracts', 'qty_unit', "VARCHAR(30) DEFAULT ''");
     ensure_column('partner_contracts', 'expiry_notified', "VARCHAR(20) DEFAULT ''");
     ensure_column('partner_contracts', 'quotation_id', 'INT NULL');
+    // The coordinator's "newly opened" list (owner, 14 Nov 2026, options C + D): a contract can be put
+    // aside until a date ("no work yet — remind me on …"), with a note and who did it.
+    ensure_column('partner_contracts', 'fresh_snooze_until', "VARCHAR(10) DEFAULT ''");
+    ensure_column('partner_contracts', 'fresh_snooze_note',  "VARCHAR(300) DEFAULT ''");
+    ensure_column('partner_contracts', 'fresh_snoozed_by',   "VARCHAR(150) DEFAULT ''");
     // Opening a new contract number is a two-signature act (a manager endorses,
     // the branch manager approves), and an idle contract is closed automatically.
     // These columns carry that lifecycle. Legacy rows default to OPEN so nothing
@@ -905,9 +910,21 @@ function contract_after_register($contractId, $quoteId = 0) {
 //  through approval and have not had a single work order raised under their number —
 //  within the viewer's own branch scope. A contract leaves the list with its first work
 //  order, or when it is closed. No time limit is invented here.
-function contracts_awaiting_first_call() {
+//  WHEN A NEW CONTRACT IS ON THE LIST (owner, 14 Nov 2026 — options C + D): from its start date (an
+//  annual or rate contract signed today for work from April is not "new work" yet) until its end date
+//  (a contract that ran out without work is no longer anybody's cue), and not while a coordinator has
+//  put it aside until a date. $which: 'now' (the list), 'later' (starting later), 'snoozed'.
+function contracts_awaiting_first_call($which = 'now') {
     try {
+        static $mig = false; if (!$mig && function_exists('contracts_migrate')) { contracts_migrate(); $mig = true; }
         [$w, $a] = function_exists('scope_clause') ? scope_clause('pc.branch_id', 'pc.sbu') : ['1=1', []];
+        $t = date('Y-m-d');
+        $started = "(COALESCE(pc.start_date,'') = '' OR SUBSTR(pc.start_date,1,10) <= ?)";
+        $notOver = "(COALESCE(pc.end_date,'') = '' OR SUBSTR(pc.end_date,1,10) >= ?)";
+        $awake   = "(COALESCE(pc.fresh_snooze_until,'') = '' OR pc.fresh_snooze_until <= ?)";
+        if ($which === 'later')        { $cond = "NOT $started AND $notOver"; $ca = [$t, $t]; }
+        elseif ($which === 'snoozed')  { $cond = "$started AND $notOver AND NOT $awake"; $ca = [$t, $t, $t]; }
+        else                           { $cond = "$started AND $notOver AND $awake"; $ca = [$t, $t, $t]; }
         return ops_all(
             "SELECT pc.*, COALESCE(bp.display_name, bp.legal_name) client_name, q.subject quote_subject
                FROM partner_contracts pc
@@ -916,9 +933,32 @@ function contracts_awaiting_first_call() {
               WHERE COALESCE(pc.open_status,'') = 'OPEN' AND COALESCE(pc.is_active,1) = 1
                 AND COALESCE(pc.opened_at,'') <> '' AND COALESCE(pc.contract_number,'') <> ''
                 AND NOT EXISTS (SELECT 1 FROM calls c WHERE c.contract_number = pc.contract_number)
+                AND $cond
                 AND $w
-              ORDER BY pc.opened_at DESC, pc.id DESC", $a) ?: [];
+              ORDER BY pc.opened_at DESC, pc.id DESC", array_merge($ca, $a)) ?: [];
     } catch (Throwable $e) { return []; }
+}
+//  "No work yet — remind me on <date>" (owner, 14 Nov 2026 — option D). Returns '' or why not.
+function contract_fresh_snooze($contractId, $until, $note, $byName) {
+    $c = ops_one("SELECT * FROM partner_contracts WHERE id=?", [(int)$contractId]);
+    if (!$c) return 'That contract was not found.';
+    $mine = false;
+    foreach (array_merge(contracts_awaiting_first_call('now'), contracts_awaiting_first_call('snoozed')) as $r) if ((int)$r['id'] === (int)$c['id']) $mine = true;
+    if (!$mine) return 'That contract is not on your list of newly opened contracts.';
+    $until = trim((string)$until);
+    if ($until === '') {                                                       // back on the list now
+        db()->prepare("UPDATE partner_contracts SET fresh_snooze_until='', fresh_snooze_note='', fresh_snoozed_by='' WHERE id=?")->execute([(int)$c['id']]);
+        return '';
+    }
+    $d = DateTime::createFromFormat('Y-m-d', $until);
+    if (!$d || $d->format('Y-m-d') !== $until) return 'Pick a real date to be reminded on.';
+    if ($until <= date('Y-m-d')) return 'Pick a date after today.';
+    if (trim((string)($c['end_date'] ?? '')) !== '' && $until > substr((string)$c['end_date'], 0, 10))
+        return 'The contract ends on ' . fdate(substr((string)$c['end_date'], 0, 10)) . ' — pick a date before then.';
+    db()->prepare("UPDATE partner_contracts SET fresh_snooze_until=?, fresh_snooze_note=?, fresh_snoozed_by=? WHERE id=?")
+        ->execute([$until, substr(trim((string)$note), 0, 300), substr((string)$byName, 0, 150), (int)$c['id']]);
+    if (function_exists('act_log')) act_log('PARTNER', (int)$c['partner_id'], 'SYSTEM', 'Contract ' . $c['contract_number'] . ' — no work yet; back on the coordinator\'s list on ' . fdate($until) . ' (' . $byName . ')', ['body' => (string)$note, 'auto' => 1]);
+    return '';
 }
 
 //  What to tell whoever just registered a contract: it is open, or who it waits for.

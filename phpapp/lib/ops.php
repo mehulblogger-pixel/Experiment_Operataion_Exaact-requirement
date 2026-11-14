@@ -3457,7 +3457,7 @@ function ops_route_module_map() {
         'adspro-sync'=>'leads','adspro-backfill'=>'leads',
         'stage-gates'=>'leads','stage-gate-save'=>'leads','stage-gate-delete'=>'leads',
         'inquiries'=>'inquiries','inquiry-new'=>'inquiries','inquiry-edit'=>'inquiries','inquiry-delete'=>'inquiries','inquiry-drop'=>'inquiries','inquiry-reopen'=>'inquiries',
-        'quotes'=>'quotes','quote'=>'quotes','quote-new'=>'quotes','quote-edit'=>'quotes','quote-revise'=>'quotes','quote-status'=>'quotes','quote-doc'=>'quotes','quote-pdf'=>'quotes','quote-approve'=>'quotes','quote-unapprove'=>'quotes','quote-approval-rules'=>'quotes','quote-contract'=>'quotes','quote-add-contract'=>'quotes','quote-float'=>'quotes','client-quotes'=>'calls','quote-context'=>'calls','quote-client'=>'quotes','quote-files'=>'quotes','quote-file'=>'quotes','quote-file-delete'=>'quotes','quote-unlock'=>'quotes','quote-followup'=>'quotes','quote-external'=>'quotes','quotes-export'=>'quotes','quote-final'=>'quotes','quote-compose'=>'quotes','followup-compose'=>'quotes','quote-preorder-save'=>'quotes','quote-milestones'=>'quotes','preorder-checklist'=>'quotes','sales-setup'=>'quotes','quote-delegations'=>'quotes',
+        'quotes'=>'quotes','quote'=>'quotes','quote-new'=>'quotes','quote-edit'=>'quotes','quote-revise'=>'quotes','quote-status'=>'quotes','quote-doc'=>'quotes','quote-pdf'=>'quotes','quote-approve'=>'quotes','quote-unapprove'=>'quotes','quote-approval-rules'=>'quotes','quote-contract'=>'quotes','quote-add-contract'=>'quotes','quote-float'=>'quotes','client-quotes'=>'calls','quote-context'=>'calls','quote-client'=>'quotes','quote-files'=>'quotes','quote-file'=>'quotes','quote-file-delete'=>'quotes','quote-unlock'=>'quotes','quote-followup'=>'quotes','quote-external'=>'quotes','quotes-export'=>'quotes','quote-final'=>'quotes','quote-compose'=>'quotes','quote-costing-card'=>'quotes','quote-costing-lines'=>'quotes','followup-compose'=>'quotes','quote-preorder-save'=>'quotes','quote-milestones'=>'quotes','preorder-checklist'=>'quotes','sales-setup'=>'quotes','quote-delegations'=>'quotes',
         'attendance-recon'=>'reconcile',
         'availability'=>'jobs','schedule'=>'jobs',
         'documents'=>'idems','document'=>'idems','document-new'=>'idems','document-edit'=>'idems','document-submit'=>'idems','document-finalize'=>'idems','document-delete'=>'idems','document-fill'=>'idems','release-notes'=>'idems','document-ai-review'=>'idems','document-rn-flag'=>'idems','document-scope-from-qap'=>'idems','document-polish-text'=>'idems',
@@ -3802,7 +3802,7 @@ function ops_dispatch($route, $method) {
             ops_candidates($route, $method); return true;
         case $route === 'inquiries' || $route === 'inquiry-new' || $route === 'inquiry-edit' || $route === 'inquiry-delete' || $route === 'inquiry-drop' || $route === 'inquiry-reopen':
             ops_crm_inquiries($route, $method); return true;
-        case $route === 'quotes' || $route === 'quote' || $route === 'quote-new' || $route === 'quote-edit' || $route === 'quote-revise' || $route === 'quote-status' || $route === 'quote-doc' || $route === 'quote-pdf' || $route === 'quote-approve' || $route === 'quote-unapprove' || $route === 'quote-contract' || $route === 'quote-add-contract' || $route === 'quote-float' || $route === 'quote-client' || $route === 'partner-address' || $route === 'quote-files' || $route === 'quote-file' || $route === 'quote-file-delete' || $route === 'quote-unlock' || $route === 'quote-followup' || $route === 'quote-external' || $route === 'quotes-export' || $route === 'quote-final' || $route === 'quote-compose' || $route === 'followup-compose' || $route === 'quote-preorder-save':
+        case $route === 'quotes' || $route === 'quote' || $route === 'quote-new' || $route === 'quote-edit' || $route === 'quote-revise' || $route === 'quote-status' || $route === 'quote-doc' || $route === 'quote-pdf' || $route === 'quote-approve' || $route === 'quote-unapprove' || $route === 'quote-contract' || $route === 'quote-add-contract' || $route === 'quote-float' || $route === 'quote-client' || $route === 'partner-address' || $route === 'quote-files' || $route === 'quote-file' || $route === 'quote-file-delete' || $route === 'quote-unlock' || $route === 'quote-followup' || $route === 'quote-external' || $route === 'quotes-export' || $route === 'quote-final' || $route === 'quote-compose' || $route === 'quote-costing-card' || $route === 'quote-costing-lines' || $route === 'followup-compose' || $route === 'quote-preorder-save':
             ops_crm_quotes($route, $method); return true;
         case $route === 'preorder-checklist':
             return ops_preorder_checklist($method);
@@ -5438,6 +5438,13 @@ function user_discipline_save($userId, $insId, $raw, $posTitle) {
 // a call form prefilled from that contract.
 function ops_raise_call() {
     ops_require(can('ops.call.create') || is_master(), 'Only operations / coordinators can raise ' . Tlp('call') . '.');
+    //  "No work yet — remind me on …" for a newly opened contract (owner, 14 Nov 2026 — option D).
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && ($_POST['do'] ?? '') === 'snooze' && function_exists('contract_fresh_snooze')) {
+        $err = contract_fresh_snooze((int)($_POST['contract_id'] ?? 0), (string)($_POST['until'] ?? ''), (string)($_POST['note'] ?? ''), user_name(current_user()));
+        if ($err !== '') flash($err, 'error');
+        else flash(trim((string)($_POST['until'] ?? '')) === '' ? 'Back on the list.' : 'Put aside — it comes back on the list on ' . fdate((string)$_POST['until']) . '.');
+        redirect('/raise-call');
+    }
     $clientId = (int)($_GET['client_id'] ?? 0);
     $client = $clientId ? ops_one("SELECT id, legal_name, display_name FROM business_partners WHERE id=? AND is_client=1", [$clientId]) : null;
     $contracts = [];
@@ -5461,7 +5468,9 @@ function ops_raise_call() {
     view('ops/raise_call', ['clients' => clients_list(), 'clientId' => $clientId, 'client' => $client, 'contracts' => $contracts,
         //  Contracts just opened with no work order yet — offered first, so the coordinator
         //  does not have to know the client's name to find the new work (bounce list 1.6).
-        'fresh' => (!$clientId && function_exists('contracts_awaiting_first_call')) ? contracts_awaiting_first_call() : []]);
+        'fresh' => (!$clientId && function_exists('contracts_awaiting_first_call')) ? contracts_awaiting_first_call() : [],
+        'freshLater' => (!$clientId && function_exists('contracts_awaiting_first_call')) ? contracts_awaiting_first_call('later') : [],
+        'freshSnoozed' => (!$clientId && function_exists('contracts_awaiting_first_call')) ? contracts_awaiting_first_call('snoozed') : []]);
 }
 
 function ops_calls($route, $method) {

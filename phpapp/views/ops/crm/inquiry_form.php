@@ -1,4 +1,6 @@
-<?php $isEdit = !empty($inq['id']); ?>
+<?php $isEdit = !empty($inq['id']);
+  //  Assigned to someone else (owner, 14 Nov 2026, option C): view only — say who works on it.
+  $inqWork = !$isEdit || !function_exists('crm_inquiry_can_work') || crm_inquiry_can_work($inq); ?>
 <div class="master-head">
   <div><h1><?= $isEdit ? 'Edit inquiry — ' . e($inq['inquiry_no']) : 'New ' . Tl('client') . ' ' . Tl('inquiry') ?></h1>
     <p class="sub" style="margin:2px 0 0">Capture what the <?= e(Tl('client')) ?> asked for. You can raise a <?= e(Tl('quote')) ?> against it afterwards.</p></div>
@@ -54,7 +56,8 @@
     <div class="ff ff-wide"><label>Notes</label><input class="form-control" name="notes" value="<?= e($inq['notes'] ?? '') ?>"></div>
   </div>
   <div style="margin-top:16px">
-    <button class="btn" type="submit"><?= $inq ? 'Save inquiry' : 'Create inquiry' ?></button>
+    <?php if (!$inqWork): ?><div class="msg msg-info" style="margin:0 0 8px">🔒 <?= e(crm_assignee_words((int)$inq['assigned_to'], Tl('inquiry'))) ?></div><?php else: ?>
+    <button class="btn" type="submit"><?= $inq ? 'Save inquiry' : 'Create inquiry' ?></button><?php endif; ?>
     <a class="btn secondary" href="/inquiries">Cancel</a>
   </div>
 </form>
@@ -63,7 +66,7 @@
 if ($isEdit):
   $iSt = (string)($inq['status'] ?: 'OPEN');
   $iQuotes = ops_all("SELECT id, quote_no, rev, status FROM quotations WHERE inquiry_id=? AND COALESCE(is_current,1)=1 ORDER BY id DESC", [(int)$inq['id']]) ?: [];
-  $canEditInq = can('mod.inquiries.edit');
+  $canEditInq = can('mod.inquiries.edit') && ($inqWork ?? true);
   $words = ['OPEN' => 'Open — no ' . Tl('quote') . ' yet.', 'QUOTED' => 'Quoted — a ' . Tl('quote') . ' is out; this follows it.',
             'WON' => 'Won — its ' . Tl('quote') . ' was accepted.', 'LOST' => 'Lost — its ' . Tl('quote') . ' was lost or expired.',
             'DROPPED' => 'Dropped — closed without a ' . Tl('quote') . '.']; ?>
