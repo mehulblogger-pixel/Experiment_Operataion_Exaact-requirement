@@ -82,3 +82,8 @@ in the chain sign first; top management last).
 ### Assigned work and the costing tab (owner, 14 Nov 2026)
 
 Enquiries and quotations assigned to people who report to you are yours to work on too; others you view.
+
+### A submitted costing (owner, 14 Nov 2026)
+
+You see every approval level at the top of the costing; you approve or send back — "Reopen as draft" is
+only for the person who prepared it.

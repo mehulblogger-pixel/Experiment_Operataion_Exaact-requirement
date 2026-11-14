@@ -51,7 +51,7 @@ try {
 
     t_section('Costing — the screen');
     $v = (string)file_get_contents(__DIR__ . '/../views/ops/project_costing.php');
-    t_ok(strpos($v, '<b>Quick start</b>') !== false && strpos($v, '/project-costing-ctc-heads') !== false, 'the role box offers "Quick start"');
+    t_ok(strpos($v, '<b>Price</b>') !== false && strpos($v, '/project-costing-ctc-heads') !== false && strpos($v, 'Build the salary break-up') !== false, 'the role box offers the salary break-up from the CTC, inside its one Price box');
     t_ok(strpos($v, "getAttribute('id')!=='pcSettings'") !== false && strpos($v, "name='with_settings'") !== false, 'each button sends the other box along');
     t_ok(strpos($v, 'Also saves a role you are typing below') !== false, '"Save settings" says it keeps the role too');
     t_ok(strpos($v, 'class="btn small ofdone"') !== false && strpos($v, '.che .ofd .ofbox{position:absolute') !== false, 'the "% of" picker is a pop-over with Done, above the page — it no longer spills over the row');

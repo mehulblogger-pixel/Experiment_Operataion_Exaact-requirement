@@ -96,8 +96,10 @@ try {
     $pdo->prepare("UPDATE project_costings SET status='DRAFT', quote_id=NULL WHERE id=?")->execute([$cid]);
     $pdo->prepare("DELETE FROM quote_lines WHERE quote_id=?")->execute([(int)$mq['id']]);
     $pdo->prepare("DELETE FROM quotations WHERE id=?")->execute([(int)$mq['id']]);
-    $g = $drive($X, 'project-costing', 'GET', ['id' => $cid], [], ['name="line_basis"', 'id="pc-settings-panel"', 'Default basis']);
-    t_ok(!empty($g['has']['name="line_basis"']) && !empty($g['has']['Default basis']), 'the role editor asks for the role\'s basis; the settings call the costing\'s one the default');
+    $g = $drive($X, 'project-costing', 'GET', ['id' => $cid], [], ['name="line_basis"', 'id="pc-settings-panel"', 'id="pcs-basis"']);
+    //  Owner, 14 Nov 2026: "dual entry boxes like Default basis for new roles … are not at all good" — the basis
+    //  is asked once, on the role; the settings no longer carry a second "Default basis" box.
+    t_ok(!empty($g['has']['name="line_basis"']) && empty($g['has']['id="pcs-basis"']), 'the basis is asked once — on the role; the settings have no second "Default basis" box');
 
     t_section('Settings at the top of the page');
     $v = (string) file_get_contents(__DIR__ . '/../views/ops/project_costing.php');

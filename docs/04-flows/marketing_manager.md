@@ -49,3 +49,8 @@ then "✓ I have sent it — mark sent".
 You may work on every enquiry and quotation assigned to someone who reports to you (directly or through
 others); one assigned outside your line you can view. A revision's costing is changed from the quotation's
 own Costing tab.
+
+### A submitted costing (owner, 14 Nov 2026)
+
+The top of the costing lists every level in signing order — designation, names, and where each stands.
+As an approver you approve or send it back with a reason; "Reopen as draft" is only for its preparer.

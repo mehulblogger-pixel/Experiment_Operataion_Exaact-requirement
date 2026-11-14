@@ -66,8 +66,11 @@ try {
 
     t_section('Costing — from the rate: the screen asks one question');
     $v = (string)file_get_contents(__DIR__ . '/../views/ops/project_costing.php');
-    t_ok(strpos($v, 'I know the CTC') !== false && strpos($v, "I know the rate the <?= \$e(Tl('client')) ?> pays") !== false, 'Quick start asks: "I know the CTC" or "I know the rate the client pays"');
-    t_ok(strpos($v, 'data-ctc-mode="rate" hidden') !== false && strpos($v, "l.hidden=l.getAttribute('data-ctc-mode')!==m") !== false, 'only the chosen direction\'s box is shown — never both');
+    //  Owner, 14 Nov 2026: one Price box — "Cost + my margin" or "The client's rate is fixed"; each figure once.
+    t_ok(strpos($v, 'Cost + my margin — the rate follows') !== false && strpos($v, "The <?= \$e(Tl('client')) ?>'s rate is fixed") !== false, 'the Price box asks one question: cost + my margin, or the client\'s rate is fixed');
+    t_ok(strpos($v, 'data-ctc-mode="rate"') !== false && strpos($v, "l.hidden=l.getAttribute('data-ctc-mode')!==m") !== false, 'only the chosen direction\'s box is shown — never both');
+    t_eq([substr_count($v, 'name="target_margin"'), substr_count($v, 'name="boq_qty"'), substr_count($v, 'name="rate_manual"'), substr_count($v, 'id="ch_ctc_tm"')], [1, 1, 0, 0],
+        'margin and quantity are each one box; there is no second "fixed rate override" or second margin box');
     t_ok(strpos($v, "localStorage.setItem('pc_ctc_mode',m)") !== false && strpos($v, "localStorage.getItem('pc_ctc_mode')") !== false,
         'the question last chosen is remembered — "Save settings" reloads the page and used to flip it back to "I know the CTC"');
     //  Owner, 13 Nov 2026 (SAL-176 11 & 12): "CTC is man-day only instead of man-month".

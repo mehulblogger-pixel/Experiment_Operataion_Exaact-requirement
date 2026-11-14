@@ -10,7 +10,9 @@ $locked = function_exists('pc_locked') && pc_locked($h);
 //  Locked by its quotation (owner, 14 Nov 2026): gone for approval, approved, sent, won or contracted.
 $qLock = function_exists('pc_quote_lock_reason') ? pc_quote_lock_reason($h) : '';
 //  Who may reopen (owner, 14 Nov 2026): an approved costing only by the last approver's level or above.
-$mayReopen = $h['status'] === 'APPROVED' ? (function_exists('pc_can_reopen_approved') && pc_can_reopen_approved($h)) : (function_exists('pc_can_edit') && pc_can_edit());
+//  Waiting for approval: only its preparer takes it back; approvers send it back (owner, 14 Nov 2026).
+$mayReopen = $h['status'] === 'APPROVED' ? (function_exists('pc_can_reopen_approved') && pc_can_reopen_approved($h))
+           : ($h['status'] === 'SUBMITTED' ? (function_exists('pc_is_author') && pc_is_author($h)) : (function_exists('pc_can_edit') && pc_can_edit()));
 $canEdit = function_exists('pc_can_edit') && pc_can_edit() && !$locked;
 // Approving follows the quotation levels (owner, 20 Oct 2026): the person who
 // may sign is the one the CURRENT level waits for, not anyone who may approve.
@@ -74,7 +76,8 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
       <?php foreach ($pcRevs as $i => $rv): $rl = function_exists('pc_rev_label') ? pc_rev_label((int)$rv['rev']) : ('Rev ' . (int)$rv['rev']); ?><?= $i ? ' · ' : '' ?><?php if ((int)$rv['id'] === (int)$h['id']): ?><b><?= $e($rl) ?></b> <span class="muted">(this one, <?= $e(strtolower(PC_STATUS[$rv['status']] ?? $rv['status'])) ?>)</span><?php else: ?><a href="/project-costing?id=<?= (int)$rv['id'] ?>"><?= $e($rl) ?></a> <span class="muted">(<?= $e(strtolower(PC_STATUS[$rv['status']] ?? $rv['status'])) ?>)</span><?php endif; ?><?php endforeach; ?>
     </p>
     <?php endif; ?>
-    <p class="sub" style="margin:2px 0 0">Default <?= $e(PC_BASES[$basis] ?? $basis) ?><?= !empty($h['site']) ? ' · '.$e($h['site']) : '' ?><?= !empty($h['sbu']) ? ' · ' . $e($sbuOpts[$h['sbu']] ?? $h['sbu']) : '' ?></p>
+    <?php $pcSub = trim((!empty($h['site']) ? $h['site'] : '') . (!empty($h['sbu']) ? (!empty($h['site']) ? ' · ' : '') . ($sbuOpts[$h['sbu']] ?? $h['sbu']) : '')); ?>
+    <?php if ($pcSub !== ''): ?><p class="sub" style="margin:2px 0 0"><?= $e($pcSub) ?></p><?php endif; ?>
     <p class="sub" style="margin:2px 0 0">For:
       <?php if ($forInq): ?><a href="/inquiry-edit?id=<?= (int)$forInq['id'] ?>">enquiry <?= $e($forInq['inquiry_no']) ?></a><?php endif; ?>
       <?php if ($forInq && $forLead): ?> · <?php endif; ?>
@@ -89,7 +92,10 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
       if ($revQ && function_exists('pc_prices_quote') && pc_prices_quote($h, (int)$revQ['id']) && pc_can_edit() && pc_revise_problem((int)$revQ['id']) === ''): ?>
       <form method="post" action="/project-costing-revise" style="display:inline;margin-left:6px"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="quote_id" value="<?= (int)$revQ['id'] ?>"><button class="btn" style="padding:4px 10px">✎ Change the costing for <?= $e($revQ['quote_no']) ?> revision <?= (int)$revQ['rev'] ?></button></form>
       <?php endif; ?><?php elseif ($canEdit===false && $mayReopen): ?> <form method="post" action="/project-costing-reopen" style="display:inline"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="id" value="<?= (int)$h['id'] ?>"><button class="btn btn-ghost" style="padding:4px 10px">Reopen as draft</button></form><?php endif; ?></div><?php endif; ?>
-<?php if ($h['status']==='SUBMITTED' && function_exists('pc_waiting_words')): ?><div class="lockmsg" style="background:var(--warn-soft,#fff6e5)">⏳ <?= $e(pc_waiting_words($h)) ?></div><?php endif; ?>
+<?php if ($h['status']==='SUBMITTED' && function_exists('pc_levels_status') && ($lvS = pc_levels_status($h))): //  every level, in signing order (SAL-188) ?>
+<div class="lockmsg pc-levels" style="background:var(--warn-soft,#fff6e5)"><b>⏳ Waiting for approval — <?= count($lvS) ?> level<?= count($lvS) === 1 ? '' : 's' ?>:</b>
+  <ol style="margin:4px 0 0 20px;padding:0"><?php foreach ($lvS as [$lw, $ls]): ?><li style="<?= $ls === 'NOW' ? 'font-weight:600' : ($ls === 'DONE' ? 'color:var(--ok,#1a7f37)' : 'color:var(--muted)') ?>"><?= $e($lw) ?></li><?php endforeach; ?></ol></div>
+<?php endif; ?>
 <?php if ($h['status']==='REJECTED' && !empty($h['reject_note'])): ?><div class="lockmsg" style="background:var(--bad-soft,#fdecec)">↩ Sent back: <?= $e($h['reject_note']) ?></div><?php endif; ?>
 
 <!-- Project rollup -->
@@ -142,7 +148,8 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
       <div class="ff"><label for="pcs-site">Site</label><input class="form-control" id="pcs-site" name="site" value="<?= $e($h['site']) ?>"></div>
       <div class="ff"><label for="pcs-sbu">Business unit <span class="muted">— which SBU Head approves</span></label><select class="form-control" id="pcs-sbu" name="sbu"><option value="">—</option>
         <?php foreach ($sbuOpts as $k=>$v): ?><option value="<?= $e($k) ?>" <?= (string)($h['sbu'] ?? '')===(string)$k?'selected':'' ?>><?= $e($v) ?></option><?php endforeach; ?></select></div>
-      <div class="ff"><label for="pcs-basis">Default basis <span class="muted">— for new roles</span></label><select class="form-control" id="pcs-basis" name="basis"><?php foreach (PC_BASES as $k=>$v): ?><option value="<?= $e($k) ?>" <?= $basis===$k?'selected':'' ?>><?= $e($v) ?></option><?php endforeach; ?></select></div>
+      <?php //  No "Default basis" here any more (owner, 14 Nov 2026: dual entry boxes) — each role chooses its own
+            //  basis in the role box; a new role starts with the basis of the last role saved. ?>
       <div class="ff"><label for="pcs-loadon">Loadings applied on</label><select class="form-control" id="pcs-loadon" name="load_on"><option value="COST" <?= strtoupper((string)$h['load_on'])!=='RATE'?'selected':'' ?>>Direct cost (standard)</option><option value="RATE" <?= strtoupper((string)$h['load_on'])==='RATE'?'selected':'' ?>>Sell rate (Excel-style)</option></select></div>
       <div class="ff"><label for="pcs-oh">Overhead %</label><input class="form-control" id="pcs-oh" type="number" step="0.01" name="overhead_pct" value="<?= $e($h['overhead_pct']) ?>"></div>
       <div class="ff"><label for="pcs-ins">Insurance %</label><input class="form-control" id="pcs-ins" type="number" step="0.01" name="insurance_pct" value="<?= $e($h['insurance_pct']) ?>"></div>
@@ -158,7 +165,6 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
   </form>
   <?php else: ?>
     <div class="pc-set" style="font-size:13px">
-      <div><span class="muted">Default basis</span><br><?= $e(PC_BASES[$basis] ?? $basis) ?></div>
       <div><span class="muted">Loadings on</span><br><?= strtoupper((string)$h['load_on'])==='RATE' ? 'Sell rate' : 'Direct cost' ?></div>
       <div class="w2"><span class="muted">Loadings</span><br>Overhead <?= $e($h['overhead_pct']) ?>% · Insurance <?= $e($h['insurance_pct']) ?>% · Bad debt <?= $e($h['baddebt_pct']) ?>% · Contingency <?= $e($h['contingency_pct']) ?>% · Negotiation <?= $e($h['negotiation_pct']) ?>%</div>
       <?php if (!empty($h['inclusions'])): ?><div class="w2"><span class="muted">Inclusions</span><br><?= nl2br($e($h['inclusions'])) ?></div><?php endif; ?>
@@ -418,25 +424,34 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
       <div class="ff"><label for="ch_dpm">Working days in a month</label><input class="form-control" id="ch_dpm" type="number" min="1" max="31" step="0.5" name="dpm" value="<?= $fv('dpm') ?: $e($dpmDefault) ?>" title="Turns per-day heads into a month, and monthly heads into a day rate"></div>
     </div>
 
-    <?php // Owner, 13 Nov 2026: "we must enter CTC, margin shall be entered and salary structure shall be
-          // generated accordingly." Built from the company's own salary components (Compensation setup).
+    <?php //  ONE PRICE BOX — each figure typed once (owner, 14 Nov 2026: "There are dual entry boxes like …
+          //  Man months, Margin etc … Duplicate entries are not at all good for the user"). The margin, the
+          //  client's rate and the quantity live here only; the quick salary break-up uses them.
+          //  Owner, 13 Nov 2026: "we must enter CTC, margin shall be entered and salary structure shall be
+          //  generated accordingly." Built from the company's own salary components (Compensation setup).
           $ctcOn = function_exists('comp_defs') && function_exists('pc_heads_from_ctc') && comp_defs(true);
-          if ($ctcOn): ?>
-    <div class="ctcq" id="ch_ctcq">
-      <div class="ctcq-t"><b>Quick start</b> <span class="muted">Answer one question and the salary break-up is worked out for you.</span></div>
-      <div class="ctcq-m" role="radiogroup" aria-label="What do you know?">
-        <label><input type="radio" name="ch_ctc_mode" value="ctc" checked> I know the CTC</label>
-        <label><input type="radio" name="ch_ctc_mode" value="rate"> I know the rate the <?= $e(Tl('client')) ?> pays</label>
+          $negPct = (float)($h['negotiation_pct'] ?? 0);
+          $rateFixed = isset($f['price_mode']) ? strtoupper((string)$f['price_mode']) === 'RATE' : (float)($f['rate_manual'] ?? 0) > 0;
+          $quoted = isset($f['rate_quoted']) ? (string)$f['rate_quoted'] : ((float)($f['rate_manual'] ?? 0) > 0 ? round((float)$f['rate_manual'] * (1 + $negPct / 100), 2) : ''); ?>
+    <div class="ctcq" id="ch_ctcq" data-edit="<?= $editLn ? ($rateFixed ? 'rate' : 'ctc') : '' ?>">
+      <div class="ctcq-t"><b>Price</b> <span class="muted">How this role is priced — each figure is typed once, here.</span></div>
+      <div class="ctcq-m" role="radiogroup" aria-label="How is the price set?">
+        <label><input type="radio" name="price_mode" value="MARGIN" <?= $rateFixed ? '' : 'checked' ?>> Cost + my margin — the rate follows</label>
+        <label><input type="radio" name="price_mode" value="RATE" <?= $rateFixed ? 'checked' : '' ?>> The <?= $e(Tl('client')) ?>'s rate is fixed</label>
       </div>
       <div class="ctcq-f">
-        <label data-ctc-mode="ctc">CTC per person, a month (<?= $e($sym) ?>)<input id="ch_ctc" type="number" min="0" step="any" inputmode="decimal" placeholder="e.g. 45000"></label>
-        <label data-ctc-mode="rate" hidden>Rate the <?= $e(Tl('client')) ?> pays, <span data-bw="job"><?= $e($lb === 'FIXED' ? 'for the job' : $unitWord) ?></span> (<?= $e($sym) ?>)<input id="ch_ctc_rate" type="number" min="0" step="any" inputmode="decimal" placeholder="e.g. 66000"></label>
-        <label>Margin you want (%)<input id="ch_ctc_tm" type="number" min="0" max="99.9" step="0.1" inputmode="decimal" placeholder="e.g. 22" value="<?= $num0('target_margin') ?>"></label>
-        <button type="button" class="btn" id="ch_ctc_go">Build the salary break-up</button>
+        <label data-ctc-mode="rate"<?= $rateFixed ? '' : ' hidden' ?>><?= $e(ucfirst(Tl('client'))) ?>'s rate, <span data-bw="job"><?= $e($lb === 'FIXED' ? 'for the job' : $unitWord) ?></span> (<?= $e($sym) ?>)<input id="ch_ctc_rate" name="rate_quoted" type="number" min="0" step="any" inputmode="decimal" placeholder="e.g. 66000" value="<?= $e($quoted) ?>"></label>
+        <label for="pc_tm">Margin you want (%)<input id="pc_tm" name="target_margin" type="number" min="0" max="99.9" step="0.1" inputmode="decimal" placeholder="e.g. 22" value="<?= $num0('target_margin') ?>"></label>
+        <label for="pc_boq"><span><span data-bw="qty"><?= $e($qtyLabel) ?></span> (BOQ) — all people together</span><input id="pc_boq" name="boq_qty" type="number" step="0.01" min="0" inputmode="decimal" value="<?= $fv('boq_qty') ?>"></label>
       </div>
-      <div class="ctcq-n muted" id="ch_ctc_note" data-ctc="Type what one person costs the company a month; the break-up is filled in and the rate follows your margin." data-rate="Type the rate and the margin; it works back to the CTC you can afford, and fills in its break-up."><span data-ctc-hint>Type what one person costs the company a month; the break-up is filled in and the rate follows your margin.</span> Uses your company's salary components — Basic is <?= $e(rtrim(rtrim(number_format(comp_basic_pct(), 2), '0'), '.')) ?>% of the CTC<?= (function_exists('hiring_admin_can') && hiring_admin_can()) ? ' (<a href="/comp-setup">change the components</a>)' : '' ?>. You can still change any head afterwards.</div>
+      <?php if ($ctcOn): ?>
+      <div class="ctcq-f" style="border-top:1px dashed var(--line);padding-top:10px">
+        <label data-ctc-mode="ctc"<?= $rateFixed ? ' hidden' : '' ?>>CTC per person, a month (<?= $e($sym) ?>) <span style="font-weight:400">— to build the salary break-up</span><input id="ch_ctc" type="number" min="0" step="any" inputmode="decimal" placeholder="e.g. 45000"></label>
+        <button type="button" class="btn" id="ch_ctc_go" data-l-ctc="Build the salary break-up" data-l-rate="Work out the CTC and its break-up"><?= $rateFixed ? 'Work out the CTC and its break-up' : 'Build the salary break-up' ?></button>
+      </div>
+      <?php endif; ?>
+      <div class="ctcq-n muted" id="ch_ctc_note" data-ctc="The rate follows the cost heads and your margin.<?= $ctcOn ? ' Type the CTC to fill the break-up from your company\'s salary components.' : '' ?>" data-rate="The rate is the <?= $e(Tl('client')) ?>'s; your margin decides how much of it is left for the person.<?= $ctcOn ? ' Press the button to work back to the CTC you can afford and fill its break-up.' : '' ?>"><span data-ctc-hint><?= $rateFixed ? 'The rate is the client\'s; your margin decides how much of it is left for the person.' : 'The rate follows the cost heads and your margin.' ?></span><?php if ($negPct > 0): ?> <span class="muted">This costing adds <?= $e(rtrim(rtrim(number_format($negPct, 2), '0'), '.')) ?>% negotiation padding on top of the cost-based rate.</span><?php endif; ?></div>
     </div>
-    <?php endif; ?>
 
     <p class="sub" style="margin:14px 0 6px">Cost heads — <b><?= $e($sym) ?> <span data-bw="unit"><?= $e($unitWord) ?></span></b>. Each head can be an amount, a % of other heads, quantity × rate or a formula, entered per month, per day, per year or one time. Names can be changed freely — a % keeps pointing at the right head.</p>
     <div class="addbar">
@@ -454,11 +469,6 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
     <noscript><div class="msg msg-warning">The heads editor needs JavaScript switched on in your browser.</div></noscript>
     <div class="msg msg-error errs" id="ch_errs" role="alert"></div>
 
-    <div class="form-grid" style="margin-top:12px">
-      <div class="ff"><label for="pc_boq"><span data-bw="qty"><?= $e($qtyLabel) ?></span> (BOQ) <span class="muted">all people together</span></label><input class="form-control" type="number" step="0.01" min="0" id="pc_boq" name="boq_qty" value="<?= $fv('boq_qty') ?>"></div>
-      <div class="ff"><label for="pc_tm">Target margin (%) <span class="muted">sets the rate</span></label><input class="form-control" type="number" step="0.1" min="0" max="99.9" id="pc_tm" name="target_margin" value="<?= $num0('target_margin') ?>" placeholder="e.g. 22"></div>
-      <div class="ff"><label for="pc_rate">…or fixed rate<span data-bw="rate"><?= $e($rateLabel) ?></span> <span class="muted">override</span></label><input class="form-control" type="number" step="0.01" min="0" id="pc_rate" name="rate_manual" value="<?= $num0('rate_manual') ?>" placeholder="overrides margin"></div>
-    </div>
     <div class="totals" aria-live="polite">
       <?php //  Owner, 13 Nov 2026 (SAL-176): on a per-man-day costing "CTC is man-day only instead of man-month".
             //  A day sheet works in man-days, but a salary is thought of by the month — so a day figure
@@ -603,7 +613,7 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
     var id=+this.value; this.value=''; if(!id) return; var t=TPL.filter(function(x){return x.id===id;})[0]; if(!t) return;
     read(); if(rows.length && !confirm('Replace the heads on this role with the template "'+t.name+'"?')) return;
     rows=JSON.parse(JSON.stringify(t.items)); rows.forEach(function(r){ if(r.amount!=null && r.calc==null) r.calc=r.amount?String(r.amount):''; }); render(); });
-  ['ch_dpm','pc_boq','pc_tm','pc_rate','ch_ppl'].forEach(function(id){ var el=document.getElementById(id); if(el) el.addEventListener('input',schedule); });
+  ['ch_dpm','pc_boq','pc_tm','ch_ctc_rate','ch_ppl'].forEach(function(id){ var el=document.getElementById(id); if(el) el.addEventListener('input',schedule); });
   //  A role's basis (14 Nov 2026): every label on the role follows it, and the figures are worked again.
   (function(){ var bs=document.getElementById('ch_basis'); if(!bs) return;
     var W={LONG:{unit:'per man-month',qty:'Man-months',rate:'/man-month',job:'per man-month'},DAILY:{unit:'per man-day',qty:'Man-days',rate:'/man-day',job:'per man-day'},FIXED:{unit:'per person',qty:'Units',rate:'/lump',job:'for the job'}};
@@ -660,29 +670,28 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
     carry(f,ev.target);
   });
   //  QUICK START — a salary break-up from the CTC, with the company's own components.
+  //  THE PRICE BOX (owner, 14 Nov 2026: each figure typed once). One choice decides how the price is
+  //  set; the margin box serves both ways, the client's rate box shows only when the rate is fixed.
   var cq=document.getElementById('ch_ctc_go');
+  var cNote=document.getElementById('ch_ctc_note'), cTm=document.getElementById('pc_tm');
+  var cRate=document.getElementById('ch_ctc_rate'), cCtc=document.getElementById('ch_ctc');
+  var mode=function(){ var m=document.querySelector('input[name=price_mode]:checked'); return (m&&m.value==='RATE')?'rate':'ctc'; };
+  var showMode=function(m){
+    [].forEach.call(document.querySelectorAll('#ch_ctcq [data-ctc-mode]'),function(l){ l.hidden=l.getAttribute('data-ctc-mode')!==m; });
+    var hint=cNote&&cNote.querySelector('[data-ctc-hint]'); if(hint) hint.textContent=cNote.getAttribute('data-'+m);
+    if(cq) cq.textContent=cq.getAttribute('data-l-'+m);
+  };
+  [].forEach.call(document.querySelectorAll('input[name=price_mode]'),function(rd){ rd.addEventListener('change',function(){
+    var m=mode(); showMode(m);
+    try{ localStorage.setItem('pc_ctc_mode',m); }catch(e){}
+    (m==='rate'?cRate:(cCtc||cTm)).focus(); schedule();
+  }); });
+  //  A new role opens the way the last one was priced (SAL-176: "Save settings" used to flip it back to
+  //  "I know the CTC"); a role being edited opens the way it IS priced. This browser only.
+  try{ var box=document.getElementById('ch_ctcq'); if(box && !box.getAttribute('data-edit')){ var saved=localStorage.getItem('pc_ctc_mode');
+       var sr=saved&&document.querySelector('input[name=price_mode][value="'+(saved==='rate'?'RATE':'MARGIN')+'"]');
+       if(sr && !sr.checked){ sr.checked=true; showMode(saved); } } }catch(e){}
   if(cq){
-    var cNote=document.getElementById('ch_ctc_note'), cTm=document.getElementById('ch_ctc_tm'), pTm=document.getElementById('pc_tm');
-    cTm.addEventListener('input',function(){ pTm.value=cTm.value; schedule(); });
-    pTm.addEventListener('input',function(){ cTm.value=pTm.value; });
-    var cRate=document.getElementById('ch_ctc_rate'), cCtc=document.getElementById('ch_ctc');
-    var mode=function(){ var m=document.querySelector('input[name=ch_ctc_mode]:checked'); return m?m.value:'ctc'; };
-    //  One question decides which box is shown — never both (owner: "the screen shall not be very confusing").
-    var showMode=function(m){
-      [].forEach.call(document.querySelectorAll('#ch_ctcq [data-ctc-mode]'),function(l){ l.hidden=l.getAttribute('data-ctc-mode')!==m; });
-      var hint=cNote.querySelector('[data-ctc-hint]'); if(hint) hint.textContent=cNote.getAttribute('data-'+m);
-    };
-    [].forEach.call(document.querySelectorAll('input[name=ch_ctc_mode]'),function(rd){ rd.addEventListener('change',function(){
-      var m=mode(); showMode(m);
-      try{ localStorage.setItem('pc_ctc_mode',m); }catch(e){}
-      (m==='rate'?cRate:cCtc).focus();
-    }); });
-    //  Remember the last question chosen (owner, 13 Nov 2026, SAL-176): "Save settings" reloads the
-    //  page, which used to flip back to "I know the CTC" — a client's rate of 66,000 then went into
-    //  the CTC box and a 95% margin priced the person at ₹15,10,740 a month. This browser only;
-    //  without storage the page simply opens on "I know the CTC", as before.
-    try{ var saved=localStorage.getItem('pc_ctc_mode'); var sr=saved&&document.querySelector('input[name=ch_ctc_mode][value="'+saved+'"]');
-         if(sr && !sr.checked){ sr.checked=true; showMode(saved); } }catch(e){}
     var bad=function(msg,el){ cNote.className='ctcq-n bad'; cNote.textContent=msg; if(el) el.focus(); };
     var build=function(){
       var m=mode(), fd=new FormData(); fd.set('_csrf',f.querySelector('[name=_csrf]').value); fd.set('costing_id',f.querySelector('[name=costing_id]').value);
@@ -702,12 +711,10 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
         cq.disabled=false;
         if(!j.ok) return bad(j.err||'It could not be worked out.');
         rows=j.items; rows.forEach(function(r){ if(r.amount!=null && r.calc==null) r.calc=r.amount?String(r.amount):''; });
-        if(cTm.value!=='') pTm.value=cTm.value;
-        var pr=document.getElementById('pc_rate');
-        if(m==='rate'){ pr.value=j.rate_manual; cCtc.value=j.ctc; } else if(pr.value!=='' && confirm('This role has a fixed rate typed in, which overrides the margin. Clear it so the rate follows your margin?')) pr.value='';
+        if(m==='rate' && cCtc) cCtc.value=j.ctc;
         cNote.className='ctcq-n ok'; cNote.textContent='✓ '+j.note+((m==='ctc'&&cTm.value==='')?' Now type the margin you want — the rate follows.':'');
         render();
-        var nx=document.getElementById((m==='ctc'&&cTm.value==='')?'ch_ctc_tm':(document.getElementById('ch_role').value.trim()===''?'ch_role':'pc_boq')); if(nx) nx.focus();
+        var nx=document.getElementById((m==='ctc'&&cTm.value==='')?'pc_tm':(document.getElementById('ch_role').value.trim()===''?'ch_role':'pc_boq')); if(nx) nx.focus();
       }).catch(function(){ cq.disabled=false; bad('It could not be worked out just now — try again.'); });
     };
     cq.addEventListener('click',build);

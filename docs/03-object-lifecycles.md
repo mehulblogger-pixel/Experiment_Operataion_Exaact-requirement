@@ -408,6 +408,17 @@ stateDiagram-v2
   is the default for new roles and for roles saved before (blank). A role's cost heads, quantity, rate,
   revenue, quotation line unit, hiring request and requisition all use the role's basis
   (`pc_line_basis()`). Not a status — no lifecycle change.
+- **Each figure typed once (owner, 14 Nov 2026: "Duplicate entries are not at all good for the user").**
+  A role's price is set in one Price box: "Cost + my margin" (the rate follows; no fixed rate kept) or
+  "The client's rate is fixed" (the client's rate is typed once, as the client pays it; the rate kept,
+  `rate_manual`, is that rate before the costing's negotiation padding, so the quoted rate is exactly what
+  was typed). One margin box, one quantity box. The costing has no "Default basis" box any more: each role
+  chooses its basis, and a new role starts with the basis of the last role saved (`project_costings.basis`
+  now records that; older roles without a basis are given the costing's basis first, so they never change).
+- **SUBMITTED → DRAFT ("Reopen as draft") is its preparer's only (14 Nov 2026)** — approvers use Send back
+  (SUBMITTED → REJECTED) with a reason. The top of a submitted costing lists every level in signing order,
+  with designation, names and where each stands (`pc_levels_status()`); the submit message lists them too.
+  No status or transition is added.
 - **A revision gets its own costing — automatically, as the costing's next Rev (owner, 14 Nov 2026:
   "once the quote is revised … it shall be editable"; then "Yes" to making it automatically, and
   "when the costing is revised it must have a revision number starting from Rev. 01, 02 etc.").**

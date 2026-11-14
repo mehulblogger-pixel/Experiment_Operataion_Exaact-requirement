@@ -42,3 +42,8 @@ signed — with "all levels at the same time" the others still sign. Nothing abo
 other reporting directly or indirectly to him." Your level opens — and you are e-mailed — only once
 every other level has signed, wherever your level sits in the setup, for quotations and project costings
 alike. If one of them takes their approval back, yours is reset with it.
+
+### A submitted costing (owner, 14 Nov 2026)
+
+The list at the top shows every level and where it stands; yours is marked "signs last". Approvers do not
+have "Reopen as draft" on a costing waiting for approval — send it back with a reason instead.

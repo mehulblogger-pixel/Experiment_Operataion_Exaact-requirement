@@ -100,3 +100,12 @@ with its roles and prices. "✎ Change the costing" opens it over the quotation 
 margins and submit it there; close it to come back, nothing typed on the quotation is lost. "⇣ Take the
 costing's prices into the line items" fills the lines; press Save. Assigned work: an enquiry or quotation
 assigned to someone is worked by them and the people above them — you view the others.
+
+### The costing role box — each figure once (owner, 14 Nov 2026)
+
+One **Price** box per role: choose "Cost + my margin" (type the CTC to build the salary break-up, and the
+margin) or "The client's rate is fixed" (type the client's rate once — that is exactly the rate quoted —
+and the margin; "Work out the CTC and its break-up" finds what you can afford). One margin box, one
+quantity box. Basis is chosen on the role; a new role starts with the last role's basis. Once you submit,
+the top of the costing lists every approval level by designation and name; only you can take it back out
+of approval.

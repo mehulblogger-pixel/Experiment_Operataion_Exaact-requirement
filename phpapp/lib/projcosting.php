@@ -356,6 +356,24 @@ function pc_preview_levels($h) {
     return $out;
 }
 
+//  EVERY LEVEL, IN THE ORDER THEY SIGN, WITH WHERE EACH STANDS (owner, 14 Nov 2026, SAL-188: "No exact
+//  approval list is provided … the green line at the head shows 3 levels approval pending; history at the
+//  bottom shows which"). [[words, state], …] — state: DONE · NOW · LATER · BACK.
+function pc_levels_status($h) {
+    $steps = pc_steps((int)$h['id']); if (!$steps) return [];
+    $open = pc_open_levels((int)$h['id']); $last = pc_last_levels((int)$h['id']);
+    usort($steps, fn($a, $b) => [in_array((int)$a['level'], $last, true) ? 1 : 0, (int)$a['level'], (int)$a['id']] <=> [in_array((int)$b['level'], $last, true) ? 1 : 0, (int)$b['level'], (int)$b['id']]);
+    $out = []; $multi = count(array_unique(array_map(fn($s) => (int)$s['level'], $steps))) > 1;
+    foreach ($steps as $s) {
+        $w = pc_level_words($s, $h);
+        if ($multi && in_array((int)$s['level'], $last, true)) $w .= ' — signs last';
+        if ($s['status'] === 'APPROVED') $out[] = [$w . ': ✓ approved by ' . $s['acted_by'] . (trim((string)$s['acted_at']) !== '' ? ', ' . fdate(substr((string)$s['acted_at'], 0, 10)) : ''), 'DONE'];
+        elseif ($s['status'] === 'REJECTED') $out[] = [$w . ': ↩ sent back by ' . $s['acted_by'], 'BACK'];
+        elseif (in_array((int)$s['level'], $open, true)) $out[] = [$w . ': ⏳ waiting — with them now', 'NOW'];
+        else $out[] = [$w . ': after the levels before it', 'LATER'];
+    }
+    return $out;
+}
 //  What the costing is waiting for now, in one line ('' when nothing is pending).
 function pc_waiting_words($h) {
     $st = (string)($h['status'] ?? '');
@@ -1087,6 +1105,17 @@ function pc_line_from_post(array $p, array $h) {
         //  The role's own basis, chosen on the role (14 Nov 2026); else the costing's default.
         'basis' => isset(PC_BASES[strtoupper((string)($p['line_basis'] ?? ''))]) ? strtoupper((string)$p['line_basis']) : pc_line_basis([], $h),
     ];
+    //  ONE PRICE BOX (owner, 14 Nov 2026: "Duplicate entries are not at all good for the user"): the role
+    //  says how its price is set. Cost + margin → no fixed rate. The client's rate fixed → the rate the
+    //  client pays is typed once; the rate kept is that rate before this costing's negotiation padding,
+    //  so the price quoted is exactly what was typed. (A post without the choice keeps rate_manual as sent.)
+    $pm = strtoupper((string)($p['price_mode'] ?? ''));
+    if ($pm === 'MARGIN') $line['rate_manual'] = 0;
+    elseif ($pm === 'RATE') {
+        $qr = max(0, $num('rate_quoted')); $neg = (float)($h['negotiation_pct'] ?? 0);
+        $line['rate_manual'] = $qr > 0 ? round($qr / (1 + $neg / 100), 2) : 0;
+        if ($qr <= 0) $errs[] = 'Type the rate the ' . Tl('client') . ' pays — or choose "Cost + my margin".';
+    }
     if ($line['role_label'] === '') $errs[] = 'Give the role a name.';
     if ($line['target_margin'] < 0 || $line['target_margin'] >= 100) $errs[] = 'The target margin must be from 0 up to (not including) 100%.';
     $ev = ch_evaluate($items, ch_unit_for_basis($line['basis']), $dpm);
@@ -1344,7 +1373,7 @@ function pc_role_save(array $h, array $p) {
     if ($errs) {
         // Keep what was typed, so nothing has to be entered twice.
         $_SESSION['pc_line_draft'][$cid] = ['line_id' => $lineId, 'post' => array_intersect_key($p,
-            array_flip(['group_label', 'role_label', 'headcount', 'boq_qty', 'target_margin', 'rate_manual', 'dpm', 'items_json', 'line_basis']))];
+            array_flip(['group_label', 'role_label', 'headcount', 'boq_qty', 'target_margin', 'rate_manual', 'dpm', 'items_json', 'line_basis', 'price_mode', 'rate_quoted']))];
         return ['errs' => $errs, 'line_id' => $lineId, 'role' => $line['role_label']];
     }
     $c = pc_line_calc($line, $h);
@@ -1360,6 +1389,13 @@ function pc_role_save(array $h, array $p) {
         $lineId = (int)$pdo->lastInsertId();
     }
     unset($_SESSION['pc_line_draft'][$cid]);
+    //  The next new role starts with this role's basis (there is no separate "default basis" box any more,
+    //  14 Nov 2026). Roles saved before basis was per role carry the costing's basis; they are given it
+    //  first, so changing the costing's basis never changes them.
+    if ((string)$line['basis'] !== (string)($h['basis'] ?? '')) {
+        $pdo->prepare("UPDATE project_costing_lines SET basis=? WHERE costing_id=? AND COALESCE(basis,'')=''")->execute([pc_line_basis([], $h), $cid]);
+        $pdo->prepare("UPDATE project_costings SET basis=? WHERE id=?")->execute([(string)$line['basis'], $cid]);
+    }
     pc_restamp($cid);
     return ['errs' => [], 'line_id' => $lineId, 'role' => $line['role_label']];
 }
@@ -1638,8 +1674,8 @@ function ops_projcosting($route, $method) {
                 $r['rate_manual'] = $b['rate_manual'];
                 $r['note'] = 'At ' . fmoney((float)$_POST['rate']) . ' ' . $b['unit'] . ' and a ' . rtrim(rtrim(number_format((float)$_POST['margin'], 2), '0'), '.')
                            . '% margin, you can afford a CTC of ' . fmoney($b['ctc']) . ' a month. The break-up below adds up to it; the rate is fixed at what the ' . Tl('client') . ' pays.'
-                           //  With a negotiation padding the "fixed rate" box holds the rate BEFORE the padding — say so, or 62,857 beside "66,000" looks like a mistake.
-                           . ($b['negotiation_pct'] > 0 ? ' (The fixed-rate box shows ' . fmoney($b['rate_manual']) . ': this costing adds ' . rtrim(rtrim(number_format($b['negotiation_pct'], 2), '0'), '.') . '% negotiation padding on top, which brings it to ' . fmoney((float)$_POST['rate']) . '.)' : '');
+                           //  The rate is typed once, as the client pays it (14 Nov 2026) — no second "fixed rate" box to explain.
+                           . '';
             }
         } else {
             $r = pc_heads_from_ctc($_POST['ctc'] ?? 0);
@@ -1742,7 +1778,8 @@ function ops_projcosting($route, $method) {
             $lv = []; foreach (pc_steps($id) as $s) $lv[] = pc_level_words($s, $h2);
             pc_trail($id, 'Submitted for approval by ' . user_name(current_user()) . ' — ' . $n . ' level' . ($n === 1 ? '' : 's') . ($n > 1 ? ($together ? ', the others at the same time and the last one after them' : ', in order') : ''),
                 implode("\n", $lv));
-            flash('Costing submitted for approval — ' . $n . ' level' . ($n === 1 ? '' : 's') . ' to pass' . ($n > 1 ? ($together ? ', the others at the same time and the last one after them.' : ', in order.') : '.'));
+            flash('Costing submitted for approval — ' . $n . ' level' . ($n === 1 ? '' : 's') . ' to pass' . ($n > 1 ? ($together ? ', the others at the same time and the last one after them' : ', in order') : '')
+                . ': ' . implode('; ', array_map(fn($x) => $x[0], pc_levels_status($h2))) . '.');
         } elseif ($route === 'project-costing-approve') {
             $openBefore = pc_open_levels($id);
             $r = pc_sign_level($h, (string)($_POST['approval_ref'] ?? ''));
@@ -1778,6 +1815,9 @@ function ops_projcosting($route, $method) {
         } else { // reopen to draft — an approval is for the figures approved, so it goes
             //  An approved costing: only the last approver's level or above (14 Nov 2026); otherwise the editors, as before.
             if ($h['status'] === 'APPROVED') ops_require(pc_can_reopen_approved($h), pc_reopen_who_words($h));
+            //  Waiting for approval (owner, 14 Nov 2026: "Every approver has a button to reopen the draft"):
+            //  only the person who prepared it takes it back; an approver sends it back, with a reason.
+            elseif ($h['status'] === 'SUBMITTED') ops_require(pc_is_author($h), 'Only the person who prepared it (' . ($h['created_by'] ?: 'its preparer') . ') can take it back out of approval. As an approver, use "Send back" with a reason.');
             else ops_require(pc_can_edit(), 'You cannot reopen this.');
             $pdo->prepare("DELETE FROM project_costing_approvals WHERE costing_id=?")->execute([$id]);
             $pdo->prepare("UPDATE project_costings SET status='DRAFT', approved_by='', approved_at='', approval_ref='', updated_at=? WHERE id=?")->execute([date('c'), $id]);
