@@ -241,8 +241,27 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
       <?php if (!empty($h['quote_id'])): ?>
         <a class="btn secondary" href="/quote?id=<?= (int)$h['quote_id'] ?>">📝 View linked quotation</a>
         <span class="muted" style="font-size:12px">A quotation was generated from this costing.</span>
+      <?php elseif ($h['status'] === 'APPROVED' && !empty($quoteCands)): ?>
+        <?php //  Revise, or a new quotation? (owner, 15 Nov 2026) — a live quotation exists for this job or client. ?>
+        <form method="post" action="/project-costing-to-quote" class="pc-revnew" style="flex:1 1 100%;border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--soft,#f6f8fa)">
+          <input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="id" value="<?= (int)$h['id'] ?>">
+          <div style="font-weight:600;margin-bottom:4px"><?= count($quoteCands) === 1 ? 'A live quotation already exists' : count($quoteCands) . ' live quotations already exist' ?> — revise it, or make a separate one?</div>
+          <div class="muted" style="font-size:12.5px;margin-bottom:8px">When the client changed the requirement, revise the quotation they already have: they get one offer, and its history keeps the earlier price. Make a separate quotation only for a different job.</div>
+          <?php foreach ($quoteCands as $i => $qc): $rec = $i === 0 && $qc['match'] !== 'client'; ?>
+            <label style="display:flex;gap:8px;align-items:flex-start;margin:4px 0;cursor:pointer">
+              <input type="radio" name="make" value="rev:<?= (int)$qc['id'] ?>" required <?= $rec ? 'checked' : '' ?> style="margin-top:3px">
+              <span><b>Revise <?= $e($qc['quote_no']) ?></b><?= $rec ? ' <span class="pill p-ok" style="font-size:11px">recommended</span>' : '' ?><br>
+                <span class="muted" style="font-size:12.5px"><?= $e(pc_candidate_words($qc)) ?> — makes its next revision at this costing's prices</span></span>
+            </label>
+          <?php endforeach; ?>
+          <label style="display:flex;gap:8px;align-items:flex-start;margin:4px 0;cursor:pointer">
+            <input type="radio" name="make" value="new" required style="margin-top:3px">
+            <span><b>Make a separate new quotation</b><br><span class="muted" style="font-size:12.5px">A new quotation number — for a different job. The history notes the live ones it stands beside.</span></span>
+          </label>
+          <button class="btn primary" style="margin-top:8px">📝 Create quotation</button>
+        </form>
       <?php elseif ($h['status'] === 'APPROVED'): ?>
-        <form method="post" action="/project-costing-to-quote"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="id" value="<?= (int)$h['id'] ?>"><button class="btn primary">📝 Create quotation</button></form>
+        <form method="post" action="/project-costing-to-quote"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="id" value="<?= (int)$h['id'] ?>"><input type="hidden" name="make" value="new"><button class="btn primary">📝 Create quotation</button></form>
         <span class="muted" style="font-size:12px">One quote line per role, priced at its rate × its quantity (man-months, man-days or one lump sum).</span>
       <?php else: //  Owner, 13 Nov 2026: the button showed at every stage — after each level's signature,
                   //  to the author and every approver — and was refused when pressed. It is offered only

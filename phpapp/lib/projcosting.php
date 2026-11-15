@@ -826,8 +826,107 @@ function pc_make_quote($roll) {
         // the costing it was made from — and is worked by its preparer.
         db()->prepare("UPDATE quotations SET inquiry_id=?, lead_id=?, sbu=? WHERE id=?")
             ->execute([(int)($h['inquiry_id'] ?? 0) ?: null, (int)($h['lead_id'] ?? 0) ?: null, (string)($h['sbu'] ?? ''), $qid]);
+        if (function_exists('crm_log_created')) crm_log_created($qid, 'from costing ' . $h['code']);
         return ['id' => $qid, 'no' => $no];
     } catch (Throwable $e) { return ['err' => $e->getMessage()]; }
+}
+
+// ============================================================================
+//  REVISE, OR A NEW QUOTATION? (owner, 15 Nov 2026: "Create quotation should ask revise or new",
+//  and look at the same client too.) A costing made after a quotation already went out for the same
+//  job used to make a SECOND quotation — two live offers for one job. "Create quotation" now offers
+//  the live quotations of the same enquiry, lead or deal first, then the client's other live ones
+//  (which may be another job), and the person chooses: revise one of them, or a separate quotation.
+//  Live = its current revision is not won or lost.
+// ============================================================================
+const PC_LIVE_QUOTE_STATES = ['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'SENT', 'EXPIRED', 'REJECTED'];
+function pc_quote_candidates(array $h) {
+    $ph = implode(',', array_fill(0, count(PC_LIVE_QUOTE_STATES), '?'));
+    [$sw, $sa] = function_exists('scope_office_clause') ? scope_office_clause('q.office_id') : ['1=1', []];
+    $sql = "SELECT q.id, q.quote_no, q.rev, q.status, q.subtotal, q.total_amount, q.inquiry_id, q.lead_id, q.client_id, q.client_name, q.subject
+            FROM quotations q WHERE q.is_current=1 AND q.status IN ($ph) AND $sw";
+    $args = array_merge(PC_LIVE_QUOTE_STATES, $sa);
+    $out = [];
+    $add = function ($rows, $match) use (&$out) {
+        foreach ($rows ?: [] as $r) if (!isset($out[(int)$r['id']])) { $r['match'] = $match; $out[(int)$r['id']] = $r; }
+    };
+    try {
+        if (!empty($h['inquiry_id'])) $add(ops_all($sql . " AND q.inquiry_id=? ORDER BY q.id DESC", array_merge($args, [(int)$h['inquiry_id']])), 'inquiry');
+        if (!empty($h['lead_id']))    $add(ops_all($sql . " AND q.lead_id=? ORDER BY q.id DESC", array_merge($args, [(int)$h['lead_id']])), 'lead');
+        if (!empty($h['opportunity_id']) && function_exists('opp_quotes')) {
+            $ids = array_values(array_filter(array_map(fn($r) => (int)($r['id'] ?? 0), opp_quotes((int)$h['opportunity_id']) ?: [])));
+            if ($ids) $add(ops_all($sql . " AND q.quote_no IN (SELECT quote_no FROM quotations WHERE id IN (" . implode(',', array_fill(0, count($ids), '?')) . ")) ORDER BY q.id DESC",
+                                   array_merge($args, $ids)), 'deal');
+        }
+        if (!empty($h['client_id'])) $add(ops_all($sql . " AND q.client_id=? ORDER BY q.id DESC LIMIT 20", array_merge($args, [(int)$h['client_id']])), 'client');
+    } catch (Throwable $e) {}
+    return array_values($out);
+}
+//  How a candidate is described next to its choice.
+function pc_candidate_words(array $c) {
+    $st = function_exists('lk_options_or') && defined('QUOTE_STATUS') ? (lk_options_or('quote_status', QUOTE_STATUS)[$c['status']] ?? $c['status']) : $c['status'];
+    $why = ['inquiry' => 'same enquiry', 'lead' => 'same lead', 'deal' => 'same deal', 'client' => 'same client — check it is the same job'][$c['match']] ?? '';
+    return $c['quote_no'] . ' revision ' . (int)$c['rev'] . ' · ' . $st . ' · ' . (function_exists('fmoney') ? fmoney((float)$c['subtotal']) : number_format((float)$c['subtotal'])) . ' before tax'
+         . (trim((string)$c['subject']) !== '' ? ' · ' . $c['subject'] : '') . ' (' . $why . ')';
+}
+//  "Revise Q-…": the next revision of that quotation, priced by this costing — one line per role at its
+//  rate and quantity, in its own unit. A role whose name matches a line of the quotation keeps that
+//  line's site and settings. Lines that are not manpower (travel, consumables …) are kept as they were;
+//  manpower lines the costing no longer has are dropped — the earlier revision keeps them, in the history.
+//  The costing is linked to the new revision; the earlier revision and its costing stay as they were.
+function pc_revise_quote_from_costing(array $roll, array $q) {
+    $h = $roll['header']; $pdo = db();
+    $made = crm_quote_make_revision($q, 'Re-priced from costing ' . $h['code'] . ' (' . count($roll['lines']) . ' role' . (count($roll['lines']) === 1 ? '' : 's')
+          . ') — chosen instead of a separate ' . Tl('quote'));
+    $nid = (int)$made['id'];
+    $byName = [];
+    foreach ($made['lines'] as $l) $byName[mb_strtolower(trim((string)$l['description']))] = $l;
+    $carryCols = $made['lines'] ? array_values(array_diff(array_keys($made['lines'][0]), ['id', 'quote_id', 'line_no', 'description', 'qty', 'unit', 'rate', 'amount'])) : [];
+    $rows = pc_quote_line_rows($h, $roll['lines']);
+    $roleNames = array_map(fn($r) => mb_strtolower(trim($r['desc'])), $rows);
+    $kept = [];
+    foreach ($made['lines'] as $l)
+        if (!in_array(mb_strtolower(trim((string)$l['description'])), $roleNames, true) && !in_array(strtoupper((string)$l['unit']), ['MANMONTH', 'MANDAY', 'LOT'], true)) $kept[] = $l;
+    $dropped = count($made['lines']) - count($kept) - count(array_filter($rows, fn($r) => isset($byName[mb_strtolower(trim($r['desc']))])));
+    $pdo->prepare("DELETE FROM quote_lines WHERE quote_id=?")->execute([$nid]);
+    $n = 0; $matched = 0;
+    $put = function (array $c) use ($pdo) {
+        $cols = array_keys($c);
+        $pdo->prepare("INSERT INTO quote_lines (" . implode(',', $cols) . ") VALUES (" . implode(',', array_fill(0, count($cols), '?')) . ")")->execute(array_values($c));
+    };
+    foreach ($rows as $r) {
+        $c = ['quote_id' => $nid, 'line_no' => ++$n, 'description' => $r['desc'], 'qty' => $r['qty'], 'unit' => $r['unit'], 'rate' => $r['rate'], 'amount' => $r['amount']];
+        $src = $byName[mb_strtolower(trim($r['desc']))] ?? null;
+        if ($src) {
+            $matched++;
+            foreach ($carryCols as $k) {
+                $v = $src[$k];
+                if ($k === 'location_id' && $v !== null) $v = $made['locmap'][(int)$v] ?? null;   // the new revision's copy of the site
+                $c[$k] = $v;
+            }
+        }
+        if (empty($c['order_type'])) $c['order_type'] = 'LINE';
+        $put($c);
+    }
+    foreach ($kept as $l) {
+        $c = ['quote_id' => $nid, 'line_no' => ++$n];
+        foreach (array_diff(array_keys($l), ['id', 'quote_id', 'line_no']) as $k) {
+            $v = $l[$k];
+            if ($k === 'location_id' && $v !== null) $v = $made['locmap'][(int)$v] ?? null;
+            $c[$k] = $v;
+        }
+        $put($c);
+    }
+    crm_quote_recalc($nid);
+    $pdo->prepare("UPDATE project_costings SET quote_id=?, updated_at=? WHERE id=?")->execute([$nid, date('c'), (int)$h['id']]);
+    $me = user_name(current_user());
+    crm_log_change($nid, 'Priced from costing ' . $h['code'] . ' by ' . $me . ': ' . count($rows) . ' line' . (count($rows) === 1 ? '' : 's') . ' at the costing\'s rates'
+        . ($matched ? ' (' . $matched . ' kept their site and settings)' : '')
+        . ($kept ? '; ' . count($kept) . ' other line' . (count($kept) === 1 ? '' : 's') . ' kept as before' : '')
+        . ($dropped > 0 ? '; ' . $dropped . ' manpower line' . ($dropped === 1 ? '' : 's') . ' of the earlier revision not in this costing' : '')
+        . '. The earlier revision and its costing stay as they were.');
+    pc_trail((int)$h['id'], 'Priced ' . $q['quote_no'] . ' revision ' . (int)$made['rev'] . ' — chosen by ' . $me . ' instead of a separate ' . Tl('quote'));
+    return ['id' => $nid, 'no' => (string)$q['quote_no'], 'rev' => (int)$made['rev'], 'kept' => count($kept)];
 }
 
 // Create a recruitment requirement from one role line. Carries the per-person
@@ -1890,8 +1989,37 @@ function ops_projcosting($route, $method) {
             flash('Make the quotation once this costing is approved — submit it for approval first.', 'error');
             redirect('/project-costing?id=' . $id);
         }
+        if (!empty($roll['header']['quote_id'])) { flash('A quotation is already linked to this costing — open it with "View linked quotation".', 'warning'); redirect('/project-costing?id=' . $id . '#use'); }
+        //  Revise, or a separate quotation? (owner, 15 Nov 2026) Asked whenever a live quotation exists
+        //  for the same enquiry, lead, deal or client.
+        $cands = pc_quote_candidates($roll['header']);
+        $make = trim((string)($_POST['make'] ?? ''));
+        if ($cands && $make === '') {
+            flash('Choose first: revise one of the live ' . Tlp('quote') . ' listed, or make a separate new ' . Tl('quote') . '.', 'error');
+            redirect('/project-costing?id=' . $id . '#use');
+        }
+        if (strncmp($make, 'rev:', 4) === 0) {
+            $pick = (int)substr($make, 4);
+            $cand = null; foreach ($cands as $c) if ((int)$c['id'] === $pick) $cand = $c;
+            if (!$cand) { flash('That ' . Tl('quote') . ' can no longer be revised from here (it was won, lost or revised meanwhile). Choose again.', 'error'); redirect('/project-costing?id=' . $id . '#use'); }
+            $q = crm_quote_get($pick);
+            ops_require(can('crm.quote.create') || can('mod.quotes.edit') || is_master_of('quotes'), 'You cannot revise quotations.');
+            if (!crm_quote_can_work($q)) { flash(crm_assignee_words((int)crm_quote_owner_user_id($q), Tl('quote')), 'error'); redirect('/project-costing?id=' . $id . '#use'); }
+            $r = pc_revise_quote_from_costing($roll, $q);
+            flash($r['no'] . ' revision ' . str_pad((string)$r['rev'], 2, '0', STR_PAD_LEFT) . ' made from this costing — one line per role at its prices. '
+                . ($r['kept'] ? $r['kept'] . ' other line' . ($r['kept'] === 1 ? ' was' : 's were') . ' kept from the earlier revision; check them. ' : '')
+                . 'The earlier revision stays in the history.');
+            redirect('/quote?id=' . $r['id']);
+        }
         $r = pc_make_quote($roll);
-        if (!empty($r['id'])) { pc_trail($id, 'Quotation ' . $r['no'] . ' made from this costing by ' . user_name(current_user())); flash('Quotation ' . $r['no'] . ' drafted from this costing — review and send.'); redirect('/quote?id=' . $r['id']); }
+        if (!empty($r['id'])) {
+            pc_trail($id, 'Quotation ' . $r['no'] . ' made from this costing by ' . user_name(current_user()));
+            //  A separate quotation although others were live: written down, with the ones it stands beside.
+            if ($cands) crm_log_change((int)$r['id'], 'Made as a separate ' . Tl('quote') . ' by ' . user_name(current_user()) . ', although '
+                . implode(', ', array_map(fn($c) => $c['quote_no'] . ' (' . ['inquiry' => 'same enquiry', 'lead' => 'same lead', 'deal' => 'same deal', 'client' => 'same client'][$c['match']] . ')', $cands))
+                . ' ' . (count($cands) === 1 ? 'was' : 'were') . ' live.');
+            flash('Quotation ' . $r['no'] . ' drafted from this costing — review and send.'); redirect('/quote?id=' . $r['id']);
+        }
         flash($r['err'] ?? 'Could not create the quotation.', 'error'); redirect('/project-costing?id=' . $id);
     }
 
@@ -1942,7 +2070,9 @@ function ops_projcosting($route, $method) {
         if (!$roll) { http_response_code(404); view('notfound'); return true; }
         pc_link_migrate();
         $chOn = function_exists('ch_library');
-        view('ops/project_costing', ['roll' => $roll, 'heads' => pc_heads(),
+        //  Revise or new (15 Nov 2026): the live quotations this costing could revise instead.
+        $qc = ((string)$roll['header']['status'] === 'APPROVED' && empty($roll['header']['quote_id'])) ? pc_quote_candidates($roll['header']) : [];
+        view('ops/project_costing', ['roll' => $roll, 'heads' => pc_heads(), 'quoteCands' => $qc,
             'chLib' => $chOn ? ch_library() : [], 'chTpls' => $chOn ? ch_templates() : [], 'chManage' => $chOn && ch_can_manage(),
             'clients' => function_exists('clients_list') ? clients_list() : [],
             'offices' => function_exists('offices_list') ? offices_list() : []]);

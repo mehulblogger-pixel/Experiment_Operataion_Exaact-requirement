@@ -627,6 +627,7 @@ function opp_create_quote($oppId) {
                      function_exists('user_name') ? user_name(current_user()) : '', date('c')]);
         $qid = (int)db()->lastInsertId();
         opp_link_quote($oppId, $qid);        // keep the deal and the quote joined
+        if (function_exists('crm_log_created')) crm_log_created($qid, 'from deal ' . (string)$o['ref']);
         return ['id' => $qid, 'no' => $no];
     } catch (Throwable $e) { return ['err' => 'The quotation could not be created: ' . $e->getMessage()]; }
 }
@@ -1017,6 +1018,7 @@ function opp_generate_quote($oppId) {
                    ($o['office_id'] ?? null) ?: null, (string)($o['name'] ?? ''), $val, $val, $me, date('c')]);
     $qid = (int)$pdo->lastInsertId();
     opp_link_quote((int)$o['id'], $qid);
+    if (function_exists('crm_log_created')) crm_log_created($qid, 'from deal ' . (string)$o['ref'] . ' (quotation of record for a direct order)');
     if (function_exists('act_log')) act_log('OPPORTUNITY', (int)$o['id'], 'SYSTEM',
         'Quotation ' . $qno . ' generated (quote-of-record for a direct order)', ['auto' => 1, 'partner_id' => $o['partner_id'] ?: null]);
     return ['ok' => true, 'quote_id' => $qid, 'quote_no' => $qno];

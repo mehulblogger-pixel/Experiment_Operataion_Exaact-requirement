@@ -1055,6 +1055,95 @@ function quote_history_json($cid, $excludeQuoteId = 0) {
 // ---- Change log (§xxi) ------------------------------------------------------
 // Every save appends to the same history the revisions use, so "what changed"
 // and "the final copy" are answered from one place.
+// ============================================================================
+//  A NEW REVISION OF A QUOTATION — one piece of code for the "Revise" button and for
+//  "Create quotation" on a costing when the person chooses to revise an existing
+//  quotation (owner, 15 Nov 2026). The new revision is a DRAFT carrying every column,
+//  site, line and billing milestone of the one it comes from; every other revision is
+//  demoted; the source is snapshotted; and the history says who made it, when, and why.
+//  Returns ['id' => new id, 'rev' => its number, 'lines' => source lines, 'locs' => source sites].
+// ============================================================================
+function crm_quote_make_revision(array $q, $summary) {
+    $pdo = db();
+    $base = (int)($q['parent_id'] ?: $q['id']);
+    $newRev = (int)$q['rev'] + 1;
+    // Snapshot the source first (fully-drained reads), then INSERT the new revision
+    // BEFORE flipping the old ones — doing the same-table UPDATE first was observed
+    // to corrupt the following wide INSERT under SQLite + the php built-in server.
+    $srcRows = ops_all("SELECT * FROM quotations WHERE id=?", [$q['id']]);
+    $src = $srcRows[0];
+    $srcLines = crm_quote_lines($q['id']);
+    $srcLocs  = crm_quote_locations($q['id']);
+    $snap = ['header' => $q, 'lines' => $srcLines, 'locations' => $srcLocs];
+
+    // A revision is the SAME quotation, priced again. So it carries every
+    // column except the handful that identify this attempt and its progress.
+    //
+    // This list used to be written out by hand, and it silently lost whatever
+    // was added to the table afterwards: the sites, the types of inspection,
+    // the product category, the executing offices and the terms all vanished
+    // the moment somebody revised. Working the other way round — everything
+    // except what must be new — means a column added next year is carried
+    // without anybody remembering to come back here.
+    $skip = ['id',                                          // a new row
+             'quote_no','rev','parent_id','is_current',     // identity of the revision
+             'status','submitted_at','sent_at','accepted_date',
+             'lost_reason','lost_reason_other',
+             'rejected_by','rejected_at','reject_remarks',  // this attempt's history
+             'locked','unlocked_until',
+             // D-10 — a revision is reviewed afresh: it starts unticked and unwaived.
+             'preorder_checklist','preorder_waiver','preorder_waived_by','preorder_waived_at',
+             'created_by','created_at','updated_at'];
+    $carryCols = array_values(array_diff(array_keys($src), $skip));
+    $cols = array_merge(['quote_no','rev','parent_id','is_current','status','created_by','created_at','updated_at'], $carryCols);
+    $vals = array_merge([$src['quote_no'], $newRev, $base, 1, 'DRAFT', user_name(current_user()), date('c'), date('c')],
+        array_map(function ($c) use ($src) { return $src[$c]; }, $carryCols));
+    $pdo->prepare("INSERT INTO quotations (" . implode(',', $cols) . ") VALUES ("
+        . implode(',', array_fill(0, count($cols), '?')) . ")")->execute($vals);
+    $nid = (int)$pdo->lastInsertId();
+
+    // The sites. These were not copied at all, so every location typed into a
+    // quotation disappeared on the first revision — the single most annoying
+    // thing about revising, and the hardest to notice until the PDF is out.
+    $locMap = [];   // old location id => new, so the lines keep pointing at the right site
+    if ($srcLocs) {
+        $lcCols = array_values(array_diff(array_keys($srcLocs[0]), ['id', 'quote_id']));
+        $li = $pdo->prepare("INSERT INTO quote_locations (quote_id," . implode(',', $lcCols) . ") VALUES (?,"
+            . implode(',', array_fill(0, count($lcCols), '?')) . ")");
+        foreach ($srcLocs as $L) {
+            $li->execute(array_merge([$nid], array_map(function ($c) use ($L) { return $L[$c]; }, $lcCols)));
+            $locMap[(int)$L['id']] = (int)$pdo->lastInsertId();
+        }
+    }
+
+    // The lines, with every column they have — the office, the site and the
+    // activity code were being dropped as well.
+    if ($srcLines) {
+        $liCols = array_values(array_diff(array_keys($srcLines[0]), ['id', 'quote_id']));
+        $lins = $pdo->prepare("INSERT INTO quote_lines (quote_id," . implode(',', $liCols) . ") VALUES (?,"
+            . implode(',', array_fill(0, count($liCols), '?')) . ")");
+        foreach ($srcLines as $l) {
+            $row = [];
+            foreach ($liCols as $c) {
+                $v = $l[$c];
+                // a line pointing at a site must point at the NEW copy of it
+                if ($c === 'location_id' && $v !== null && isset($locMap[(int)$v])) $v = $locMap[(int)$v];
+                $row[] = $v;
+            }
+            $lins->execute(array_merge([$nid], $row));
+        }
+    }
+
+    // The billing schedule travels with the revision too.
+    if (function_exists('ms_copy_quote')) ms_copy_quote((int)$q['id'], $nid);
+
+    // Now demote every other revision of this quote.
+    $pdo->prepare("UPDATE quotations SET is_current=0 WHERE quote_no=? AND id<>?")->execute([$q['quote_no'], $nid]);
+    $pdo->prepare("INSERT INTO quote_revisions (quote_id,rev,changed_by,changed_at,summary,snapshot) VALUES (?,?,?,?,?,?)")
+        ->execute([$base, $newRev, user_name(current_user()), date('c'), 'Revision ' . (int)$q['rev'] . ' as it stood before revision ' . $newRev . ' was made (kept to show what changed)', json_encode($snap)]);
+    crm_log_change($nid, 'Revision ' . $newRev . ' created by ' . user_name(current_user()) . ' on ' . date('d M Y, H:i') . ' from rev ' . (int)$q['rev'] . ' — ' . $summary);
+    return ['id' => $nid, 'rev' => $newRev, 'lines' => $srcLines, 'locs' => $srcLocs, 'locmap' => $locMap];
+}
 function crm_log_change($qid, $summary, $detail = null) {
     $q = crm_quote_get((int)$qid); if (!$q) return;
     $base = (int)($q['parent_id'] ?: $q['id']);
@@ -1065,6 +1154,11 @@ function crm_log_change($qid, $summary, $detail = null) {
     } catch (Throwable $e) {}
     //  Every change a quotation records is also the moment its enquiry may have moved on.
     if (!empty($q['inquiry_id'])) crm_inquiry_sync((int)$q['inquiry_id']);
+}
+//  WHO CREATED IT (owner, 15 Nov 2026: "history tab must have detail on who created the quote").
+//  The first line of every quotation's history: who, when, and what it was made from.
+function crm_log_created($qid, $from) {
+    crm_log_change((int)$qid, 'Created by ' . user_name(current_user()) . ' on ' . date('d M Y, H:i') . ' — ' . $from . '.');
 }
 
 // ---------------------------------------------------------------------------
@@ -2308,7 +2402,7 @@ function ops_crm_quotes($route, $method) {
             // open order is drawn down against do not exist, so nothing can tell
             // that an ARC won through a portal has been served out.
             $nLines = crm_save_lines_from_post($id, $b); crm_quote_fill_unit_from_lines($id);
-            crm_log_change($id, 'Registered from ' . (lk_options_or('quote_origin', QUOTE_ORIGINS)[$b['origin'] ?? ''] ?? 'an external portal')
+            crm_log_created($id, 'registered from ' . (lk_options_or('quote_origin', QUOTE_ORIGINS)[$b['origin'] ?? ''] ?? 'an external portal')
                 . ($nLines ? ' with ' . $nLines . ' line item(s)' : ''));
             if ($extStatus === 'SENT') crm_schedule_followups($id);
             if ($extStatus === 'LOST') $pdo->prepare("UPDATE quotations SET lost_reason_other=? WHERE id=?")->execute(['Registered as lost from ' . trim((string)($b['origin_portal'] ?? '') ?: 'the portal'), $id]);
@@ -2494,6 +2588,8 @@ function ops_crm_quotes($route, $method) {
                 if ($once !== '') $_SESSION['quote_form_once'][$once] = (int)$id;
                 crm_save_locations($id, $b);
                 crm_save_lines($id, $b); crm_quote_recalc($id); crm_quote_fill_unit_from_lines($id);
+                try { $leadRef = $leadId ? (string) ops_val("SELECT ref FROM leads WHERE id=?", [$leadId]) : ''; } catch (Throwable $e) { $leadRef = ''; }
+                crm_log_created((int)$id, $inqRow ? 'from ' . Tl('inquiry') . ' ' . $inqRow['inquiry_no'] : ($leadId ? 'from lead ' . ($leadRef !== '' ? $leadRef : '#' . $leadId) : 'as a new ' . Tl('quote')));
                 if ($inqId) crm_inquiry_sync((int)$inqId);
                 // Carry the lead's attachments onto the quote, so the customer's
                 // RFQ, specs and correspondence stay for future reference.
@@ -2586,7 +2682,7 @@ function ops_crm_quotes($route, $method) {
             'preorderOn' => preorder_checklist_enabled(), 'preorderItems' => preorder_checklist_items(),
             'preorderState' => preorder_checklist_state($q), 'preorderRequireAll' => preorder_checklist_require_all(),
             'preorderCanWaive' => crm_quote_checklist_can_waive($q),
-            'revs' => ops_all("SELECT id, rev, status, total_amount, is_current, created_at FROM quotations WHERE quote_no=? ORDER BY rev", [$q['quote_no']]),
+            'revs' => ops_all("SELECT id, rev, status, total_amount, is_current, created_at, created_by FROM quotations WHERE quote_no=? ORDER BY rev", [$q['quote_no']]),
             'hist' => ops_all("SELECT * FROM quote_revisions WHERE quote_id=? ORDER BY rev DESC, id DESC", [$base]),
             'followups' => ops_all("SELECT * FROM quote_followups WHERE quote_id=? ORDER BY due_date", [$q['id']]),
             'approvals' => crm_approvals($q['id']),
@@ -2918,84 +3014,9 @@ function ops_crm_quotes($route, $method) {
         $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
         ops_require(can('crm.quote.create') || can('mod.quotes.edit') || is_master_of('quotes'), 'You cannot revise quotations.');
         if (!crm_quote_can_work($q)) { flash(crm_assignee_words((int)crm_quote_owner_user_id($q), Tl('quote')), 'error'); redirect('/quote?id=' . $q['id']); }
-        $base = (int)($q['parent_id'] ?: $q['id']);
         $summary = trim($_POST['summary'] ?? '') ?: 'Revised';
-        $newRev = (int)$q['rev'] + 1;
-        // Snapshot the source first (fully-drained reads), then INSERT the new revision
-        // BEFORE flipping the old ones — doing the same-table UPDATE first was observed
-        // to corrupt the following wide INSERT under SQLite + the php built-in server.
-        $srcRows = ops_all("SELECT * FROM quotations WHERE id=?", [$q['id']]);
-        $src = $srcRows[0];
-        $srcLines = crm_quote_lines($q['id']);
-        $srcLocs  = crm_quote_locations($q['id']);
-        $snap = ['header' => $q, 'lines' => $srcLines, 'locations' => $srcLocs];
-
-        // A revision is the SAME quotation, priced again. So it carries every
-        // column except the handful that identify this attempt and its progress.
-        //
-        // This list used to be written out by hand, and it silently lost whatever
-        // was added to the table afterwards: the sites, the types of inspection,
-        // the product category, the executing offices and the terms all vanished
-        // the moment somebody revised. Working the other way round — everything
-        // except what must be new — means a column added next year is carried
-        // without anybody remembering to come back here.
-        $skip = ['id',                                          // a new row
-                 'quote_no','rev','parent_id','is_current',     // identity of the revision
-                 'status','submitted_at','sent_at','accepted_date',
-                 'lost_reason','lost_reason_other',
-                 'rejected_by','rejected_at','reject_remarks',  // this attempt's history
-                 'locked','unlocked_until',
-                 // D-10 — a revision is reviewed afresh: it starts unticked and unwaived.
-                 'preorder_checklist','preorder_waiver','preorder_waived_by','preorder_waived_at',
-                 'created_by','created_at','updated_at'];
-        $carryCols = array_values(array_diff(array_keys($src), $skip));
-        $cols = array_merge(['quote_no','rev','parent_id','is_current','status','created_by','created_at','updated_at'], $carryCols);
-        $vals = array_merge([$src['quote_no'], $newRev, $base, 1, 'DRAFT', user_name(current_user()), date('c'), date('c')],
-            array_map(function ($c) use ($src) { return $src[$c]; }, $carryCols));
-        $pdo->prepare("INSERT INTO quotations (" . implode(',', $cols) . ") VALUES ("
-            . implode(',', array_fill(0, count($cols), '?')) . ")")->execute($vals);
-        $nid = (int)$pdo->lastInsertId();
-
-        // The sites. These were not copied at all, so every location typed into a
-        // quotation disappeared on the first revision — the single most annoying
-        // thing about revising, and the hardest to notice until the PDF is out.
-        $locMap = [];   // old location id => new, so the lines keep pointing at the right site
-        if ($srcLocs) {
-            $lcCols = array_values(array_diff(array_keys($srcLocs[0]), ['id', 'quote_id']));
-            $li = $pdo->prepare("INSERT INTO quote_locations (quote_id," . implode(',', $lcCols) . ") VALUES (?,"
-                . implode(',', array_fill(0, count($lcCols), '?')) . ")");
-            foreach ($srcLocs as $L) {
-                $li->execute(array_merge([$nid], array_map(function ($c) use ($L) { return $L[$c]; }, $lcCols)));
-                $locMap[(int)$L['id']] = (int)$pdo->lastInsertId();
-            }
-        }
-
-        // The lines, with every column they have — the office, the site and the
-        // activity code were being dropped as well.
-        if ($srcLines) {
-            $liCols = array_values(array_diff(array_keys($srcLines[0]), ['id', 'quote_id']));
-            $lins = $pdo->prepare("INSERT INTO quote_lines (quote_id," . implode(',', $liCols) . ") VALUES (?,"
-                . implode(',', array_fill(0, count($liCols), '?')) . ")");
-            foreach ($srcLines as $l) {
-                $row = [];
-                foreach ($liCols as $c) {
-                    $v = $l[$c];
-                    // a line pointing at a site must point at the NEW copy of it
-                    if ($c === 'location_id' && $v !== null && isset($locMap[(int)$v])) $v = $locMap[(int)$v];
-                    $row[] = $v;
-                }
-                $lins->execute(array_merge([$nid], $row));
-            }
-        }
-
-        // The billing schedule travels with the revision too.
-        if (function_exists('ms_copy_quote')) ms_copy_quote((int)$q['id'], $nid);
-
-        // Now demote every other revision of this quote.
-        $pdo->prepare("UPDATE quotations SET is_current=0 WHERE quote_no=? AND id<>?")->execute([$q['quote_no'], $nid]);
-        $pdo->prepare("INSERT INTO quote_revisions (quote_id,rev,changed_by,changed_at,summary,snapshot) VALUES (?,?,?,?,?,?)")
-            ->execute([$base, $newRev, user_name(current_user()), date('c'), $summary, json_encode($snap)]);
-        crm_log_change($nid, 'Revision ' . $newRev . ' created from rev ' . (int)$q['rev'] . ' — ' . $summary);
+        $made = crm_quote_make_revision($q, $summary);
+        $nid = $made['id']; $newRev = $made['rev']; $srcLines = $made['lines']; $srcLocs = $made['locs'];
         //  Its costing (owner, 14 Nov 2026: "Yes" — the copy is made AUTOMATICALLY, as the costing's
         //  next revision, Rev 01, 02 …). When the costing that priced the earlier revision is held by
         //  it (gone for approval or beyond), the new quotation revision gets its own draft copy at once;

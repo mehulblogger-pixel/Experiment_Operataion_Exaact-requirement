@@ -183,6 +183,7 @@ stateDiagram-v2
   DRAFT --> LOST : the person assigned, reason required (the deal died before it was sent)
   SENT --> EXPIRED : validity lapsed · crm_expire_quotes cron, no user
   SENT --> SENT : raise a revision (new rev, new DRAFT; this row is superseded and can no longer move)
+  APPROVED --> APPROVED : "Create quotation" on a newer approved costing, choosing "Revise" — the same revise move from any live status (Draft, Pending approval, Approved, Sent, Expired, Rejected); new rev, new DRAFT at the costing's prices (owner, 15 Nov 2026)
   ACCEPTED --> [*] : final — no route moves it; Accounts registers the contract on the current revision
   LOST --> [*]
 ```
@@ -329,6 +330,11 @@ stateDiagram-v2
   costing is APPROVED; before that the page says what it waits for. (The route already refused a
   quotation from anything but an APPROVED costing — the button merely matched it.) No status or
   transition is added; with "all levels at the same time" (Set up Sales) the levels still sign together.
+- **"Create quotation" asks: revise, or new (owner, 15 Nov 2026).** When the costing's enquiry, lead or
+  deal (else the same client) has a live quotation, the person chooses: revise it — its next revision is
+  made at this costing's prices and linked to this costing, the earlier revision and its costing stay as
+  they were — or make a separate quotation, which its history records beside the live ones. No status is
+  added; revising uses the existing revise move. Every quotation's history starts with who created it.
 
 - **Tagged and levelled (owner, 20 Oct 2026):** *"tagged with that inquiry or lead … approval level as
   of quotation shall be applicable."* A new costing must be tagged with what it prices — an enquiry or

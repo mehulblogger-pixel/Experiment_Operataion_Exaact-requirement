@@ -251,7 +251,7 @@
   <?php $canSubmit = $canSubmit ?? true; $submitProblem = (string)($submitProblem ?? ''); $sendProblem = (string)($sendProblem ?? ''); ?>
   <?php if (($st==='DRAFT' || $st==='REJECTED') && !$needsApproval): ?>
     <?php if ($canSend && $sendProblem === ''): ?><?= $act('SENT','✉ Send to ' . Tl('client')) ?><?php elseif ($canSend): ?><span class="q-why" style="font-size:12.5px;color:var(--warn,#9a5b00);background:var(--warn-soft,#fdf1e3);border-radius:8px;padding:4px 10px">⚠ <?= e($sendProblem) ?></span><?php endif; ?>
-    <span class="muted" style="font-size:12.5px">No approval needed — your approval rules do not cover this value.</span>
+    <span class="muted" style="font-size:12.5px">No approval needed — <?= e(crm_quote_no_approval_reason($q)) ?>.</span>
   <?php elseif (($st==='DRAFT' || $st==='REJECTED') && $canSubmit): ?>
     <?php if ($submitProblem === ''): ?>
       <?= $act('PENDING_APPROVAL', $st==='REJECTED' ? '↻ Submit for approval again' : 'Submit for approval') ?>
@@ -868,12 +868,13 @@
 <div class="panel-split">
   <div class="panel">
     <h3 class="tab-sub" style="margin-top:0">Revision history</h3>
-    <table class="grid"><tr><th>Rev</th><th>Status</th><th class="num">Total</th><th>When</th><th></th></tr>
+    <table class="grid"><tr><th>Rev</th><th>Status</th><th class="num">Total</th><th>Created by</th><th>When</th><th></th></tr>
       <?php foreach ($revs as $rv): ?>
       <tr>
         <td><b><?= $rv['rev']>0?'Rev '.str_pad((string)$rv['rev'],2,'0',STR_PAD_LEFT):'Original' ?></b> <?= $rv['is_current']?'<span class="pill p-ok">current</span>':'' ?></td>
         <td><?= e(lk_options_or('quote_status', QUOTE_STATUS)[$rv['status']] ?? $rv['status']) ?></td>
         <td class="num"><?= e(cur_sym()) ?><?= number_format((float)$rv['total_amount'],0) ?></td>
+        <td><?= e(trim((string)($rv['created_by'] ?? '')) !== '' ? (string)$rv['created_by'] : '—') ?></td>
         <td class="muted"><?= e(substr((string)$rv['created_at'],0,10)) ?></td>
         <td><?= $rv['is_current']?'':'<a class="btn small secondary" href="/quote?id='.(int)$rv['id'].'">view</a>' ?></td>
       </tr>
