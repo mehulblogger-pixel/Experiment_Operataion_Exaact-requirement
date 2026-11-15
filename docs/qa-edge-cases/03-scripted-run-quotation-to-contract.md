@@ -1,5 +1,7 @@
 # Scripted Test Run — Quotation → Contract (with exact figures & verdicts)
 
+> **Replaced for day-to-day use (15 Nov 2026).** The rules below were written in August and parts are out of date (costing approval levels, locks, revisions, "Create quotation" revise-or-new). The current, complete description of quotation and project costing as the app works in v51.1 is the reference doc **"Quotation and costing — complete flow and rules"**: https://claude.ai/artifact/FqM8hkCmqC45VjGEBw8jU7 (status rules also in `docs/03-object-lifecycles.md`). This file is kept as the record of the August test run.
+
 **Scope.** The commercial stage of the E2E flow (`docs/qa-edge-cases/00-end-to-end-flow.md`): inquiry → quote →
 approval → accept → register the contract → open it → the contract-state verdict that gates all downstream
 work. Verifiable figures (the §27 "committed" amount, the `contract_classify` verdicts, the §25 engagement

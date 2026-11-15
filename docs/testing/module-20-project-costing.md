@@ -1,5 +1,7 @@
 # Inspection Ops — Project Costing — Test & Documentation Report
 
+> **Replaced for day-to-day use (15 Nov 2026).** The rules below were written in August and parts are out of date (costing approval levels, locks, revisions, "Create quotation" revise-or-new). The current, complete description of quotation and project costing as the app works in v51.1 is the reference doc **"Quotation and costing — complete flow and rules"**: https://claude.ai/artifact/FqM8hkCmqC45VjGEBw8jU7 (status rules also in `docs/03-object-lifecycles.md`). This file is kept as the record of the August test run. The Word copies in this folder are not updated.
+
 > **Prompt 3 · Module MOD-PROJCOST.** Read from `lib/projcosting.php` (`pc_line_calc`,
 > `pc_rollup`, `pc_restamp`, `pc_locked`, `pc_make_quote`, `pc_make_requisition`,
 > `pc_defaults`, `pc_can`/`pc_can_edit`/`pc_can_approve`, `ops_projcosting`) and
