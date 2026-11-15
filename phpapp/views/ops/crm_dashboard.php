@@ -128,19 +128,33 @@
     <?php endif; ?>
 
     <?php // ---- Losses --------------------------------------------------- ?>
-    <?php if ($losses): ?>
+    <?php $leadLosses = $leadLosses ?? []; if ($losses || $leadLosses): ?>
       <div class="panel" style="margin-bottom:14px">
         <h3 style="margin-top:0">Why we lose</h3>
+        <?php if ($losses): ?>
         <table class="dt">
-          <caption class="sr-only">Loss reasons</caption>
-          <thead><tr><th scope="col">Reason</th><th scope="col" class="num">Deals</th><th scope="col" class="num">Leads</th><th scope="col" class="num">Value</th></tr></thead>
+          <caption class="sr-only">Loss reasons — deals</caption>
+          <thead><tr><th scope="col">Reason</th><th scope="col" class="num">Deals</th><th scope="col" class="num">Value</th></tr></thead>
           <tbody>
           <?php foreach ($losses as $l): ?>
-            <tr><td><?= e($l['reason']) ?></td><td class="num"><?= (int)$l['n'] ?></td><td class="num"><?= (int)($l['leads'] ?? 0) ?></td><td class="num"><?= e(fmoney($l['value'])) ?></td></tr>
+            <tr><td><?= e($l['reason']) ?></td><td class="num"><?= (int)$l['n'] ?></td><td class="num"><?= e(fmoney($l['value'])) ?></td></tr>
           <?php endforeach; ?>
           </tbody>
         </table>
         <p class="muted" style="font-size:12.5px;margin:10px 0 0">Won <?= (int)$h['won'] ?> (<?= e(fmoney($h['won_value'])) ?>) against lost <?= (int)$h['lost'] ?> in this window.</p>
+        <?php endif; ?>
+        <?php if ($leadLosses): ?>
+        <h4 style="margin:<?= $losses ? '14px' : '0' ?> 0 6px;font-size:13.5px">Leads we did not pursue, by reason</h4>
+        <table class="dt">
+          <caption class="sr-only">Loss reasons — leads</caption>
+          <thead><tr><th scope="col">Reason</th><th scope="col" class="num">Leads</th><th scope="col" class="num">Value</th></tr></thead>
+          <tbody>
+          <?php foreach ($leadLosses as $l): ?>
+            <tr><td><?= e($l['reason']) ?></td><td class="num"><?= (int)$l['n'] ?></td><td class="num"><?= e(fmoney($l['value'])) ?></td></tr>
+          <?php endforeach; ?>
+          </tbody>
+        </table>
+        <?php endif; ?>
       </div>
     <?php endif; ?>
   </div>

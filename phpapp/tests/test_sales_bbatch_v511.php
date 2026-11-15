@@ -66,17 +66,20 @@ try {
 
     // DEF-SAL-026 — a year with only leads.
     $pdo->prepare("INSERT INTO leads (ref, company_name, status, created_at, updated_at) VALUES (?,?, 'OPEN', ?, ?)")
-        ->execute(['BBY-' . $tag, 'BB Year ' . $tag, '2021-06-15T10:00:00', '2021-06-15T10:00:00']);
+        ->execute(['BBY-' . $tag, 'BB Year ' . $tag, '1996-06-15T10:00:00', '1996-06-15T10:00:00']);
     $made['leads'][] = (int)$pdo->lastInsertId();
-    t_ok(in_array(fy_label(2021), fy_options(), true), 'DEF-SAL-026 · FY ' . fy_label(2021) . ', with only a lead in it, can be picked in the Year box');
+    // (A wide window: other tests may leave far-future dates that would narrow the default ten years.)
+    t_ok(in_array(fy_label(1996), fy_options(200), true), 'DEF-SAL-026 · FY ' . fy_label(1996) . ', with only a lead in it, can be picked in the Year box');
 
     // DEF-SAL-025 — lead loss reasons are counted.
     $reasons = lk_options_or('quote_lost_reason', QUOTE_LOST_REASONS); $rk = array_key_first($reasons);
     $pdo->prepare("INSERT INTO leads (ref, company_name, status, lost_reason, lost_note, value, created_at, updated_at) VALUES (?,?, 'LOST', ?, 'went elsewhere', 50000, ?, ?)")
         ->execute(['BBL-' . $tag, 'BB Lost ' . $tag, $rk, date('c'), date('c')]);
     $made['leads'][] = (int)$pdo->lastInsertId();
-    $rows = crmdash_losses(365); $hit = array_values(array_filter($rows, fn($r) => $r['reason'] === $reasons[$rk]));
-    t_ok($hit && (int)$hit[0]['leads'] >= 1, 'DEF-SAL-025 · "Why we lose" counts the lost lead under "' . $reasons[$rk] . '"');
+    $rows = lead_loss_reasons(365); $hit = array_values(array_filter($rows, fn($r) => $r['reason'] === $reasons[$rk]));
+    t_ok($hit && (int)$hit[0]['n'] >= 1, 'DEF-SAL-025 · "Why we lose" counts the lost lead under "' . $reasons[$rk] . '"');
+    $g = $drive($BDM, 'crm-dashboard', 'GET', ['days' => 365], [], ['Leads we did not pursue, by reason', $reasons[$rk]]);
+    t_ok(!empty($g['has']['Leads we did not pursue, by reason']), '…and the Sales dashboard shows it in "Why we lose"');
 
     t_section('Sales B-batch — pipelines and the funnel');
     $pc = pipe_create('BB Funnel ' . $tag, 'OPPORTUNITY');

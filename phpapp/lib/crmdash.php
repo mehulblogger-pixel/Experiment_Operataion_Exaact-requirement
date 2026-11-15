@@ -133,20 +133,6 @@ function crmdash_funnel($pipelineId = 0, $days = 365) {
             'entered' => $entered];
 }
 
-// "Why we lose" — lost deals and lost leads, one row per reason (DEF-SAL-025).
-function crmdash_losses($days = 365) {
-    $rows = [];
-    foreach ((function_exists('opp_loss_reasons') ? opp_loss_reasons($days) : []) as $r)
-        $rows[$r['reason']] = ['reason' => $r['reason'], 'n' => $r['n'], 'leads' => 0, 'value' => $r['value']];
-    foreach ((function_exists('lead_loss_reasons') ? lead_loss_reasons($days) : []) as $r) {
-        $rows[$r['reason']] = ($rows[$r['reason']] ?? ['reason' => $r['reason'], 'n' => 0, 'leads' => 0, 'value' => 0.0]);
-        $rows[$r['reason']]['leads'] += $r['n']; $rows[$r['reason']]['value'] += $r['value'];
-    }
-    $rows = array_values($rows);
-    usort($rows, fn($a, $b) => ($b['n'] + $b['leads']) <=> ($a['n'] + $a['leads']));
-    return $rows;
-}
-
 // ---- The numbers a sales manager is asked for -------------------------------
 function crmdash_headline($days = 365) {
     $cut = date('Y-m-d', strtotime("-$days days"));
@@ -296,7 +282,10 @@ function ops_crmdash($route, $method) {
         'owners'   => crmdash_owners($days),
         'stuck'    => crmdash_stuck(10),
         'activity' => crmdash_activity(30),
-        'losses'   => crmdash_losses($days),
+        'losses'   => function_exists('opp_loss_reasons') ? opp_loss_reasons($days) : [],
+        // DEF-SAL-025 — why LEADS were not pursued, counted beside the deals (kept apart so the deals
+        // table still reads exactly as Opportunities → "Why deals were lost").
+        'leadLosses' => function_exists('lead_loss_reasons') ? lead_loss_reasons($days) : [],
         'pipelines'=> function_exists('pipelines_all') ? (crmdash_try(fn() => pipelines_all('OPPORTUNITY'), []) ?: []) : [],
         'days'     => $days, 'pipe' => $pipe,
         'industry' => function_exists('industry_current') ? industry_current() : '',

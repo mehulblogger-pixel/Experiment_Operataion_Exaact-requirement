@@ -35,11 +35,16 @@ $dueCount = $dueCount ?? 0; $sla = $sla ?? 7; ?>
 <form method="get" action="/inquiries" class="filter-bar" style="gap:8px;flex-wrap:wrap">
   <input class="form-control" name="q" value="<?= e($q) ?>" placeholder="Search no. / subject / client" style="min-width:220px">
   <select class="form-control" name="st" onchange="this.form.submit()"><option value="">All statuses</option>
-    <?php foreach ($stOpts + ['QUOTED_ANY' => 'Quoted — any outcome', 'LOST_DROPPED' => 'Lost or dropped'] as $k=>$v): ?><option value="<?= e($k) ?>" <?= $st===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select>
+    <?php foreach ($stOpts as $k=>$v): ?><option value="<?= e($k) ?>" <?= $st===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select>
   <?= fy_select_html($fy ?? current_fy()) ?>
   <button class="btn small" type="submit">Search</button>
   <?php if ($q!==''||$st!==''||($fy ?? current_fy())!==current_fy()): ?><a class="btn small secondary" href="/inquiries">Reset</a><?php endif; ?>
 </form>
+<?php // DEF-SAL-024 — a card opened a group of statuses: say which, as the status box shows one at a time.
+  $stGroupWords = ['QUOTED_ANY' => 'quoted — whatever the outcome (awaiting an answer, won or lost)', 'LOST_DROPPED' => 'lost or dropped'];
+  if (isset($stGroupWords[$st])): ?>
+<p class="muted" style="margin:6px 0 10px">Showing the <?= e(Tlp('inquiry')) ?> <?= e($stGroupWords[$st]) ?>. <a href="/inquiries">Show all</a></p>
+<?php endif; ?>
 
 <div class="panel" style="padding:0;overflow:hidden">
   <div class="tbl-scroll" style="overflow-x:auto">

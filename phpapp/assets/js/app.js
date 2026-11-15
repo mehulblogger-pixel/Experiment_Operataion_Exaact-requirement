@@ -819,6 +819,8 @@
   // Word the refusal from the browser's own reason, not always "still needs filling in".
   function problemOf(el) {
     var v = el.validity || {}, nm = fieldLabel(el);
+    // A box may say in its own words what is missing (data-msg), e.g. a confirmation tick.
+    if (el.getAttribute && el.getAttribute('data-msg') && (v.valueMissing || v.customError)) return el.getAttribute('data-msg').replace(/[.\s]+$/, '');
     var nice = function (x) { return /^\d{4}-\d{2}-\d{2}$/.test(x) ? new Date(x + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : x; };
     if (v.valueMissing) return (el.type === 'radio' || el.tagName === 'SELECT') ? nm + ' needs a choice' : (el.type === 'checkbox' ? nm + ' needs ticking' : nm + ' still needs filling in');
     if (v.rangeUnderflow) return nm + ' cannot be ' + (el.type === 'date' ? 'before ' : 'below ') + nice(el.min);
@@ -2105,10 +2107,12 @@
     var max = parseInt((document.body && document.body.getAttribute('data-upload-max')) || '0', 10);
     if (!(max > 0)) return;
     var total = 0; for (var i = 0; i < inp.files.length; i++) total += inp.files[i].size;
-    if (total <= max * 0.98) { var old = inp.parentNode && inp.parentNode.querySelector('.upload-too-large'); if (old) old.parentNode.removeChild(old); return; }
+    if (total <= max * 0.98) { inp.setCustomValidity(''); var old = inp.parentNode && inp.parentNode.querySelector('.upload-too-large'); if (old) old.parentNode.removeChild(old); return; }
     var mb = Math.floor(max / 1048576), have = (total / 1048576).toFixed(1);
     var msg = 'That file is too large (' + have + ' MB) — the limit is ' + mb + ' MB. Choose a smaller file or compress it.';
-    inp.value = ''; inp.setCustomValidity('');
+    //  Keep the choice but mark it wrong: Save is then refused with this reason (the form guard),
+    //  instead of silently saving the rest without the file.
+    inp.setCustomValidity(msg);
     var note = inp.parentNode && inp.parentNode.querySelector('.upload-too-large');
     if (!note && inp.parentNode) { note = document.createElement('div'); note.className = 'msg msg-error upload-too-large'; note.setAttribute('role', 'alert'); note.style.marginTop = '6px'; inp.parentNode.insertBefore(note, inp.nextSibling); }
     if (note) note.textContent = msg;

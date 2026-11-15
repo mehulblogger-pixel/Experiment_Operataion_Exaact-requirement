@@ -2552,11 +2552,26 @@ function ops_crm_quotes($route, $method) {
             // cached), so the key alone cannot see the repeat. The same person, for the same customer and
             // subject, within 15 minutes, is treated as the same quotation: say so and link to it. A real
             // second quotation is one tick away ("Save it as a separate quotation").
+            //  A repeat is the SAME quotation: same lines too, and the earlier one still an untouched draft.
+            //  A deliberate second quotation ("Quote again", a revised scope) differs, or follows one that
+            //  has moved on (sent, lost), and is never held.
             if ($refused === null && !$q && ($b['dup_ok'] ?? '') !== '1') {
                 $dupName = $cid ? '' : trim((string)($b['client_name'] ?? ''));
-                $dupOf = ops_one("SELECT id, quote_no, created_at FROM quotations WHERE created_by=? AND subject=? AND "
+                $dupOf = ops_one("SELECT id, quote_no, created_at FROM quotations WHERE created_by=? AND subject=? AND status='DRAFT' AND "
                     . ($cid ? "client_id=?" : "client_id IS NULL AND COALESCE(client_name,'')=?") . " AND created_at>=? ORDER BY id DESC LIMIT 1",
                     [user_name(current_user()), trim((string)($b['subject'] ?? '')), $cid ? (int)$cid : $dupName, date('c', time() - 900)]) ?: null;
+                if ($dupOf) {
+                    $fp = function (array $rows) { $o = []; foreach ($rows as $r) $o[] = mb_strtolower(trim((string)$r[0])) . '|' . round((float)$r[1], 3) . '|' . round((float)$r[2], 2) . '|' . trim((string)$r[3]);
+                        sort($o); return implode("\n", $o); };
+                    $posted = []; foreach ((array)($b['l_desc'] ?? []) as $i => $d) {
+                        $qq = ((array)($b['l_qty'] ?? []))[$i] ?? ''; $rr = ((array)($b['l_rate'] ?? []))[$i] ?? '';
+                        if (trim((string)$d) === '' && (float)$qq == 0.0 && (float)$rr == 0.0) continue;
+                        $posted[] = [$d, $qq, $rr, ((array)($b['l_unit'] ?? []))[$i] ?? ''];
+                    }
+                    $saved = array_map(fn($r) => [$r['description'], $r['qty'], $r['rate'], $r['unit']],
+                        ops_all("SELECT description, qty, rate, unit FROM quote_lines WHERE quote_id=?", [(int)$dupOf['id']]) ?: []);
+                    if ($fp($posted) !== $fp($saved)) $dupOf = null;
+                }
                 if ($dupOf) $refused = 'You saved this same ' . Tl('quote') . ' (' . $dupOf['quote_no'] . ') a few minutes ago, so it was not saved again. Open '
                     . $dupOf['quote_no'] . ' below — or, if this really is a separate ' . Tl('quote') . ', tick "Save it as a separate ' . Tl('quote') . '" and press Create again.';
             }

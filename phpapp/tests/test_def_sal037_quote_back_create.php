@@ -53,6 +53,19 @@ try {
     t_ok(!empty($r3['has']['not saved again']) && !empty($r3['has']['(' . $no . ')']), '…the page says ' . $no . ' was saved a few minutes ago and was not saved again');
     t_ok(!empty($r3['has']['Save it as a separate']) && !empty($r3['has']['/quote?id=' . $made]), '…the form links to it and offers "Save it as a separate quotation"');
 
+    // A deliberate second quotation with a different scope (other lines) is never held.
+    $drive($MEX, 'quote-new', 'POST', [], $post(['form_once' => 'q-key-6', 'l_desc' => ['Stage inspection — revised scope'], 'l_qty' => ['3'], 'l_rate' => ['12000']]));
+    t_eq($count(), 2, '"Quote again" with a revised scope (different lines) is saved at once');
+    $pdo->prepare("DELETE FROM quote_lines WHERE quote_id=(SELECT MAX(id) FROM quotations WHERE subject=?)")->execute([$subject]);
+    $pdo->prepare("DELETE FROM quotations WHERE id=(SELECT MAX(id) FROM (SELECT id FROM quotations WHERE subject=?) x)")->execute([$subject]);
+    // Once the first has moved on (lost, sent …), the same details again are a new quotation.
+    $pdo->prepare("UPDATE quotations SET status='LOST' WHERE id=?")->execute([$made]);
+    $drive($MEX, 'quote-new', 'POST', [], $post(['form_once' => 'q-key-7']));
+    t_eq($count(), 2, 'after the first is lost, the same details make a new quotation (it is not a repeat of a draft)');
+    $pdo->prepare("DELETE FROM quote_lines WHERE quote_id=(SELECT MAX(id) FROM quotations WHERE subject=?)")->execute([$subject]);
+    $pdo->prepare("DELETE FROM quotations WHERE id=(SELECT MAX(id) FROM (SELECT id FROM quotations WHERE subject=?) x)")->execute([$subject]);
+    $pdo->prepare("UPDATE quotations SET status='DRAFT' WHERE id=?")->execute([$made]);
+
     // Ticked: saved as a genuine second quotation.
     $drive($MEX, 'quote-new', 'POST', [], $post(['form_once' => 'q-key-2', 'dup_ok' => '1']));
     t_eq($count(), 2, 'with "Save it as a separate quotation" ticked, it is saved — nothing legitimate is blocked');

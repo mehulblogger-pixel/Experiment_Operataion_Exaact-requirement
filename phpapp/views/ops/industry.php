@@ -87,7 +87,7 @@
     <form method="post" action="/industry-apply">
       <input type="hidden" name="key" value="<?= e($showKey) ?>"><input type="hidden" name="do" value="company">
       <label class="chk" style="display:flex;gap:8px;align-items:flex-start;font-size:13px;margin-bottom:10px">
-        <input type="checkbox" name="confirm" value="1" required style="margin-top:2px">
+        <input type="checkbox" name="confirm" value="1" required data-msg="Tick the confirmation first — it lists what will change." style="margin-top:2px">
         <span>I understand the changes listed above.</span>
       </label>
       <button class="btn secondary" type="submit">Make <?= e($preview['label']) ?> our industry</button>
