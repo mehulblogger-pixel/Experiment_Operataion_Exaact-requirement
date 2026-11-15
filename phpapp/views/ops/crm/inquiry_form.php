@@ -18,6 +18,13 @@
 <?php if (!empty($originRef)): ?><div class="msg" style="margin-bottom:12px;background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:8px 12px">Came from lead <strong><?= e($originRef) ?></strong> — the client, contact and requirement were carried over automatically.</div><?php endif; ?>
 
 <form method="post" action="/<?= $isEdit ? 'inquiry-edit?id=' . (int)$inq['id'] : 'inquiry-new' ?>" class="panel">
+  <?php if (!$isEdit): ?><input type="hidden" name="form_once" value="<?= e((string)($inq['form_once'] ?? bin2hex(random_bytes(12)))) ?>"><?php endif; ?>
+  <?php if (!$isEdit && !empty($dupOf)): ?>
+    <div class="msg" style="margin-bottom:12px;display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+      <a class="btn small" href="/inquiry-edit?id=<?= (int)$dupOf['id'] ?>">Open <?= e($dupOf['inquiry_no']) ?></a>
+      <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="dup_ok" value="1"> Save it as a separate <?= e(Tl('inquiry')) ?></label>
+    </div>
+  <?php endif; ?>
   <div class="form-grid">
     <div class="ff"><label><?= e(Tl('client')) ?> * <a href="#" class="addlink" data-qa="client" data-target="select[name='client_id']">+ Add new</a></label>
       <select class="form-control searchable" name="client_id"><option value="">— pick or type below —</option>

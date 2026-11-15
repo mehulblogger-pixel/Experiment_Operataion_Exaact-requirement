@@ -47,9 +47,17 @@ this one is your safety net if anything looks wrong afterward.
 2. This route *never* touches `config.local.php` or `data.sqlite` — they are
    already ignored by Git — so it is the safest.
 
-**Otherwise (download a ZIP):**
-1. On GitHub, open the branch, click **Code ▾ → Download ZIP**.
-2. That ZIP has the newest `phpapp` folder inside it.
+**Otherwise (an update ZIP):**
+1. Use the **update ZIP prepared for you** (built by `tools/release.sh`, or the zip handed over with
+   each update). It never contains the `tests/` folder, `config.local.php`, `tenants.php`, any
+   `*.sqlite` database or the `exaact_data*` / `exaact_backups*` folders — leaving them out is what
+   keeps the test copy in test mode, the live site live, and your settings and data where they are.
+2. **Do not use GitHub's "Code ▾ → Download ZIP".** That ZIP is the whole repository: it includes
+   the `tests/` folder and other folders that must never be uploaded to a site.
+
+> **If you use the Git route above:** a pull also brings the `tests/` folder into the site folder.
+> Delete `tests/` from the site folder after each pull (File Manager → select `tests` → Delete).
+> It is not needed to run the app, and it must not be left on a site.
 
 ---
 

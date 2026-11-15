@@ -2124,6 +2124,15 @@ function ops_crm_inquiries($route, $method) {
         if ($method === 'POST' && $inq && !crm_inquiry_can_work($inq)) { flash(crm_assignee_words((int)$inq['assigned_to'], Tl('inquiry')), 'error'); redirect('/inquiry-edit?id=' . (int)$inq['id']); }
         if ($method === 'POST') {
             $b = $_POST;
+            // The same form sent twice (a double click, or Back and send again) saves once
+            // (DEF-0001, 15 Nov 2026 — the rule the quotation form already follows, SA-26):
+            // the new-inquiry form carries a one-time key, and a key already used opens the
+            // inquiry it created instead of making a second one.
+            $once = trim((string)($b['form_once'] ?? ''));
+            if (!$inq && $once !== '' && !empty($_SESSION['inquiry_form_once'][$once])) {
+                flash('That ' . Tl('inquiry') . ' was already saved — here it is.', 'warning');
+                redirect('/inquiry-edit?id=' . (int)$_SESSION['inquiry_form_once'][$once]);
+            }
             $cid = ($b['client_id'] ?? '') !== '' ? (int)$b['client_id'] : null;
             // D-12 — no new enquiry for a customer who is blocked.
             if ($cid && !$inq && ($tb = partner_trade_block($cid)) !== '') { flash($tb, 'error'); redirect('/inquiry-new'); }
@@ -2170,6 +2179,25 @@ function ops_crm_inquiries($route, $method) {
                     'users' => ops_all("SELECT id, first_name, last_name, username FROM users WHERE is_active=1 ORDER BY first_name, username")]);
                 return;
             }
+            // The same inquiry sent again a little later (browser Back and "Create inquiry" again:
+            // the page is fetched afresh, so it carries a NEW one-time key while the browser refills
+            // what was typed) — DEF-0001, 15 Nov 2026. If this person saved an inquiry for the same
+            // client with the same subject in the last 15 minutes, nothing is saved: the form comes
+            // back saying so, with a link to it, and a tick to save it as a separate inquiry anyway.
+            // Nothing legitimate is blocked — the tick always saves.
+            if (!$inq && ($b['dup_ok'] ?? '') !== '1') {
+                $dup = ops_one("SELECT id, inquiry_no, created_at FROM crm_inquiries WHERE created_by=? AND subject=? AND "
+                    . ($cid ? "client_id=?" : "client_id IS NULL AND COALESCE(client_name,'')=?") . " AND created_at>=? ORDER BY id DESC LIMIT 1",
+                    [user_name(current_user()), $vals[5], $cid ? (int)$cid : (string)$cname, date('c', time() - 900)]);
+                if ($dup) {
+                    view('ops/crm/inquiry_form', ['inq' => $b, 'dupOf' => $dup,
+                        'error' => 'You saved this same ' . Tl('inquiry') . ' (' . $dup['inquiry_no'] . ', same ' . Tl('client') . ' and subject) a few minutes ago, so it was not saved again. Open ' . $dup['inquiry_no'] . ' below — or, if this really is a separate ' . Tl('inquiry') . ', tick "Save it as a separate ' . Tl('inquiry') . '" and press Create again.',
+                        'clients' => clients_list(), 'sbuOpts' => lk_options_or('sbu', OPS_SBUS),
+                        'sourceOpts' => INQUIRY_SOURCES, 'statusOpts' => crm_inquiry_status_opts(),
+                        'users' => ops_all("SELECT id, first_name, last_name, username FROM users WHERE is_active=1 ORDER BY first_name, username")]);
+                    return;
+                }
+            }
             if ($inq) {
                 $pdo->prepare("UPDATE crm_inquiries SET client_id=?,client_name=?,contact_name=?,contact_email=?,contact_mobile=?,subject=?,service_requirement=?,sbu=?,source=?,received_date=?,assigned_to=?,status=?,notes=? WHERE id=?")
                     ->execute(array_merge($vals, [$inq['id']]));
@@ -2181,7 +2209,9 @@ function ops_crm_inquiries($route, $method) {
                     ->execute(array_merge([$no], $vals, [user_name(current_user()), date('c'), crm_inquiry_office_for_recorder()]));
                 // Ads Pro is told an enquiry exists so it can stop advertising to
                 // somebody who has already asked us for a price. Queued, not sent.
-                if (function_exists('ads_queue_inquiry')) ads_queue_inquiry((int)$pdo->lastInsertId(), 'Enquiry raised');
+                $newId = (int)$pdo->lastInsertId();
+                if ($once !== '') $_SESSION['inquiry_form_once'][$once] = $newId;
+                if (function_exists('ads_queue_inquiry')) ads_queue_inquiry($newId, 'Enquiry raised');
                 flash("$no created. You can now raise a quotation against it.");
                 redirect('/inquiries');
             }

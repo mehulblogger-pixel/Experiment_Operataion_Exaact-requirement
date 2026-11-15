@@ -15,7 +15,7 @@ const L = require(ROBOT + '/harness/lib-g1.js');
 const { execFileSync } = require('child_process');
 const qa = require('./qa');
 const EV = path.resolve(__dirname, '..', 'evidence');
-const PORT = 8990, DB = ROBOT + '/w9.sqlite';
+const PORT = +(process.env.QA_PORT || 8990), DB = process.env.QA_DB || ROBOT + '/w9.sqlite', TID = process.env.QA_TEST_ID || 'DEMO-01';
 const sql = (q, p = []) => JSON.parse(execFileSync('php', [ROBOT + '/harness/tq.php', DB, q, JSON.stringify(p)]).toString());
 
 (async () => {
@@ -23,8 +23,8 @@ const sql = (q, p = []) => JSON.parse(execFileSync('php', [ROBOT + '/harness/tq.
   const t = new T({ id: 'DEMO-01', def: { steps: [] }, base: 'http://127.0.0.1:' + PORT, db: DB, pwFile: ROBOT + '/pw.txt', browser, shotDir: EV });
   const log = [], consoleErrors = [], netFails = [], shots = [];
   const ok = (step, what, pass, evidence) => { log.push({ step, what, pass, evidence }); console.log(pass ? 'PASS' : 'FAIL', step, what); };
-  const shot = async (name, what) => { const f = `DEMO-01-${name}.png`; await t.p.screenshot({ path: path.join(EV, f), fullPage: false }); shots.push([f, what]); return f; };
-  qa.append('agent', { id: 'A00', by: 'A00', status: 'IN PROGRESS', current: 'DEMO-01: one complete test cycle on Sales → Inquiries → New inquiry', screen: '/inquiry-new' });
+  const shot = async (name, what) => { const f = `${TID}-${name}.png`; await t.p.screenshot({ path: path.join(EV, f), fullPage: false }); shots.push([f, what]); return f; };
+  qa.append('agent', { id: 'A00', by: 'A00', status: 'IN PROGRESS', current: TID + ': one complete test cycle on Sales → Inquiries → New inquiry', screen: '/inquiry-new' });
 
   try {
     // 1 — sign in as a real role and open the screen through the menu, as a person would
@@ -61,8 +61,8 @@ const sql = (q, p = []) => JSON.parse(execFileSync('php', [ROBOT + '/harness/tq.
     const after4 = sql('SELECT COUNT(*) n FROM crm_inquiries')[0].n;
     const r = rows[0] || {};
     const dbOk = rows.length === 1 && after4 === before + 1 && r.inquiry_no === (m && m[1]) && /TB Refinery/i.test(r.client || '') && r.contact_email === 'demo.patel@tbrefinery.test' && r.status === 'OPEN';
-    fs.writeFileSync(path.join(EV, 'DEMO-01-db-row.json'), JSON.stringify(rows, null, 1));
-    ok(4, `Database: crm_inquiries has exactly one new row (${before} → ${after4}): ${JSON.stringify(r)}.`, dbOk, 'DEMO-01-db-row.json');
+    fs.writeFileSync(path.join(EV, TID + '-db-row.json'), JSON.stringify(rows, null, 1));
+    ok(4, `Database: crm_inquiries has exactly one new row (${before} → ${after4}): ${JSON.stringify(r)}.`, dbOk, TID + '-db-row.json');
 
     // 5 — the same submission sent twice (browser Back + submit again) must not create a second record
     await t.p.goBack(); await t.p.waitForLoadState('load');
@@ -80,14 +80,14 @@ const sql = (q, p = []) => JSON.parse(execFileSync('php', [ROBOT + '/harness/tq.
 
   // ---- tracker: test, evidence, agent
   const pass = log.every(x => x.pass);
-  qa.append('test', { id: 'DEMO-01', by: 'A00', module: 'CRM and Sales', submodule: 'Inquiries', title: 'DEMO — create a client inquiry: server-side validation, valid save, database check, double-submit check',
+  qa.append('test', { id: TID, by: 'A00', module: 'CRM and Sales', submodule: 'Inquiries', title: 'DEMO — create a client inquiry: server-side validation, valid save, database check, double-submit check',
     pre: 'As: Marketing Executive (test.mktexec) · private copy, worker 9 · made-up client "TB Refinery Ltd"',
     steps: log.map(x => `${x.step}. ${x.what.split('→')[0]}`).join('\n'), expected: '1 form opens · 2 empty form refused by the SERVER, nothing saved · 3 "INQ-… created" · 4 exactly one row with the typed values, status OPEN · 5 second send creates no second row · 6 listed in the register · 7 no console errors or failed requests',
     actual: log.map(x => `${x.step}. ${x.pass ? 'PASS' : 'FAIL'} — ${x.what}`).join('\n'), status: pass ? 'COMPLETED – PASS' : 'COMPLETED – FAIL', executed: true,
-    evidence: shots.map(s => 'evidence/' + s[0]).join('\n') + '\nevidence/DEMO-01-db-row.json' });
-  shots.forEach(([f, what], i) => qa.append('evidence', { id: 'EV-DEMO-' + (i + 1), by: 'A00', ref: 'DEMO-01', type: 'screenshot', file: 'QA-REPORTS/V51/evidence/' + f, what }));
-  qa.append('evidence', { id: 'EV-DEMO-DB', by: 'A00', ref: 'DEMO-01', type: 'database', file: 'QA-REPORTS/V51/evidence/DEMO-01-db-row.json', what: 'The crm_inquiries row read back after saving' });
-  qa.append('agent', { id: 'A00', by: 'A00', status: 'IN PROGRESS', current: 'DEMO-01 finished: ' + (pass ? 'all 7 checks passed' : 'one or more checks failed') + '. Waiting for owner approval of the plan.', next: 'Owner review of discovery report and demo' });
-  fs.writeFileSync(path.join(EV, 'DEMO-01-result.json'), JSON.stringify({ pass, log, consoleErrors, netFails }, null, 1));
+    evidence: shots.map(s => 'evidence/' + s[0]).join('\n') + '\nevidence/' + TID + '-db-row.json' });
+  shots.forEach(([f, what], i) => qa.append('evidence', { id: 'EV-' + TID + '-' + (i + 1), by: 'A00', ref: TID, type: 'screenshot', file: 'QA-REPORTS/V51/evidence/' + f, what }));
+  qa.append('evidence', { id: 'EV-' + TID + '-DB', by: 'A00', ref: TID, type: 'database', file: 'QA-REPORTS/V51/evidence/' + TID + '-db-row.json', what: 'The crm_inquiries row read back after saving' });
+  qa.append('agent', { id: 'A00', by: 'A00', status: 'IN PROGRESS', current: TID + ' finished: ' + (pass ? 'all 7 checks passed' : 'one or more checks failed') + '. Waiting for owner approval of the plan.', next: 'Owner review of discovery report and demo' });
+  fs.writeFileSync(path.join(EV, TID + '-result.json'), JSON.stringify({ pass, log, consoleErrors, netFails }, null, 1));
   console.log('RESULT', pass ? 'PASS' : 'FAIL');
 })();

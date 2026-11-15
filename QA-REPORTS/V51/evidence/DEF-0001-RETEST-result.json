@@ -1,0 +1,49 @@
+{
+ "pass": true,
+ "log": [
+  {
+   "step": 1,
+   "what": "Signed in as Test MktExec (Marketing Executive); Sales → Inquiries → \"+ New inquiry\" opened the form \"New client inquiry\".",
+   "pass": true,
+   "evidence": "DEF-0001-RETEST-1-form.png"
+  },
+  {
+   "step": 2,
+   "what": "Empty form sent past the browser checks → server answered: \"Please add a client (pick one, or type a name); the contact person; a contact e-mail or mobile; the business unit (business unit); a subject.\". Rows in crm_inquiries: 0 before, 0 after.",
+   "pass": true,
+   "evidence": "DEF-0001-RETEST-2-server-validation.png"
+  },
+  {
+   "step": 3,
+   "what": "Valid submit → message: \"INQ-00001 created. You can now raise a quotation against it.\".",
+   "pass": true,
+   "evidence": "DEF-0001-RETEST-4-created.png"
+  },
+  {
+   "step": 4,
+   "what": "Database: crm_inquiries has exactly one new row (0 → 1): {\"id\":1,\"inquiry_no\":\"INQ-00001\",\"subject\":\"QA DEMO-01 — shutdown TPI, columns C-101/102\",\"status\":\"OPEN\",\"client_id\":666,\"client\":\"TB Refinery Ltd\",\"contact_email\":\"demo.patel@tbrefinery.test\",\"sbu\":\"OGC\",\"source\":\"EMAIL\",\"received_date\":\"2026-11-15\",\"created_by\":\"Test MktExec\"}.",
+   "pass": true,
+   "evidence": "DEF-0001-RETEST-db-row.json"
+  },
+  {
+   "step": 5,
+   "what": "Back + submit the same form again → \"You saved this same inquiry (INQ-00001, same client and subject) a few minutes ago, so it was not saved again. Open INQ-00001 below — or, if this really is a separate inquiry, tick \"Save it as a separate inquiry\" and press Create again. | Open INQ-00001 Save it as a separate inquiry\". Rows with this subject: 1.",
+   "pass": true,
+   "evidence": "DEF-0001-RETEST-5-resubmit.png"
+  },
+  {
+   "step": 6,
+   "what": "Register Sales → Inquiries lists the new inquiry: yes.",
+   "pass": true,
+   "evidence": "DEF-0001-RETEST-6-register.png"
+  },
+  {
+   "step": 7,
+   "what": "Browser console errors: none. Failed / 5xx network requests: none.",
+   "pass": true,
+   "evidence": ""
+  }
+ ],
+ "consoleErrors": [],
+ "netFails": []
+}

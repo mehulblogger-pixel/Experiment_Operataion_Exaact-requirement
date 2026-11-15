@@ -41,10 +41,23 @@ mkdir -p "$STAGE"
 
 # Tracked files only. Anything not in git is, by definition, not part of the
 # product — that is what keeps a stray test database out of a customer's server.
-git ls-files . | while read -r f; do
+#
+# NEVER in a distributable package (owner's rule, 24 Oct 2026 — CLAUDE.md "Test copy and going
+# live"): the tests/ folder, each site's own config.local.php and tenants.php (root level only —
+# lib/tenants.php and views/ops/tenants.php are program files and stay), any *.sqlite database,
+# and the exaact_data* / exaact_backups* folders. Leaving them out is what keeps the test copy in
+# test mode, the live site live, and stops a site losing its settings or data.
+EXCLUDE='^tests/|^config\.local\.php$|^tenants\.php$|\.sqlite$|^exaact_data|^exaact_backups'
+git ls-files . | grep -Ev "$EXCLUDE" | while read -r f; do
     mkdir -p "$STAGE/$(dirname "$f")"
     cp "$f" "$STAGE/$f"
 done
+# Fail loudly rather than ship a forbidden file.
+if [ -d "$STAGE/tests" ] || [ -f "$STAGE/config.local.php" ] || [ -f "$STAGE/tenants.php" ] \
+   || [ -n "$(find "$STAGE" -name '*.sqlite' -o -name 'exaact_data*' -o -name 'exaact_backups*' | head -1)" ]; then
+    echo "REFUSING TO BUILD — a forbidden file reached the package (tests/, config.local.php, tenants.php, *.sqlite, exaact_data*, exaact_backups*)."
+    rm -rf "$STAGE"; exit 1
+fi
 
 # The one file every installation must edit, shipped as a template so an
 # upgrade never overwrites the customer's own credentials.
