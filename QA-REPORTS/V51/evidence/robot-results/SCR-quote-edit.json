@@ -1,0 +1,845 @@
+{
+ "id": "SCR-quote-edit",
+ "title": "Screen check — Edit — Q-00001",
+ "area": "Sales",
+ "module": "Quotes",
+ "persona": "MASTER_ADMIN",
+ "kind": "screen",
+ "status": "FAILED",
+ "steps": [
+  {
+   "n": 1,
+   "do": "Open the screen: Go to Sales → CRM — Quotations → Edit — Q-00001 (or type /quote-edit?id=4 after the site address).",
+   "expect": "The page heading reads \"Edit — Q-00001\"; the breadcrumb reads Home › Sales › CRM — Quotations; the page loads in under 3 seconds with no error.",
+   "status": "pass",
+   "observed": "Opened without error in 187 ms; heading \"Edit — Q-00001\"; breadcrumb Home › Sales › CRM — Quotations › Edit.",
+   "shot": "SCR-quote-edit-1.jpg"
+  },
+  {
+   "n": 2,
+   "do": "Read the line under the heading.",
+   "expect": "It says: \"Fill the header, add the sites, then the line items. The quote number is generated on save.\" — and it is true for what you see.",
+   "status": "pass",
+   "observed": "The line reads as the test says. (Whether it is true for what you see is checked by the other steps.)"
+  },
+  {
+   "n": 3,
+   "do": "Tab \"Client & header\" — open it.",
+   "expect": "It opens to its own content; nothing typed on another tab is lost; switching back keeps the content.",
+   "status": "pass",
+   "observed": "The \"Client & header\" tab opens to its own content."
+  },
+  {
+   "n": 4,
+   "do": "Tab \"Offices\" — open it.",
+   "expect": "It opens to its own content; nothing typed on another tab is lost; switching back keeps the content.",
+   "status": "pass",
+   "observed": "The \"Offices\" tab opens to its own content."
+  },
+  {
+   "n": 5,
+   "do": "Tab \"Sites\" — open it.",
+   "expect": "It opens to its own content; nothing typed on another tab is lost; switching back keeps the content.",
+   "status": "pass",
+   "observed": "The \"Sites\" tab opens to its own content."
+  },
+  {
+   "n": 6,
+   "do": "Tab \"Commercials\" — open it.",
+   "expect": "It opens to its own content; nothing typed on another tab is lost; switching back keeps the content.",
+   "status": "pass",
+   "observed": "The \"Commercials\" tab opens to its own content."
+  },
+  {
+   "n": 7,
+   "do": "Tab \"Line items\" — open it.",
+   "expect": "It opens to its own content; nothing typed on another tab is lost; switching back keeps the content.",
+   "status": "pass",
+   "observed": "The \"Line items\" tab opens to its own content."
+  },
+  {
+   "n": 8,
+   "do": "Tab \"Terms\" — open it.",
+   "expect": "It opens to its own content; nothing typed on another tab is lost; switching back keeps the content.",
+   "status": "pass",
+   "observed": "The \"Terms\" tab opens to its own content."
+  },
+  {
+   "n": 9,
+   "do": "Form “Save quote”: fill every field with valid values and press “Save quote”.",
+   "expect": "Saved with a confirmation message; the saved values show exactly as typed when reopened.",
+   "status": "pass",
+   "observed": "Saved — \"Quote saved.\"; the values show as typed when reopened."
+  },
+  {
+   "n": 10,
+   "do": "Same form: press “Save quote” with everything empty.",
+   "expect": "Refused with one clear sentence naming what is missing; no half-saved record.",
+   "status": "pass",
+   "observed": "Refused: \"Say who the quote is for — pick the client, or type their name. Nothing was saved.\". Nothing was saved."
+  },
+  {
+   "n": 11,
+   "do": "Field \"Client + Add new\" (select) — try each choice in turn: — not on file, type the name —, 2MM BETON, A A Vasani Polypipe Llp, AGGARWAL BATH CONCEPTS, AGP City Gas Private Limited, ALK INFRA, AMAN MACHINE TOOLS PRIVATE LIMITED, AMBICA TRADING, AMPLUS SUN BEAT PRIVATE LIMITED, AMPO VALVES INDIA PRIVATE LIMITED, ANANTA PROCON, ARHAM RENEWTECH INDIA PRIVATE LIMITED, ARVIND ENGINEERING LIMITED, Acme Air Equipments Company Private Limited, Acme Solar Holding Private Limited, Acmefil Engineering Systems Private Limited, Adaptive Engineering Private Limited, Aditya Birla, Aditya Birla Renewables Limited, Aditya Sales Corporation, Aeon Software Private Limited, Aeron Composite Limited, Afrzen Private Limited, Agro Pulping Machinery Private Limited, Aia Engineering Limited … (40 choices).",
+   "expect": "Each choice saves and is still selected when the record is reopened.",
+   "status": "pass",
+   "observed": "Tried — \"— not on file, type the name —\": accepted (\"Quote saved.\"); \"TB Defaulter Co\": refused — \"TB Defaulter Co is blocked (Unpaid for 180 days). Nothing new can be raised for them — only payment reminders — until a \"; \"TB Group Child\": accepted (\"Quote saved.\"); \"TB Group Parent\": accepted (\"Quote saved.\"); \"TB Paused Co\": refused — \"TB Paused Co is on hold (Credit review). Nothing new can be raised for them — only payment reminders — until a manager c\"; \"TB Pharma LLP\": accepted (\"Quote saved.\"); \"TB Refinery Ltd\": accepted (\"Quote saved.\"); \"TB Steel Works Pvt Ltd\": accepted (\"Quote save",
+   "note": "The choices have changed since the test was written (e.g. — not on file, type the name —, 2MM BETON are no longer offered — demo data on the copy the test was measured on)."
+  },
+  {
+   "n": 12,
+   "do": "Field \"…or client name\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Quote saved.\"); empty: refused — \"Say who the quote is for — pick the client, or type their name. Nothing was saved.\"; 300 characters: accepted (\"Quote saved.\"); special characters: accepted (\"Quote saved.\"); Hindi/Gujarati: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 13,
+   "do": "Field \"Business Unit (primary)\" (select) — try each choice in turn: —, Industrial, Oil, Gas & Chemicals, Minerals, Governments & Institutions, Agriculture & Food, Consumer & Retail, Environment, Other (9 choices).",
+   "expect": "Each choice saves and is still selected when the record is reopened.",
+   "status": "pass",
+   "observed": "Tried — \"—\": accepted (\"Quote saved.\"); \"Industrial\": accepted (\"Quote saved.\"); \"Oil, Gas & Chemicals\": accepted (\"Quote saved.\"); \"Minerals\": accepted (\"Quote saved.\"); \"Governments & Institutions\": accepted (\"Quote saved.\"); \"Agriculture & Food\": accepted (\"Quote saved.\"); \"Consumer & Retail\": accepted (\"Quote saved.\"); \"Environment\": accepted (\"Quote saved.\"); \"Other\": accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 14,
+   "do": "Field \"Contact person\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Quote saved.\"); empty: accepted (\"Quote saved.\"); 300 characters: accepted (\"Quote saved.\"); special characters: accepted (\"Quote saved.\"); Hindi/Gujarati: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 15,
+   "do": "Field \"Contact e-mail\" (email) — try a valid e-mail; then \"abc@\" ; then capitals ABC@EXAMPLE.TEST.",
+   "expect": "Valid saves. \"abc@\" is refused with a message.",
+   "status": "pass",
+   "observed": "Tried — a valid e-mail: accepted (\"Quote saved.\"); \"abc@\": refused by the form (\"Please enter a part following '@'. 'abc@' is incomplete.\"); capitals: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 16,
+   "do": "Field \"Contact mobile\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Quote saved.\"); empty: accepted (\"Quote saved.\"); 300 characters: accepted (\"Quote saved.\"); special characters: accepted (\"Quote saved.\"); Hindi/Gujarati: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 17,
+   "do": "Field \"Subject / scope title\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Quote saved.\"); empty: refused — \"Give the quote a subject — what is being offered. Nothing was saved.\"; 300 characters: accepted (\"Quote saved.\"); special characters: accepted (\"Quote saved.\"); Hindi/Gujarati: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 18,
+   "do": "Field \"Inspection (third-party / TPI)\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 19,
+   "do": "Field \"Expediting\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 20,
+   "do": "Field \"Resident / site posting\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 21,
+   "do": "Field \"Vendor assessment\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 22,
+   "do": "Field \"Vendor audit\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 23,
+   "do": "Field \"Pre-production inspection\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 24,
+   "do": "Field \"During-production inspection\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 25,
+   "do": "Field \"Stage / In-process inspection\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 26,
+   "do": "Field \"Final inspection\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 27,
+   "do": "Field \"Final random inspection (FRI)\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 28,
+   "do": "Field \"Pre-shipment inspection (PSI)\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 29,
+   "do": "Field \"Witness / Test witnessing\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 30,
+   "do": "Field \"Factory Acceptance Test (FAT)\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 31,
+   "do": "Field \"Site Acceptance Test (SAT)\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 32,
+   "do": "Field \"Source inspection\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 33,
+   "do": "Field \"Surveillance\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 34,
+   "do": "Field \"Loading / container supervision\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 35,
+   "do": "Field \"Sampling\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 36,
+   "do": "Field \"Dimensional inspection\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 37,
+   "do": "Field \"Welding inspection\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 38,
+   "do": "Field \"NDT witnessing\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 39,
+   "do": "Field \"Material verification (PMI)\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 40,
+   "do": "Field \"Painting / coating inspection\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 41,
+   "do": "Field \"Mechanical testing witness\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 42,
+   "do": "Field \"Calibration verification\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 43,
+   "do": "Field \"Safety audit\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 44,
+   "do": "Field \"Management-system audit\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 45,
+   "do": "Field \"Second-party audit\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 46,
+   "do": "Field \"Desktop / Document review\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 47,
+   "do": "Field \"Technical audit\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 48,
+   "do": "Field \"Supply-chain posting\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 49,
+   "do": "Field \"Site supervision\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 50,
+   "do": "Field \"Commissioning & installation\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 51,
+   "do": "Field \"Site QA / QC\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 52,
+   "do": "Field \"Type test\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 53,
+   "do": "Field \"Tender review\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 54,
+   "do": "Field \"Other\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 55,
+   "do": "Field \"Product category — spelling is unified automatically\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Quote saved.\"); empty: accepted (\"Quote saved.\"); 300 characters: accepted (\"Quote saved.\"); special characters: accepted (\"Quote saved.\"); Hindi/Gujarati: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 56,
+   "do": "Field \"Where did this quote come from?\" (select) — try each choice in turn: Our quotation, Client's portal, Tender / e-procurement portal, Submitted by e-mail only, Other (5 choices).",
+   "expect": "Each choice saves and is still selected when the record is reopened.",
+   "status": "pass",
+   "observed": "Tried — \"Our quotation\": accepted (\"Quote saved.\"); \"Client's portal\": accepted (\"Quote saved.\"); \"Tender / e-procurement portal\": accepted (\"Quote saved.\"); \"Submitted by e-mail only\": accepted (\"Quote saved.\"); \"Other\": accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 57,
+   "do": "Field \"Portal / reference — for a quote submitted outside our format\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Quote saved.\"); empty: accepted (\"Quote saved.\"); 300 characters: accepted (\"Quote saved.\"); special characters: accepted (\"Quote saved.\"); Hindi/Gujarati: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 58,
+   "do": "Field \"their reference / bid no.\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Quote saved.\"); empty: accepted (\"Quote saved.\"); 300 characters: accepted (\"Quote saved.\"); special characters: accepted (\"Quote saved.\"); Hindi/Gujarati: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 59,
+   "do": "Field \"Primary / owning Office\" (select) — try each choice in turn: —, Ahmedabad, Ahmedabad, Bengaluru, Bhubaneswar, Chandigarh, Chennai, Delhi, Hyderabad, Indore, Jaipur, Kochi, Kolkata, Lucknow, Mumbai, Nagpur, Pune, Vadodara, Visakhapatnam (19 choices).",
+   "expect": "Each choice saves and is still selected when the record is reopened.",
+   "status": "pass",
+   "observed": "Tried — \"—\": accepted (\"Quote saved.\"); \"Ahmedabad\": accepted (\"Quote saved.\"); \"Bengaluru\": accepted (\"Quote saved.\"); \"Bhubaneswar\": accepted (\"Quote saved.\"); \"Chandigarh\": accepted (\"Quote saved.\"); \"Chennai\": accepted (\"Quote saved.\"); \"Delhi\": accepted (\"Quote saved.\"); \"Hyderabad\": accepted (\"Quote saved.\"); \"Indore\": accepted (\"Quote saved.\"); \"Jaipur\": accepted (\"Quote saved.\"); \"Kochi\": accepted (\"Quote saved.\"); \"Kolkata\": accepted (\"Quote saved.\"); (18 choices — the first 12 were tried; the rest are more of the same list). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 60,
+   "do": "Field \"Ahmedabad\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 61,
+   "do": "Field \"Ahmedabad\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 62,
+   "do": "Field \"Bengaluru\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 63,
+   "do": "Field \"Bhubaneswar\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 64,
+   "do": "Field \"Chandigarh\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 65,
+   "do": "Field \"Chennai\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 66,
+   "do": "Field \"Delhi\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 67,
+   "do": "Field \"Hyderabad\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 68,
+   "do": "Field \"Indore\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 69,
+   "do": "Field \"Jaipur\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 70,
+   "do": "Field \"Kochi\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 71,
+   "do": "Field \"Kolkata\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 72,
+   "do": "Field \"Lucknow\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 73,
+   "do": "Field \"Mumbai\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 74,
+   "do": "Field \"Nagpur\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 75,
+   "do": "Field \"Pune\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 76,
+   "do": "Field \"Vadodara\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 77,
+   "do": "Field \"Visakhapatnam\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 78,
+   "do": "Field \"Vendor / manufacturer site + Add new — carried to the work order\" (select) — try each choice in turn: — none / decide later —, 3Ginfratech, A A Vasani Polypipe Llp, A H Marine, A K Industries, ALTRA FINE STEEL PRIVATE LIMITED, AMCON CASTINGS PRIVATE LIMITED, APPL Containers Limited, ARCELLOR CONTROLS INDIA, ARRIS TECHNOLOGIS, AUM Steel Industries, Aarohi Embedded Systems, AbhiRaj Steel Buildings LLP, Accord Tubes And Profiles Llp, Accu Panels Energy Private Limited, Acme Air Equipments Company Private Limited, Acmefil Engineering Systems Private Limited, Acs Engitech Private Limited, Activa Engineers, Adaptive Engineering Private Limited, Aditya Birla Renewables Limited, Aegis Engineering Company Private Limited, Aegis Valve Industries Private Limited, Aero Engineers Private Limited, Aeron Composite Limited … (40 choices).",
+   "expect": "Each choice saves and is still selected when the record is reopened.",
+   "status": "outdated",
+   "observed": "There is no box called \"Vendor / manufacturer site + Add new — carried to the work order\" on this screen any more.",
+   "suggest": "",
+   "shot": "SCR-quote-edit-78-old.jpg"
+  },
+  {
+   "n": 79,
+   "do": "Field \"Name / label\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Quote saved.\"); empty: accepted (\"Quote saved.\"); 300 characters: accepted (\"Quote saved.\"); special characters: accepted (\"Quote saved.\"); Hindi/Gujarati: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 80,
+   "do": "Field \"Type\" (select) — try each choice in turn: Site to be confirmed, Project site, Manufacturer works, Registered office, Corporate office, Plant, Warehouse, Port / yard, Laboratory, Other (10 choices).",
+   "expect": "Each choice saves and is still selected when the record is reopened.",
+   "status": "pass",
+   "observed": "Tried — \"— not on file, type the name —\": accepted (\"Quote saved.\"); \"TB Defaulter Co\": refused — \"TB Defaulter Co is blocked (Unpaid for 180 days). Nothing new can be raised for them — only payment reminders — until a \"; \"TB Group Child\": accepted (\"Quote saved.\"); \"TB Group Parent\": accepted (\"Quote saved.\"); \"TB Paused Co\": refused — \"TB Paused Co is on hold (Credit review). Nothing new can be raised for them — only payment reminders — until a manager c\"; \"TB Pharma LLP\": accepted (\"Quote saved.\"); \"TB Refinery Ltd\": accepted (\"Quote saved.\"); \"TB Steel Works Pvt Ltd\": accepted (\"Quote save",
+   "note": "The choices have changed since the test was written (e.g. Site to be confirmed, Project site, Manufacturer works are no longer offered — demo data on the copy the test was measured on)."
+  },
+  {
+   "n": 81,
+   "do": "Field \"Vendor (site) — optional\" (select) — try each choice in turn: — not a vendor site / decide later —, 3Ginfratech, A A Vasani Polypipe Llp, A H Marine, A K Industries, ALTRA FINE STEEL PRIVATE LIMITED, AMCON CASTINGS PRIVATE LIMITED, APPL Containers Limited, ARCELLOR CONTROLS INDIA, ARRIS TECHNOLOGIS, AUM Steel Industries, Aarohi Embedded Systems, AbhiRaj Steel Buildings LLP, Accord Tubes And Profiles Llp, Accu Panels Energy Private Limited, Acme Air Equipments Company Private Limited, Acmefil Engineering Systems Private Limited, Acs Engitech Private Limited, Activa Engineers, Adaptive Engineering Private Limited, Aditya Birla Renewables Limited, Aegis Engineering Company Private Limited, Aegis Valve Industries Private Limited, Aero Engineers Private Limited, Aeron Composite Limited … (40 choices).",
+   "expect": "Each choice saves and is still selected when the record is reopened.",
+   "status": "needs",
+   "observed": "",
+   "note": "The choices have changed since the test was written (e.g. — not a vendor site / decide later —, 3Ginfratech, A A Vasani Polypipe Llp are no longer offered — demo data on the copy the test was measured on).",
+   "reason": "The robot could not try any value in \"Vendor (site) — optional\" (the box may only appear after another choice).",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-edit-81-needs.jpg"
+  },
+  {
+   "n": 82,
+   "do": "Field \"Address line 1\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Quote saved.\"); empty: accepted (\"Quote saved.\"); 300 characters: accepted (\"Quote saved.\"); special characters: accepted (\"Quote saved.\"); Hindi/Gujarati: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 83,
+   "do": "Field \"Line 2\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Quote saved.\"); empty: accepted (\"Quote saved.\"); 300 characters: accepted (\"Quote saved.\"); special characters: accepted (\"Quote saved.\"); Hindi/Gujarati: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 84,
+   "do": "Field \"City\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Quote saved.\"); empty: accepted (\"Quote saved.\"); 300 characters: accepted (\"Quote saved.\"); special characters: accepted (\"Quote saved.\"); Hindi/Gujarati: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 85,
+   "do": "Field \"State\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Quote saved.\"); empty: accepted (\"Quote saved.\"); 300 characters: accepted (\"Quote saved.\"); special characters: accepted (\"Quote saved.\"); Hindi/Gujarati: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 86,
+   "do": "Field \"PIN\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Quote saved.\"); empty: accepted (\"Quote saved.\"); 300 characters: accepted (\"Quote saved.\"); special characters: accepted (\"Quote saved.\"); Hindi/Gujarati: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 87,
+   "do": "Field \"Site contact\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Quote saved.\"); empty: accepted (\"Quote saved.\"); 300 characters: accepted (\"Quote saved.\"); special characters: accepted (\"Quote saved.\"); Hindi/Gujarati: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 88,
+   "do": "Field \"Mobile\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Quote saved.\"); empty: accepted (\"Quote saved.\"); 300 characters: accepted (\"Quote saved.\"); special characters: accepted (\"Quote saved.\"); Hindi/Gujarati: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 89,
+   "do": "Field \"Nearest Office\" (select) — try each choice in turn: —, Ahmedabad, Ahmedabad, Bengaluru, Bhubaneswar, Chandigarh, Chennai, Delhi, Hyderabad, Indore, Jaipur, Kochi, Kolkata, Lucknow, Mumbai, Nagpur, Pune, Vadodara, Visakhapatnam (19 choices).",
+   "expect": "Each choice saves and is still selected when the record is reopened.",
+   "status": "needs",
+   "observed": "",
+   "note": "The choices have changed since the test was written (e.g. —, Ahmedabad, Ahmedabad are no longer offered — demo data on the copy the test was measured on).",
+   "reason": "The robot could not try any value in \"Nearest Office\" (the box may only appear after another choice).",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-edit-89-needs.jpg"
+  },
+  {
+   "n": 90,
+   "do": "Field \"Validity (days)\" (number) — try a normal value; then 0; then a negative number (-1); then a decimal (0.5); then a very large number (9999999999); then letters.",
+   "expect": "Normal value saves. 0 and negatives are accepted only where they make sense, otherwise refused with a message. Decimals keep their paise. Very large numbers show with Indian grouping (99,99,99,999). Letters are refused.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Quote saved.\"); 0: accepted (\"Quote saved.\"); -1: refused — \"Validity (days) cannot be negative. Nothing was saved.\"; 0.5: refused by the form (\"Please enter a valid value. The two nearest valid values are 0 and 1.\"); 9999999999: refused — \"Validity (days) cannot be more than 3650. Nothing was saved.\"; letters: the box is a number box — letters cannot be typed in. Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 91,
+   "do": "Field \"Currency\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Quote saved.\"); empty: accepted (\"Quote saved.\"); 300 characters: accepted (\"Quote saved.\"); special characters: accepted (\"Quote saved.\"); Hindi/Gujarati: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 92,
+   "do": "Field \"GST %\" (number) — try a normal value; then 0; then a negative number (-1); then a decimal (0.5); then a very large number (9999999999); then letters.",
+   "expect": "Normal value saves. 0 and negatives are accepted only where they make sense, otherwise refused with a message. Decimals keep their paise. Very large numbers show with Indian grouping (99,99,99,999). Letters are refused.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Quote saved.\"); 0: accepted (\"Quote saved.\"); -1: refused by the form (\"Value must be greater than or equal to 0.\"); 0.5: accepted (\"Quote saved.\"); 9999999999: refused by the form (\"Value must be less than or equal to 100.\"); letters: the box is a number box — letters cannot be typed in. Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 93,
+   "do": "Field \"Payment terms\" (select) — try each choice in turn: — select —, 100% advance, 50% advance, balance against report, 25% advance, balance against report, Against submission of report, Against invoice, 7 days from invoice, 10 days from invoice, 15 days from invoice, 21 days from invoice, 30 days from invoice, 45 days from invoice, 60 days from invoice, 90 days from invoice, Milestone-linked, Against proforma invoice, Letter of credit, Other (see terms) (18 choices).",
+   "expect": "Each choice saves and is still selected when the record is reopened.",
+   "status": "pass",
+   "observed": "Tried — \"— select —\": accepted (\"Quote saved.\"); \"100% advance\": accepted (\"Quote saved.\"); \"50% advance, balance against report\": accepted (\"Quote saved.\"); \"25% advance, balance against report\": accepted (\"Quote saved.\"); \"Against submission of report\": accepted (\"Quote saved.\"); \"Against invoice\": accepted (\"Quote saved.\"); \"7 days from invoice\": accepted (\"Quote saved.\"); \"10 days from invoice\": accepted (\"Quote saved.\"); \"15 days from invoice\": accepted (\"Quote saved.\"); \"21 days from invoice\": accepted (\"Quote saved.\"); \"30 days from invoice\": accepted (\"Quote saved.\"); \"45 days from inv"
+  },
+  {
+   "n": 94,
+   "do": "Field \"Advance %\" (number) — try a normal value; then 0; then a negative number (-1); then a decimal (0.5); then a very large number (9999999999); then letters.",
+   "expect": "Normal value saves. 0 and negatives are accepted only where they make sense, otherwise refused with a message. Decimals keep their paise. Very large numbers show with Indian grouping (99,99,99,999). Letters are refused.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Quote saved.\"); 0: accepted (\"Quote saved.\"); -1: refused — \"Advance % cannot be negative. Nothing was saved.\"; 0.5: accepted (\"Quote saved.\"); 9999999999: refused — \"Advance % cannot be more than 100. Nothing was saved.\"; letters: the box is a number box — letters cannot be typed in. Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 95,
+   "do": "Field \"Advance required before scheduling\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 96,
+   "do": "Field \"Report only against payment\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Quote saved.\"); unticked: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 97,
+   "do": "Field \"Signed by — the stored signature goes on the PDF\" (select) — try each choice in turn: — use the company signature — (1 choices).",
+   "expect": "Each choice saves and is still selected when the record is reopened.",
+   "status": "pass",
+   "observed": "Tried — \"— use the company signature —\": accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 98,
+   "do": "Field \"Business Unit\" (select) — try each choice in turn: —, Industrial, Oil, Gas & Chemicals, Minerals, Governments & Institutions, Agriculture & Food, Consumer & Retail, Environment, Other (9 choices).",
+   "expect": "Each choice saves and is still selected when the record is reopened.",
+   "status": "pass",
+   "observed": "Tried — \"—\": accepted (\"Quote saved.\"); \"Industrial\": accepted (\"Quote saved.\"); \"Oil, Gas & Chemicals\": accepted (\"Quote saved.\"); \"Minerals\": accepted (\"Quote saved.\"); \"Governments & Institutions\": accepted (\"Quote saved.\"); \"Agriculture & Food\": accepted (\"Quote saved.\"); \"Consumer & Retail\": accepted (\"Quote saved.\"); \"Environment\": accepted (\"Quote saved.\"); \"Other\": accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 99,
+   "do": "Field \"Activity\" (select) — try each choice in turn: — pick an Business Unit first — (1 choices).",
+   "expect": "Each choice saves and is still selected when the record is reopened.",
+   "status": "pass",
+   "observed": "Tried — \"—\": accepted (\"Quote saved.\"); \"Industrial\": accepted (\"Quote saved.\"); \"Oil, Gas & Chemicals\": accepted (\"Quote saved.\"); \"Minerals\": accepted (\"Quote saved.\"); \"Governments & Institutions\": accepted (\"Quote saved.\"); \"Agriculture & Food\": accepted (\"Quote saved.\"); \"Consumer & Retail\": accepted (\"Quote saved.\"); \"Environment\": accepted (\"Quote saved.\"); \"Other\": accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 100,
+   "do": "Field \"Service — from the types above\" (select) — try each choice in turn.",
+   "expect": "Each choice saves and is still selected when the record is reopened.",
+   "status": "pass",
+   "observed": "Tried — \"—\": accepted (\"Quote saved.\"); \"Industrial\": accepted (\"Quote saved.\"); \"Oil, Gas & Chemicals\": accepted (\"Quote saved.\"); \"Minerals\": accepted (\"Quote saved.\"); \"Governments & Institutions\": accepted (\"Quote saved.\"); \"Agriculture & Food\": accepted (\"Quote saved.\"); \"Consumer & Retail\": accepted (\"Quote saved.\"); \"Environment\": accepted (\"Quote saved.\"); \"Other\": accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 101,
+   "do": "Field \"Description\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Quote saved.\"); empty: accepted (\"Quote saved.\"); 300 characters: accepted (\"Quote saved.\"); special characters: accepted (\"Quote saved.\"); Hindi/Gujarati: accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 102,
+   "do": "Field \"Site\" (select) — try each choice in turn: — add a site above — (1 choices).",
+   "expect": "Each choice saves and is still selected when the record is reopened.",
+   "status": "pass",
+   "observed": "Tried — \"— not on file, type the name —\": accepted (\"Quote saved.\"); \"TB Defaulter Co\": refused — \"TB Defaulter Co is blocked (Unpaid for 180 days). Nothing new can be raised for them — only payment reminders — until a \"; \"TB Group Child\": accepted (\"Quote saved.\"); \"TB Group Parent\": accepted (\"Quote saved.\"); \"TB Paused Co\": refused — \"TB Paused Co is on hold (Credit review). Nothing new can be raised for them — only payment reminders — until a manager c\"; \"TB Pharma LLP\": accepted (\"Quote saved.\"); \"TB Refinery Ltd\": accepted (\"Quote saved.\"); \"TB Steel Works Pvt Ltd\": accepted (\"Quote save"
+  },
+  {
+   "n": 103,
+   "do": "Field \"Order\" (select) — try each choice in turn: Open order (ARC / call-off), Line-item order (2 choices).",
+   "expect": "Each choice saves and is still selected when the record is reopened.",
+   "status": "pass",
+   "observed": "Tried — \"—\": accepted (\"Quote saved.\"); \"Industrial\": accepted (\"Quote saved.\"); \"Oil, Gas & Chemicals\": accepted (\"Quote saved.\"); \"Minerals\": accepted (\"Quote saved.\"); \"Governments & Institutions\": accepted (\"Quote saved.\"); \"Agriculture & Food\": accepted (\"Quote saved.\"); \"Consumer & Retail\": accepted (\"Quote saved.\"); \"Environment\": accepted (\"Quote saved.\"); \"Other\": accepted (\"Quote saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 104,
+   "do": "Field \"Qty\" (number) — try a normal value; then 0; then a negative number (-1); then a decimal (0.5); then a very large number (9999999999); then letters.",
+   "expect": "Normal value saves. 0 and negatives are accepted only where they make sense, otherwise refused with a message. Decimals keep their paise. Very large numbers show with Indian grouping (99,99,99,999). Letters are refused.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Quote saved.\"); 0: accepted (\"Quote saved.\"); -1: refused by the form (\"Value must be greater than or equal to 0.\"); 0.5: accepted (\"Quote saved.\"); 9999999999: accepted (\"Quote saved.\"); letters: the box is a number box — letters cannot be typed in. Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 105,
+   "do": "Field \"Unit\" (select) — try each choice in turn: Man-day, Man-month, Per visit, Audit day, Per lot / lump sum, Per document, Per km, Other (8 choices).",
+   "expect": "Each choice saves and is still selected when the record is reopened.",
+   "status": "fail",
+   "observed": "The robot hit a problem on this step: locator.evaluate: Target page, context or browser has been closed"
+  },
+  {
+   "n": 106,
+   "do": "Field \"Rate ₹\" (number) — try a normal value; then 0; then a negative number (-1); then a decimal (0.5); then a very large number (9999999999); then letters.",
+   "expect": "Normal value saves. 0 and negatives are accepted only where they make sense, otherwise refused with a message. Decimals keep their paise. Very large numbers show with Indian grouping (99,99,99,999). Letters are refused.",
+   "status": "fail",
+   "observed": "The robot hit a problem on this step: page.goto: Target page, context or browser has been closed"
+  },
+  {
+   "n": 107,
+   "do": "Field \"Terms conditions\" (textarea) — try several lines with line breaks; then 3,000 characters; then leave it empty.",
+   "expect": "Line breaks are kept when the record is reopened and printed. Very long text is kept or refused with a message — never a blank page.",
+   "status": "fail",
+   "observed": "The robot hit a problem on this step: page.goto: Target page, context or browser has been closed"
+  },
+  {
+   "n": 108,
+   "do": "Same form: press “Save quote” twice quickly (double-click).",
+   "expect": "Saved once — never two records.",
+   "status": "fail",
+   "observed": "The robot hit a problem on this step: page.goto: Target page, context or browser has been closed"
+  },
+  {
+   "n": 109,
+   "do": "Button \"+ Add site\" — press it.",
+   "expect": "It does what its words say; a message confirms what happened.",
+   "status": "fail",
+   "observed": "The robot hit a problem on this step: page.goto: Target page, context or browser has been closed"
+  },
+  {
+   "n": 110,
+   "do": "Button \"+ Add line\" — press it.",
+   "expect": "It does what its words say; a message confirms what happened.",
+   "status": "fail",
+   "observed": "The robot hit a problem on this step: page.goto: Target page, context or browser has been closed"
+  },
+  {
+   "n": 111,
+   "do": "Button / link \"← CRM — Quotations\" — press it.",
+   "expect": "It opens the screen at /quotes; Back returns here.",
+   "status": "fail",
+   "observed": "The robot hit a problem on this step: page.goto: Target page, context or browser has been closed"
+  },
+  {
+   "n": 112,
+   "do": "Button / link \"Cancel\" — press it.",
+   "expect": "It opens the screen at /quote?id=…; Back returns here.",
+   "status": "fail",
+   "observed": "The robot hit a problem on this step: page.goto: Target page, context or browser has been closed"
+  },
+  {
+   "n": 113,
+   "do": "Table with columns: Name / label, Type, Vendor (site) — optional, Address line 1, Line 2, City, State, PIN, Site contact, Mobile, Nearest Office.",
+   "expect": "Every column has a value or a dash; numbers line up; long text wraps; an empty list says so in words; on a phone the table scrolls inside itself.",
+   "status": "fail",
+   "observed": "page.goto: Target page, context or browser has been closed",
+   "shot": "SCR-quote-edit-113-fail.jpg"
+  },
+  {
+   "n": 114,
+   "do": "Table with columns: Business Unit, Activity, Service — from the types above, Description, Site, Order, Qty, Unit, Rate ₹, Amount ₹.",
+   "expect": "Every column has a value or a dash; numbers line up; long text wraps; an empty list says so in words; on a phone the table scrolls inside itself.",
+   "status": "fail",
+   "observed": "page.goto: Target page, context or browser has been closed",
+   "shot": "SCR-quote-edit-114-fail.jpg"
+  },
+  {
+   "n": 115,
+   "do": "Narrow the window to phone width (about 390 pixels) or open on a phone.",
+   "expect": "Readable and usable without the whole page scrolling sideways; buttons big enough to tap.",
+   "status": "fail",
+   "observed": "The robot hit a problem on this step: browser.newContext: Target page, context or browser has been closed"
+  },
+  {
+   "n": 116,
+   "do": "Who may open it: sign in as each role (or ask your administrator) and open this screen.",
+   "expect": "Measured on a test copy today — opened for: Business Development Manager, Key Accounts Manager, Marketing Executive, Marketing Manager. Refused for: Asst. Manager, Branch Application Manager, Branch Manager, Business Director, Coordinator, Finance, Inspector, Operation Manager, Quality Head, Business Unit Head, Senior Inspector, Technical Head. Check this against what your business wants (docs/02-permission-matrix.md). Record any surprise. Note: this was measured on one sample record, so a refusal can be the branch wall.",
+   "status": "fail",
+   "observed": "The robot hit a problem on this step: browser.newContext: Target page, context or browser has been closed"
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SCR-quote-edit-end.jpg",
+ "seconds": 7185,
+ "ranAt": "2026-11-15T13:45:32.318Z"
+}
