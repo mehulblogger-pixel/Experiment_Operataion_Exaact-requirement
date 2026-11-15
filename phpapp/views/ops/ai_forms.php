@@ -38,7 +38,7 @@ $typeLabel = ['text' => 'Text', 'textarea' => 'Paragraph', 'number' => 'Number',
       <?php if ($canBuy && ($left === 0 || $left <= max(5, (int) round($cap * 0.15)))): ?>
         <form method="post" action="/ai-topup-order" style="margin:0">
           <?php if (function_exists('csrf_field')) echo csrf_field(); ?>
-          <button class="btn" type="submit">Buy <?= $packSize ?> more · <?= e($psym . number_format($packPrice)) ?></button>
+          <button class="btn" type="submit">Buy <?= $packSize ?> more · <?= e($psym . nf($packPrice)) ?></button>
         </form>
       <?php endif; ?>
     </div>

@@ -12,7 +12,7 @@ $money     = function_exists('connect_engv_money') ? connect_engv_money($v) : []
 $approved  = in_array($status, ['APPROVED','PAID'], true);
 $clientConfirmed = trim((string)($v['client_paid_at'] ?? '')) !== '';
 $settled   = function_exists('connect_engv_is_settled') && connect_engv_is_settled($v);
-$inr = fn($n) => '₹' . number_format((int)round((float)$n));
+$inr = fn($n) => '₹' . nf((int)round((float)$n));
 $kb  = fn($n) => $n >= 1048576 ? round($n/1048576, 1) . ' MB' : max(1, (int)round($n/1024)) . ' KB';
 $pill = function ($s) {
     $m = ['DRAFT'=>['Draft','muted'],'SUBMITTED'=>['Awaiting your review','warn'],'APPROVED'=>['Approved','ok'],
@@ -60,7 +60,7 @@ $canReview = $status === 'SUBMITTED';
     <div><div class="k" style="font-size:12px;color:var(--muted)">+ Platform fee (your share)</div><div style="font-size:18px;font-weight:700">+<?= e($inr($money['commission_client'])) ?></div></div>
     <div><div class="k" style="font-size:12px;color:var(--muted)">You pay</div><div style="font-size:22px;font-weight:800;color:#0f7d5a"><?= e($inr($money['client_payable'])) ?></div></div>
   </div>
-  <p class="plead" style="margin:8px 0 0;font-size:12.5px">A <?= e(rtrim(rtrim(number_format((float)$money['commission_pct'],2),'0'),'.')) ?>% platform commission on the fee is shared with the professional — you settle directly with them; the platform only makes the match.</p>
+  <p class="plead" style="margin:8px 0 0;font-size:12.5px">A <?= e(rtrim(rtrim(nf((float)$money['commission_pct'],2),'0'),'.')) ?>% platform commission on the fee is shared with the professional — you settle directly with them; the platform only makes the match.</p>
 </div>
 <?php endif; ?>
 

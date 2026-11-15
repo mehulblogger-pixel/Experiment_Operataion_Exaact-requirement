@@ -126,14 +126,14 @@
 
   <!-- Activity timesheet -->
   <div class="ctitle"><h3 style="font-size:14px">Activity timesheet
-    <span class="muted">(<?= rtrim(rtrim(number_format($dep['ts_totals']['hours'],1),'0'),'.') ?>h + <?= rtrim(rtrim(number_format($dep['ts_totals']['ot_hours'],1),'0'),'.') ?> OT over <?= (int)$dep['ts_totals']['days'] ?> day(s))</span></h3></div>
+    <span class="muted">(<?= rtrim(rtrim(nf($dep['ts_totals']['hours'],1),'0'),'.') ?>h + <?= rtrim(rtrim(nf($dep['ts_totals']['ot_hours'],1),'0'),'.') ?> OT over <?= (int)$dep['ts_totals']['days'] ?> day(s))</span></h3></div>
   <?php if ($dep['timesheet']): ?>
     <table class="grid" style="margin-bottom:8px">
       <tr><th>Date</th><th>Activity</th><th>Hours</th><th>OT</th><th>Billable</th></tr>
       <?php foreach (array_slice($dep['timesheet'], -12) as $t): ?>
         <tr><td style="white-space:nowrap"><?= e($fmt($t['ts_date'])) ?></td><td><?= e($t['activity']) ?></td>
-          <td><?= e(rtrim(rtrim(number_format((float)$t['hours'],1),'0'),'.')) ?></td>
-          <td><?= (float)$t['ot_hours'] ? e(rtrim(rtrim(number_format((float)$t['ot_hours'],1),'0'),'.')) : '—' ?></td>
+          <td><?= e(rtrim(rtrim(nf((float)$t['hours'],1),'0'),'.')) ?></td>
+          <td><?= (float)$t['ot_hours'] ? e(rtrim(rtrim(nf((float)$t['ot_hours'],1),'0'),'.')) : '—' ?></td>
           <td><?= (int)$t['billable'] === 1 ? 'Yes' : 'No' ?></td></tr>
       <?php endforeach; ?>
     </table>
@@ -162,7 +162,7 @@
         <tr>
           <td style="white-space:nowrap"><?= e($fmt($ap['period_from'])) ?> – <?= e($fmt($ap['period_to'])) ?></td>
           <td><?= e($ap['basis']) ?: '—' ?></td>
-          <td><?= (float)$ap['billable_days'] ? e(rtrim(rtrim(number_format((float)$ap['billable_days'],1),'0'),'.')).' d' : '' ?><?= (float)$ap['billable_hours'] ? ' '.e(rtrim(rtrim(number_format((float)$ap['billable_hours'],1),'0'),'.')).' h' : '' ?></td>
+          <td><?= (float)$ap['billable_days'] ? e(rtrim(rtrim(nf((float)$ap['billable_days'],1),'0'),'.')).' d' : '' ?><?= (float)$ap['billable_hours'] ? ' '.e(rtrim(rtrim(nf((float)$ap['billable_hours'],1),'0'),'.')).' h' : '' ?></td>
           <td><?php $at = $ap['status']==='APPROVED'?'p-ok':($ap['status']==='REJECTED'?'p-bad':'p-mut'); ?><span class="pill <?= $at ?>"><?= e($depApprovalStatuses[$ap['status']] ?? $ap['status']) ?></span></td>
           <td><?= e($ap['client_rep']) ?: '—' ?><?= $ap['approved_on'] ? '<br><span class="muted">'.e($fmt($ap['approved_on'])).'</span>' : '' ?></td>
           <?php if ($depCanEdit): ?>

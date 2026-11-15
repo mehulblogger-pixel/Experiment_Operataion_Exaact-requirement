@@ -557,12 +557,12 @@ function tapi_seed_defaults() {
 function tapi_fmt_value($value, $unit) {
     if ($value === null) return '—';
     $unit = strtolower((string)$unit);
-    if ($unit === 'money')  return function_exists('fmoney_short') ? fmoney_short($value) : number_format((float)$value);
-    if ($unit === '%')      return rtrim(rtrim(number_format((float)$value, 1), '0'), '.') . '%';
-    if ($unit === 'days')   return rtrim(rtrim(number_format((float)$value, 1), '0'), '.') . ' d';
-    if ($unit === 'hours')  return rtrim(rtrim(number_format((float)$value, 1), '0'), '.') . ' h';
+    if ($unit === 'money')  return function_exists('fmoney_short') ? fmoney_short($value) : nf((float)$value);
+    if ($unit === '%')      return rtrim(rtrim(nf((float)$value, 1), '0'), '.') . '%';
+    if ($unit === 'days')   return rtrim(rtrim(nf((float)$value, 1), '0'), '.') . ' d';
+    if ($unit === 'hours')  return rtrim(rtrim(nf((float)$value, 1), '0'), '.') . ' h';
     // count / anything else
-    return (float)$value == (int)$value ? number_format((int)$value) : number_format((float)$value, 1);
+    return (float)$value == (int)$value ? nf((int)$value) : nf((float)$value, 1);
 }
 function tapi_status_tone($status) {
     return ['GOOD'=>'ok', 'WARN'=>'warn', 'BAD'=>'bad', 'NO_DATA'=>'mut', 'INFO'=>'info'][$status] ?? 'info';

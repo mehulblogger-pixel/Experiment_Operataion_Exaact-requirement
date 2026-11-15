@@ -190,7 +190,7 @@ function ops_reset_data($method) {
         }
         $res = reset_run($keys);
         flash($res['total']
-            ? number_format($res['total']) . ' record(s) removed from ' . count($res['tables']) . ' table(s). '
+            ? nf($res['total']) . ' record(s) removed from ' . count($res['tables']) . ' table(s). '
               . 'The standard lists have been put back and your login is untouched.'
             : 'There was nothing to delete in what you ticked.');
         redirect('/reset-data');

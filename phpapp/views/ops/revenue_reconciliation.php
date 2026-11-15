@@ -3,7 +3,7 @@
   // job's legacy invoice snapshot disagrees with the books ledger, so finance can drive
   // it to green before any revenue reader is switched onto the ledger (§28). Changes nothing.
   $summary = $summary ?? []; $rows = $rows ?? []; $tol = $tol ?? 1;
-  $m = fn($n) => function_exists('fmoney_short') ? fmoney_short($n) : number_format((float)$n, 2);
+  $m = fn($n) => function_exists('fmoney_short') ? fmoney_short($n) : nf((float)$n, 2);
   $green = !empty($summary['green']);
   $mode = $mode ?? 'reconciled'; $modes = $modes ?? [];
 ?>

@@ -605,8 +605,8 @@ function contract_gate($quoteId) {
     $res['pending'] = override_open($quoteId, $kind);
     $res['reason'] = $st['state'] === 'EXPIRED'
         ? 'The contract behind this order expired on ' . fdate($st['end_date'], 'an earlier date') . '.'
-        : 'The quantity sold on this order has been used up (' . rtrim(rtrim(number_format((float)$st['qty_used'], 2), '0'), '.')
-          . ' of ' . rtrim(rtrim(number_format((float)$st['qty_total'], 2), '0'), '.') . ').';
+        : 'The quantity sold on this order has been used up (' . rtrim(rtrim(nf((float)$st['qty_used'], 2), '0'), '.')
+          . ' of ' . rtrim(rtrim(nf((float)$st['qty_total'], 2), '0'), '.') . ').';
     return $res;
 }
 // Count an override against its allowance once work is actually booked.

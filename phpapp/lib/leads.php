@@ -257,6 +257,22 @@ function lead_can_mark_lost($l) {
     return leads_can_edit();
 }
 // A valid reason is one on the lost-reason list; remarks are always required.
+// DEF-SAL-025 — why LEADS are lost, for the Sales dashboard's "Why we lose" (it counted lost deals only).
+function lead_loss_reasons($days = 365) {
+    if (function_exists('leads_migrate')) leads_migrate();
+    $cut = date('Y-m-d', strtotime("-$days days"));
+    [$sw, $sa] = scope_office_clause('l.office_id');
+    $labels = function_exists('lk_options_or') ? lk_options_or('quote_lost_reason', QUOTE_LOST_REASONS) : QUOTE_LOST_REASONS;
+    $out = [];
+    try {
+        foreach (ops_all("SELECT l.lost_reason, COUNT(*) n, COALESCE(SUM(l.value),0) v FROM leads l
+                          WHERE $sw AND l.status='LOST' AND COALESCE(NULLIF(l.updated_at,''), l.created_at) >= ?
+                          GROUP BY l.lost_reason ORDER BY n DESC", array_merge($sa, [$cut])) ?: [] as $r)
+            $out[] = ['reason' => $labels[$r['lost_reason']] ?? ($r['lost_reason'] ?: 'Not recorded'), 'n' => (int)$r['n'], 'value' => (float)$r['v']];
+    } catch (Throwable $e) {}
+    return $out;
+}
+
 function lead_lost_problem($l, $reason, $note) {
     if (!lead_can_mark_lost($l)) return 'Only the person responsible for this lead (' . (trim((string)($l['owner_name'] ?? '')) ?: 'its owner')
         . ') can mark it lost. Ask them, or have it reassigned to you first.';
@@ -485,6 +501,13 @@ function lead_stalled($l, $today = null) {
     return ($l['status'] ?? '') === 'OPEN' && $sla > 0 && lead_days_in_stage($l, $today) > $sla;
 }
 
+// DEF-SAL-031 — an open lead whose "Expected to close" date has passed. It was not
+// flagged anywhere, so a lead expected in 2019 looked as healthy as one due next month.
+function lead_close_overdue($l, $today = null) {
+    $ec = substr(trim((string)($l['expected_close'] ?? '')), 0, 10);
+    return ($l['status'] ?? '') === 'OPEN' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $ec) && $ec < ($today ?: date('Y-m-d'));
+}
+
 // Module 17 — the open leads that need attention NOW: past their stage service
 // level, or with a follow-up date (next_action_on) that has come and gone. The
 // second signal finally reads next_action_on, which was stored and shown as "it
@@ -500,6 +523,8 @@ function leads_due($today = null) {
         $na = substr(trim((string)($l['next_action_on'] ?? '')), 0, 10);
         if ($na !== '' && $na < $today)
             $reasons[] = 'follow-up was due ' . fdate($na) . (trim((string)($l['next_action'] ?? '')) !== '' ? ' — ' . $l['next_action'] : '');
+        if (lead_close_overdue($l, $today))
+            $reasons[] = 'expected to close by ' . fdate(substr((string)$l['expected_close'], 0, 10)) . ' — that date has passed';
         if (!$reasons) continue;
         $out[] = $l + ['due_reasons' => $reasons, 'due_days' => lead_days_in_stage($l, $today)];
     }
@@ -600,6 +625,9 @@ function lead_create(array $b) {
         return ['err' => 'A man-month deputation places people on the customer’s site, so the site details are required. Add them, or choose man-day.'];
     if ($dep !== 'MANMONTH') $site = '';   // man-day / none carries no site
     $count = max(0, (int)($b['manpower_count'] ?? 0));
+    // DEF-SAL-017 — a man-month deputation for nobody was saved without a word.
+    if ($dep === 'MANMONTH' && $count < 1)
+        return ['err' => 'A man-month deputation places people on the customer’s site — say how many (at least 1).'];
     $skills = trim((string)($b['manpower_skills'] ?? ''));
 
     $u = current_user();
@@ -1633,6 +1661,10 @@ function ops_leads($route, $method) {
         $site = trim((string)($_POST['site_location'] ?? ''));
         if ($dep === 'MANMONTH' && $site === '') {
             flash('A man-month deputation places people on the customer’s site, so the site details are required. Add them, or choose man-day.', 'error');
+            redirect('/lead-edit?id=' . $id);
+        }
+        if ($dep === 'MANMONTH' && (int)($_POST['manpower_count'] ?? 0) < 1) {
+            flash('A man-month deputation places people on the customer’s site — say how many (at least 1).', 'error');
             redirect('/lead-edit?id=' . $id);
         }
         if ($dep !== 'MANMONTH') $site = '';

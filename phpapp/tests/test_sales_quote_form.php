@@ -110,7 +110,8 @@ t_ok(ops_val("SELECT location_id FROM quote_lines WHERE quote_id=?", [$made]) ==
      'a line can never point at another quotation\'s site');
 
 // A brand-new quotation pairs a line with its second site before it is ever saved.
-$drive($BDM, 'quote-new', 'POST', [], $base([
+// (Its own subject: the same customer and subject again minutes later is held as a repeat — DEF-SAL-037.)
+$drive($BDM, 'quote-new', 'POST', [], $base(['subject' => 'Third-party inspection — two sites',
     'loc_id' => ['0', '0'], 'loc_label' => ['Vapi works', 'Hazira yard'], 'loc_line1' => ['GIDC', 'Port road'], 'loc_city' => ['Vapi', 'Surat'],
     'l_desc' => ['At Hazira'], 'l_location' => ['new:1']]));
 $nq = (int) ops_val("SELECT MAX(id) FROM quotations");

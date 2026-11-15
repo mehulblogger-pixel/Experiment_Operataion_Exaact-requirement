@@ -452,7 +452,7 @@ function sched_resolve($row, $officeId = null, $startOverride = null, $clientId 
             $extra['basis'] = $rule['basis'];
             $extra['min_days'] = $rule['min_days'];
             $note = $m . ' month(s), 1st to the last day — ' . count($dates) . ' working day(s); '
-                  . rtrim(rtrim(number_format((float)($r['claimable'] ?? 0), 2), '0'), '.')
+                  . rtrim(rtrim(nf((float)($r['claimable'] ?? 0), 2), '0'), '.')
                   . ' man-month(s) claimable'
                   . ($rule['basis'] === 'MIN_DAYS' ? ' on a ' . (int)$rule['min_days'] . '-day basis' : ' on a calendar basis');
             break;

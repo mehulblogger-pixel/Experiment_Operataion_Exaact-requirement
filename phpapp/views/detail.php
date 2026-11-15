@@ -246,7 +246,7 @@ function addr_name($a) { return (lk_options_or('address_type', ADDRESS_TYPES)[$a
                   data-title="<?= e((string)($pq['subject'] ?? '')) ?>"
                   data-lines="<?= (int)$pq['line_count'] ?>">
             <?= e($pq['quote_no']) ?><?= (int)$pq['rev'] ? ' R' . (int)$pq['rev'] : '' ?>
-            · <?= e(cur_sym()) ?><?= number_format((float)$pq['total_amount'], 0) ?>
+            · <?= e(cur_sym()) ?><?= nf((float)$pq['total_amount'], 0) ?>
             · <?= (int)$pq['line_count'] ?> line(s)
             <?= ($pq['contract_number'] ?? '') !== '' ? ' · contract ' . e($pq['contract_number']) : ' · no contract yet' ?>
             <?= $pq['subject'] ? ' — ' . e(mb_strimwidth($pq['subject'], 0, 40, '…')) : '' ?>

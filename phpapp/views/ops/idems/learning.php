@@ -11,10 +11,10 @@
 </div>
 
 <div class="kpi-row">
-  <div class="kpi"><span class="kic">🧠</span><div class="k">Learned entries</div><div class="v"><?= number_format($stats['total']) ?></div><div class="d">distinct wordings</div></div>
-  <div class="kpi"><span class="kic">🔁</span><div class="k">Times seen</div><div class="v"><?= number_format($stats['uses']) ?></div><div class="d">across reports</div></div>
-  <div class="kpi"><span class="kic">📚</span><div class="k">Reports learned from</div><div class="v"><?= number_format($stats['reports']) ?></div><div class="d">approved / issued</div></div>
-  <div class="kpi"><span class="kic">⚠️</span><div class="k">NCR patterns</div><div class="v <?= $stats['ncr'] ? 'down' : '' ?>"><a href="/learning?scope=NCR"><?= number_format($stats['ncr']) ?></a></div><div class="d">recurring causes</div></div>
+  <div class="kpi"><span class="kic">🧠</span><div class="k">Learned entries</div><div class="v"><?= nf($stats['total']) ?></div><div class="d">distinct wordings</div></div>
+  <div class="kpi"><span class="kic">🔁</span><div class="k">Times seen</div><div class="v"><?= nf($stats['uses']) ?></div><div class="d">across reports</div></div>
+  <div class="kpi"><span class="kic">📚</span><div class="k">Reports learned from</div><div class="v"><?= nf($stats['reports']) ?></div><div class="d">approved / issued</div></div>
+  <div class="kpi"><span class="kic">⚠️</span><div class="k">NCR patterns</div><div class="v <?= $stats['ncr'] ? 'down' : '' ?>"><a href="/learning?scope=NCR"><?= nf($stats['ncr']) ?></a></div><div class="d">recurring causes</div></div>
 </div>
 
 <?php if (!$stats['total']): ?>

@@ -18,7 +18,7 @@
   <div style="padding:12px 16px;background:var(--soft);border-bottom:1px solid var(--line);display:flex;gap:14px;flex-wrap:wrap;align-items:end">
     <div class="ff" style="flex:1;min-width:220px"><label for="pname">Name</label>
       <input class="form-control" id="pname" name="pipeline_name" value="<?= e($p['name']) ?>" maxlength="120" <?= $canEdit?'':'disabled' ?>></div>
-    <div class="ff-check"><input type="checkbox" name="active" id="pactive" value="1" <?= (int)$p['active']?'checked':'' ?> <?= $canEdit?'':'disabled' ?>>
+    <div class="ff-check"><input type="checkbox" name="pipe_active" id="pactive" value="1" <?= (int)$p['active']?'checked':'' ?> <?= $canEdit?'':'disabled' ?>>
       <label for="pactive">In use</label></div>
   </div>
 
@@ -26,7 +26,7 @@
     <table class="dt">
       <caption class="sr-only">Stages, in order</caption>
       <thead><tr>
-        <th scope="col" style="width:46px">Order</th>
+        <th scope="col" style="width:76px">Order</th>
         <th scope="col">Stage name</th>
         <th scope="col">What it means</th>
         <th scope="col" class="num">Probability</th>
@@ -40,7 +40,8 @@
         <tr><td colspan="8" class="muted" style="padding:18px;text-align:center">No stages yet — add the first one below.</td></tr>
       <?php else: foreach ($stages as $i => $s): $sid = (int)$s['id']; ?>
         <tr<?= (int)$s['active'] ? '' : ' style="opacity:.55"' ?>>
-          <td><?= $i + 1 ?></td>
+          <td><label class="sr-only" for="o-<?= $sid ?>">Order</label>
+              <input class="form-control" id="o-<?= $sid ?>" name="order[<?= $sid ?>]" type="number" min="1" step="1" value="<?= $i + 1 ?>" style="width:64px;text-align:right" title="Change the number to move this stage, then Save" <?= $canEdit?'':'disabled' ?>></td>
           <td><label class="sr-only" for="n-<?= $sid ?>">Stage name</label>
               <input class="form-control" id="n-<?= $sid ?>" name="name[<?= $sid ?>]" value="<?= e($s['name']) ?>" maxlength="120" style="min-width:170px" <?= $canEdit?'':'disabled' ?>></td>
           <td><label class="sr-only" for="k-<?= $sid ?>">What this stage means</label>
@@ -103,7 +104,7 @@
       <span class="muted" style="font-size:12px">A deal past this shows as stopped moving. 0 means never chase it.</span></div>
   </div>
   <button class="btn" style="margin-top:12px">Add it</button>
-  <span class="muted" style="font-size:12.5px;margin-left:8px">It goes on the end; drag order by changing the rows above and saving.</span>
+  <span class="muted" style="font-size:12.5px;margin-left:8px">It goes on the end. To move it (for example before Won), change its Order number in the table above and press Save.</span>
 </form>
 <?php endif; ?>
 

@@ -5,7 +5,7 @@ $e = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES);
 $isCn = fn($r) => ($r['doc'] ?? '') === 'credit_note';
 $sum = fn($k) => array_sum(array_map(fn($r) => ($isCn($r) ? -1 : 1) * (int) $r[$k], $rows));   // credit notes net off
 $cnCount = count(array_filter($rows, $isCn));
-$money = fn($n) => '₹' . number_format((int) $n);
+$money = fn($n) => '₹' . nf((int) $n);
 $st = fn($c) => (defined('GST_STATES') && isset(GST_STATES[$c])) ? GST_STATES[$c] : (string) $c;
 $b2b = count(array_filter($rows, fn($r) => $r['buyer']['gstin'] !== '' && ($r['doc'] ?? '') !== 'credit_note'));
 $mLabel = fn($m) => date('F Y', strtotime($m . '-01'));

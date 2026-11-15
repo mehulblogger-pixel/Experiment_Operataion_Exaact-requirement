@@ -4,8 +4,8 @@
 $d = $d ?? []; $f = $d['f'] ?? [];
 $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
 $sym = function_exists('cur_sym') ? cur_sym() : '₹';
-$m = function ($v) use ($sym) { return function_exists('fmoney_short') ? fmoney_short($v) : ($sym . number_format((float)$v)); };
-$pct = fn($v) => rtrim(rtrim(number_format((float)$v, 1), '0'), '.') . '%';
+$m = function ($v) use ($sym) { return function_exists('fmoney_short') ? fmoney_short($v) : ($sym . nf((float)$v)); };
+$pct = fn($v) => rtrim(rtrim(nf((float)$v, 1), '0'), '.') . '%';
 $K = $d['kpi'] ?? []; $C = $d['conv'] ?? []; $PL = $d['pl'] ?? [];
 // query-string builder that preserves other filters
 $qs = function ($over = []) use ($f) {

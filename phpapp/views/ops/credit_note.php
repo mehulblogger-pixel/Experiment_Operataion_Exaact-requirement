@@ -5,10 +5,10 @@
 // register line. Data: $inv (the credit note).
 $e = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES);
 $inv = is_array($inv ?? null) ? $inv : [];
-$money = fn($n) => '₹' . number_format((int) $n);
+$money = fn($n) => '₹' . nf((int) $n);
 $sup = (array) ($inv['supplier'] ?? []); $buy = (array) ($inv['buyer'] ?? []);
 $state = fn($c) => (defined('GST_STATES') && isset(GST_STATES[$c])) ? GST_STATES[$c] . ' (' . $c . ')' : (string) $c;
-$pct = fn($r) => rtrim(rtrim(number_format((float) $r, 2), '0'), '.') . '%';
+$pct = fn($r) => rtrim(rtrim(nf((float) $r, 2), '0'), '.') . '%';
 $fd = fn($d) => function_exists('fdate') ? fdate($d) : $d;
 $logo = function_exists('commercial_logo_data_uri') ? commercial_logo_data_uri() : '';
 $words = function_exists('amount_in_words_inr') ? amount_in_words_inr((int) ($inv['total'] ?? 0)) : '';

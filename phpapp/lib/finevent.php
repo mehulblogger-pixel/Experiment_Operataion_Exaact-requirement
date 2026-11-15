@@ -140,7 +140,7 @@ function financial_events_render(array $f = [], $title = 'Money timeline') {
     if (!$ev) return;
     $roll = financial_rollup($f);
     $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
-    $m = function ($n) { return function_exists('fmoney_short') ? fmoney_short($n) : number_format((float)$n); };
+    $m = function ($n) { return function_exists('fmoney_short') ? fmoney_short($n) : nf((float)$n); };
     $tone = ['COMMIT'=>'p-mut', 'BILLED'=>'p-info', 'IN'=>'p-ok', 'CREDIT'=>'p-warn', 'REVERSE'=>'p-bad'];
     echo '<div class="panel"><h3 class="tab-sub" style="margin-top:0">' . $e($title)
        . ' <span class="muted" style="font-weight:400;font-size:12px">— quotes, invoices, receipts &amp; credits in one line</span></h3>';

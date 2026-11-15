@@ -110,7 +110,7 @@ function mkt_plan_change_quote($kind, $subId, $planId, $period = 'MONTH', $onDat
     $cur = mkt_active_sub($kind, $subId);
     $q = ['ok' => true, 'plan' => $plan, 'period' => $period, 'list' => $list, 'credit' => 0.0, 'price' => $list,
           'due' => 0.0, 'extra_days' => 0, 'current' => $cur];
-    $fmt = fn($n) => number_format((float)$n, 2);
+    $fmt = fn($n) => nf((float)$n, 2);
     if (!$cur) return array_merge($q, ['type' => 'NEW', 'starts' => $today, 'expires' => mkt_period_end($today, $period),
         'msg' => 'Starts today.']);
     $curPeriod = strtoupper((string)$cur['period']) === 'YEAR' ? 'YEAR' : 'MONTH';
@@ -153,7 +153,7 @@ function mkt_plan_change_apply($kind, $subId, $planId, $period = 'MONTH', $by = 
         db()->prepare("UPDATE mkt_subscriptions SET pending_plan_id=?, pending_period=? WHERE id=?")
             ->execute([(int)$plan['id'], $q['period'], (int)$q['current']['id']]);
         return [true, 'Your plan changes to ' . $plan['name'] . ' on ' . $q['starts'] . '. '
-            . ($q['due'] > 0 ? 'Nothing is charged now; you will pay ' . number_format($q['due'], 2) . ' for it then.' : 'Nothing is charged.'),
+            . ($q['due'] > 0 ? 'Nothing is charged now; you will pay ' . nf($q['due'], 2) . ' for it then.' : 'Nothing is charged.'),
             (int)$q['current']['id']];
     }
     $list = $q['list']; $discount = 0.0; $code = '';
@@ -181,7 +181,7 @@ function mkt_plan_change_apply($kind, $subId, $planId, $period = 'MONTH', $by = 
                    $code, round($discount, 2), round($credit, 2), (string)$by, date('c')]);
     $id = (int)db()->lastInsertId();
     $msg = $q['type'] === 'UPGRADE'
-        ? 'Upgraded to ' . $plan['name'] . ' from today, until ' . $expires . '.' . ($credit > 0 ? ' Your unused time (' . number_format($credit, 2) . ') was taken off.' : '')
+        ? 'Upgraded to ' . $plan['name'] . ' from today, until ' . $expires . '.' . ($credit > 0 ? ' Your unused time (' . nf($credit, 2) . ') was taken off.' : '')
         : ($starts > date('Y-m-d') ? $plan['name'] . ' is booked from ' . $starts . ' to ' . $expires . ', straight after your current period.'
                                    : 'Subscribed to ' . $plan['name'] . ' until ' . $expires . '.');
     return [true, $msg, $id];

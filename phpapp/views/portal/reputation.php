@@ -9,7 +9,7 @@
 <p class="plead" style="margin:0 0 12px">Professionals rate their experience of working for you — including how you paid. This is visible to freelancers deciding whether to take your jobs, so keeping it strong helps you hire.</p>
 
 <div class="pcard" style="max-width:760px;display:flex;gap:26px;flex-wrap:wrap;align-items:center">
-  <div><div style="font-size:30px;font-weight:800;color:#0a5c5c"><?= $summary['avg_stars'] !== null ? number_format((float)$summary['avg_stars'], 1) : '—' ?></div>
+  <div><div style="font-size:30px;font-weight:800;color:#0a5c5c"><?= $summary['avg_stars'] !== null ? nf((float)$summary['avg_stars'], 1) : '—' ?></div>
     <div class="muted" style="font-size:12px"><?= (int)($summary['count'] ?? 0) ?> rating<?= (int)($summary['count'] ?? 0) === 1 ? '' : 's' ?></div></div>
   <?php if (($summary['paid_fair_pct'] ?? null) !== null): ?>
     <div><div style="font-size:22px;font-weight:700"><?= (int)$summary['paid_fair_pct'] ?>%</div><div class="muted" style="font-size:12px">paid on time</div></div>

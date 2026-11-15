@@ -76,8 +76,8 @@ $deptSel = function ($field, $cur) use ($depts, $e) {
   <div class="msg msg-info" style="margin:10px 0">
     From costing <a href="/project-costing?id=<?= (int) $pcH['id'] ?>"><?= $e($pcH['code']) ?></a>, role <b><?= $e($pcLn['role_label']) ?></b>
     <?= $pcQ ? '· quotation <a href="/quote?id=' . (int) $pcQ['id'] . '">' . $e($pcQ['quote_no']) . '</a> accepted by the client' : '' ?>.
-    Budget per person: cost <b><?= $e(number_format($pcC['loaded'])) ?></b>, billed at <b><?= $e(number_format($pcC['proposed'])) ?></b>
-    (<?= $e(number_format($pcC['margin'], 1)) ?>% margin) per <?= ($pcH['basis'] ?? '') === 'DAILY' ? 'day' : 'month' ?>.
+    Budget per person: cost <b><?= $e(nf($pcC['loaded'])) ?></b>, billed at <b><?= $e(nf($pcC['proposed'])) ?></b>
+    (<?= $e(nf($pcC['margin'], 1)) ?>% margin) per <?= ($pcH['basis'] ?? '') === 'DAILY' ? 'day' : 'month' ?>.
   </div>
 <?php endif; endif; ?>
 <?php if ($r && function_exists('na_html')) echo na_html('hiring_request', $r + ['__remaining' => (int) $remaining]); ?>
@@ -149,7 +149,7 @@ $deptSel = function ($field, $cur) use ($depts, $e) {
       //  page rather than trusting the code. The symbol is added only on the
       //  plain-number fallback.
       $dFmt = function ($n) use ($dSym) {
-        return function_exists('fmoney_short') ? fmoney_short($n) : $dSym . number_format($n, 0);
+        return function_exists('fmoney_short') ? fmoney_short($n) : $dSym . nf($n, 0);
       };
     ?>
     <?php if ($mayDecide && !empty($dC['has'])): ?>
@@ -158,7 +158,7 @@ $deptSel = function ($field, $cur) use ($depts, $e) {
         <span style="font-size:12px">&mdash;
           <?php if ($dC['per_person'] > 0): ?>
             <?= (int) $dC['qty'] ?> &times; <?= $e($dFmt($dC['per_person'])) ?>
-            <?= $dC['per_period'] && $dC['months'] > 0 ? '&times; ' . $e(rtrim(rtrim(number_format($dC['months'], 2), '0'), '.')) . ' months' : '' ?>
+            <?= $dC['per_period'] && $dC['months'] > 0 ? '&times; ' . $e(rtrim(rtrim(nf($dC['months'], 2), '0'), '.')) . ' months' : '' ?>
           <?php endif; ?>
           <?= $dC['onetime'] > 0 ? ($dC['per_person'] > 0 ? ' + ' : '') . 'one-time ' . $e($dFmt($dC['onetime'])) : '' ?>
         </span>
@@ -705,11 +705,11 @@ if ($r && ($steps || !empty($r['submitted_at']))): ?>
       <tr><th>Estimated cost</th><td>
         <?php if (empty($sC['has'])): ?><span class="muted">not estimated</span>
         <?php else: ?>
-          <b><?= $e(function_exists('fmoney_short') ? fmoney_short($sC['total']) : $sSym . number_format($sC['total'], 0)) ?></b>
+          <b><?= $e(function_exists('fmoney_short') ? fmoney_short($sC['total']) : $sSym . nf($sC['total'], 0)) ?></b>
           <span class="muted" style="font-size:12px">—
-            <?php if ($sC['per_person'] > 0): ?><?= (int) $sC['qty'] ?> &times; <?= $e($sSym . number_format($sC['per_person'], 0)) ?> <?= $e(mb_strtolower((string) $sC['basis_label'])) ?><?php endif; ?>
-            <?php if ($sC['per_period'] && $sC['months'] > 0): ?> &times; <?= $e(rtrim(rtrim(number_format($sC['months'], 2), '0'), '.')) ?> months<?php endif; ?>
-            <?php if ($sC['onetime'] > 0): ?><?= $sC['per_person'] > 0 ? ' + ' : '' ?>one-time <?= $e($sSym . number_format($sC['onetime'], 0)) ?><?php endif; ?>
+            <?php if ($sC['per_person'] > 0): ?><?= (int) $sC['qty'] ?> &times; <?= $e($sSym . nf($sC['per_person'], 0)) ?> <?= $e(mb_strtolower((string) $sC['basis_label'])) ?><?php endif; ?>
+            <?php if ($sC['per_period'] && $sC['months'] > 0): ?> &times; <?= $e(rtrim(rtrim(nf($sC['months'], 2), '0'), '.')) ?> months<?php endif; ?>
+            <?php if ($sC['onetime'] > 0): ?><?= $sC['per_person'] > 0 ? ' + ' : '' ?>one-time <?= $e($sSym . nf($sC['onetime'], 0)) ?><?php endif; ?>
           </span>
           <?php if (!empty($sC['partial'])): ?><span class="pill p-warn" style="font-size:11px;margin-left:6px">no duration — one period only</span><?php endif; ?>
         <?php endif; ?>

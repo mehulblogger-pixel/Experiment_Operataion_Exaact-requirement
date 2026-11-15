@@ -11,7 +11,7 @@ $sym = $cur === 'INR' ? '₹' : ($cur . ' ');
 $payOn = !empty($cfg['enabled']);
 $onMods = $sub['modules'] ?? []; $addable = $sub['addable'] ?? [];
 $modLabel = fn($k) => $modules[$k][0] ?? ucfirst($k);
-$fmt = fn($n) => ((int) $n < 0 ? '− ' : '') . $sym . number_format(abs((int) $n));   // a refund is a minus line
+$fmt = fn($n) => ((int) $n < 0 ? '− ' : '') . $sym . nf(abs((int) $n));   // a refund is a minus line
 ?>
 <div class="master-head">
   <div><h1>Your subscription</h1>

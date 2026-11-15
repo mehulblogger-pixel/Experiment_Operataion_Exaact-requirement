@@ -3,7 +3,7 @@
 // private roster, and put people forward to open requirements on the marketplace.
 $org = $org ?? []; $bench = $bench ?? []; $summary = $summary ?? []; $allocs = $allocs ?? [];
 $reqs = $reqs ?? []; $disciplines = $disciplines ?? [];
-$inr = fn($n) => (float)$n > 0 ? '₹' . number_format((int)round((float)$n)) : '—';
+$inr = fn($n) => (float)$n > 0 ? '₹' . nf((int)round((float)$n)) : '—';
 $avPill = function ($s) {
     $s = strtoupper((string)$s);
     $m = ['AVAILABLE'=>['Available','ok'],'ALLOCATED'=>['Allocated','warn'],'OFF'=>['Off','muted']];

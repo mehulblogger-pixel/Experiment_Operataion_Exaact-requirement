@@ -2067,7 +2067,7 @@ function idems_expediting_advisory($doc, $fields = null, $data = null, $prev = n
     if ($fields === null) $fields = idems_fields((int)($doc['report_type_id'] ?? 0));
     if ($data === null) { $data = json_decode($doc['data'] ?? '[]', true); if (!is_array($data)) $data = []; }
     $sections = idems_sections((int)($doc['report_type_id'] ?? 0));
-    $num = function($v){ return rtrim(rtrim(number_format((float)$v,1),'0'),'.'); };
+    $num = function($v){ return rtrim(rtrim(nf((float)$v,1),'0'),'.'); };
     $fmtD = function($s){ $s=trim((string)$s); if($s==='')return ''; $t=strtotime($s); return $t?date('d-M-Y',$t):$s; };
     // Locate a table field's rows + a label→column-key map for the columns we need.
     $tableRows = function($fkey) use ($fields,$data){
@@ -2266,7 +2266,7 @@ function idems_expediting_risk($doc, $fields = null, $data = null, $vperf = null
     $req = $fc['required']!=='' ? $pd($fc['required']) : null; $tnow = $pd($today);
     $daysToReq = ($req && $tnow) ? (int)floor(($req - $tnow)/86400) : null;
     if ($daysToReq !== null && $pct !== null && $daysToReq <= 30 && $daysToReq >= 0 && $pct < 80)
-        $add('Schedule pressure', 'Only '.$daysToReq.' day'.($daysToReq==1?'':'s').' to the required date at '.rtrim(rtrim(number_format($pct,1),'0'),'.').'% progress', min(16, (int)round((80-$pct)/5) + (30-$daysToReq)/3), 'warn');
+        $add('Schedule pressure', 'Only '.$daysToReq.' day'.($daysToReq==1?'':'s').' to the required date at '.rtrim(rtrim(nf($pct,1),'0'),'.').'% progress', min(16, (int)round((80-$pct)/5) + (30-$daysToReq)/3), 'warn');
     elseif ($daysToReq !== null && $daysToReq < 0 && ($ms['total']===0 || $ms['complete']<$ms['total']))
         $add('Past required date', 'The required date has passed and work is not complete', 14, 'bad');
 
@@ -2284,9 +2284,9 @@ function idems_expediting_risk($doc, $fields = null, $data = null, $vperf = null
         $vperf = idems_vendor_expediting_perf((int)$doc['vendor_id']);
     if (is_array($vperf)) {
         $rel = $vperf['commitments']['reliability_pct'] ?? null;
-        if ($rel !== null && $rel < 70) $add('Weak commitment track record', 'Vendor has met only '.rtrim(rtrim(number_format($rel,1),'0'),'.').'% of past commitments on time', min(12, (int)round((70-$rel)/5)), 'warn');
+        if ($rel !== null && $rel < 70) $add('Weak commitment track record', 'Vendor has met only '.rtrim(rtrim(nf($rel,1),'0'),'.').'% of past commitments on time', min(12, (int)round((70-$rel)/5)), 'warn');
         $opt = $vperf['forecast']['optimism_pct'] ?? null;
-        if ($opt !== null && $opt >= 50) $add('Chronically optimistic forecasts', 'Vendor forecasts ran optimistic on '.rtrim(rtrim(number_format($opt,1),'0'),'.').'% of past reports', min(8, (int)round($opt/12)), 'warn');
+        if ($opt !== null && $opt >= 50) $add('Chronically optimistic forecasts', 'Vendor forecasts ran optimistic on '.rtrim(rtrim(nf($opt,1),'0'),'.').'% of past reports', min(8, (int)round($opt/12)), 'warn');
     }
 
     $score = min(100, $score);
@@ -2722,7 +2722,7 @@ function idems_vendor_run_reminders($today = null) {
                 ops_mail($to, "Vendor re-assessment due: $nm ({$vp['reassess_on']})",
                     "$nm is due for re-assessment on {$vp['reassess_on']}.\n\n"
                     . "Current status: " . (lk_options_or('vendor_approval_status', [])[$vp['approval_status']] ?? $vp['approval_status'])
-                    . "\nLast score: " . ($vp['last_score'] !== null ? rtrim(rtrim(number_format((float)$vp['last_score'],1),'0'),'.') . '/100' : '—')
+                    . "\nLast score: " . ($vp['last_score'] !== null ? rtrim(rtrim(nf((float)$vp['last_score'],1),'0'),'.') . '/100' : '—')
                     . "\n\nRaise a Vendor Assessment to re-qualify this vendor.");
                 $reminded++;
             }
@@ -3009,10 +3009,10 @@ function idems_qa_quantity_checks($f, $rows) {
         $where = ($f['label'] ?? 'Table') . ' — row ' . ($i+1);
         if ($offK !== null && ($off = $num($rr[$offK] ?? '')) !== null) {
             $sum = $pass + $rej + $hold;
-            if (abs($sum - $off) > 0.001) $issues[] = ['where' => $where, 'why' => 'Offered ' . rtrim(rtrim(number_format($off,2),'0'),'.') . ' ≠ Passed ' . rtrim(rtrim(number_format($pass,2),'0'),'.') . ' + Rejected ' . rtrim(rtrim(number_format($rej,2),'0'),'.') . ($holdK!==null?' + Hold ' . rtrim(rtrim(number_format($hold,2),'0'),'.'):'') . ' = ' . rtrim(rtrim(number_format($sum,2),'0'),'.') . ' (difference ' . rtrim(rtrim(number_format($sum-$off,2),'0'),'.') . ')'];
+            if (abs($sum - $off) > 0.001) $issues[] = ['where' => $where, 'why' => 'Offered ' . rtrim(rtrim(nf($off,2),'0'),'.') . ' ≠ Passed ' . rtrim(rtrim(nf($pass,2),'0'),'.') . ' + Rejected ' . rtrim(rtrim(nf($rej,2),'0'),'.') . ($holdK!==null?' + Hold ' . rtrim(rtrim(nf($hold,2),'0'),'.'):'') . ' = ' . rtrim(rtrim(nf($sum,2),'0'),'.') . ' (difference ' . rtrim(rtrim(nf($sum-$off,2),'0'),'.') . ')'];
         } elseif ($poK !== null && ($po = $num($rr[$poK] ?? '')) !== null && $balK !== null) {
             $bal = $num($rr[$balK] ?? '') ?? 0; $sum = $pass + $rej + $hold + $bal;
-            if (abs($sum - $po) > 0.001) $issues[] = ['where' => $where, 'why' => 'PO Qty ' . rtrim(rtrim(number_format($po,2),'0'),'.') . ' ≠ Passed + Rejected + Hold + Balance = ' . rtrim(rtrim(number_format($sum,2),'0'),'.') . ' (difference ' . rtrim(rtrim(number_format($sum-$po,2),'0'),'.') . ')'];
+            if (abs($sum - $po) > 0.001) $issues[] = ['where' => $where, 'why' => 'PO Qty ' . rtrim(rtrim(nf($po,2),'0'),'.') . ' ≠ Passed + Rejected + Hold + Balance = ' . rtrim(rtrim(nf($sum,2),'0'),'.') . ' (difference ' . rtrim(rtrim(nf($sum-$po,2),'0'),'.') . ')'];
         }
     }
     return $issues;
@@ -3192,11 +3192,11 @@ function idems_qa_run($doc, $fields = null, $data = null, $srcDocs = null) {
             $rejects  = $recRaw !== '' && strpos($recRaw, 'not approved') !== false;
             if ($approves && $ov < 50)
                 $add('high', 'scorecard', 'Recommendation approves the vendor despite a low score', 'Recommendation',
-                     'The assessment score is ' . rtrim(rtrim(number_format($ov,1),'0'),'.') . '/100 (' . $sc['band'] . '), but the recommendation is "' . $recRaw . '".',
+                     'The assessment score is ' . rtrim(rtrim(nf($ov,1),'0'),'.') . '/100 (' . $sc['band'] . '), but the recommendation is "' . $recRaw . '".',
                      'Recommendation', 'Reconcile the recommendation with the score, or record the justification.');
             if ($rejects && $ov >= 75)
                 $add('medium', 'scorecard', 'Recommendation rejects a vendor with a strong score', 'Recommendation',
-                     'The assessment score is ' . rtrim(rtrim(number_format($ov,1),'0'),'.') . '/100 (' . $sc['band'] . '), but the vendor is not approved.',
+                     'The assessment score is ' . rtrim(rtrim(nf($ov,1),'0'),'.') . '/100 (' . $sc['band'] . '), but the vendor is not approved.',
                      'Recommendation', 'Confirm the reason for not approving despite the score.');
         }
     }
@@ -3236,7 +3236,7 @@ function idems_qa_run($doc, $fields = null, $data = null, $srcDocs = null) {
                     $pf = idems_vendor_performance($vidP);
                     if ($pf && $pf['score'] !== null && (float)$pf['score'] < 50)
                         $add('medium', 'vendor', 'Live performance is poor despite the approval recommendation', 'Vendor 360',
-                             'The vendor\'s live performance score is ' . rtrim(rtrim(number_format((float)$pf['score'],1),'0'),'.') . '/100 (' . $pf['band'] . '), driven by open quality issues.', 'Vendor 360',
+                             'The vendor\'s live performance score is ' . rtrim(rtrim(nf((float)$pf['score'],1),'0'),'.') . '/100 (' . $pf['band'] . '), driven by open quality issues.', 'Vendor 360',
                              'Review the open reports, NCRs and complaints on the vendor page before approving.');
                 } catch (Throwable $e) {}
             }
@@ -3273,7 +3273,7 @@ function idems_qa_run($doc, $fields = null, $data = null, $srcDocs = null) {
             $sc = function_exists('idems_score_doc') ? idems_score_doc($sections ?? idems_sections((int)($doc['report_type_id'] ?? 0)), $fields, $data) : null;
             if ($sc && ($sc['overall'] ?? null) !== null && (float)$sc['overall'] >= 80 && ($es['milestones']['delayed'] ?? 0) > 0)
                 $add('medium', 'expediting', 'High overall progress despite a delayed milestone', 'Milestone status',
-                     'Overall progress reads ' . rtrim(rtrim(number_format((float)$sc['overall'],1),'0'),'.') . '% but ' . $es['milestones']['delayed'] . ' milestone(s) are marked delayed.', 'Milestone status',
+                     'Overall progress reads ' . rtrim(rtrim(nf((float)$sc['overall'],1),'0'),'.') . '% but ' . $es['milestones']['delayed'] . ' milestone(s) are marked delayed.', 'Milestone status',
                      'Check that the stage weights and the milestone status are consistent.');
             // d) Open quality issues against the vendor that may affect delivery.
             $vp = (int)($doc['vendor_id'] ?? 0);
@@ -3290,7 +3290,7 @@ function idems_qa_run($doc, $fields = null, $data = null, $srcDocs = null) {
                 $dr = idems_expediting_dispatch_readiness($fields, $data);
                 if ($dr && !empty($dr['blockers']))
                     $add('high', 'expediting', 'Dispatch is blocked on ' . count($dr['blockers']) . ' mandatory item(s)', 'Dispatch readiness',
-                         'Dispatch readiness is ' . ($dr['pct'] === null ? '—' : rtrim(rtrim(number_format((float)$dr['pct'],1),'0'),'.') . '%') . ', but mandatory item(s) are not met: ' . implode('; ', array_slice($dr['blockers'], 0, 6)) . '.', 'Dispatch readiness',
+                         'Dispatch readiness is ' . ($dr['pct'] === null ? '—' : rtrim(rtrim(nf((float)$dr['pct'],1),'0'),'.') . '%') . ', but mandatory item(s) are not met: ' . implode('; ', array_slice($dr['blockers'], 0, 6)) . '.', 'Dispatch readiness',
                          'Close the mandatory blocker(s) before dispatch, regardless of the overall %.');
             }
         } catch (Throwable $e) {}
@@ -7194,7 +7194,7 @@ function idems_balance_break($r) {
 // worth snapshotting (so the row simply doesn't print). Deterministic — no LLM.
 function idems_report_kpis($doc, $sections, $fields, $data) {
     $code = strtoupper((string)($doc['type_code'] ?? ''));
-    $num  = function($v){ return rtrim(rtrim(number_format((float)$v,1),'0'),'.'); };
+    $num  = function($v){ return rtrim(rtrim(nf((float)$v,1),'0'),'.'); };
     // Pull the first non-empty value for any of the given field keys, mapped
     // through its options so a stored code reads as its label.
     $fieldVal = function($keys) use ($fields,$data) {
@@ -7447,7 +7447,7 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
         } else {
             $cardLbl = $isER ? 'OVERALL PROGRESS' : 'ASSESSMENT SCORE';
             $p->text($tx, $cardLbl, 8, true, [110,110,110]);
-            $ovTxt = rtrim(rtrim(number_format((float)$scard['overall'],1),'0'),'.');
+            $ovTxt = rtrim(rtrim(nf((float)$scard['overall'],1),'0'),'.');
             $p->y = $cardY + 9; $p->text($tx + 120, $ovTxt . ($isER ? '%' : ' / 100'), 13, true, $oc);
             $p->y = $cardY + 9; $p->text($ml, strtoupper($cardBand), 9, true, $oc, $right, 'R');
         }
@@ -7460,7 +7460,7 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
             $p->rectFill($barX, $by + 1, $barW, 5, [225,227,230]);
             $frac = max(0.02, min(1, ((float)$b['score'])/100));
             $p->rectFill($barX, $by + 1, $barW*$frac, 5, $c);
-            $p->y = $by; $p->text($ml, rtrim(rtrim(number_format((float)$b['score'],1),'0'),'.'), 8, true, $c, $right, 'R');
+            $p->y = $by; $p->text($ml, rtrim(rtrim(nf((float)$b['score'],1),'0'),'.'), 8, true, $c, $right, 'R');
             $by += 12;
         }
         $p->y = $cardY + $need - 6; $p->gap(6);
@@ -9064,6 +9064,11 @@ function ops_idems_templates($route, $method) {
             'doc_revision'=>trim($_POST['doc_revision'] ?? ''), 'issue_date'=>trim($_POST['issue_date'] ?? ''),
             'active'=>!empty($_POST['active'])?1:0, 'is_default'=>!empty($_POST['is_default'])?1:0,
         ];
+        // DEF-SAL-034 — a format with no name was saved as a nameless draft nobody could find again.
+        if ($vals['name'] === '') {
+            flash('Give the report format a name (for example "Client A — Inspection Report format") — nothing was saved.', 'error');
+            redirect($id ? '/report-template-edit?id=' . $id : '/report-templates');
+        }
         // uploaded .docx
         if (!empty($_FILES['tpl']['tmp_name']) && is_uploaded_file($_FILES['tpl']['tmp_name'])) {
             $bytes = file_get_contents($_FILES['tpl']['tmp_name']);
@@ -10653,7 +10658,7 @@ function idems_ai_provenance($chars = null, $files = 0) {
     $a = function_exists('ai_active') ? ai_active() : null;
     $prov = $a ? ($a['provider'] . '/' . $a['model']) : 'unknown provider';
     $bits = ['sent to ' . $prov];
-    if ($chars !== null) $bits[] = number_format((int)$chars) . ' chars';
+    if ($chars !== null) $bits[] = nf((int)$chars) . ' chars';
     if ((int)$files > 0)  $bits[] = (int)$files . ' file(s)';
     return implode(' · ', $bits);
 }

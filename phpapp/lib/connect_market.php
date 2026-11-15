@@ -452,8 +452,8 @@ function cx_requirement_from_requisition($requisitionId) {
     $lines = [];
     foreach ([['skills', 'Skills'], ['qualification', 'Qualification'], ['relevant_experience', 'Experience']] as [$k, $lbl])
         if (trim((string)($rq[$k] ?? '')) !== '') $lines[] = $lbl . ': ' . trim((string)$rq[$k]);
-    if ((float)($rq['experience_min'] ?? 0) > 0) $lines[] = 'At least ' . rtrim(rtrim(number_format((float)$rq['experience_min'], 1), '0'), '.') . ' years\' experience';
-    if ($months > 0) $lines[] = 'Duration: about ' . rtrim(rtrim(number_format($months, 1), '0'), '.') . ' month' . ($months == 1 ? '' : 's');
+    if ((float)($rq['experience_min'] ?? 0) > 0) $lines[] = 'At least ' . rtrim(rtrim(nf((float)$rq['experience_min'], 1), '0'), '.') . ' years\' experience';
+    if ($months > 0) $lines[] = 'Duration: about ' . rtrim(rtrim(nf($months, 1), '0'), '.') . ' month' . ($months == 1 ? '' : 's');
     foreach ([['duty_hours', 'Duty hours'], ['shift', 'Shift']] as [$k, $lbl]) if (trim((string)($rq[$k] ?? '')) !== '') $lines[] = $lbl . ': ' . trim((string)$rq[$k]);
     if (trim((string)($rq['responsibilities'] ?? '')) !== '') $lines[] = "\n" . trim((string)$rq['responsibilities']);
     $id = cx_requirement_create([
@@ -654,7 +654,7 @@ function cx_requirement_replace($requirementId, $newApplicationId, array $in = [
                 'rate_unit' => $eng['rate_unit'], 'rate_inclusive' => $eng['rate_inclusive'], 'voucher_cadence' => $eng['voucher_cadence'],
                 'reimb_terms' => $eng['reimb_terms'], 'shift' => $eng['shift'], 'notes' => 'Replaces ' . $oldName,
             ]);
-            $msg .= $bok ? ' A booking for what is left' . ($left > 0 ? ' (' . rtrim(rtrim(number_format($left, 2), '0'), '.') . ' ' . ($eng['rate_unit'] ?: 'day') . '(s))' : '') . ' is recorded at their rate — check the dates.' : ' Record their booking.';
+            $msg .= $bok ? ' A booking for what is left' . ($left > 0 ? ' (' . rtrim(rtrim(nf($left, 2), '0'), '.') . ' ' . ($eng['rate_unit'] ?: 'day') . '(s))' : '') . ' is recorded at their rate — check the dates.' : ' Record their booking.';
         } else {
             $msg .= ' Record their booking.';
         }
@@ -764,7 +764,7 @@ function ops_connect_requirements($route, $method) {
                 setting_set('connect_commission_pct', $pct);
                 $share = isset($_POST['client_share']) ? max(0, min(100, (float)$_POST['client_share'])) : (function_exists('connect_commission_client_share') ? connect_commission_client_share() : 50);
                 setting_set('connect_commission_client_share', $share);
-                $nf = fn($n) => rtrim(rtrim(number_format((float)$n, 2), '0'), '.');
+                $nf = fn($n) => rtrim(rtrim(nf((float)$n, 2), '0'), '.');
                 flash('Platform commission set to ' . $nf($pct) . '% of the professional\'s fee — the client pays ' . $nf($share) . '% of it, the professional ' . $nf(100 - $share) . '%. New vouchers use it.');
             } else {
                 flash('Only an administrator can change the platform commission.', 'error');

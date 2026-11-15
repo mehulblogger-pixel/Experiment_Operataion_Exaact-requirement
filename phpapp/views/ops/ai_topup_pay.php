@@ -3,16 +3,16 @@
   $cur = $currency ?? 'INR'; $sym = $cur === 'INR' ? '₹' : ($cur . ' ');
 ?>
 <div class="master-head"><div><h1>Buy more AI actions</h1>
-  <p class="sub" style="margin:2px 0 0"><strong><?= $size ?></strong> extra AI actions for this month — <strong><?= e($sym . number_format($price)) ?></strong>.</p></div></div>
+  <p class="sub" style="margin:2px 0 0"><strong><?= $size ?></strong> extra AI actions for this month — <strong><?= e($sym . nf($price)) ?></strong>.</p></div></div>
 
 <div class="panel" style="max-width:520px;text-align:center">
   <p class="sub">The secure Razorpay window should open automatically. If it does not, use the button below.</p>
-  <button class="btn" id="paybtn" type="button">Pay <?= e($sym . number_format($price)) ?></button>
+  <button class="btn" id="paybtn" type="button">Pay <?= e($sym . nf($price)) ?></button>
   <a class="btn secondary" href="/ai-forms" style="margin-left:8px">Cancel</a>
   <p class="muted" style="margin-top:14px;font-size:12.5px">Your card details go straight to Razorpay — this application never sees them.
     The actions are added the instant the payment is confirmed.</p>
   <?php $tx = $tax ?? null; if (is_array($tx) && !empty($tx['on'])): ?>
-  <p class="muted" style="font-size:12.5px">Includes GST (<?= e(rtrim(rtrim(number_format((float) $tx['rate'], 2), '0'), '.')) ?>%). The GST tax invoice is in Your subscription → Payment history once the payment is confirmed.</p><?php endif; ?>
+  <p class="muted" style="font-size:12.5px">Includes GST (<?= e(rtrim(rtrim(nf((float) $tx['rate'], 2), '0'), '.')) ?>%). The GST tax invoice is in Your subscription → Payment history once the payment is confirmed.</p><?php endif; ?>
   <?php if (function_exists('saas_refund_policy_text') && function_exists('current_tenant') && current_tenant() !== ''): ?>
   <p class="muted" style="font-size:12.5px;text-align:left"><b>Refunds:</b> <?= e(saas_refund_policy_text()) ?></p><?php endif; ?>
 </div>

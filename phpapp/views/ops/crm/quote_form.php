@@ -32,6 +32,12 @@
   <?php if ($inqId !== ''): ?><input type="hidden" name="inquiry_id" value="<?= (int)$inqId ?>"><?php endif; ?>
   <?php if ($preLead): ?><input type="hidden" name="lead_id" value="<?= (int)$preLead['id'] ?>"><?php endif; ?>
   <?php if (!$isEdit): ?><input type="hidden" name="form_once" value="<?= e((string)($posted['form_once'] ?? bin2hex(random_bytes(12)))) ?>"><?php endif; ?>
+  <?php if (!$isEdit && !empty($dupOf)): ?>
+    <div class="msg" style="margin-bottom:12px;display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+      <a class="btn small" href="/quote?id=<?= (int)$dupOf['id'] ?>">Open <?= e($dupOf['quote_no']) ?></a>
+      <label style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="dup_ok" value="1"> Save it as a separate <?= e(Tl('quote')) ?></label>
+    </div>
+  <?php endif; ?>
   <?php if ($isEdit): ?><input type="hidden" name="row_version" value="<?= e((string)($posted['row_version'] ?? ($q['updated_at'] ?? ''))) ?>"><?php endif; ?>
 
 <div data-tabs data-tabs-key="quoteform" class="form-tabs">
@@ -264,7 +270,7 @@
       <td><input class="form-control num l_qty" type="number" step="0.01" min="0" name="l_qty[]" value="<?= e($ln['qty'] ?? '') ?>"></td>
       <td><select class="form-control" name="l_unit[]"><?php foreach ($unitOpts as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($ln['unit'] ?? (function_exists('default_charge_unit') ? default_charge_unit() : 'MANDAY'))===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></td>
       <td><input class="form-control num l_rate" type="number" step="0.01" name="l_rate[]" value="<?= e($ln['rate'] ?? '') ?>"></td>
-      <td class="num l_amt"><?= isset($ln['amount']) ? number_format((float)$ln['amount'],0) : '0' ?></td>
+      <td class="num l_amt"><?= isset($ln['amount']) ? nf((float)$ln['amount'], 2) : '0' ?></td>
       <td><button type="button" class="btn small danger lrm" title="Remove this line">✕</button></td>
     </tr>
     <?php endforeach; ?>
@@ -318,7 +324,7 @@
 
   var tbody = document.querySelector('#lines tbody');
   var lbody = document.querySelector('#locs tbody');
-  function nfmt(n){ return (Math.round(n)||0).toLocaleString('en-IN'); }
+  function nfmt(n){ n = Math.round((n || 0) * 100) / 100; return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }  // a quotation shows money to the paisa (DEF-SAL-018)
 
   // ---- §i / §ii: picking a client locks the free-text name and fills contacts
   var sel = document.getElementById('client_id'), nameBox = document.getElementById('client_name');

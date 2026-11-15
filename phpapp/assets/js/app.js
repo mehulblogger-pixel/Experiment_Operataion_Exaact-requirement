@@ -775,18 +775,62 @@
   //      checks it anyway and answers with a message that opens the section it
   //      lives in. Better a clear refusal from the server than a dead button.
   //  Either way something happens when Save is pressed. That is the whole point.
-  function fieldLabel(el) {
-    var ff = el.closest ? el.closest('.ff') : null;
-    var lab = ff ? ff.querySelector('label') : null;
-    if (!lab) return el.name || 'a field';
-    // Labels carry hints and an "+ Add new" link; naming the box means the words
-    // that name it, not everything printed alongside.
-    var c = lab.cloneNode(true);
-    Array.prototype.forEach.call(c.querySelectorAll('a, button, .muted, small'), function (n) {
-      n.parentNode.removeChild(n);
+  // DEF-SAL-002 — name a box by the words the person SEES next to it, never by its code
+  // (waiver_reason, l_qty[], confirm, make). In a table, "Qty on line 2" is the column
+  // heading plus the row. Only as a last resort is the code turned into plain words.
+  function cleanText(n) {
+    var c = n.cloneNode(true);
+    Array.prototype.forEach.call(c.querySelectorAll('a, button, .muted, small, input, select, textarea'), function (x) {
+      x.parentNode.removeChild(x);
     });
-    var t = c.textContent.replace(/\s+/g, ' ').trim().replace(/[\s*:—-]+$/, '');
-    return t || el.name || 'a field';
+    return c.textContent.replace(/\s+/g, ' ').trim().replace(/[\s*:—-]+$/, '');
+  }
+  function fieldLabel(el) {
+    var t = '';
+    if (el.id) { try { var lf = document.querySelector('label[for="' + el.id.replace(/"/g, '\\"') + '"]'); if (lf) t = cleanText(lf); } catch (e) {} }
+    if (!t && el.type === 'radio') {
+      var grp = el.closest ? el.closest('fieldset, .ff, .radio-group, .ff-check') : null;
+      var lg = null;
+      if (grp) { lg = grp.querySelector('legend'); if (!lg) Array.prototype.some.call(grp.querySelectorAll('label'), function (l) { if (!l.querySelector('input')) { lg = l; return true; } return false; }); }
+      if (lg) t = cleanText(lg);
+    }
+    if (!t) { var ff = el.closest ? el.closest('.ff') : null; var lab = ff ? ff.querySelector('label') : null; if (lab) t = cleanText(lab); }
+    if (!t) { var wrap = el.closest ? el.closest('label') : null; if (wrap) t = cleanText(wrap); }
+    if (!t) t = (el.getAttribute('aria-label') || el.getAttribute('title') || '').trim();
+    var td = el.closest ? el.closest('td') : null, tr = td ? td.parentNode : null, table = tr ? tr.closest('table') : null;
+    if (td && table) {
+      if (!t) {
+        var idx = Array.prototype.indexOf.call(tr.children, td);
+        var head = table.querySelector('thead tr');
+        var th = head && head.children[idx] ? cleanText(head.children[idx]) : '';
+        if (th) t = th;
+      }
+      var body = tr.parentNode, rows = Array.prototype.filter.call(body.children, function (r) { return r.tagName === 'TR'; });
+      var n = rows.indexOf(tr) + 1;
+      if (t && n > 0 && table.querySelector('thead') && !/ on line \d+$/.test(t)) t += ' on line ' + n;   // a list of lines: say which line
+    }
+    if (!t) t = (el.getAttribute('placeholder') || '').trim();
+    if (!t && el.name) {
+      t = el.name.replace(/\[\]$/, '').replace(/\[.*?\]/g, '').replace(/^l_/, '').replace(/_/g, ' ').trim();
+      t = t ? t.charAt(0).toUpperCase() + t.slice(1) : '';
+    }
+    return t || 'a box';
+  }
+  // Word the refusal from the browser's own reason, not always "still needs filling in".
+  function problemOf(el) {
+    var v = el.validity || {}, nm = fieldLabel(el);
+    var nice = function (x) { return /^\d{4}-\d{2}-\d{2}$/.test(x) ? new Date(x + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : x; };
+    if (v.valueMissing) return (el.type === 'radio' || el.tagName === 'SELECT') ? nm + ' needs a choice' : (el.type === 'checkbox' ? nm + ' needs ticking' : nm + ' still needs filling in');
+    if (v.rangeUnderflow) return nm + ' cannot be ' + (el.type === 'date' ? 'before ' : 'below ') + nice(el.min);
+    if (v.rangeOverflow) return nm + ' cannot be ' + (el.type === 'date' ? 'after ' : 'above ') + nice(el.max);
+    if (v.badInput) return nm + ' must be a number';
+    if (v.typeMismatch) return nm + (el.type === 'email' ? ' is not an e-mail address' : (el.type === 'url' ? ' is not a web address' : ' is not in the right form'));
+    if (v.patternMismatch) return nm + ' is not in the right form' + (el.title ? ' (' + el.title + ')' : '');
+    if (v.tooShort) return nm + ' is too short (at least ' + el.minLength + ' characters)';
+    if (v.tooLong) return nm + ' is too long (at most ' + el.maxLength + ' characters)';
+    if (v.stepMismatch) return nm + ' must be in steps of ' + el.step;
+    if (v.customError && el.validationMessage) return nm + ': ' + el.validationMessage;
+    return nm + ' is not right yet';
   }
   function onScreen(el) {
     return !!(el && (el.offsetWidth || el.offsetHeight || (el.getClientRects && el.getClientRects().length)));
@@ -807,12 +851,19 @@
     if (old && old.parentNode) old.parentNode.removeChild(old);
   }
   function showProblems(f, bad) {
-    var names = bad.map(function (b) { return fieldLabel(b.el); });
+    // One message per box: a group of radio buttons (or same-named boxes) is ONE question.
+    var seen = {}, names = [];
+    bad.forEach(function (b) {
+      var key = (b.el.type === 'radio' && b.el.name) ? 'r:' + b.el.name : null;
+      if (key && seen[key]) return; if (key) seen[key] = 1;
+      var p = problemOf(b.el); if (names.indexOf(p) < 0) names.push(p);
+    });
     var box = document.createElement('div');
     box.className = 'msg msg-error guard-msg';
-    box.textContent = bad.length === 1
-      ? 'Nothing has been saved — ' + names[0] + ' still needs filling in.'
-      : 'Nothing has been saved — ' + bad.length + ' boxes still need filling in: ' + names.join(', ') + '.';
+    box.setAttribute('role', 'alert');
+    box.textContent = names.length === 1
+      ? 'Nothing has been saved — ' + names[0] + '.'
+      : 'Nothing has been saved — ' + names.length + ' boxes need attention: ' + names.join('; ') + '.';
     f.insertBefore(box, f.firstChild);
     bad.forEach(function (b) {
       b.mark.classList.add('field-bad');
@@ -2025,4 +2076,73 @@
   function init() { document.querySelectorAll('[data-rqb]').forEach(wire); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
+})();
+
+// DEF-SAL-027 — jump links (#costing, #approvals …) must land BELOW the sticky top bar. Its height
+// differs between a laptop (~70px) and a phone (~159px, it wraps), so measure it and publish it as
+// --topbar-h for scroll-margin-top rules.
+(function () {
+  function measure() {
+    var h = 0;
+    document.querySelectorAll('.topbar, .topbar-slim').forEach(function (el) {
+      var cs = window.getComputedStyle(el);
+      if (cs.display === 'none' || (cs.position !== 'sticky' && cs.position !== 'fixed')) return;
+      var r = el.getBoundingClientRect(); if (r.bottom > h) h = r.bottom;
+    });
+    if (h > 0) { document.documentElement.style.setProperty('--topbar-h', Math.round(h) + 'px'); document.documentElement.setAttribute('data-topbar-h', '1'); }
+  }
+  function init() { measure(); window.addEventListener('resize', measure); window.addEventListener('orientationchange', measure); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+
+// DEF-SAL-003 — refuse a file the server would drop BEFORE it is sent: the person learns the limit
+// at once instead of waiting for an upload that can never arrive.
+(function () {
+  document.addEventListener('change', function (ev) {
+    var inp = ev.target;
+    if (!inp || inp.tagName !== 'INPUT' || inp.type !== 'file' || !inp.files) return;
+    var max = parseInt((document.body && document.body.getAttribute('data-upload-max')) || '0', 10);
+    if (!(max > 0)) return;
+    var total = 0; for (var i = 0; i < inp.files.length; i++) total += inp.files[i].size;
+    if (total <= max * 0.98) { var old = inp.parentNode && inp.parentNode.querySelector('.upload-too-large'); if (old) old.parentNode.removeChild(old); return; }
+    var mb = Math.floor(max / 1048576), have = (total / 1048576).toFixed(1);
+    var msg = 'That file is too large (' + have + ' MB) — the limit is ' + mb + ' MB. Choose a smaller file or compress it.';
+    inp.value = ''; inp.setCustomValidity('');
+    var note = inp.parentNode && inp.parentNode.querySelector('.upload-too-large');
+    if (!note && inp.parentNode) { note = document.createElement('div'); note.className = 'msg msg-error upload-too-large'; note.setAttribute('role', 'alert'); note.style.marginTop = '6px'; inp.parentNode.insertBefore(note, inp.nextSibling); }
+    if (note) note.textContent = msg;
+  }, true);
+})();
+
+// DEF-SAL-036 — put back what was typed before the session timed out. Fills boxes by name in the
+// page's forms; list boxes (name="x[]") are filled in order into the rows that exist. A box the
+// person has already changed is left alone. Says so at the top of the form.
+(function () {
+  var data = window.__formRetry;
+  if (!data || typeof data !== 'object') return;
+  function fill() {
+    var done = 0, target = null;
+    Object.keys(data).forEach(function (name) {
+      var val = data[name];
+      var list = Array.isArray(val) || (val && typeof val === 'object') ? Object.keys(val).map(function (k) { return val[k]; }) : null;
+      var els = document.querySelectorAll('form [name="' + (list ? name + '[]' : name).replace(/"/g, '\\"') + '"]');
+      if (!els.length && list) els = document.querySelectorAll('form [name="' + name.replace(/"/g, '\\"') + '"]');
+      Array.prototype.forEach.call(els, function (el, i) {
+        var v = list ? list[i] : val;
+        if (v === undefined || v === null || el.type === 'hidden' || el.type === 'file' || el.type === 'password') return;
+        if (el.type === 'checkbox' || el.type === 'radio') {
+          var want = list ? list.map(String).indexOf(String(el.value)) >= 0 : String(v) === String(el.value);
+          if (el.checked !== want) { el.checked = want; done++; }
+        } else if (String(el.value) !== String(v)) { el.value = String(v); done++; el.dispatchEvent(new Event('change', { bubbles: true })); }
+        if (!target) target = el.form;
+      });
+    });
+    if (done && target && !target.querySelector('.retry-note')) {
+      var n = document.createElement('div'); n.className = 'msg msg-warning retry-note'; n.setAttribute('role', 'status');
+      n.textContent = 'What you typed before you were signed out has been put back. Check it, then press the button again.';
+      target.insertBefore(n, target.firstChild);
+    }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill); else fill();
 })();

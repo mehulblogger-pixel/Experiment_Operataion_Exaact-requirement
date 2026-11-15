@@ -39,7 +39,7 @@
           </ul><?php endif; ?>
         </div>
       <?php endif; ?>
-      <div class="ff"><label>Name</label><input class="form-control" name="name" value="<?= e($edit['name'] ?? '') ?>" placeholder="e.g. Client A — Inspection Report format"></div>
+      <div class="ff"><label>Name</label><input class="form-control" name="name" required value="<?= e($edit['name'] ?? '') ?>" placeholder="e.g. Client A — Inspection Report format"></div>
       <div class="form-grid">
         <div class="ff"><label>Report type <span class="muted">(blank = any)</span></label>
           <select class="form-control searchable" name="report_type_id"><option value="">Any</option><?php foreach ($types as $t): ?><option value="<?= (int)$t['id'] ?>" <?= ($edit && (int)$edit['report_type_id']===(int)$t['id'])?'selected':'' ?>><?= e($t['code']) ?> — <?= e($t['name']) ?></option><?php endforeach; ?></select></div>

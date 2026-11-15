@@ -446,7 +446,7 @@ function saas_refund_plan(array $o, array $req, $now = null) {
         if ($reason !== 'platform') return ['error' => 'Choose what to take back: logins, a module or storage packs.'] + $out;
         $amount = (int) ($req['amount'] ?? 0);
         if ($amount < 1 || $amount > $left)
-            return ['error' => 'Type the amount to return (between ₹1 and ₹' . number_format($left) . ').', 'suggest' => 0] + $out;
+            return ['error' => 'Type the amount to return (between ₹1 and ₹' . nf($left) . ').', 'suggest' => 0] + $out;
         return ['ok' => true, 'amount' => $amount, 'suggest' => 0,
                 'effect' => 'Nothing is taken back — only the overcharge is returned. The plan stays exactly as it is.',
                 'plan' => ['none' => true]] + $out;
@@ -469,7 +469,7 @@ function saas_refund_plan(array $o, array $req, $now = null) {
     $suggest = max(1, min($left, (int) round($left * min(1, $removed / $addedVal))));
     $amount = (int) ($req['amount'] ?? 0);
     if (isset($req['amount']) && ($amount < 1 || $amount > $left))
-        return ['error' => 'The amount must be between ₹1 and ₹' . number_format($left) . ' (what is left of this payment).', 'suggest' => $suggest] + $out;
+        return ['error' => 'The amount must be between ₹1 and ₹' . nf($left) . ' (what is left of this payment).', 'suggest' => $suggest] + $out;
     $bits = [];
     if ($wantMods) $bits[] = implode(', ', array_map(fn($k) => defined('PRODUCT_MODULES') && isset(PRODUCT_MODULES[$k]) ? PRODUCT_MODULES[$k][0] : $k, $wantMods));
     if ($seatsRm) $bits[] = $seatsRm . ' login' . ($seatsRm === 1 ? '' : 's');
@@ -567,7 +567,7 @@ function saas_refund_execute($orderId, array $req, array $cfg, $byName, $nonce, 
     saas_refund_history_line($amount, 'Refund — ' . saas_order_label($o) . ($cn !== '' ? ' (credit note ' . $cn . ')' : ''), $rf['id'], (string) $orderId, $byName);
     if (function_exists('idems_log')) idems_log('setting', null, 'PAYMENT_REFUNDED', ['field' => (string) $orderId, 'new' => $amount . ' ' . $plan['scope'] . ' ' . $req['reason']]);
     return ['ok' => true, 'amount' => $amount, 'credit_note' => $cn, 'effect' => $plan['effect'],
-            'msg' => '₹' . number_format($amount) . ' is being refunded to the customer\'s card / UPI (Razorpay: usually 5–7 working days). ' . $plan['effect']
+            'msg' => '₹' . nf($amount) . ' is being refunded to the customer\'s card / UPI (Razorpay: usually 5–7 working days). ' . $plan['effect']
                    . ($cn !== '' ? ' GST credit note ' . $cn . ' issued.' : '')];
 }
 
@@ -605,7 +605,7 @@ function saas_refund_extra($extraId, array $cfg, $byName, $ourError = false, $no
     db()->prepare("UPDATE saas_payment_extras SET status='REFUNDED', refund_id=?, refunded_at=? WHERE id=?")->execute([$rf['id'], date('c'), (int) $extraId]);
     saas_refund_history_line((int) $x['amount'], 'Refund — the same payment made twice', $rf['id'], (string) $x['order_id'], $byName);
     if (function_exists('idems_log')) idems_log('setting', null, 'PAYMENT_REFUNDED', ['field' => (string) $x['order_id'], 'new' => (int) $x['amount'] . ' paid-twice by ' . $byName]);
-    return ['ok' => true, 'amount' => (int) $x['amount'], 'msg' => 'The second payment of ₹' . number_format((int) $x['amount']) . ' is being refunded in full (Razorpay: usually 5–7 working days). Nothing else changes.'];
+    return ['ok' => true, 'amount' => (int) $x['amount'], 'msg' => 'The second payment of ₹' . nf((int) $x['amount']) . ' is being refunded in full (Razorpay: usually 5–7 working days). Nothing else changes.'];
 }
 
 // Everything the platform owner needs to see about one company's payments.

@@ -93,7 +93,7 @@ function connect_engage_cancel($id, $kind, $reason = '', $who = '', $worked = 0)
         ->execute([$kind, trim((string)$reason), date('c'), (string)$who, $worked, date('c'), $id]);
     //  On the job's own timeline (this used an unregistered entity name, so the
     //  entry was stored against nothing).
-    if (function_exists('act_log') && (int)$row['requirement_id'] > 0) { try { act_log('CX_REQUIREMENT', (int)$row['requirement_id'], 'SYSTEM', 'Booking of ' . (string)$row['subject_name'] . ' ended — ' . (connect_engage_cancel_kinds()[$kind] ?? $kind) . (trim((string)$reason) !== '' ? ': ' . trim((string)$reason) : '') . ($worked > 0 ? ' (' . rtrim(rtrim(number_format($worked, 2), '0'), '.') . ' worked)' : ''), ['auto' => 1]); } catch (Throwable $e) {} }
+    if (function_exists('act_log') && (int)$row['requirement_id'] > 0) { try { act_log('CX_REQUIREMENT', (int)$row['requirement_id'], 'SYSTEM', 'Booking of ' . (string)$row['subject_name'] . ' ended — ' . (connect_engage_cancel_kinds()[$kind] ?? $kind) . (trim((string)$reason) !== '' ? ': ' . trim((string)$reason) : '') . ($worked > 0 ? ' (' . rtrim(rtrim(nf($worked, 2), '0'), '.') . ' worked)' : ''), ['auto' => 1]); } catch (Throwable $e) {} }
     return [true, 'Booking ended (' . strtolower(str_replace('_', '-', $kind)) . '). The resource is free again' . ((int)$row['requirement_id'] > 0 ? ' — the requirement can be re-sourced for a replacement.' : '.')];
 }
 
@@ -325,7 +325,7 @@ function connect_engage_client_save($requirementId, $partyId, array $in, $who = 
     if (!$ok) return [false, $msg];
     if (function_exists('act_log')) try {
         act_log('CX_REQUIREMENT', (int)$req['id'], 'SYSTEM', 'Booking ' . ($ex ? 'changed' : 'recorded') . ' by the client' . ($who !== '' ? ' (' . $who . ')' : '') . ': ' . connect_engage_basis_label($basis)
-            . ((float)$row['quantity'] > 0 ? ', ' . rtrim(rtrim(number_format((float)$row['quantity'], 2), '0'), '.') : '') . ', from ' . $start . ($end !== '' ? ' to ' . $end : ''));
+            . ((float)$row['quantity'] > 0 ? ', ' . rtrim(rtrim(nf((float)$row['quantity'], 2), '0'), '.') : '') . ', from ' . $start . ($end !== '' ? ' to ' . $end : ''));
     } catch (Throwable $e) {}
     return [true, $ex ? 'Booking updated.' : 'Booking recorded — the company can now plan and bill it.'];
 }
@@ -380,7 +380,7 @@ function connect_engage_describe($e) {
     $basis = strtoupper((string)($e['basis'] ?? ''));
     $rate = (float)($e['rate'] ?? 0); $unit = (string)($e['rate_unit'] ?? 'day');
     $qty = (float)($e['quantity'] ?? 0); $freq = (string)($e['frequency_note'] ?? '');
-    $rateStr = $rate > 0 ? '₹' . number_format((int)$rate) . '/' . $unit : '';
+    $rateStr = $rate > 0 ? '₹' . nf((int)$rate) . '/' . $unit : '';
     switch ($basis) {
         case 'MAN_DAYS':   $commit = rtrim(rtrim((string)$qty, '0'), '.') . ' man-days'; break;
         case 'MAN_MONTHS': $commit = rtrim(rtrim((string)$qty, '0'), '.') . ' man-months'; break;

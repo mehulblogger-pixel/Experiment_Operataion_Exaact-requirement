@@ -316,18 +316,18 @@ function ch_evaluate(array $items, $unit = 'MONTH', $dpm = null) {
         $errors[$cycle[0]] = 'These heads use each other in a loop: ' . implode(' → ', $names) . '. Break the loop so one of them stands on its own.';
         $order = array_keys($by);
     }
-    $money = fn($v) => (function_exists('cur_sym') ? cur_sym() : '₹') . number_format((float) $v, abs($v - round($v)) > 0.004 ? 2 : 0);
-    $pctTxt = fn($v) => rtrim(rtrim(number_format((float) $v, 3), '0'), '.') . '%';
+    $money = fn($v) => (function_exists('cur_sym') ? cur_sym() : '₹') . nf((float) $v, abs($v - round($v)) > 0.004 ? 2 : 0);
+    $pctTxt = fn($v) => rtrim(rtrim(nf((float) $v, 3), '0'), '.') . '%';
     $monthly = []; $once = []; $rows = [];
     foreach ($order as $code) {
         $it = $by[$code]; $why = ''; $m = 0.0; $o = 0.0; $isOnce = $it['per'] === 'ONCE';
         if (isset($errors[$code])) { $rows[$code] = ['monthly' => 0, 'once' => 0, 'unit' => 0, 'why' => $errors[$code], 'error' => true]; $monthly[$code] = 0; $once[$code] = 0; continue; }
         $toMonthly = function ($v, $per) use ($dpm) { return $per === 'DAY' ? $v * $dpm : ($per === 'YEAR' ? $v / 12 : $v); };
-        $perTxt = fn($v, $per) => $per === 'DAY' ? $money($v) . ' a day × ' . rtrim(rtrim(number_format($dpm, 1), '0'), '.') . ' days'
+        $perTxt = fn($v, $per) => $per === 'DAY' ? $money($v) . ' a day × ' . rtrim(rtrim(nf($dpm, 1), '0'), '.') . ' days'
                                  : ($per === 'YEAR' ? $money($v) . ' a year ÷ 12' : ($per === 'ONCE' ? $money($v) . ' one time' : ''));
         if ($it['type'] === 'AMOUNT' || $it['type'] === 'QTYRATE') {
             $v = $it['type'] === 'AMOUNT' ? (float) $it['amount'] : (float) $it['qty'] * (float) $it['rate'];
-            $why = $it['type'] === 'QTYRATE' ? rtrim(rtrim(number_format((float) $it['qty'], 2), '0'), '.') . ' × ' . $money($it['rate']) . ' = ' . $money($v)
+            $why = $it['type'] === 'QTYRATE' ? rtrim(rtrim(nf((float) $it['qty'], 2), '0'), '.') . ' × ' . $money($it['rate']) . ' = ' . $money($v)
                  : (!empty($it['calc']) ? $it['calc'] . ' = ' . $money($v) : '');
             [$v, $clampTxt] = ch_clamp($v, $it, $money);
             if ($isOnce) $o = $v; else { $m = $toMonthly($v, $it['per']); $pt = $perTxt($v, $it['per']); if ($pt !== '') $why = trim($why . ($why !== '' ? '; ' : '') . $pt); }
@@ -618,18 +618,18 @@ function ch_template_set_active($id, $on, $by) {
 // library list and the printed sheet.
 function ch_item_summary(array $it, array $labels = []) {
     $sym = function_exists('cur_sym') ? cur_sym() : '₹';
-    $m = fn($v) => $sym . number_format((float) $v, abs((float) $v - round((float) $v)) > 0.004 ? 2 : 0);
+    $m = fn($v) => $sym . nf((float) $v, abs((float) $v - round((float) $v)) > 0.004 ? 2 : 0);
     $per = $it['per'] ?? 'MONTH';
     $perW = $per === 'ONCE' ? ' one time' : ($per === 'DAY' ? ' a day' : ($per === 'YEAR' ? ' a year' : ' a month'));
     switch ($it['type'] ?? 'AMOUNT') {
         case 'PCT':
             $of = implode(' + ', array_map(fn($c) => $labels[$c] ?? $c, (array) ($it['of'] ?? [])));
-            $s = rtrim(rtrim(number_format((float) ($it['pct'] ?? 0), 3), '0'), '.') . '% of ' . $of;
+            $s = rtrim(rtrim(nf((float) ($it['pct'] ?? 0), 3), '0'), '.') . '% of ' . $of;
             if ((float) ($it['cap'] ?? 0) > 0) $s .= ', counted up to ' . $m($it['cap']);
             if ((float) ($it['upto'] ?? 0) > 0) $s .= ', only while it is up to ' . $m($it['upto']);
             if ($per === 'ONCE') $s .= ' (one time)';
             break;
-        case 'QTYRATE': $s = rtrim(rtrim(number_format((float) ($it['qty'] ?? 0), 2), '0'), '.') . ' × ' . $m($it['rate'] ?? 0) . $perW; break;
+        case 'QTYRATE': $s = rtrim(rtrim(nf((float) ($it['qty'] ?? 0), 2), '0'), '.') . ' × ' . $m($it['rate'] ?? 0) . $perW; break;
         case 'FORMULA': $s = 'Formula: ' . ($it['expr'] ?? '') . ($per === 'ONCE' ? ' (one time)' : ''); break;
         default: $s = ((float) ($it['amount'] ?? 0) != 0 ? $m($it['amount']) : 'Amount') . $perW;
     }

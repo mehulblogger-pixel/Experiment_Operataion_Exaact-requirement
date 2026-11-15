@@ -4,7 +4,7 @@
   $me = $me ?? []; $plans = $plans ?? []; $current = $current ?? null; $packs = $packs ?? [];
   $free = !empty($free); $freeUntil = (string)($freeUntil ?? ''); $enforce = !empty($enforce); $payOn = !empty($payOn);
   $cur = $currency ?? '₹'; $am = (int)($annualMonths ?? 10); $meId = (int)($me['id'] ?? 0);
-  $money = fn($n) => e($cur) . number_format((float)$n);
+  $money = fn($n) => e($cur) . nf((float)$n);
   $limLabel = function_exists('mkt_limit_keys') ? mkt_limit_keys() : [];
 ?>
 <h1>Membership &amp; plans</h1>

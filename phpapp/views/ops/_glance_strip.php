@@ -43,7 +43,7 @@ $gsGlance = $glanceWantMgmt
         <div style="font-weight:700;font-size:20px"><?= (int)$gsM['attention'] ?><?php if ($gsM['attention_hi']): ?> <span style="font-size:12px;color:var(--warn,#b45309);font-weight:600"><?= (int)$gsM['attention_hi'] ?> pressing</span><?php endif; ?></div></a>
       <?php if ($gsM['outstanding'] !== null): ?>
         <a href="/command-centre" style="text-decoration:none;color:inherit"><div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em">Outstanding</div>
-          <div style="font-weight:700;font-size:20px;font-variant-numeric:tabular-nums"><?= e(function_exists('fmoney_short') ? fmoney_short($gsM['outstanding']) : number_format($gsM['outstanding'])) ?></div></a>
+          <div style="font-weight:700;font-size:20px;font-variant-numeric:tabular-nums"><?= e(function_exists('fmoney_short') ? fmoney_short($gsM['outstanding']) : nf($gsM['outstanding'])) ?></div></a>
       <?php endif; ?>
       <?php if ($gsM['health'] !== null): ?>
       <a href="/system-status" style="text-decoration:none;color:inherit"><div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em">Platform</div>

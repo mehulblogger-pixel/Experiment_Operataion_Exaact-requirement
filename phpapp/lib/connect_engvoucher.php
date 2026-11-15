@@ -618,7 +618,7 @@ function connect_engv_report_delete($id, $engagementId) {
 function connect_engv_describe($v) {
     $model = connect_engv_is_exclusive($v) ? 'Fee + expenses' : 'All-inclusive';
     $unit  = (string)($v['rate_unit'] ?? 'day');
-    $rate  = (float)($v['rate'] ?? 0) > 0 ? '₹' . number_format((int)$v['rate']) . '/' . $unit : '';
+    $rate  = (float)($v['rate'] ?? 0) > 0 ? '₹' . nf((int)$v['rate']) . '/' . $unit : '';
     return ['model' => $model, 'rate' => $rate,
             'fee' => (float)($v['fee_total'] ?? 0), 'reimb' => (float)($v['reimb_total'] ?? 0), 'grand' => (float)($v['grand_total'] ?? 0)];
 }

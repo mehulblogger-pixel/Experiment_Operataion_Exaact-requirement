@@ -4,7 +4,7 @@
   // for now (no real money moves); the switch keeps it invisible until turned on.
   $rows = $rows ?? []; $totals = $totals ?? []; $enabled = !empty($enabled);
   $cur = $currency ?? '₹'; $commissionPct = (float)($commissionPct ?? 0);
-  $money = fn($n) => e($cur) . number_format((float)$n, 2);
+  $money = fn($n) => e($cur) . nf((float)$n, 2);
   $badge = function ($s) {
       $s = strtoupper((string)$s);
       $c = ['HELD' => '#0a5c5c', 'DISPUTED' => '#8a5a00', 'RELEASED' => '#2f7a34', 'REFUNDED' => '#9a2a2a'][$s] ?? '#667';
@@ -37,7 +37,7 @@
     </div>
     <div class="ff" style="display:flex;gap:8px;align-items:end"><button class="btn" type="submit">Save</button></div>
   </form>
-  <p class="muted" style="margin:10px 0 0;font-size:13px">Platform commission: <strong><?= e(rtrim(rtrim(number_format($commissionPct, 2), '0'), '.')) ?>%</strong> — the one Marketplace rate, taken from a hold when funds are released.
+  <p class="muted" style="margin:10px 0 0;font-size:13px">Platform commission: <strong><?= e(rtrim(rtrim(nf($commissionPct, 2), '0'), '.')) ?>%</strong> — the one Marketplace rate, taken from a hold when funds are released.
     <?php if (function_exists('is_master') && is_master()): ?><a href="/connect-requirements">Change it on Marketplace requirements</a><?php else: ?>Your administrator sets it.<?php endif; ?></p>
 </div>
 

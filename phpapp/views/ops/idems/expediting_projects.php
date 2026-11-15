@@ -11,7 +11,7 @@
   };
   $progCol = function($s){ $s=(float)$s; if($s>=90) return '#15803d'; if($s>=50) return '#2563eb'; if($s>0) return '#b45309'; return 'var(--muted)'; };
   $riskCol = function($b){ switch($b){ case 'CRITICAL': return '#dc2626'; case 'HIGH': return '#c2410c'; case 'MEDIUM': return '#b45309'; case 'LOW': return '#15803d'; default: return 'var(--muted)'; } };
-  $num = function($v){ return $v===null ? '—' : rtrim(rtrim(number_format((float)$v,1),'0'),'.'); };
+  $num = function($v){ return $v===null ? '—' : rtrim(rtrim(nf((float)$v,1),'0'),'.'); };
   $fmtD = function($s){ $s=trim((string)$s); if($s==='')return '—'; $t=strtotime($s); return $t?date('d-M-Y',$t):$s; };
 ?>
 <div class="master-head">

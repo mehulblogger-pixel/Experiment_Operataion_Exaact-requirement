@@ -119,6 +119,7 @@
               <div style="font-size:11.5px;margin-top:4px">
                 <span class="pill <?= $sc['score']>=60?'p-ok':($sc['score']>=35?'p-warn':'p-mut') ?>" style="font-size:10.5px"><?= (int)$sc['score'] ?></span>
                 <?php if ($st): ?><span class="pill p-bad" style="font-size:10.5px"><?= lead_days_in_stage($l) ?>d</span><?php endif; ?>
+                <?php if (lead_close_overdue($l)): ?><span class="pill p-bad" style="font-size:10.5px" title="Expected to close by <?= e(fdate(substr((string)$l['expected_close'], 0, 10))) ?> — that date has passed">⏰ close date passed</span><?php endif; ?>
                 <?php // Field #5 — this lead has been worked as a deal. Show it on the
                       //   board so the transfer is visible here; the card opens the lead,
                       //   which carries "Open the deal →". ?>

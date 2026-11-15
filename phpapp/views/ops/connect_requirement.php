@@ -110,14 +110,14 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
         <tr>
           <td><?= (int)$p['seq'] ?></td><td><?= e($p['role']) ?></td><td><?= e($p['discipline_code']) ?></td>
           <td><?= (int)$p['quantity'] ?></td><td>₹<?= (int)$p['rate'] ?>/<?= e($p['unit']) ?></td><td><?= e($p['shift_pattern']) ?></td>
-          <td>₹<?= number_format((int)$p['quantity']*(float)$p['rate'],0) ?></td>
+          <td>₹<?= nf((int)$p['quantity']*(float)$p['rate'],0) ?></td>
           <td><form method="post" action="/connect-requirement" onsubmit="return confirm('Remove this position?');">
             <input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="position_id" value="<?= (int)$p['id'] ?>"><input type="hidden" name="action" value="position_delete">
             <button class="btn secondary" type="submit" style="font-size:12px">Remove</button></form></td>
         </tr>
       <?php endforeach; ?>
       </tbody>
-      <?php if ($crew): ?><tfoot><tr><th colspan="6" style="text-align:right">Crew total</th><th>₹<?= number_format((float)$crew['value'],0) ?></th><th></th></tr></tfoot><?php endif; ?>
+      <?php if ($crew): ?><tfoot><tr><th colspan="6" style="text-align:right">Crew total</th><th>₹<?= nf((float)$crew['value'],0) ?></th><th></th></tr></tfoot><?php endif; ?>
     </table></div>
   <?php endif; ?>
   <details style="margin-top:8px"><summary style="cursor:pointer;font-weight:600">➕ Add a position</summary>
@@ -143,7 +143,7 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
   <?php if ($billable): $bs = strtoupper((string)$billable['status']); ?>
     <p class="cxmeta" style="margin:0">
       <span class="cxpill <?= $bs==='BILLED'?'ok':($bs==='CANCELLED'?'bad':'info') ?>"><?= e(ucfirst(strtolower($bs))) ?></span>
-      This engagement is in the billing ledger — <?= (int)$billable['qty'] ?> × ₹<?= (int)$billable['rate'] ?> = <strong>₹<?= number_format((float)$billable['amount'], 0) ?></strong>.
+      This engagement is in the billing ledger — <?= (int)$billable['qty'] ?> × ₹<?= (int)$billable['rate'] ?> = <strong>₹<?= nf((float)$billable['amount'], 0) ?></strong>.
       <a href="/billable-events">Open the billable events board →</a>
     </p>
     <p class="cxmeta" style="margin:6px 0 0">Finance approves and attests the real invoice from there — the books ledger stays the single money truth.</p>
@@ -219,7 +219,7 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
         </div>
         <div class="cxmeta" style="margin:8px 0">
           <?php if (isset($m['trust']) && (int)$m['trust'] > 0): ?><strong>Trust <?= (int)$m['trust'] ?></strong><?php if (!empty($m['trust_band'])): ?> · <?= e($m['trust_band']) ?><?php endif; ?> · <?php elseif ($isPro): ?><strong><?= e($m['trust_band'] ?? 'New') ?></strong> · <?php endif; ?>
-          <?php if ($m['stars'] !== null && (int)$m['jobs'] >= 3): ?>★ <?= e(number_format((float)$m['stars'],1)) ?> · <?php endif; ?>
+          <?php if ($m['stars'] !== null && (int)$m['jobs'] >= 3): ?>★ <?= e(nf((float)$m['stars'],1)) ?> · <?php endif; ?>
           <?php if ((int)$m['verified'] > 0): ?><?= (int)$m['verified'] ?> verified · <?php endif; ?>
           <span class="cxpill <?= $epCls==='p-ok'?'ok':($epCls==='p-bad'?'bad':'warn') ?>"><?= e($epLbl) ?></span>
           · match <?= (int)$m['score'] ?>%
@@ -274,7 +274,7 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
       · <?= e($d['commitment']) ?><?php if ($d['rate']): ?> · <?= e($d['rate']) ?><?php endif; ?>
       <?php $exM = strtoupper((string)($engagement['rate_inclusive'] ?? 'INCLUSIVE')) === 'EXCLUSIVE'; ?>
       · <?= $exM ? 'Fee + expenses' : 'All-inclusive' ?>
-      <?php if ($d['total'] !== null): ?> · est. ₹<?= number_format((int)$d['total']) ?><?php endif; ?>
+      <?php if ($d['total'] !== null): ?> · est. ₹<?= nf((int)$d['total']) ?><?php endif; ?>
       <div class="cxmeta">Status: <?= e(ucfirst(strtolower((string)$engagement['status']))) ?><?php if (!empty($engagement['subject_name'])): ?> · <?= e($engagement['subject_name']) ?><?php endif; ?><?php if (function_exists('connect_engv_summary_for_subject') && !empty($engagement['subject_kind'])): $vs = connect_engv_summary_for_subject($engagement['subject_kind'], (int)$engagement['subject_id']); if ($vs['total'] > 0): ?> · <?= (int)$vs['total'] ?> voucher<?= $vs['total']===1?'':'s' ?> (<?= (int)$vs['submitted']+(int)$vs['approved'] ?> pending)<?php endif; endif; ?></div>
     </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -358,7 +358,7 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
       <input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="action" value="replace_award">
       <label style="font-size:13px;font-weight:600">Award to
         <select class="form-control" name="application_id" required><option value="">— choose —</option>
-          <?php foreach ($replace_candidates as $c): ?><option value="<?= (int)$c['id'] ?>"><?= e($c['applicant_name']) ?><?= (float)$c['proposed_rate'] > 0 ? ' — ₹' . number_format((float)$c['proposed_rate'], 0) : '' ?><?= strtoupper((string)$c['status']) === 'REJECTED' ? ' (applied earlier)' : '' ?></option><?php endforeach; ?>
+          <?php foreach ($replace_candidates as $c): ?><option value="<?= (int)$c['id'] ?>"><?= e($c['applicant_name']) ?><?= (float)$c['proposed_rate'] > 0 ? ' — ₹' . nf((float)$c['proposed_rate'], 0) : '' ?><?= strtoupper((string)$c['status']) === 'REJECTED' ? ' (applied earlier)' : '' ?></option><?php endforeach; ?>
         </select></label>
       <label style="font-size:13px;font-weight:600">Why
         <select class="form-control" name="kind" required>
@@ -390,7 +390,7 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
     [$l,$c] = $m[$s] ?? $m['DRAFT'];
     return '<span style="display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:700;color:'.$c.';background:'.$c.'1a">'.e($l).'</span>';
   };
-  $vinr = fn($n) => '₹'.number_format((int)round((float)$n));
+  $vinr = fn($n) => '₹'.nf((int)round((float)$n));
 ?>
 <div class="panel" style="margin-top:14px">
   <h3 style="margin:0 0 4px">🧾 Engagement vouchers</h3>

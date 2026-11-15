@@ -25,19 +25,19 @@ t_ok(strpos($ann, 'Basic ₹20,000 ₹240,000') !== false, 'each line shows its 
 t_ok(strpos($ann, 'Total CTC ₹30,000 ₹360,000') !== false, 'Total CTC 30,000 a month, 360,000 a year');
 
 $letter = $plain(offer_letter_html($offer, $cand, $sal));
-t_ok(strpos($letter, '30,000 a month (') !== false && strpos($letter, '360,000 a year)') !== false, 'the built-in offer letter says the CTC a month, with the year beside it');
+t_ok(strpos($letter, '30,000 a month (') !== false && strpos($letter, '3,60,000 a year)') !== false, 'the built-in offer letter says the CTC a month, with the year beside it');
 t_ok(strpos($letter, 'annual compensation') === false, '… and no longer calls the monthly figure annual');
 
 $tpl = doc_tpl_by_code('OFFER');
 if ($tpl) {
     $old = ['body' => "Dear {name},\nYour total annual compensation (CTC) will be {ctc}, with a net take-home of {net_pay}.\n{salary_table}"];
     $r = $plain(doc_render_template($old, $cand)['html']);
-    t_ok(strpos($r, 'total compensation (CTC) will be ₹30,000 a month (₹360,000 a year)') !== false, 'a letter template saved with the old wording reads correctly: ' . substr($r, strpos($r, 'Your'), 90));
+    t_ok(strpos($r, 'total compensation (CTC) will be ₹30,000 a month (₹3,60,000 a year)') !== false, 'a letter template saved with the old wording reads correctly: ' . substr($r, strpos($r, 'Your'), 90));
     t_ok(strpos($r, 'net take-home of ₹26,000 a month') !== false, 'the take-home is said to be a month');
     t_ok(strpos($r, 'Per year') !== false, 'and its {salary_table} has the year beside the month');
 }
 $m = doc_token_map($cand);
-t_eq([$m['ctc_monthly'], $m['ctc_annual']], ['₹30,000', '₹360,000'], 'templates can also use {ctc_monthly} and {ctc_annual} on their own');
+t_eq([$m['ctc_monthly'], $m['ctc_annual']], ['₹30,000', '₹3,60,000'], 'templates can also use {ctc_monthly} and {ctc_annual} on their own');
 
 foreach ([["DELETE FROM job_offers WHERE candidate_id=?", [$cid]], ["DELETE FROM salary_structures WHERE candidate_id=?", [$cid]], ["DELETE FROM candidates WHERE id=?", [$cid]]] as [$q, $a])
     try { db()->prepare($q)->execute($a); } catch (Throwable $e) {}

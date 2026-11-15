@@ -124,7 +124,7 @@
 <div class="panel" data-tab="Report" style="margin:0 0 12px;border:1px solid <?= $oc ?>;background:color-mix(in srgb,<?= $oc ?> 5%,transparent)">
   <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap">
     <div style="display:flex;flex-direction:column;align-items:center;min-width:96px">
-      <div style="font-size:34px;font-weight:800;line-height:1;color:<?= $oc ?>;font-variant-numeric:tabular-nums"><?= rtrim(rtrim(number_format($ov,1),'0'),'.') ?><span style="font-size:15px;font-weight:600;color:var(--muted)">/100</span></div>
+      <div style="font-size:34px;font-weight:800;line-height:1;color:<?= $oc ?>;font-variant-numeric:tabular-nums"><?= rtrim(rtrim(nf($ov,1),'0'),'.') ?><span style="font-size:15px;font-weight:600;color:var(--muted)">/100</span></div>
       <div style="font-size:12px;font-weight:700;letter-spacing:.03em;color:<?= $oc ?>;margin-top:3px"><?= e(strtoupper($scorecard['band'])) ?></div>
     </div>
     <div style="flex:1;min-width:240px">
@@ -134,7 +134,7 @@
           <div style="display:flex;align-items:center;gap:9px;font-size:12px">
             <span style="flex:0 0 200px;color:var(--ink)"><?= e($s['title']) ?></span>
             <span style="flex:1;height:8px;background:color-mix(in srgb,var(--line) 60%,transparent);border-radius:5px;overflow:hidden"><span style="display:block;height:100%;width:<?= max(2,(int)round($s['score'])) ?>%;background:<?= $c ?>"></span></span>
-            <span style="flex:0 0 42px;text-align:right;font-variant-numeric:tabular-nums;color:<?= $c ?>;font-weight:600"><?= rtrim(rtrim(number_format($s['score'],1),'0'),'.') ?></span>
+            <span style="flex:0 0 42px;text-align:right;font-variant-numeric:tabular-nums;color:<?= $c ?>;font-weight:600"><?= rtrim(rtrim(nf($s['score'],1),'0'),'.') ?></span>
           </div>
         <?php endforeach; ?>
       </div>

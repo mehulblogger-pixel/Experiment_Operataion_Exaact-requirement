@@ -59,7 +59,7 @@
   // on every page load is worse than one that never collapsed.
   try { if (localStorage.getItem("navCollapsed") === "1") document.documentElement.classList.add("nav-collapsed"); } catch (e) {}
 </script>
-</head><body class="<?= $u ? 'app' : '' ?><?= $isInsp ? ' inspector' : '' ?>">
+</head><body class="<?= $u ? 'app' : '' ?><?= $isInsp ? ' inspector' : '' ?>" data-upload-max="<?= function_exists('upload_post_max_bytes') ? (int)upload_post_max_bytes() : 0 ?>">
 <?php if (function_exists('app_is_test_copy') && app_is_test_copy()): ?>
 <div role="status" style="background:#7c2d12;color:#fff;text-align:center;padding:6px 12px;font-size:13px;font-weight:600;position:sticky;top:0;z-index:1000">TEST COPY — not the live system. <?= e(app_test_mail_banner()) ?> Payments: Razorpay test keys only.</div>
 <?php endif; ?>

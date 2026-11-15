@@ -9,7 +9,7 @@
 
 <div class="card" style="display:flex;gap:22px;align-items:center;flex-wrap:wrap">
   <div>
-    <div style="font-size:30px;font-weight:800;color:var(--teal)"><?= $summary['avg_stars'] !== null ? number_format((float)$summary['avg_stars'], 1) : '—' ?></div>
+    <div style="font-size:30px;font-weight:800;color:var(--teal)"><?= $summary['avg_stars'] !== null ? nf((float)$summary['avg_stars'], 1) : '—' ?></div>
     <div class="muted" style="font-size:12px"><?= (int)($summary['count'] ?? 0) ?> rating<?= (int)($summary['count'] ?? 0) === 1 ? '' : 's' ?></div>
   </div>
   <?php if (($summary['rehire_pct'] ?? null) !== null): ?>

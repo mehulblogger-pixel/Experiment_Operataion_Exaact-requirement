@@ -61,19 +61,42 @@ function crmdash_funnel($pipelineId = 0, $days = 365) {
     [$sw, $sa] = scope_office_clause('o.office_id');
     $cut = date('Y-m-d', strtotime("-$days days"));
 
-    // Reached-ever, per stage, from the history plus wherever a deal sits now.
-    // A deal created straight into stage 2 never generated a history row for it,
-    // so the current stage has to be counted as "reached" as well.
-    $reached = [];
-    foreach ($stages as $s) {
-        $sid = (int)$s['id'];
-        $reached[$sid] = (int)crmdash_val(
-            "SELECT COUNT(DISTINCT o.id) FROM opportunities o
-             WHERE $sw AND o.pipeline_id=? AND o.created_at >= ?
-               AND (o.stage_id=? OR EXISTS (SELECT 1 FROM opportunity_stage_history h
-                                            WHERE h.opportunity_id=o.id AND h.to_stage_id=?))",
-            array_merge($sa, [$pipe, $cut, $sid, $sid]), 0);
+    // DEF-SAL-016 — "reached" counts a deal through EVERY open stage up to the furthest one it
+    // reached (a deal created in stage 2, or moved 1 → 3, has passed the stages before). A won deal
+    // has passed every open stage. Won and Lost count the deals that closed there. Counting only the
+    // stages a deal sat in or was moved INTO gave conversions above 100%.
+    $pos = []; $kind = []; $openPos = [];
+    foreach (array_values($stages) as $i => $s) { $pos[(int)$s['id']] = $i; $kind[(int)$s['id']] = (string)$s['kind']; if ($s['kind'] === 'OPEN') $openPos[] = $i; }
+    $lastOpen = $openPos ? max($openPos) : -1; $firstOpen = $openPos ? min($openPos) : -1;
+    $reached = array_fill_keys(array_map(fn($s) => (int)$s['id'], $stages), 0);
+    $deals = crmdash_rows("SELECT o.id, o.stage_id FROM opportunities o WHERE $sw AND o.pipeline_id=? AND o.created_at >= ?", array_merge($sa, [$pipe, $cut])) ?: [];
+    $seen = [];
+    if ($deals) {
+        $ids = array_map(fn($d) => (int)$d['id'], $deals);
+        foreach (array_chunk($ids, 500) as $chunk) {
+            $ph = implode(',', array_fill(0, count($chunk), '?'));
+            foreach (crmdash_rows("SELECT opportunity_id, from_stage_id, to_stage_id FROM opportunity_stage_history WHERE opportunity_id IN ($ph)", $chunk) ?: [] as $h) {
+                foreach (['from_stage_id', 'to_stage_id'] as $c) if ($h[$c] !== null && $h[$c] !== '') $seen[(int)$h['opportunity_id']][(int)$h[$c]] = true;
+            }
+        }
     }
+    foreach ($deals as $d) {
+        $did = (int)$d['id'];
+        $set = ($seen[$did] ?? []) + [(int)$d['stage_id'] => true];
+        $far = $firstOpen; $closed = [];
+        foreach (array_keys($set) as $sid) {
+            if (!isset($pos[$sid])) continue;
+            if ($kind[$sid] === 'OPEN') $far = max($far, $pos[$sid]); else $closed[$sid] = true;
+        }
+        if (isset($pos[(int)$d['stage_id']]) && $kind[(int)$d['stage_id']] === 'WON') $far = $lastOpen;
+        foreach ($stages as $s) {
+            $sid = (int)$s['id'];
+            if ($s['kind'] === 'OPEN') { if ($pos[$sid] <= $far) $reached[$sid]++; }
+            elseif (!empty($closed[$sid])) $reached[$sid]++;
+        }
+    }
+    $entered = count($deals);
+    $lastOpenSid = null; foreach ($stages as $s) if ($s['kind'] === 'OPEN') $lastOpenSid = (int)$s['id'];
 
     $out = []; $prevSid = null;
     foreach ($stages as $s) {
@@ -85,9 +108,11 @@ function crmdash_funnel($pipelineId = 0, $days = 365) {
         $val = 0.0; foreach ($here as $h) $val += (float)$h['value'];
 
         // Conversion from the PREVIOUS stage, using reached-ever on both.
+        //  Won: of those who reached the last open stage. Lost: of all that entered the funnel.
         $conv = null;
-        if ($prevSid !== null && ($reached[$prevSid] ?? 0) > 0)
-            $conv = round(($reached[$sid] ?? 0) * 100 / $reached[$prevSid]);
+        $base = $s['kind'] === 'LOST' ? ($prevSid !== null ? $entered : 0)
+              : ($s['kind'] === 'WON' && $lastOpenSid !== null ? ($reached[$lastOpenSid] ?? 0) : ($prevSid !== null ? ($reached[$prevSid] ?? 0) : 0));
+        if ($base > 0) $conv = round(($reached[$sid] ?? 0) * 100 / $base);
 
         $out[] = [
             'stage' => $s, 'now' => count($here), 'value' => $val,
@@ -102,11 +127,24 @@ function crmdash_funnel($pipelineId = 0, $days = 365) {
     $first = $stages[0]['id'] ?? null;
     $wonStage = null;
     foreach ($stages as $s) if ($s['kind'] === 'WON') { $wonStage = (int)$s['id']; break; }
-    $overall = ($first && $wonStage && ($reached[(int)$first] ?? 0) > 0)
-        ? round(($reached[$wonStage] ?? 0) * 100 / $reached[(int)$first]) : null;
+    $overall = ($wonStage && $entered > 0) ? round(($reached[$wonStage] ?? 0) * 100 / $entered) : null;
 
     return ['pipeline' => $pipe, 'stages' => $out, 'overall' => $overall, 'days' => $days,
-            'entered' => $first ? ($reached[(int)$first] ?? 0) : 0];
+            'entered' => $entered];
+}
+
+// "Why we lose" — lost deals and lost leads, one row per reason (DEF-SAL-025).
+function crmdash_losses($days = 365) {
+    $rows = [];
+    foreach ((function_exists('opp_loss_reasons') ? opp_loss_reasons($days) : []) as $r)
+        $rows[$r['reason']] = ['reason' => $r['reason'], 'n' => $r['n'], 'leads' => 0, 'value' => $r['value']];
+    foreach ((function_exists('lead_loss_reasons') ? lead_loss_reasons($days) : []) as $r) {
+        $rows[$r['reason']] = ($rows[$r['reason']] ?? ['reason' => $r['reason'], 'n' => 0, 'leads' => 0, 'value' => 0.0]);
+        $rows[$r['reason']]['leads'] += $r['n']; $rows[$r['reason']]['value'] += $r['value'];
+    }
+    $rows = array_values($rows);
+    usort($rows, fn($a, $b) => ($b['n'] + $b['leads']) <=> ($a['n'] + $a['leads']));
+    return $rows;
 }
 
 // ---- The numbers a sales manager is asked for -------------------------------
@@ -258,7 +296,7 @@ function ops_crmdash($route, $method) {
         'owners'   => crmdash_owners($days),
         'stuck'    => crmdash_stuck(10),
         'activity' => crmdash_activity(30),
-        'losses'   => function_exists('opp_loss_reasons') ? opp_loss_reasons($days) : [],
+        'losses'   => crmdash_losses($days),
         'pipelines'=> function_exists('pipelines_all') ? (crmdash_try(fn() => pipelines_all('OPPORTUNITY'), []) ?: []) : [],
         'days'     => $days, 'pipe' => $pipe,
         'industry' => function_exists('industry_current') ? industry_current() : '',

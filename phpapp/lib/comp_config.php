@@ -238,7 +238,7 @@ function comp_solve_from_ctc($targetCtc, array $pinned = []) {
     //  than silently returning something that does not add up.
     if (abs($target - (float) $r['ctc']) >= 0.01) {
         $r['err'] = 'This CTC cannot be split by the configured structure: the components already come to '
-                  . number_format((float) $r['ctc'], 2)
+                  . nf((float) $r['ctc'], 2)
                   . ($target < (float) $r['ctc']
                      ? ', which is more than the CTC entered. Lower the Basic percentage, or raise the CTC.'
                      : '. Check the pinned amounts.');

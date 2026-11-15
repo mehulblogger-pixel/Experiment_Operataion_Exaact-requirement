@@ -216,7 +216,7 @@ function geo_distance_m($lat1, $lon1, $lat2, $lon2) {
 }
 function geo_pretty($lat, $lon) {
     if ($lat === null || $lon === null) return '—';
-    return number_format((float)$lat, 5) . ', ' . number_format((float)$lon, 5);
+    return nf((float)$lat, 5) . ', ' . nf((float)$lon, 5);
 }
 // A map link that needs no key and no third-party script on our pages.
 function geo_map_url($lat, $lon) {

@@ -2098,7 +2098,7 @@ function hreq_leaver_facts_html($snap, $stamped = true) {
     $e = fn($x) => htmlspecialchars((string) $x, ENT_QUOTES);
     $money = function ($v) use ($e) {
         $sym = function_exists('cur_sym') ? cur_sym() : '';
-        return $e($sym . number_format((float) $v, 0));
+        return $e($sym . nf((float) $v, 0));
     };
     $bits = [];
     $bits[] = '<b>' . $e($snap['name']) . '</b>'

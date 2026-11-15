@@ -54,7 +54,7 @@ $reqs = $home['contact_requests'] ?? []; $pool = (int)($home['pool_size'] ?? 0);
 <?php endif; ?>
 <div class="hh-hero">
   <h2>Find &amp; hire technical manpower</h2>
-  <p>Search <?= number_format($pool) ?> verified professionals across the pool — by role, skill, certificate or equipment — or post exactly what you need and let qualified people apply.</p>
+  <p>Search <?= nf($pool) ?> verified professionals across the pool — by role, skill, certificate or equipment — or post exactly what you need and let qualified people apply.</p>
   <div class="hh-btns">
     <a class="hh-btn p" href="/portal/find">🔍 Search the pool</a>
     <a class="hh-btn g" href="/portal/hire">➕ Post a requirement</a>

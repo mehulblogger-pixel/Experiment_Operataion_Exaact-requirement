@@ -9,14 +9,14 @@
 </div>
 
 <div class="kpi-row" style="margin:14px 0">
-  <div class="kpi"><span class="kic">✅</span><div class="k">Sent (30d)</div><div class="v"><?= number_format($stats['sent']) ?></div><div class="d">delivered to the mail server</div></div>
-  <div class="kpi"><span class="kic">⚠️</span><div class="k">Failed (30d)</div><div class="v <?= $stats['failed'] ? 'down' : '' ?>"><a href="<?= e($qs(['failed'=>1,'kind'=>''])) ?>"><?= number_format($stats['failed']) ?></a></div><div class="d"><?= (int)$stats['norecip'] ?> had no recipient</div></div>
-  <div class="kpi"><span class="kic">📨</span><div class="k">Total (30d)</div><div class="v"><?= number_format($stats['total']) ?></div><div class="d">send attempts</div></div>
+  <div class="kpi"><span class="kic">✅</span><div class="k">Sent (30d)</div><div class="v"><?= nf($stats['sent']) ?></div><div class="d">delivered to the mail server</div></div>
+  <div class="kpi"><span class="kic">⚠️</span><div class="k">Failed (30d)</div><div class="v <?= $stats['failed'] ? 'down' : '' ?>"><a href="<?= e($qs(['failed'=>1,'kind'=>''])) ?>"><?= nf($stats['failed']) ?></a></div><div class="d"><?= (int)$stats['norecip'] ?> had no recipient</div></div>
+  <div class="kpi"><span class="kic">📨</span><div class="k">Total (30d)</div><div class="v"><?= nf($stats['total']) ?></div><div class="d">send attempts</div></div>
 </div>
 
 <?php if ((int)$stats['failed'] > 0 && !$failed): ?>
 <div class="msg msg-warning" style="margin-bottom:12px">
-  <b><?= number_format($stats['failed']) ?> send(s) failed in the last 30 days</b>
+  <b><?= nf($stats['failed']) ?> send(s) failed in the last 30 days</b>
   <?= (int)$stats['norecip'] ? '(' . (int)$stats['norecip'] . ' because no recipient could be resolved)' : '' ?>.
   <a href="<?= e($qs(['failed'=>1,'kind'=>''])) ?>">Show only failed →</a>
 </div>

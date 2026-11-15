@@ -1,7 +1,7 @@
 <?php
 $ym    = sprintf('%04d-%02d', $yr, $mon);
 $mName = date('F Y', mktime(0, 0, 0, $mon, 1, $yr));
-$money = function ($v) { return ($v < 0 ? '−₹' : '₹') . number_format(abs((float)$v), 0); };
+$money = function ($v) { return ($v < 0 ? '−₹' : '₹') . nf(abs((float)$v), 0); };
 $pill  = function ($v) { return $v > 0 ? 'p-ok' : ($v < 0 ? 'p-bad' : 'p-mut'); };
 ?>
 <div class="master-head">

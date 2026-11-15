@@ -107,7 +107,7 @@ function billable_bill_partial($id, $amount, $ref, $tol = 1.0) {
     if (($e['status'] ?? '') !== 'APPROVED') return [false, 'Only an approved event can be part-billed.'];
     if (in_array(($e['source_module'] ?? ''), ['job', 'unit'], true)) return [false, 'A closed-job event or billing unit reconciles via its books invoice, not attestation.'];
     $remaining = billable_remaining($e);
-    if ($amount > $remaining + $tol) return [false, 'That exceeds the ' . number_format($remaining, 2) . ' still to bill.'];
+    if ($amount > $remaining + $tol) return [false, 'That exceeds the ' . nf($remaining, 2) . ' still to bill.'];
     $newBilled = round((float)($e['billed_amount'] ?? 0) + $amount, 2);
     db()->prepare("INSERT INTO billable_bills (event_id, amount, bill_ref, billed_at, billed_by) VALUES (?,?,?,?,?)")
         ->execute([$id, $amount, substr($ref, 0, 80), date('c'), billable_actor()]);
@@ -118,7 +118,7 @@ function billable_bill_partial($id, $amount, $ref, $tol = 1.0) {
         return [true, 'Final bill recorded — event fully billed.'];
     }
     db()->prepare("UPDATE billable_events SET billed_amount=?, updated_at=? WHERE id=?")->execute([$newBilled, date('c'), $id]);
-    return [true, 'Partial bill of ' . number_format($amount, 2) . ' recorded — ' . number_format(round((float)$e['amount'] - $newBilled, 2), 2) . ' still to bill.'];
+    return [true, 'Partial bill of ' . nf($amount, 2) . ' recorded — ' . nf(round((float)$e['amount'] - $newBilled, 2), 2) . ' still to bill.'];
 }
 
 /**

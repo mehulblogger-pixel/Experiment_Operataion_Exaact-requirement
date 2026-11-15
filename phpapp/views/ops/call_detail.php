@@ -168,7 +168,7 @@
   $cqid  = (int)($call['quotation_id'] ?? 0);
   $cgate = ($cqid && function_exists('contract_gate')) ? contract_gate($cqid) : null;
   $cinfo = $cgate['info'] ?? null;
-  $fmtq  = fn($n) => rtrim(rtrim(number_format((float)$n, 2), '0'), '.');
+  $fmtq  = fn($n) => rtrim(rtrim(nf((float)$n, 2), '0'), '.');
 ?>
 <?php if ($cinfo && in_array($cinfo['state'], ['EXPIRING','QTY_LOW','EXPIRED','EXHAUSTED'], true)):
         $bad = in_array($cinfo['state'], ['EXPIRED','EXHAUSTED'], true); ?>

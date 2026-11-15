@@ -1,5 +1,5 @@
 <?php
-$money = function ($v) { return ($v < 0 ? '−' : '') . cur_sym() . number_format(abs((float)$v), 0); };
+$money = function ($v) { return ($v < 0 ? '−' : '') . cur_sym() . nf(abs((float)$v), 0); };
 $pill  = function ($v) { return $v > 0 ? 'p-ok' : ($v < 0 ? 'p-bad' : 'p-mut'); };
 ?>
 <div class="master-head">
@@ -103,7 +103,7 @@ $pill  = function ($v) { return $v > 0 ? 'p-ok' : ($v < 0 ? 'p-bad' : 'p-mut'); 
           <?php if (!empty($j['boss_number'])): ?><div class="muted" style="font-size:11px"><?= e($j['boss_number']) ?></div><?php endif; ?></td>
         <td><?= e($j['inspector_name'] ?: '—') ?></td>
         <td class="muted"><?= e($j['office_name'] ?: '—') ?></td>
-        <td class="num"><?= rtrim(rtrim(number_format((float)$p['mandays'], 1), '0'), '.') ?></td>
+        <td class="num"><?= rtrim(rtrim(nf((float)$p['mandays'], 1), '0'), '.') ?></td>
         <td class="num"><?= $money($p['revenue']) ?></td>
         <td class="num"><?= can_see_salary() ? $money($p['labour']) : '<span class="muted">—</span>' ?></td>
         <td class="num"><?= can_see_salary() ? $money($p['overhead']) : '<span class="muted">—</span>' ?></td>
@@ -122,7 +122,7 @@ $pill  = function ($v) { return $v > 0 ? 'p-ok' : ($v < 0 ? 'p-bad' : 'p-mut'); 
     <?php if ($rows): ?>
     <tfoot><tr style="font-weight:700;background:var(--soft)">
       <td colspan="4">Total — <?= (int)$tot['jobs'] ?> <?= e(Tlp('job')) ?></td>
-      <td class="num"><?= rtrim(rtrim(number_format((float)$tot['mandays'], 1), '0'), '.') ?></td>
+      <td class="num"><?= rtrim(rtrim(nf((float)$tot['mandays'], 1), '0'), '.') ?></td>
       <td class="num"><?= $money($tot['revenue']) ?></td>
       <td class="num"><?= can_see_salary() ? $money($tot['labour']) : '—' ?></td>
       <td class="num"><?= can_see_salary() ? $money($tot['overhead']) : '—' ?></td>

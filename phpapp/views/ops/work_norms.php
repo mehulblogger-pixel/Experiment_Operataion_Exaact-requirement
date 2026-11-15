@@ -32,8 +32,8 @@
       <tr>
         <td><?= $r['designation'] !== '' ? e($designations[$r['designation']] ?? $r['designation']) : '<span class="muted">(office default)</span>' ?></td>
         <td><?= $r['office_name'] ? e($r['office_name']) : '<span class="muted">All offices</span>' ?></td>
-        <td class="num"><?= rtrim(rtrim(number_format((float)$r['weekly_days'],1),'0'),'.') ?></td>
-        <td class="num"><?= rtrim(rtrim(number_format((float)$r['weekly_hours'],1),'0'),'.') ?></td>
+        <td class="num"><?= rtrim(rtrim(nf((float)$r['weekly_days'],1),'0'),'.') ?></td>
+        <td class="num"><?= rtrim(rtrim(nf((float)$r['weekly_hours'],1),'0'),'.') ?></td>
         <td><form method="post" action="/work-norms" onsubmit="return confirm('Remove this norm?')" style="display:inline"><input type="hidden" name="_do" value="del"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>"><button class="btn small secondary" type="submit">Remove</button></form></td>
       </tr>
       <?php endforeach; ?>

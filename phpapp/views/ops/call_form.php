@@ -414,7 +414,7 @@ document.addEventListener('DOMContentLoaded', function () {
     <div class="ff"><label>Quotation line <span class="muted">— use when there is no client PO</span></label>
       <select class="form-control searchable" name="quote_line_id"><option value="">— none / whole quotation —</option>
         <?php foreach ($qLines as $ql):
-          $lbl = ($ql['description'] ?: $ql['service_type']) . ' — ' . rtrim(rtrim(number_format((float)$ql['qty'], 2), '0'), '.') . ' ' . $ql['unit'] . ' @ ' . number_format((float)$ql['rate'], 2); ?>
+          $lbl = ($ql['description'] ?: $ql['service_type']) . ' — ' . rtrim(rtrim(nf((float)$ql['qty'], 2), '0'), '.') . ' ' . $ql['unit'] . ' @ ' . nf((float)$ql['rate'], 2); ?>
           <option value="<?= (int)$ql['id'] ?>" <?= ((int)($call['quote_line_id'] ?? 0) === (int)$ql['id']) ? 'selected' : '' ?>><?= e($lbl) ?></option>
         <?php endforeach; ?>
       </select></div>

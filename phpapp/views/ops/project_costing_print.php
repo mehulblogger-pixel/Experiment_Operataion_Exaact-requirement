@@ -4,7 +4,7 @@ $h = $roll['header']; $lines = $roll['lines']; $T = $roll['totals']; $byHead = $
 $heads = $roll['heads'] ?? []; $client = $roll['client'] ?? null;
 $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
 $sym = function_exists('cur_sym') ? cur_sym() : '₹';
-$money = fn($n) => $sym . ' ' . number_format((float)$n, 0);
+$money = fn($n) => $sym . ' ' . nf((float)$n, 0);
 $basis = (string)$h['basis'];
 $qtyLabel = $basis === 'DAILY' ? 'Man-days' : ($basis === 'FIXED' ? 'Units' : 'Man-months');
 $rateLabel = $basis === 'DAILY' ? 'Rate/man-day' : ($basis === 'FIXED' ? 'Lump' : 'Rate/man-month');
@@ -55,7 +55,7 @@ $basisName = defined('PC_BASES') ? (PC_BASES[$basis] ?? $basis) : $basis;
   <div class="kpi"><div class="l">Project revenue</div><div class="v"><?= $money($T['revenue']) ?></div></div>
   <div class="kpi"><div class="l">Project cost</div><div class="v"><?= $money($T['cost']) ?></div></div>
   <div class="kpi"><div class="l">Project profit</div><div class="v"><?= $money($T['profit']) ?></div></div>
-  <div class="kpi"><div class="l">Margin</div><div class="v"><?= number_format($T['margin'],1) ?>%</div></div>
+  <div class="kpi"><div class="l">Margin</div><div class="v"><?= nf($T['margin'],1) ?>%</div></div>
 </div>
 
 <table class="grid">
@@ -67,16 +67,16 @@ $basisName = defined('PC_BASES') ? (PC_BASES[$basis] ?? $basis) : $basis;
     if (($ln['group_label'] ?? '') !== $lastGrp && ($ln['group_label'] ?? '') !== '') { $lastGrp = $ln['group_label']; echo '<tr class="grp"><td class="l" colspan="'.$ncol.'">'.$e($lastGrp).'</td></tr>'; } ?>
     <?php $lb = pc_line_basis($ln, $h); $bw = pc_basis_words($lb); //  each role in its own basis (14 Nov 2026) ?>
     <tr><td class="l"><?= $e($ln['role_label']) ?><br><span class="muted" style="font-size:9px"><?= $e($lb === 'FIXED' ? 'lump sum' : $bw[0]) ?></span></td>
-      <?php foreach ($shown as $hk=>$hl): ?><td><?= isset($lh[$hk]) ? number_format((float)$lh[$hk]) : '—' ?></td><?php endforeach; ?>
-      <td><?= number_format($c['direct']) ?></td><td><?= number_format($c['loaded']) ?></td>
-      <td><?= number_format($c['proposed']) ?><span class="muted" style="font-size:9px"><?= $e($bw[2]) ?></span></td>
-      <td><?= $lb==='FIXED' ? '1' : number_format((float)$ln['boq_qty'], $lb==='DAILY'?0:1) ?> <span class="muted" style="font-size:9px"><?= $e(strtolower($bw[1])) ?></span></td>
-      <td><?= number_format($c['revenue']) ?></td></tr>
+      <?php foreach ($shown as $hk=>$hl): ?><td><?= isset($lh[$hk]) ? nf((float)$lh[$hk]) : '—' ?></td><?php endforeach; ?>
+      <td><?= nf($c['direct']) ?></td><td><?= nf($c['loaded']) ?></td>
+      <td><?= nf($c['proposed']) ?><span class="muted" style="font-size:9px"><?= $e($bw[2]) ?></span></td>
+      <td><?= $lb==='FIXED' ? '1' : nf((float)$ln['boq_qty'], $lb==='DAILY'?0:1) ?> <span class="muted" style="font-size:9px"><?= $e(strtolower($bw[1])) ?></span></td>
+      <td><?= nf($c['revenue']) ?></td></tr>
   <?php endforeach; ?>
   </tbody>
   <tfoot><tr class="tot"><td class="l">Total</td>
-    <?php foreach ($shown as $hk=>$hl): ?><td><?= number_format((float)($byHead[$hk] ?? 0)) ?></td><?php endforeach; ?>
-    <td><?= number_format($T['direct']) ?></td><td></td><td></td><td></td><td><?= number_format($T['revenue']) ?></td></tr></tfoot>
+    <?php foreach ($shown as $hk=>$hl): ?><td><?= nf((float)($byHead[$hk] ?? 0)) ?></td><?php endforeach; ?>
+    <td><?= nf($T['direct']) ?></td><td></td><td></td><td></td><td><?= nf($T['revenue']) ?></td></tr></tfoot>
 </table>
 
 <?php // How each role's heads are worked out, with their remarks (owner, 9 Nov 2026).
@@ -86,17 +86,17 @@ $basisName = defined('PC_BASES') ? (PC_BASES[$basis] ?? $basis) : $basis;
     $lbl = array_column($sp['items'], 'label', 'code'); ?>
   <div style="margin-top:14px;page-break-inside:avoid">
     <b><?= $e(trim(((string)$ln['group_label'] !== '' ? $ln['group_label'] . ' / ' : '') . $ln['role_label'])) ?></b>
-    <span class="muted" style="font-size:10px">— <?= (int)($ln['headcount'] ?? 1) ?> people · <?= $e(rtrim(rtrim(number_format((float)$sp['dpm'], 1), '0'), '.')) ?> working days a month</span>
+    <span class="muted" style="font-size:10px">— <?= (int)($ln['headcount'] ?? 1) ?> people · <?= $e(rtrim(rtrim(nf((float)$sp['dpm'], 1), '0'), '.')) ?> working days a month</span>
     <table class="grid" style="margin-top:4px">
       <thead><tr><th class="l">Head</th><th class="l">How it is worked out</th><th><?= $e($unitW) ?></th><th class="l">Remark</th></tr></thead>
       <tbody><?php foreach ($sp['items'] as $it): $r = $ev['rows'][$it['code']] ?? ['unit' => 0, 'once' => 0, 'why' => ''];
         if ($it['type'] === 'AMOUNT' && abs((float)$r['unit']) < 0.005 && abs((float)$r['once']) < 0.005) continue;   // an unused head ?>
         <tr><td class="l"><?= $e($it['label']) ?></td><td class="l" style="font-size:10px"><?= $e($r['why'] !== '' ? $r['why'] : ch_item_summary($it, $lbl)) ?></td>
-          <td><?= $it['per'] === 'ONCE' ? number_format((float)$r['once']) . ' once' : number_format((float)$r['unit']) ?></td>
+          <td><?= $it['per'] === 'ONCE' ? nf((float)$r['once']) . ' once' : nf((float)$r['unit']) ?></td>
           <td class="l" style="font-size:10px"><?= $e($it['note'] ?? '') ?></td></tr>
       <?php endforeach; ?></tbody>
-      <tfoot><tr class="tot"><td class="l" colspan="2">Salary <?= number_format($ev['pay']) ?> · statutory <?= number_format($ev['by_grp']['STAT']) ?> · other <?= number_format($ev['by_grp']['COST']) ?></td>
-        <td><?= number_format($ev['direct']) ?></td><td class="l"><?= $ev['once'] > 0 ? '+ ' . number_format($ev['once']) . ' one time per person' : '' ?></td></tr></tfoot>
+      <tfoot><tr class="tot"><td class="l" colspan="2">Salary <?= nf($ev['pay']) ?> · statutory <?= nf($ev['by_grp']['STAT']) ?> · other <?= nf($ev['by_grp']['COST']) ?></td>
+        <td><?= nf($ev['direct']) ?></td><td class="l"><?= $ev['once'] > 0 ? '+ ' . nf($ev['once']) . ' one time per person' : '' ?></td></tr></tfoot>
     </table>
   </div>
 <?php endforeach; ?>

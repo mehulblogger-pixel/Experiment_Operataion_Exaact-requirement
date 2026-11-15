@@ -25,9 +25,9 @@ function connect_kpi_val($sql, $args = []) {
 /** Short ₹ formatter (Cr / L / plain). */
 function connect_kpi_inr($n) {
     $n = (float)$n;
-    if ($n >= 10000000) return '₹' . rtrim(rtrim(number_format($n / 10000000, 2), '0'), '.') . ' Cr';
-    if ($n >= 100000)   return '₹' . rtrim(rtrim(number_format($n / 100000, 1), '0'), '.') . ' L';
-    return '₹' . number_format((int)round($n));
+    if ($n >= 10000000) return '₹' . rtrim(rtrim(nf($n / 10000000, 2), '0'), '.') . ' Cr';
+    if ($n >= 100000)   return '₹' . rtrim(rtrim(nf($n / 100000, 1), '0'), '.') . ' L';
+    return '₹' . nf((int)round($n));
 }
 
 /**
@@ -117,7 +117,7 @@ function connect_kpi_board($scope = []) {
         ['key' => 'concerns', 'icon' => '⚠️', 'label' => 'Open concerns', 'value' => (string)$concerns,
          'sub' => $concerns > 0 ? 'need attention' : 'all clear', 'tone' => $concerns > 0 ? 'bad' : 'ok',
          'url' => $isClient ? '/portal/requests' : '/complaints'],
-        ['key' => 'ratings', 'icon' => '⭐', 'label' => 'Ratings', 'value' => $ratingAvg !== null ? number_format($ratingAvg, 1) : '—',
+        ['key' => 'ratings', 'icon' => '⭐', 'label' => 'Ratings', 'value' => $ratingAvg !== null ? nf($ratingAvg, 1) : '—',
          'sub' => $ratingN > 0 ? ($ratingN . ' rated') : 'no ratings yet', 'tone' => ($ratingAvg !== null && $ratingAvg >= 4) ? 'ok' : '', 'url' => ''],
         ['key' => 'reports', 'icon' => '📄', 'label' => 'Reports pending', 'value' => (string)$reportsPending,
          'sub' => $reportsPending > 0 ? 'awaiting issue' : 'up to date', 'tone' => $reportsPending > 0 ? 'warn' : 'ok',
@@ -226,7 +226,7 @@ function connect_kpi_board_pro($proId) {
          'tone' => $bookedValue > 0 ? 'ok' : '', 'url' => '/pro/bookings'],
         ['key' => 'applications', 'icon' => '📨', 'label' => 'Applications', 'value' => (string)$appsLive,
          'sub' => $appsShort . ' shortlisted · ' . $appsOffered . ' offered', 'tone' => $appsOffered > 0 ? 'warn' : '', 'url' => '/pro/applications'],
-        ['key' => 'ratings', 'icon' => '⭐', 'label' => 'Ratings', 'value' => $ratingAvg !== null ? number_format($ratingAvg, 1) : '—',
+        ['key' => 'ratings', 'icon' => '⭐', 'label' => 'Ratings', 'value' => $ratingAvg !== null ? nf($ratingAvg, 1) : '—',
          'sub' => $ratingN > 0 ? ($ratingN . ' rated') : 'no ratings yet', 'tone' => ($ratingAvg !== null && $ratingAvg >= 4) ? 'ok' : '', 'url' => ''],
         ['key' => 'verification', 'icon' => '🛡️', 'label' => 'Verification', 'value' => $tierRank >= 3 ? '✓✓' : ($tierRank >= 1 ? '✓' : '—'),
          'sub' => $tierLbl . ($trustScore !== null ? ' · trust ' . $trustScore : ''), 'tone' => $tierRank >= 1 ? 'ok' : 'warn', 'url' => '/pro/verify'],
@@ -291,7 +291,7 @@ function connect_kpi_board_inspector($inspectorId) {
          'sub' => $reports > 0 ? 'to write & submit' : 'up to date', 'tone' => $reports > 0 ? 'warn' : 'ok', 'url' => '/my-jobs?f=reports'],
         ['key' => 'overdue', 'icon' => '⏰', 'label' => 'Overdue', 'value' => (string)$overdue,
          'sub' => $overdue > 0 ? 'past due date' : 'on track', 'tone' => $overdue > 0 ? 'bad' : 'ok', 'url' => '/my-jobs?f=overdue'],
-        ['key' => 'ratings', 'icon' => '⭐', 'label' => 'Ratings', 'value' => $ratingAvg !== null ? number_format($ratingAvg, 1) : '—',
+        ['key' => 'ratings', 'icon' => '⭐', 'label' => 'Ratings', 'value' => $ratingAvg !== null ? nf($ratingAvg, 1) : '—',
          'sub' => $ratingN > 0 ? ($ratingN . ' rated') : 'no ratings yet', 'tone' => ($ratingAvg !== null && $ratingAvg >= 4) ? 'ok' : '', 'url' => ''],
         ['key' => 'completed', 'icon' => '✅', 'label' => 'Completed', 'value' => (string)$done,
          'sub' => $done > 0 ? 'jobs closed' : 'none yet', 'tone' => '', 'url' => '/my-jobs'],

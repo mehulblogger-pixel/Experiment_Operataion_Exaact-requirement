@@ -1,7 +1,7 @@
 <?php
 $tot = $S['tot'];
 $sal = $S['seeSalary'];
-$money = function ($v) { return ($v < 0 ? '−₹' : '₹') . number_format(abs((float)$v), 0); };
+$money = function ($v) { return ($v < 0 ? '−₹' : '₹') . nf(abs((float)$v), 0); };
 $pill  = function ($v) { return $v > 0 ? 'p-ok' : ($v < 0 ? 'p-bad' : 'p-mut'); };
 $avg   = function ($r) { return $r['delayCounted'] ? round($r['delayDays'] / $r['delayCounted'], 1) : null; };
 $period = $F['m'] !== '' ? ($F['months'][$F['m']] ?? $F['m']) : 'FY ' . $F['fy'];
@@ -12,7 +12,7 @@ $vs = function ($now, $then, $money = false) use ($LY) {
     if ($pct === null) return '<span class="muted">no figure a year ago</span>';
     $cls = $pct > 0 ? 'p-ok' : ($pct < 0 ? 'p-bad' : 'p-mut');
     return '<span class="pill ' . $cls . '">' . ($pct > 0 ? '+' : '') . $pct . '%</span>'
-         . ' <span class="muted">vs ' . ($money ? '₹' . number_format((float)$then, 0) : (float)$then) . ' last year</span>';
+         . ' <span class="muted">vs ' . ($money ? '₹' . nf((float)$then, 0) : (float)$then) . ' last year</span>';
 };
 $qs = function ($extra = []) use ($F) {
     $q = ['fy'=>$F['fy'], 'm'=>$F['m'], 'sbu'=>$F['sbu'], 'activity'=>$F['activity'],

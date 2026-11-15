@@ -354,12 +354,12 @@ function offer_submit($id, $marginNote = '') {
     $chk = ($cand && function_exists('pc_cand_check')) ? pc_cand_check($cand, (float)$o['ctc']) : null;
     $marginNote = mb_substr(trim((string)$marginNote), 0, 300);
     if ($chk && in_array($chk['verdict'], ['LOW', 'LOSS'], true)) {
-        if ($marginNote === '') return [false, 'This offer leaves a ' . rtrim(rtrim(number_format($chk['margin'], 1), '0'), '.') . '% margin on costing '
-            . $chk['costing']['code'] . ' (' . $chk['line']['role_label'] . '), below its ' . rtrim(rtrim(number_format($chk['target'], 1), '0'), '.') . '% target. '
-            . 'A CTC up to ' . _off_cur() . number_format($chk['max_ctc'], 0) . ' a month keeps the target. To submit it anyway, write why — the approver will see it.'];
+        if ($marginNote === '') return [false, 'This offer leaves a ' . rtrim(rtrim(nf($chk['margin'], 1), '0'), '.') . '% margin on costing '
+            . $chk['costing']['code'] . ' (' . $chk['line']['role_label'] . '), below its ' . rtrim(rtrim(nf($chk['target'], 1), '0'), '.') . '% target. '
+            . 'A CTC up to ' . _off_cur() . nf($chk['max_ctc'], 0) . ' a month keeps the target. To submit it anyway, write why — the approver will see it.'];
         db()->prepare("UPDATE job_offers SET margin_note=? WHERE id=?")->execute([$marginNote, (int)$id]);
         if (function_exists('act_log')) try { act_log('CANDIDATE', (int)$o['candidate_id'], 'NOTE', 'Offer submitted below the costing target margin ('
-            . number_format($chk['margin'], 1) . '% vs ' . number_format($chk['target'], 1) . '%): ' . $marginNote); } catch (Throwable $e) {}
+            . nf($chk['margin'], 1) . '% vs ' . nf($chk['target'], 1) . '%): ' . $marginNote); } catch (Throwable $e) {}
     }
     db()->prepare("UPDATE job_offers SET status='PENDING_APPROVAL' WHERE id=?")->execute([(int)$id]);
     // Phase 6 — if a configurable approval rule matches, route the offer through
@@ -521,7 +521,7 @@ function offer_letter_html($offer, $cand, $sal) {
         '{name}'         => $name,
         '{position}'     => $position ?: 'the role',
         '{company}'      => $company,
-        '{ctc}'          => ctc_month_year($offer['ctc'], fn($v) => $cur . number_format((float)$v, 0)),
+        '{ctc}'          => ctc_month_year($offer['ctc'], fn($v) => $cur . nf((float)$v, 0)),
         '{joining_date}' => $offer['joining_date'] ? (function_exists('fdate') ? fdate($offer['joining_date'], $offer['joining_date']) : $offer['joining_date']) : '—',
         '{terms}'        => (string)$offer['offer_terms'],
         '{date}'         => date('d M Y'),
@@ -530,7 +530,7 @@ function offer_letter_html($offer, $cand, $sal) {
     $html = '<div style="font-family:Georgia,serif;max-width:720px;margin:auto;color:#1a2230;line-height:1.6">'
           . '<div style="white-space:pre-wrap;font-size:15px">' . $e($body) . '</div>';
     // Salary-structure annexure — the month, with the year beside it.
-    if ($sal) $html .= '<h3 style="margin:22px 0 8px">Annexure — Compensation structure</h3>' . sal_annexure_html($sal, fn($v) => $cur . number_format((float)$v, 0));
+    if ($sal) $html .= '<h3 style="margin:22px 0 8px">Annexure — Compensation structure</h3>' . sal_annexure_html($sal, fn($v) => $cur . nf((float)$v, 0));
     return $html . '</div>';
 }
 
@@ -615,7 +615,7 @@ function recruit_offer_panel($cand) {
     $seeSal = function_exists('can_see_salary') ? can_see_salary() : $can;
     $sal = sal_current($cid); $hrds = hrd_list($cid); $offer = offer_current($cid);
     $comp = sal_components();
-    $money = fn($v) => $cur . number_format((float)$v, 0);
+    $money = fn($v) => $cur . nf((float)$v, 0);
     $act = "/candidate-offer?id=$cid";
     $stPill = ['DRAFT'=>'p-mut','PENDING_APPROVAL'=>'p-warn','APPROVED'=>'p-info','ISSUED'=>'p-info','VIEWED'=>'p-info','ACCEPTED'=>'p-ok','DECLINED'=>'p-bad','EXPIRED'=>'p-bad','WITHDRAWN'=>'p-mut'];
     ?>
@@ -743,7 +743,7 @@ function recruit_offer_panel($cand) {
         <span>This person: <b><?= $e($money($pcChk['ctc'])) ?></b> a month <span class="muted">(from the <?= $e($pcChk['source']) ?>)</span></span>
         <span>Costed salary + statutory: <b><?= $e($money($pcChk['costed_pay'])) ?></b></span>
         <span>Keeps the target up to: <b><?= $e($money($pcChk['max_ctc'])) ?></b></span>
-        <span>Margin as costed: <b><?= $e(rtrim(rtrim(number_format($pcChk['costed_margin'], 1), '0'), '.')) ?>%</b></span>
+        <span>Margin as costed: <b><?= $e(rtrim(rtrim(nf($pcChk['costed_margin'], 1), '0'), '.')) ?>%</b></span>
       </div>
       <?php endif; ?>
       <?php if ($offer && trim((string)($offer['margin_note'] ?? '')) !== ''): ?><div style="font-size:12.5px;margin-top:6px">Reason given for going below the target: <i><?= $e($offer['margin_note']) ?></i></div><?php endif; ?>

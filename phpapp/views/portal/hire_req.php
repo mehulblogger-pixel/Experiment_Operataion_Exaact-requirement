@@ -2,7 +2,7 @@
 // Connect K2b — the client manages one of its own requirements: who applied, and
 // shortlist / offer / award / reject. Ownership is enforced in the route.
 $req = $req ?? []; $apps = $apps ?? []; $req_next = $req_next ?? []; $vouchers = $vouchers ?? [];
-$vinr = fn($n) => '₹' . number_format((int)round((float)$n));
+$vinr = fn($n) => '₹' . nf((int)round((float)$n));
 $vlabel = ['DRAFT'=>['Draft','muted'],'SUBMITTED'=>['Awaiting your review','warn'],'APPROVED'=>['Approved','ok'],'PAID'=>['Paid','ok'],'REJECTED'=>['Returned','err']];
 $pill = function ($s) {
     $s = strtoupper((string)$s);
@@ -209,7 +209,7 @@ $reqLabel = ['OPEN'=>'Open for applications','SHORTLISTING'=>'Start shortlisting
 <div class="pcard" style="max-width:680px">
   <?php if ($eng): ?>
     <div style="font-size:14px"><strong><?= e(connect_engage_basis_label($bk['basis'])) ?></strong>
-      <?php if ((float)$bk['quantity'] > 0): ?> · <?= e(rtrim(rtrim(number_format((float)$bk['quantity'], 2), '0'), '.')) ?> <?= e($bk['rate_unit'] ?: 'day') ?>(s)<?php endif; ?>
+      <?php if ((float)$bk['quantity'] > 0): ?> · <?= e(rtrim(rtrim(nf((float)$bk['quantity'], 2), '0'), '.')) ?> <?= e($bk['rate_unit'] ?: 'day') ?>(s)<?php endif; ?>
       <?php if ((float)$bk['rate'] > 0): ?> · <?= $vinr($bk['rate']) ?> a <?= e($bk['rate_unit'] ?: 'day') ?><?php endif; ?></div>
   <?php else: ?>
     <p class="muted" style="font-size:13px;margin:0 0 8px"><?php $awName = ''; foreach ($apps as $aa) if ((int)$aa['id'] === $awardedId) $awName = (string)$aa['applicant_name']; ?>Tell us how much you are booking <?= e($awName ?: 'the person you awarded') ?> for — the company plans the deployment and bills from this.</p>

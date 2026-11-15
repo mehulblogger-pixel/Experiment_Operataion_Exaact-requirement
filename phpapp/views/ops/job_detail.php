@@ -889,7 +889,7 @@ if (function_exists('hwp_for_job')):
     <?php if (!empty($job['quotation_id'])): $lq = ops_one("SELECT quote_no, rev, contract_number FROM quotations WHERE id=?", [$job['quotation_id']]); ?>
     <div><span class="k">Against <?= e(Tl('quote')) ?></span><?= $lq ? e($lq['quote_no'].((int)$lq['rev']>0?' R'.$lq['rev']:'')) : '—' ?><?= ($lq && $lq['contract_number'])?' · '.e($lq['contract_number']):'' ?></div>
     <?php endif; ?>
-    <?php if (!empty($job['adv_required'])): ?><div><span class="k">Advance</span><?= rtrim(rtrim(number_format((float)$job['adv_pct'],2),'0'),'.') ?>% · <?= !empty($job['adv_received'])?'<span style="color:var(--ok)">received</span>':'<span style="color:var(--bad)">pending</span>' ?></div><?php endif; ?>
+    <?php if (!empty($job['adv_required'])): ?><div><span class="k">Advance</span><?= rtrim(rtrim(nf((float)$job['adv_pct'],2),'0'),'.') ?>% · <?= !empty($job['adv_received'])?'<span style="color:var(--ok)">received</span>':'<span style="color:var(--bad)">pending</span>' ?></div><?php endif; ?>
     <div><span class="k">Call</span><?= e($job['call_code'] ?: '—') ?></div>
     <div><span class="k">Job type</span><?= e(lk_options_or('job_type', JOB_TYPES)[$job['job_type'] ?? 'INSPECTION'] ?? '—') ?></div>
     <div><span class="k">Stage</span><?= e(lk_options_or('job_stage', JOB_STAGES)[$job['stage'] ?? 'ALLOCATED'] ?? '—') ?></div>
@@ -939,7 +939,7 @@ if (function_exists('hwp_for_job')):
     <?php foreach ($quoteDocs as $d): ?>
       <tr>
         <td><a href="/quote-file?id=<?= (int)$d['id'] ?>">⬇ <?= e($d['file_name']) ?></a>
-            <span class="muted" style="font-size:11px">(<?= e(number_format(((int)$d['b64len']) * 3 / 4 / 1024, 0)) ?> KB)</span></td>
+            <span class="muted" style="font-size:11px">(<?= e(nf(((int)$d['b64len']) * 3 / 4 / 1024, 0)) ?> KB)</span></td>
         <td><?= e(QUOTE_FILE_KINDS[$d['kind']] ?? $d['kind']) ?></td>
         <td class="muted"><?= e($d['note'] ?: '—') ?></td>
         <td class="muted"><?= e(fdate(substr((string)$d['uploaded_at'],0,10))) ?></td>
@@ -1166,7 +1166,7 @@ if (function_exists('hwp_for_job')):
       <tr>
         <td><a href="/invoice?id=<?= (int)$bi['id'] ?>"><b><?= e($bi['invoice_no'] ?: '(draft)') ?></b></a></td>
         <td><?= e($bi['invoice_date'] ?: '—') ?></td>
-        <td class="num"><?= e(cur_sym()) ?><?= number_format((float)$bi['total'], 0) ?></td>
+        <td class="num"><?= e(cur_sym()) ?><?= nf((float)$bi['total'], 0) ?></td>
         <td><span class="pill <?= $tone ?>"><?= e($stLbl) ?></span><?php if ($st==='DRAFT'): ?> <a href="/invoice?id=<?= (int)$bi['id'] ?>" class="muted" style="font-size:12px">review &amp; issue →</a><?php endif; ?></td>
       </tr>
       <?php endforeach; ?>
@@ -1202,7 +1202,7 @@ if (function_exists('hwp_for_job')):
   <div style="display:flex;gap:26px;align-items:baseline;flex-wrap:wrap">
     <div>
       <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em">Inter-office credit</div>
-      <div style="font-weight:700;font-size:20px;font-variant-numeric:tabular-nums"><?= e(function_exists('fmoney_short') ? fmoney_short($jMoney['credit'] ?? 0) : number_format((float)($jMoney['credit'] ?? 0))) ?></div>
+      <div style="font-weight:700;font-size:20px;font-variant-numeric:tabular-nums"><?= e(function_exists('fmoney_short') ? fmoney_short($jMoney['credit'] ?? 0) : nf((float)($jMoney['credit'] ?? 0))) ?></div>
     </div>
     <div>
       <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em">Client invoice</div>

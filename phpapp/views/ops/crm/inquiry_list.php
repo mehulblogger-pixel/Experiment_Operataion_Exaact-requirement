@@ -26,16 +26,16 @@ $dueCount = $dueCount ?? 0; $sla = $sla ?? 7; ?>
     $href = fn($k) => '/inquiries?st=' . $k . ($q !== '' ? '&q=' . urlencode($q) : '') . (($fy ?? '') !== '' ? '&fy=' . urlencode((string)$fy) : ''); ?>
 <div class="kpi-row" style="margin:12px 0">
   <a class="kpi" href="/inquiries" style="text-decoration:none;color:inherit"><span class="kic">📨</span><div class="k">Enquiries</div><div class="v"><?= $fAll ?></div><div class="d"><?= (int)($funnel['OPEN'] ?? 0) ?> open, not quoted yet</div></a>
-  <a class="kpi" href="<?= e($href('QUOTED')) ?>" style="text-decoration:none;color:inherit"><span class="kic">📝</span><div class="k">Quoted</div><div class="v"><?= $fQ ?></div><div class="d"><?= $pct($fQ, $fAll) ?> of enquiries · <?= (int)($funnel['QUOTED'] ?? 0) ?> awaiting an answer</div></a>
+  <a class="kpi" href="<?= e($href('QUOTED_ANY')) ?>" style="text-decoration:none;color:inherit"><span class="kic">📝</span><div class="k">Quoted</div><div class="v"><?= $fQ ?></div><div class="d"><?= $pct($fQ, $fAll) ?> of enquiries · <?= (int)($funnel['QUOTED'] ?? 0) ?> awaiting an answer</div></a>
   <a class="kpi tone-ok" href="<?= e($href('WON')) ?>" style="text-decoration:none;color:inherit"><span class="kic">🏆</span><div class="k">Won</div><div class="v"><?= $fWon ?></div><div class="d"><?= $pct($fWon, $fAll) ?> of enquiries became orders</div></a>
-  <a class="kpi<?= $fLost ? ' tone-bad' : '' ?>" href="<?= e($href('LOST')) ?>" style="text-decoration:none;color:inherit"><span class="kic">📉</span><div class="k">Lost · Dropped</div><div class="v"><?= $fLost ?> · <?= (int)($funnel['DROPPED'] ?? 0) ?></div><div class="d">Hit rate <?= $pct($fWon, $fWon + $fLost) ?> of decided <?= e(Tlp('quote')) ?></div></a>
+  <a class="kpi<?= $fLost ? ' tone-bad' : '' ?>" href="<?= e($href('LOST_DROPPED')) ?>" style="text-decoration:none;color:inherit"><span class="kic">📉</span><div class="k">Lost · Dropped</div><div class="v"><?= $fLost ?> · <?= (int)($funnel['DROPPED'] ?? 0) ?></div><div class="d">Hit rate <?= $pct($fWon, $fWon + $fLost) ?> of decided <?= e(Tlp('quote')) ?></div></a>
 </div>
 <?php endif; ?>
 
 <form method="get" action="/inquiries" class="filter-bar" style="gap:8px;flex-wrap:wrap">
   <input class="form-control" name="q" value="<?= e($q) ?>" placeholder="Search no. / subject / client" style="min-width:220px">
   <select class="form-control" name="st" onchange="this.form.submit()"><option value="">All statuses</option>
-    <?php foreach ($stOpts as $k=>$v): ?><option value="<?= e($k) ?>" <?= $st===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select>
+    <?php foreach ($stOpts + ['QUOTED_ANY' => 'Quoted — any outcome', 'LOST_DROPPED' => 'Lost or dropped'] as $k=>$v): ?><option value="<?= e($k) ?>" <?= $st===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select>
   <?= fy_select_html($fy ?? current_fy()) ?>
   <button class="btn small" type="submit">Search</button>
   <?php if ($q!==''||$st!==''||($fy ?? current_fy())!==current_fy()): ?><a class="btn small secondary" href="/inquiries">Reset</a><?php endif; ?>

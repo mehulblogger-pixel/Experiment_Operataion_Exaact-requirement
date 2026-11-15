@@ -7,5 +7,5 @@
 <meta name="csrf-token" content="<?= e(csrf_token()) ?>">
 <link rel="stylesheet" href="/assets/css/app.css">
 <?= function_exists('theme_style_tag') ? theme_style_tag() : '' ?>
-</head><body class="app embed">
+</head><body class="app embed" data-upload-max="<?= function_exists('upload_post_max_bytes') ? (int)upload_post_max_bytes() : 0 ?>">
 <main class="container embed-main" style="padding:16px 18px">

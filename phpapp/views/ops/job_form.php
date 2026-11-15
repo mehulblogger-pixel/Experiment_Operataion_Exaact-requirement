@@ -382,7 +382,7 @@
           // shown beneath, read-only, exactly as it stands on the call. ?>
     <div class="ff"><label><?= e(T('quote')) ?></label>
       <select class="form-control searchable" name="quotation_id"><option value="">— none —</option>
-        <?php foreach (($quotes ?? []) as $qq): ?><option value="<?= (int)$qq['id'] ?>" <?= ((string)$curQuoteId===(string)$qq['id'])?'selected':'' ?>><?= e($qq['quote_no']) ?><?= (int)$qq['rev']>0?' R'.$qq['rev']:'' ?> · <?= e(cur_sym()) ?><?= number_format((float)$qq['total_amount'],0) ?></option><?php endforeach; ?>
+        <?php foreach (($quotes ?? []) as $qq): ?><option value="<?= (int)$qq['id'] ?>" <?= ((string)$curQuoteId===(string)$qq['id'])?'selected':'' ?>><?= e($qq['quote_no']) ?><?= (int)$qq['rev']>0?' R'.$qq['rev']:'' ?> · <?= e(cur_sym()) ?><?= nf((float)$qq['total_amount'],0) ?></option><?php endforeach; ?>
       </select>
       <small class="muted">Carried from the <?= e(Tl('call')) ?>. Links this <?= e(Tl('job')) ?> to the order — advance / payment-hold rules and deliverables carry over, and revenue is tracked against it.
         <?php if ($curContract !== ''): ?><br>Contract <b><?= e($curContract) ?></b>.

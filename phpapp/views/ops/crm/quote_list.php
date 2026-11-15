@@ -85,7 +85,7 @@
       <td><?= e($r['client_disp'] ?: $r['client_name'] ?: '—') ?></td>
       <td><?= e($r['subject'] ?: '—') ?></td>
       <td><?= e(lk_options_or('sbu', OPS_SBUS)[$r['sbu']] ?? $r['sbu'] ?: '—') ?></td>
-      <td class="num"><?= (float)$r['total_amount']>0 ? cur_sym().number_format((float)$r['total_amount'],0) : '—' ?></td>
+      <td class="num"><?= (float)$r['total_amount']>0 ? cur_sym().nf((float)$r['total_amount'],0) : '—' ?></td>
       <?php // The contract number, from whichever end it was settled — registered
             // by accounts on the order, or recorded on the client's Contracts tab.
             // A won order without one is work nobody can invoice. ?>

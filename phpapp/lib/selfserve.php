@@ -882,7 +882,7 @@ function saas_plan_delta_lines(array $mods, $seats, $packs, $period) {
     foreach (array_diff($mods, $cur['mods']) as $k) $out[] = ['label' => 'Add ' . $lab($k), 'amount' => (int) ($pb['modules'][$k][$per] ?? 0)];
     foreach (array_diff($cur['mods'], $mods) as $k) $out[] = ['label' => 'Drop ' . $lab($k), 'amount' => -(int) ($pb['modules'][$k][$per] ?? 0)];
     $ds = (int) $seats - (int) $cur['seats'];
-    if ($ds) $out[] = ['label' => abs($ds) . ' ' . ($ds > 0 ? 'more' : 'fewer') . ' login' . (abs($ds) === 1 ? '' : 's') . ' × ' . number_format((int) $pb['seat'][$per]), 'amount' => $ds * (int) $pb['seat'][$per]];
+    if ($ds) $out[] = ['label' => abs($ds) . ' ' . ($ds > 0 ? 'more' : 'fewer') . ' login' . (abs($ds) === 1 ? '' : 's') . ' × ' . nf((int) $pb['seat'][$per]), 'amount' => $ds * (int) $pb['seat'][$per]];
     $dp = (int) $packs - (int) $cur['packs'];
     if ($dp) $out[] = ['label' => abs($dp) . ' ' . ($dp > 0 ? 'more' : 'fewer') . ' storage pack' . (abs($dp) === 1 ? '' : 's'), 'amount' => $dp * (int) $pb['storage_pack'][$per]];
     return $out;

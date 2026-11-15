@@ -39,8 +39,8 @@
       <div class="kv-wide"><span class="k">Skills</span><?= e($ins['skills'] ?: '—') ?></div>
       <div><span class="k">Mobile</span><?= e($ins['mobile'] ?: '—') ?></div>
       <div><span class="k">E-mail</span><?= e($ins['email'] ?: '—') ?></div>
-      <div><span class="k">Leave balance</span><?= e(rtrim(rtrim(number_format((float)$ins['leave_balance'],1),'0'),'.')) ?> d</div>
-      <div><span class="k">Comp-off</span><?= e(rtrim(rtrim(number_format((float)$ins['compoff_balance'],1),'0'),'.')) ?> d</div>
+      <div><span class="k">Leave balance</span><?= e(rtrim(rtrim(nf((float)$ins['leave_balance'],1),'0'),'.')) ?> d</div>
+      <div><span class="k">Comp-off</span><?= e(rtrim(rtrim(nf((float)$ins['compoff_balance'],1),'0'),'.')) ?> d</div>
       <?php if ($canSalary): ?><div><span class="k">CTC</span><?= e(fmoney($ins['salary_ctc'])) ?></div><?php endif; ?>
     </div>
   </div>

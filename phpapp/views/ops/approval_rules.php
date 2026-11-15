@@ -18,7 +18,7 @@ $roleOptions = function ($selected) use ($e, $roles, $orgApprovers) {
 $applySummary = function ($r) use ($e) {
     $b = [];
     foreach (['applies_department'=>'Dept','applies_sbu'=>'Unit','applies_grade'=>'Grade','applies_position'=>'Position'] as $c=>$l) if (trim((string)($r[$c]??''))!=='') $b[] = $l.':'.$e($r[$c]);
-    if ((float)$r['min_amount']>0 || (float)$r['max_amount']>0) $b[] = 'Amount '.($r['min_amount']>0?$e(number_format($r['min_amount'],0)):'0').'–'.($r['max_amount']>0?$e(number_format($r['max_amount'],0)):'∞');
+    if ((float)$r['min_amount']>0 || (float)$r['max_amount']>0) $b[] = 'Amount '.($r['min_amount']>0?$e(nf($r['min_amount'],0)):'0').'–'.($r['max_amount']>0?$e(nf($r['max_amount'],0)):'∞');
     return $b ? implode(' · ', $b) : 'Any';
 };
 ?>

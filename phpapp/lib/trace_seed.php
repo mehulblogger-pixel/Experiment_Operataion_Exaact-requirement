@@ -255,7 +255,7 @@ function trace_seed($force = false) {
                     $ids['receipt'] = (int)$rc['id'];
                     books_allocate((int)$rc['id'], [$invId => ['cash' => $total, 'tds' => 0]]);
                     $step('Money-in recorded & matched', $rc['no'] ?? ('#' . $rc['id']),
-                          '₹' . number_format($total) . ' received and matched to the invoice — it now shows as paid.');
+                          '₹' . nf($total) . ' received and matched to the invoice — it now shows as paid.');
                 }
             }
         }

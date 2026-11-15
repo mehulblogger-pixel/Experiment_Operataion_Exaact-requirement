@@ -4,7 +4,7 @@
 $money = fn($v) => e(fmoney((float)$v));
 $mult  = function ($v) {
     if ($v === null) return '<span class="muted">—</span>';
-    $s = number_format((float)$v, 1) . '×';
+    $s = nf((float)$v, 1) . '×';
     return (float)$v >= 1 ? '<b>' . e($s) . '</b>' : '<b style="color:var(--bad,#b42318)">' . e($s) . '</b>';
 };
 ?>

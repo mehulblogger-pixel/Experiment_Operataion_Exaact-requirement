@@ -372,10 +372,10 @@ function quote_pdf_build($q, $lines, $tpl, $sig = [], $lh = []) {
         // single-row cells (all at $top)
         $p->y = $top + 3;
         $p->text($cols[0] + 3, (string)$sr, 9);
-        $p->text($cols[2] + 3, rtrim(rtrim(number_format((float)$l['qty'], 2), '0'), '.'), 9, false, null, $cols[3] - 3, 'R');
+        $p->text($cols[2] + 3, rtrim(rtrim(nf((float)$l['qty'], 2), '0'), '.'), 9, false, null, $cols[3] - 3, 'R');
         $p->text($cols[3] + 3, lk_options_or('charge_unit', CHARGE_UNITS)[$l['unit']] ?? $l['unit'], 9);
-        $p->text($cols[4] + 3, number_format((float)$l['rate'], 0), 9, false, null, $cols[5] - 3, 'R');
-        $p->text($cols[5] + 3, number_format((float)$l['amount'], 0), 9, false, null, $cols[6] - 3, 'R');
+        $p->text($cols[4] + 3, nf((float)$l['rate'], 2), 9, false, null, $cols[5] - 3, 'R');
+        $p->text($cols[5] + 3, nf((float)$l['amount'], 2), 9, false, null, $cols[6] - 3, 'R');
         // wrapped description lines
         $dy = $top + 3;
         foreach ($wrapped as $wl) { $p->y = $dy; $p->text($cols[1] + 3, $wl, 9); $dy += 12; }
@@ -392,9 +392,9 @@ function quote_pdf_build($q, $lines, $tpl, $sig = [], $lh = []) {
         $p->y += 15;
     };
     $cur = $q['currency'] ?: 'INR';
-    $totRow('Subtotal', number_format((float)$q['subtotal'], 2));
-    $totRow('GST (' . rtrim(rtrim(number_format((float)$q['gst_pct'], 2), '0'), '.') . '%)', number_format((float)$q['gst_amount'], 2));
-    $totRow('Total (' . $cur . ')', number_format((float)$q['total_amount'], 2), true);
+    $totRow('Subtotal', nf((float)$q['subtotal'], 2));
+    $totRow('GST (' . rtrim(rtrim(nf((float)$q['gst_pct'], 2), '0'), '.') . '%)', nf((float)$q['gst_amount'], 2));
+    $totRow('Total (' . $cur . ')', nf((float)$q['total_amount'], 2), true);
     $p->gap(2);
     $p->line('Amount in words: ' . amount_in_words_inr((float)$q['total_amount']), 9, false, 14, [70, 70, 70]);
     $p->gap(6);
@@ -411,7 +411,7 @@ function quote_pdf_build($q, $lines, $tpl, $sig = [], $lh = []) {
     $p->line('Terms & Conditions', 10, true, 15);
     $terms = [];
     if ($q['payment_terms']) $terms[] = 'Payment: ' . $q['payment_terms'] . '.';
-    if ((float)$q['advance_pct'] > 0 || $q['advance_required']) $terms[] = 'Advance: ' . rtrim(rtrim(number_format((float)$q['advance_pct'], 2), '0'), '.') . '%' . ($q['advance_required'] ? ' (to be received before scheduling).' : '.');
+    if ((float)$q['advance_pct'] > 0 || $q['advance_required']) $terms[] = 'Advance: ' . rtrim(rtrim(nf((float)$q['advance_pct'], 2), '0'), '.') . '%' . ($q['advance_required'] ? ' (to be received before scheduling).' : '.');
     if ($q['report_vs_payment']) $terms[] = 'Deliverables / reports are released against payment.';
     $terms[] = 'Validity: ' . (int)$q['validity_days'] . ' days from the date of this quotation.';
     $terms[] = 'Taxes as applicable. Prices in ' . $cur . '.';

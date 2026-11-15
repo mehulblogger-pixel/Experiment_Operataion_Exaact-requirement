@@ -2099,13 +2099,14 @@ function fdate($d, $fallback = '—') {
     if (!$d) return $fallback;
     $ts = strtotime($d); return $ts === false ? $d : date(date_fmt(), $ts);
 }
-function fmoney($v) { return $v === null || $v === '' ? '—' : cur_sym() . number_format((float)$v, 0); }
+// Money on screen: lakh/crore grouping, paise shown only when there are paise (DEF-SAL-001 / DEF-SAL-018).
+function fmoney($v) { return $v === null || $v === '' ? '—' : ((float)$v < 0 ? '-' : '') . cur_sym() . nfm(abs((float)$v)); }
 // Compact Indian money for KPI tiles: ₹1.84 L / ₹4.82 Cr / ₹6,200.
 function fmoney_short($v) {
     $n = (float)$v; $s = $n < 0 ? '-' : ''; $n = abs($n); $c = cur_sym();
     if ($n >= 1e7)  return $s . $c . rtrim(rtrim(number_format($n / 1e7, 2, '.', ''), '0'), '.') . ' Cr';
     if ($n >= 1e5)  return $s . $c . rtrim(rtrim(number_format($n / 1e5, 2, '.', ''), '0'), '.') . ' L';
-    return $s . $c . number_format($n, 0);
+    return $s . $c . nfm($n);
 }
 // ---- Working norms & limits (Settings, with the shipped defaults as fallback)
 function hours_cap()           { $v = (float)setting_get('daily_hours_cap', 0); return $v > 0 ? $v : DAILY_HOURS_CAP; }
@@ -4679,7 +4680,7 @@ function ops_dispatch($route, $method) {
                     'label' => '#' . ((int)$l['line_no'] + 1) . ' · '
                         . (lk_options_or('inspection_type', INSPECTION_TYPES)[$l['service_type']] ?? $l['service_type'])
                         . ($l['description'] ? ' — ' . mb_substr($l['description'], 0, 40) : '')
-                        . ' · ' . rtrim(rtrim(number_format((float)$l['qty'], 2), '0'), '.') . ' '
+                        . ' · ' . rtrim(rtrim(nf((float)$l['qty'], 2), '0'), '.') . ' '
                         . (lk_options_or('charge_unit', CHARGE_UNITS)[$l['unit']] ?? $l['unit'])
                         . ' @ ' . fmoney($l['rate']),
                     'sbu' => (string)$l['sbu'], 'service_type' => (string)$l['service_type'],
@@ -6343,7 +6344,7 @@ function ops_requisitions($route, $method) {
             $pctBad = [];
             foreach (['cost_statutory_pct' => 'Statutory & benefits', 'cost_agency_pct' => 'Agency service fee / markup'] as $pf => $plbl) {
                 $pv = (float)($b[$pf] ?? 0);
-                if ($pv > 100) $pctBad[] = $plbl . ' = ' . rtrim(rtrim(number_format($pv, 2), '0'), '.') . '%';
+                if ($pv > 100) $pctBad[] = $plbl . ' = ' . rtrim(rtrim(nf($pv, 2), '0'), '.') . '%';
             }
             if ($pctBad) {
                 view('ops/requisition_form', [
@@ -8042,7 +8043,7 @@ function ops_vouchers($route, $method) {
         }
         foreach ($hoursByDate as $d => $hrs) {
             if ($hrs > hours_cap() + 0.001) {
-                flash('Hours on ' . fdate($d) . ' total ' . rtrim(rtrim(number_format($hrs, 2), '0'), '.') . ' h — over the ' . hours_cap_disp() . ' h daily limit. Please reduce so no day exceeds ' . hours_cap_disp() . ' hours.', 'error');
+                flash('Hours on ' . fdate($d) . ' total ' . rtrim(rtrim(nf($hrs, 2), '0'), '.') . ' h — over the ' . hours_cap_disp() . ' h daily limit. Please reduce so no day exceeds ' . hours_cap_disp() . ' hours.', 'error');
                 redirect('/voucher?id=' . $v['id']);
             }
         }
@@ -8063,7 +8064,7 @@ function ops_vouchers($route, $method) {
             $grand += $rowTotal;
         }
         $pdo->prepare("UPDATE vouchers SET total=? WHERE id=?")->execute([$grand, $v['id']]);
-        flash('Voucher saved. Total ₹' . number_format($grand, 0) . '.');
+        flash('Voucher saved. Total ₹' . nf($grand, 0) . '.');
         redirect('/voucher?id=' . $v['id']);
     }
 
@@ -8088,7 +8089,7 @@ function ops_vouchers($route, $method) {
             $ent = ops_one("SELECT entry_date FROM voucher_entries WHERE id=? AND voucher_id=?", [(int)$b['entry_id'], $v['id']]);
             if ($ent && $ent['entry_date']) {
                 [$ok, , $cap, $tot] = hours_within_cap($v['inspector_id'], $ent['entry_date'], (float)($b['hours'] ?? 0), (int)$b['entry_id']);
-                if (!$ok) { flash('Hours on ' . $ent['entry_date'] . ' would total ' . rtrim(rtrim(number_format($tot, 2), '0'), '.') . ' h — over the ' . $cap . ' h daily limit.', 'error'); redirect('/voucher?id=' . $v['id']); }
+                if (!$ok) { flash('Hours on ' . $ent['entry_date'] . ' would total ' . rtrim(rtrim(nf($tot, 2), '0'), '.') . ' h — over the ' . $cap . ' h daily limit.', 'error'); redirect('/voucher?id=' . $v['id']); }
             }
             $pdo->prepare("UPDATE voucher_entries SET hours=?, line_no=?, file_no=?, notes=? WHERE id=? AND voucher_id=?")
                 ->execute([(float)($b['hours'] ?? 0), $b['line_no'] ?? '', $b['file_no'] ?? '', $b['notes'] ?? '', (int)$b['entry_id'], $v['id']]);
@@ -8097,7 +8098,7 @@ function ops_vouchers($route, $method) {
             $ed = $b['entry_date'] ?? '';
             if ($ed) {
                 [$ok, , $cap, $tot] = hours_within_cap($v['inspector_id'], $ed, (float)($b['hours'] ?? 0));
-                if (!$ok) { flash('Hours on ' . $ed . ' would total ' . rtrim(rtrim(number_format($tot, 2), '0'), '.') . ' h — over the ' . $cap . ' h daily limit.', 'error'); redirect('/voucher?id=' . $v['id']); }
+                if (!$ok) { flash('Hours on ' . $ed . ' would total ' . rtrim(rtrim(nf($tot, 2), '0'), '.') . ' h — over the ' . $cap . ' h daily limit.', 'error'); redirect('/voucher?id=' . $v['id']); }
             }
             $dt = in_array($b['day_type'] ?? '', ['OFFICE','LEAVE','HOLIDAY','WEEKOFF','WORK'], true) ? $b['day_type'] : 'OFFICE';
             // A day happens once. The same date added twice — a second click, a
@@ -8110,7 +8111,7 @@ function ops_vouchers($route, $method) {
             if ($clash) {
                 $dayLbl = lk_options_or('day_code', DAY_CODES)[$clash['day_type']] ?? $clash['day_type'];
                 flash(fdate($b['entry_date'] ?? '') . ' is already on this ' . Tl('voucher')
-                    . ' as ' . $dayLbl . ' (' . rtrim(rtrim(number_format((float)$clash['hours'], 2), '0'), '.') . ' h). '
+                    . ' as ' . $dayLbl . ' (' . rtrim(rtrim(nf((float)$clash['hours'], 2), '0'), '.') . ' h). '
                     . 'Edit that row rather than adding the day again.', 'warning');
                 redirect('/voucher?id=' . $v['id']);
             }
@@ -9098,7 +9099,7 @@ function svg_hbars($data, $money = false, $unit = '') {
     foreach ($data as $label => $val) {
         $bw = $max > 0 ? max(1, round(abs($val) / $max * $barW)) : 1; $col = chart_color($i); $vy = $y + $rowH * 0.68;
         $lab = htmlspecialchars(mb_strimwidth((string)$label, 0, 20, '…'), ENT_QUOTES);
-        $vv = $money ? '₹' . number_format((float)$val) : (rtrim(rtrim(number_format((float)$val, 1, '.', ''), '0'), '.') . $unit);
+        $vv = $money ? '₹' . nf((float)$val) : (rtrim(rtrim(number_format((float)$val, 1, '.', ''), '0'), '.') . $unit);
         $svg .= "<text x='0' y='$vy' font-size='12' fill='var(--muted)'>$lab</text>";
         $svg .= "<rect x='$labelW' y='$y' width='$bw' height='" . ($rowH - 5) . "' rx='4' fill='$col'></rect>";
         $svg .= "<text x='" . ($labelW + $bw + 6) . "' y='$vy' font-size='12' fill='var(--ink)'>$vv</text>";
@@ -9120,7 +9121,7 @@ function svg_donut($data, $money = false) {
         $svg .= "<circle cx='$cx' cy='$cy' r='$r' fill='none' stroke='$col' stroke-width='$sw' stroke-dasharray='$len " . ($C - $len) . "' stroke-dashoffset='" . (-$off) . "' transform='rotate(-90 $cx $cy)'></circle>";
         $off += $len; $i++;
     }
-    $svg .= "<text x='$cx' y='" . ($cy + 4) . "' text-anchor='middle' font-size='13' font-weight='700' fill='var(--ink)'>" . ($money ? '₹' . number_format($total) : rtrim(rtrim(number_format($total, 1, '.', ''), '0'), '.')) . "</text>";
+    $svg .= "<text x='$cx' y='" . ($cy + 4) . "' text-anchor='middle' font-size='13' font-weight='700' fill='var(--ink)'>" . ($money ? '₹' . nf($total) : rtrim(rtrim(number_format($total, 1, '.', ''), '0'), '.')) . "</text>";
     $ly = 22; $i = 0;
     foreach ($data as $label => $val) {
         $col = chart_color($i); $pct = round($val / $total * 100);
@@ -9245,7 +9246,7 @@ function ops_office_finance() {
                 redirect($back);
             }
             $n = office_expenses_save($oid, $yr, $mon, (array)($_POST['amt'] ?? []), (array)($_POST['note'] ?? []));
-            flash('Saved ₹' . number_format(office_expense_total($oid, $yr, $mon), 2) . ' of '
+            flash('Saved ₹' . nf(office_expense_total($oid, $yr, $mon), 2) . ' of '
                   . Tl('office') . ' costs for ' . date('F Y', mktime(0,0,0,$mon,1,$yr)) . '.');
             redirect($back);
         }
@@ -9726,11 +9727,55 @@ function action_centre($limit = 12) {
                   'sub'=>(string)($a['sub'] ?? ''), 'href'=>(string)$a['href'], 'tone'=>$tone,
                   'due'=>'', 'overdue'=>false, 'n'=>(int)$a['n'], 'icon'=>(string)($a['icon'] ?? '')];
     }
+    // DEF-SAL-021 — a salesperson's own follow-ups were never here: a lead whose follow-up date has
+    // come, an enquiry assigned to them with no quotation yet, a chase due on a quotation they own.
+    foreach (action_centre_sales($today, $soon) as $it) $out[] = $it;
     // Priority first; within a priority, the more numerous / more overdue rises. Stable in PHP 8.
     usort($out, function ($x, $y) {
         return [$x['priority'], -(int)($x['n'] ?? 0)] <=> [$y['priority'], -(int)($y['n'] ?? 0)];
     });
     return $limit > 0 ? array_slice($out, 0, $limit) : $out;
+}
+
+// The current person's own Sales follow-ups, for action_centre(). Only what is THEIRS (they own the
+// lead / quotation, or the enquiry is assigned to them), so nothing outside their own work shows.
+function action_centre_sales($today, $soon) {
+    $me = (int)(function_exists('current_user') ? (current_user()['id'] ?? 0) : 0);
+    if (!$me) return [];
+    $out = [];
+    $item = function ($pri, $title, $sub, $href, $tone, $due, $n = 1) {
+        return ['kind' => 'sales', 'priority' => $pri, 'title' => $title, 'sub' => $sub, 'href' => $href, 'tone' => $tone,
+                'due' => $due, 'overdue' => $tone === 'bad', 'n' => $n, 'icon' => '🤝'];
+    };
+    try {
+        $rows = ops_all("SELECT id, ref, company_name, next_action, next_action_on FROM leads
+                         WHERE owner_user_id=? AND status='OPEN' AND COALESCE(next_action_on,'')<>'' AND next_action_on<=?
+                         ORDER BY next_action_on LIMIT 6", [$me, $soon]) ?: [];
+        foreach ($rows as $l) {
+            $d = substr((string)$l['next_action_on'], 0, 10); $late = $d < $today;
+            $out[] = $item($late ? 0 : ($d === $today ? 1 : 3), 'Follow up ' . $l['company_name'] . (trim((string)$l['next_action']) !== '' ? ' — ' . $l['next_action'] : ''),
+                'lead ' . $l['ref'] . ' · ' . ($late ? 'was due ' . fdate($d) . ' · overdue' : ($d === $today ? 'today' : 'due ' . fdate($d))),
+                '/lead?id=' . (int)$l['id'], $late ? 'bad' : ($d === $today ? 'warn' : 'info'), $d);
+        }
+    } catch (Throwable $e) {}
+    try {
+        $n = (int)ops_val("SELECT COUNT(*) FROM crm_inquiries WHERE assigned_to=? AND status='OPEN'", [$me]);
+        if ($n > 0) $out[] = $item(2, $n . ' ' . ($n === 1 ? Tl('inquiry') : Tlp('inquiry')) . ' assigned to you, not quoted yet',
+            'make the ' . Tl('quote') . ' or say why not', '/inquiries?st=OPEN', 'warn', '', $n);
+    } catch (Throwable $e) {}
+    try {
+        $rows = ops_all("SELECT f.quote_id, f.due_date, f.note, q.quote_no, q.client_name FROM quote_followups f
+                         JOIN quotations q ON q.id=f.quote_id
+                         WHERE q.owner_id=? AND f.status='PENDING' AND COALESCE(f.due_date,'')<>'' AND f.due_date<=?
+                           AND COALESCE(q.is_current,1)=1 AND q.status NOT IN ('ACCEPTED','LOST','EXPIRED')
+                         ORDER BY f.due_date LIMIT 6", [$me, $today]) ?: [];
+        foreach ($rows as $f) {
+            $d = substr((string)$f['due_date'], 0, 10); $late = $d < $today;
+            $out[] = $item($late ? 0 : 1, 'Chase ' . $f['client_name'] . ' on ' . $f['quote_no'] . (trim((string)$f['note']) !== '' ? ' — ' . $f['note'] : ''),
+                ($late ? 'was due ' . fdate($d) . ' · overdue' : 'today'), '/quote?id=' . (int)$f['quote_id'] . '#revisions', $late ? 'bad' : 'warn', $d);
+        }
+    } catch (Throwable $e) {}
+    return $out;
 }
 
 // Phase 3 §34 — the "at a glance" strip for a landing page. Dashboards already exist (Operations home,

@@ -133,7 +133,7 @@ openssl ec -in licence-private.pem -pubout -out licence-public.pem</pre></li>
         <td><?= (int)$h['seats'] ?: 'unlimited' ?></td>
         <?php $amt = (int)($h['amount'] ?? 0); $ccy = (string)($h['currency'] ?? '');
               if ($amt > 0) $chgTot[$ccy ?: '?'] = ($chgTot[$ccy ?: '?'] ?? 0) + $amt; ?>
-        <td class="num"><?= $amt > 0 ? e(($ccy ? $ccy . ' ' : '') . number_format($amt)) : '<span class="muted">—</span>' ?></td>
+        <td class="num"><?= $amt > 0 ? e(($ccy ? $ccy . ' ' : '') . nf($amt)) : '<span class="muted">—</span>' ?></td>
         <td class="muted"><?= e(fdate($h['exp'])) ?></td>
         <td class="muted"><?= e($h['install_id'] ?: '—') ?></td><td class="muted"><?= e(fdate(substr((string)$h['created_at'],0,10))) ?></td>
         <?php if ($can): ?>
@@ -153,7 +153,7 @@ openssl ec -in licence-private.pem -pubout -out licence-public.pem</pre></li>
     </tbody>
   </table>
   <?php if ($chgTot): ?><p class="sub" style="margin:10px 0 0"><strong>Recorded charged:</strong>
-    <?= e(implode(' · ', array_map(fn($c, $v) => ($c === '?' ? '' : $c . ' ') . number_format($v), array_keys($chgTot), $chgTot))) ?>
+    <?= e(implode(' · ', array_map(fn($c, $v) => ($c === '?' ? '' : $c . ' ') . nf($v), array_keys($chgTot), $chgTot))) ?>
     <span class="muted">— from the keys where a price was entered.</span></p><?php endif; ?>
   <p class="muted" style="font-size:12px;margin:8px 0 0">Reissue keeps the same expiry and modules and only changes the seat count —
     hand the customer the new key it produces (or they pick it up automatically if they renew online). The

@@ -115,8 +115,8 @@ $freeLaunch = true; // platform is free during launch
 </section>
 
 <div class="trust">
-  <?php if ($pool > 0): ?><span><span class="v"><?= number_format($pool) ?></span> professionals listed</span><?php endif; ?>
-  <?php if ($openJobs > 0): ?><span><span class="v"><?= number_format($openJobs) ?></span> open jobs</span><?php endif; ?>
+  <?php if ($pool > 0): ?><span><span class="v"><?= nf($pool) ?></span> professionals listed</span><?php endif; ?>
+  <?php if ($openJobs > 0): ?><span><span class="v"><?= nf($openJobs) ?></span> open jobs</span><?php endif; ?>
   <span>✅ <b>Verified</b> profiles</span>
   <span>📄 Reports <b>on-platform</b></span>
   <span>⭐ Genuine <b>two-way reviews</b></span>

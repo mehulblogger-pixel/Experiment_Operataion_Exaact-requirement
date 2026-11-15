@@ -150,7 +150,7 @@ function doc_tokens_help() {
 // Build the value map for a candidate — self-contained (own lookups).
 function doc_token_map($candidate) {
     $cur = function_exists('cur_sym') ? cur_sym() : (function_exists('setting_get') ? (setting_get('currency_symbol', '₹') ?: '₹') : '₹');
-    $money = fn($v) => $cur . number_format((float)$v, 0);
+    $money = fn($v) => $cur . nf((float)$v, 0);
     $g = fn($k) => isset($candidate[$k]) ? trim((string)$candidate[$k]) : '';
     $ident = function_exists('doc_identity') ? doc_identity() : null;
     $company = $ident ? $ident['name'] : (function_exists('app_name') ? app_name() : '');

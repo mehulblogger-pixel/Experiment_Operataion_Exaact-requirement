@@ -453,7 +453,7 @@ function uvae_qa_checks($doc, $fields = null, $data = null) {
             foreach($qrows as $r){ $rr=(array)$r; $cat=strtolower(trim((string)($rr[$kCat]??''))); $resp=strtolower(trim((string)($rr[$kResp]??'')));
                 if(strpos($cat,'delivery')!==false && in_array($resp,['yes','pass'],true)){
                     $out[]=['sev'=>'medium','cat'=>'assessment','title'=>'Delivery claim differs from recorded performance','loc'=>'Assessment questionnaire',
-                        'why'=>'The delivery capability is rated positively, but the vendor\'s recorded commitment reliability is '.rtrim(rtrim(number_format($rel,1),'0'),'.').'%. Consider verification.',
+                        'why'=>'The delivery capability is rated positively, but the vendor\'s recorded commitment reliability is '.rtrim(rtrim(nf($rel,1),'0'),'.').'%. Consider verification.',
                         'fix'=>'Reconcile the assessment with the vendor\'s recorded performance.']; break; }
             }
         }

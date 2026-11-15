@@ -605,6 +605,15 @@ function upload_error_reason($file) {
 // and $_FILES both EMPTY -- the token included. The CSRF gate then fires and
 // blames the form, which sends the person back to reload and retry the same
 // huge file forever. CONTENT_LENGTH still tells the truth, so ask it first.
+// The largest request body the server accepts, in bytes (php.ini post_max_size). 0 = unknown.
+function upload_post_max_bytes() {
+    $raw = trim((string)ini_get('post_max_size'));
+    if ($raw === '' || !preg_match('/^(\d+(?:\.\d+)?)\s*([KMG]?)/i', $raw, $m)) return 0;
+    $n = (float)$m[1];
+    switch (strtoupper($m[2])) { case 'G': $n *= 1024; case 'M': $n *= 1024; case 'K': $n *= 1024; }
+    return (int)$n;
+}
+
 function upload_post_too_large() {
     if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? '')) !== 'POST') return false;
     if (!empty($_POST) || !empty($_FILES)) return false;

@@ -189,8 +189,8 @@ function mkt_pay_render_checkout(array $order, $postAction, $cancelUrl, $label =
     echo '<div style="font-family:Segoe UI,Arial,sans-serif;max-width:520px;margin:44px auto;padding:26px;border:1px solid #e2ddd6;border-radius:12px;color:#333">';
     echo '<div style="font-weight:700;color:#0a5c5c;margin-bottom:6px">' . $e($brand) . '</div>';
     echo '<h2 style="margin:0 0 12px">Complete your payment</h2>';
-    echo '<p style="color:#555">' . $e($label ?: 'Marketplace purchase') . ' — <b>' . $e($sym . number_format($amountMajor)) . '</b>. The secure Razorpay window should open automatically.</p>';
-    echo '<button id="paybtn" type="button" style="padding:10px 16px;background:#0a5c5c;color:#fff;border:0;border-radius:8px;font-weight:600;cursor:pointer">Pay ' . $e($sym . number_format($amountMajor)) . '</button>';
+    echo '<p style="color:#555">' . $e($label ?: 'Marketplace purchase') . ' — <b>' . $e($sym . nf($amountMajor)) . '</b>. The secure Razorpay window should open automatically.</p>';
+    echo '<button id="paybtn" type="button" style="padding:10px 16px;background:#0a5c5c;color:#fff;border:0;border-radius:8px;font-weight:600;cursor:pointer">Pay ' . $e($sym . nf($amountMajor)) . '</button>';
     echo ' <a href="' . $e($cancelUrl) . '" style="margin-left:8px;color:#555">Cancel</a>';
     echo '<p style="color:#888;font-size:12.5px;margin-top:14px">Your card details go straight to Razorpay — this application never sees them.</p>';
     echo '<form method="post" action="' . $e($postAction) . '" id="vf" style="display:none">';

@@ -62,7 +62,7 @@ function settlement_render($title = 'Inter-office settlement') {
     $m = settlement_matrix();
     if (!$m) return;
     $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
-    $money = fn($n) => function_exists('fmoney') ? fmoney($n) : number_format((float)$n, 2);
+    $money = fn($n) => function_exists('fmoney') ? fmoney($n) : nf((float)$n, 2);
     $out = array_sum(array_map(fn($p) => $p['outstanding'], $m));
     echo '<div class="panel"><h3 class="tab-sub" style="margin-top:0">' . $e($title)
        . ' <span class="muted" style="font-weight:400;font-size:12px">(' . count($m) . ' office pair' . (count($m) === 1 ? '' : 's') . ')</span></h3>'

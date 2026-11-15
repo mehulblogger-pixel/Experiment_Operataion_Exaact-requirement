@@ -2,7 +2,7 @@
   // Slice P4 — the Billable Events board (the Commercial cockpit). Read-first;
   // manage actions gated by billable_can_manage() (finance.reconcile / master).
   $rows = $rows ?? []; $roll = $roll ?? []; $statuses = $statuses ?? []; $status = $status ?? ''; $canManage = $canManage ?? false;
-  $m = fn($n) => function_exists('fmoney_short') ? fmoney_short($n) : number_format((float)$n);
+  $m = fn($n) => function_exists('fmoney_short') ? fmoney_short($n) : nf((float)$n);
   $tone = ['PENDING' => 'p-warn', 'APPROVED' => 'p-info', 'BILLED' => 'p-ok', 'CANCELLED' => 'p-mut', 'DISPUTED' => 'p-bad'];
 ?>
 <div class="master-head">
@@ -68,7 +68,7 @@
             <td><?php if ((int)$u['job_id']): ?><a href="/job?id=<?= (int)$u['job_id'] ?>#billing"><?= e($u['job_code'] ?: '#' . (int)$u['job_id']) ?></a><?php endif; ?></td>
             <td><?= e(BILLUNIT_KINDS[$u['source_kind']] ?? $u['source_kind']) ?></td>
             <td><?= e(fdate($u['period_from'])) ?><?= ($u['period_to'] && $u['period_to'] !== $u['period_from']) ? ' – ' . e(fdate($u['period_to'])) : '' ?></td>
-            <td class="num"><?= e(rtrim(rtrim(number_format((float)$u['qty'], 4), '0'), '.')) ?></td>
+            <td class="num"><?= e(rtrim(rtrim(nf((float)$u['qty'], 4), '0'), '.')) ?></td>
             <td class="num"><?= e($m($u['amount'])) ?></td>
             <td class="muted" style="font-size:12.5px"><?= e($u['due_reason']) ?></td>
           </tr>

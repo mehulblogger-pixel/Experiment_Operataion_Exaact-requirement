@@ -43,7 +43,7 @@ $nlc = count($liveContracts);
         <?php foreach ($awaiting as $aq): ?>
           <option value="<?= (int)$aq['id'] ?>" data-value="<?= e((string)$aq['total_amount']) ?>" data-title="<?= e($aq['subject'] ?? '') ?>">
             <?= e($aq['quote_no']) ?><?= (int)$aq['rev'] ? ' R' . (int)$aq['rev'] : '' ?>
-            · <?= e(cur_sym()) ?><?= number_format((float)$aq['total_amount'], 0) ?>
+            · <?= e(cur_sym()) ?><?= nf((float)$aq['total_amount'], 0) ?>
             · <?= e(lk_options_or('quote_status', QUOTE_STATUS)[$aq['status']] ?? $aq['status']) ?>
             <?= $aq['subject'] ? ' — ' . e(mb_strimwidth($aq['subject'], 0, 40, '…')) : '' ?>
           </option>

@@ -857,6 +857,15 @@ if (function_exists('superadmin_address_gate')) superadmin_address_gate($route);
 // --- Public routes ---
 // $stage is 'password' for the ordinary form and 'code' once the password has
 // been accepted and a second factor is still owed.
+// After signing in: back to the screen a timed-out session was on (DEF-SAL-036), else home.
+// Only an address on this site, and only for an hour.
+function login_landing() {
+    $a = $_SESSION['after_login'] ?? null; unset($_SESSION['after_login']);
+    $to = is_array($a) ? (string)($a['to'] ?? '') : '';
+    if ($to !== '' && (time() - (int)($a['at'] ?? 0)) < 3600 && $to[0] === '/' && substr($to, 0, 2) !== '//' && strpos($to, '\\') === false)
+        return $to;
+    return '/';
+}
 function render_login($error, $stage = 'password', $note = '') {
     require __DIR__ . '/views/login_page.php';
     exit;
@@ -887,7 +896,7 @@ if ($route === 'login') {
                 flash('Welcome, ' . user_name($u) . '.');
                 if (strpos($code, '-') !== false)
                     flash('You signed in with a recovery code. ' . $left . ' left — generate a new set from Two-step sign-in.', 'warning');
-                redirect('/');
+                redirect(login_landing());
             }
             idems_log('user', $u['id'], 'LOGIN_FAILED', ['field'=>$u['username'] . ' (wrong code)']);
             $wait = login_fail($u['username']); login_fail(login_ip_key());
@@ -969,7 +978,7 @@ if ($route === 'login') {
             }
             complete_login($u);
             flash('Welcome, ' . user_name($u) . '.');
-            redirect('/');
+            redirect(login_landing());
         }
         // record failed attempts too — they matter for a compliance review
         if (function_exists('idems_log')) idems_log('user', $u['id'] ?? null, 'LOGIN_FAILED', ['field'=>substr((string)($_POST['username'] ?? ''), 0, 60)]);
@@ -988,6 +997,11 @@ if ($route === 'login') {
         return render_login('Invalid username or password.');
     }
     if (current_user()) redirect('/');
+    // DEF-SAL-036 — why they were signed out (idle / too long signed in).
+    if (!empty($_SESSION['login_note'])) {
+        $why = (string)$_SESSION['login_note']; unset($_SESSION['login_note']);
+        return render_login(null, 'password', $why);
+    }
     // A refused single sign-on handoff has a reason, and the person needs it.
     // "Invalid username or password" on a screen they never typed into is the
     // most confusing message this application could give them.
@@ -1181,7 +1195,17 @@ if ($expired !== '') {
     idems_log('user', current_user()['id'] ?? null, 'LOGOUT', ['field'=>'session expired']);
     $_SESSION = []; session_destroy();
     session_start();
-    flash($expired, 'warning');
+    // DEF-SAL-036 — the reason is shown ON the sign-in page (it never drew flash messages, so the
+    // reason was lost), and what was being sent is kept: after signing in again the person goes back
+    // to the screen they were on, with what they typed put back in its boxes.
+    $_SESSION['login_note'] = $expired . ' Sign in again to carry on where you were.';
+    if ($route !== '' && !in_array($route, ['login', 'logout'], true) && strpos($route, 'assets/') !== 0) {
+        if ($method === 'POST') form_stash($route, $_POST);
+        $uri = (string)($_SERVER['REQUEST_URI'] ?? '');
+        $back = '/' . $route . ((string)parse_url($uri, PHP_URL_QUERY) !== '' ? '?' . parse_url($uri, PHP_URL_QUERY) : '');
+        $_SESSION['after_login'] = ['to' => $back, 'at' => time()];
+        if ($method === 'POST') $_SESSION['login_note'] .= ' What you typed has been kept.';
+    }
     redirect('/login');
 }
 session_touch();
@@ -1244,6 +1268,16 @@ if ($method === 'POST' && function_exists('saas_storage_full') && saas_request_h
 // browser approve, delete or create things here using their own session, and
 // nothing afterwards would look wrong. The one-shot ticket below is a different
 // thing entirely — it is minted in the browser and only stops double-posting.
+// DEF-SAL-003 — a file bigger than the server accepts arrives as an EMPTY post (PHP drops the whole
+// body), so it has no security token either. Ask about the size FIRST: the person is told the file is
+// too large and what the limit is, and goes back to the page the form was on — not "session timed
+// out", and not a blank page for routes that have no screen of their own (letterhead, signature).
+if ($method === 'POST' && function_exists('upload_post_too_large') && upload_post_too_large()) {
+    $limitMb = max(1, (int)floor(upload_post_max_bytes() / 1048576));
+    flash('That file is too large — the limit is ' . $limitMb . ' MB. Nothing was saved. Choose a smaller file (or compress it) and try again.', 'error');
+    redirect_back('');
+}
+
 if ($method === 'POST' && !csrf_ok($_POST['_csrf'] ?? '')) {
     idems_log('user', current_user()['id'] ?? null, 'CSRF_REJECTED', ['field' => substr($route, 0, 60)]);
     // Keep what they typed. The old message said "nothing was changed", which was

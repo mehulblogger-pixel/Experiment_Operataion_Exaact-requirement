@@ -5,7 +5,7 @@
   $edit = $edit ?? null; $limitKeys = $limitKeys ?? []; $audiences = $audiences ?? [];
   $annualMonths = (int)($annualMonths ?? 10); $proFreeUntil = (string)($proFreeUntil ?? ''); $cur = $currency ?? '₹';
   $eLim = $edit ? (function_exists('mkt_plan_limits') ? mkt_plan_limits($edit) : []) : [];
-  $money = fn($n) => e($cur) . number_format((float)$n);
+  $money = fn($n) => e($cur) . nf((float)$n);
   $planRow = function ($p) use ($cur, $money, $limitKeys) {
       $lim = function_exists('mkt_plan_limits') ? mkt_plan_limits($p) : [];
       $bits = [];
@@ -214,7 +214,7 @@
           <?php foreach ($coupons as $c): ?>
             <tr<?= empty($c['is_active']) ? ' style="opacity:.5"' : '' ?>>
               <td><b><?= e($c['code']) ?></b><?php if ($c['label']): ?><br><span class="muted" style="font-size:11px"><?= e($c['label']) ?></span><?php endif; ?></td>
-              <td><?= strtoupper((string)$c['kind'])==='FIXED' ? $money($c['value']) : rtrim(rtrim(number_format((float)$c['value'],2),'0'),'.').'%' ?></td>
+              <td><?= strtoupper((string)$c['kind'])==='FIXED' ? $money($c['value']) : rtrim(rtrim(nf((float)$c['value'],2),'0'),'.').'%' ?></td>
               <td class="muted" style="font-size:12.5px"><?= e($c['audience'] ?: 'Any') ?></td>
               <td class="muted" style="font-size:12px"><?= e($c['valid_from'] ?: '—') ?> → <?= e($c['valid_until'] ?: '—') ?></td>
               <td class="muted"><?= (int)$c['used'] ?><?= (int)$c['max_uses']>0 ? '/'.(int)$c['max_uses'] : '' ?></td>

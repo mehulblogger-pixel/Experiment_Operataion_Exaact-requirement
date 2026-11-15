@@ -16,7 +16,7 @@ $box = function ($name, $key, $val, $attrs = '', $short = false) use ($sug, $why
 };
 $firstMod = true;
 $unset = function_exists('commercial_unset') ? commercial_unset() : [];
-$yr = fn($v) => (int) $v > 0 ? e($sym . number_format((int) $v)) : '<span class="muted">not offered</span>';
+$yr = fn($v) => (int) $v > 0 ? e($sym . nf((int) $v)) : '<span class="muted">not offered</span>';
 ?>
 <style>
   .pu-hint{font-size:11.5px;color:var(--muted,#656e7a);margin-top:3px;line-height:1.35;max-width:340px}
@@ -62,7 +62,7 @@ $yr = fn($v) => (int) $v > 0 ? e($sym . number_format((int) $v)) : '<span class=
             // with the storage rules on Companies. ?>
       <?php $pkGb = (float) setting_get('saas_storage_pack_gb', 0); ?>
       <tr>
-        <td><b>Extra storage pack</b><div class="pu-hint"><?= $pkGb > 0 ? e(rtrim(rtrim(number_format($pkGb, 2), '0'), '.')) . ' GB each — optional, a company buys only if it needs more' : 'pack size not set (Companies → 💾 Storage allowance)' ?></div></td>
+        <td><b>Extra storage pack</b><div class="pu-hint"><?= $pkGb > 0 ? e(rtrim(rtrim(nf($pkGb, 2), '0'), '.')) . ' GB each — optional, a company buys only if it needs more' : 'pack size not set (Companies → 💾 Storage allowance)' ?></div></td>
         <td><?= $box('pack_month', 'saas_storage_pack_price_month', $raw['saas_storage_pack_price_month'] ?? '', 'type="number" min="0"') ?></td>
         <td><input class="form-control" type="number" min="0" name="saas_storage_pack_price_year" value="<?= e($raw['saas_storage_pack_price_year'] ?? '') ?>" placeholder="discount" style="width:130px"></td>
         <td><?= $yr($pb['storage_pack']['year'] ?? 0) ?></td>

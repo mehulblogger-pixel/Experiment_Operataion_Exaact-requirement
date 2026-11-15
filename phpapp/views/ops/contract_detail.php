@@ -47,14 +47,14 @@
 <?php // ---- Commercial ---------------------------------------------------- ?>
 <?php if ($canSeeMoney): ?>
 <div class="kpi-row" style="margin:16px 0">
-  <div class="kpi"><div class="k">Contract value</div><div class="v"><?= e(cur_sym()) ?><?= number_format($money['value'],0) ?></div></div>
-  <div class="kpi"><div class="k">Invoiced</div><div class="v"><?= e(cur_sym()) ?><?= number_format($money['invoiced'],0) ?></div></div>
-  <div class="kpi"><div class="k">Received</div><div class="v"><?= e(cur_sym()) ?><?= number_format($money['received'],0) ?></div></div>
-  <div class="kpi"><div class="k">Outstanding</div><div class="v"><?= e(cur_sym()) ?><?= number_format($money['outstanding'],0) ?></div></div>
+  <div class="kpi"><div class="k">Contract value</div><div class="v"><?= e(cur_sym()) ?><?= nf($money['value'],0) ?></div></div>
+  <div class="kpi"><div class="k">Invoiced</div><div class="v"><?= e(cur_sym()) ?><?= nf($money['invoiced'],0) ?></div></div>
+  <div class="kpi"><div class="k">Received</div><div class="v"><?= e(cur_sym()) ?><?= nf($money['received'],0) ?></div></div>
+  <div class="kpi"><div class="k">Outstanding</div><div class="v"><?= e(cur_sym()) ?><?= nf($money['outstanding'],0) ?></div></div>
   <?php // Module 18 — value minus invoiced: is the contract under- or over-billed?
     if ((float)$money['value'] > 0): $rem = (float)($money['remaining'] ?? 0); ?>
   <div class="kpi"><div class="k"><?= $rem < 0 ? 'Over-billed' : 'Left to invoice' ?></div>
-    <div class="v <?= $rem < 0 ? 'down' : '' ?>"><?= e(cur_sym()) ?><?= number_format(abs($rem),0) ?></div>
+    <div class="v <?= $rem < 0 ? 'down' : '' ?>"><?= e(cur_sym()) ?><?= nf(abs($rem),0) ?></div>
     <div class="d"><?= $rem < 0 ? 'billed beyond value' : 'of contract value' ?></div></div>
   <?php endif; ?>
 </div>
@@ -64,7 +64,7 @@
   <div><span class="k">Contract number</span><b><?= e($c['contract_number'] ?: '—') ?></b></div>
   <div><span class="k">Status</span><span class="pill <?= $osTone ?>"><?= e($osLbl) ?></span></div>
   <?php if ($c['start_date'] || $c['end_date']): ?><div><span class="k">Period</span><?= e(($c['start_date'] ?: '?').' → '.($c['end_date'] ?: '?')) ?></div><?php endif; ?>
-  <?php if ($canSeeMoney && (float)($c['value'] ?? 0) > 0): ?><div><span class="k">Value</span><?= e(cur_sym()) ?><?= number_format((float)$c['value'],0) ?></div><?php endif; ?>
+  <?php if ($canSeeMoney && (float)($c['value'] ?? 0) > 0): ?><div><span class="k">Value</span><?= e(cur_sym()) ?><?= nf((float)$c['value'],0) ?></div><?php endif; ?>
   <div><span class="k">Billing branch</span><?= e($c['branch_name'] ?: '—') ?></div>
   <?php if (!empty($c['requested_by'])): ?><div><span class="k">Requested</span><?= e($c['requested_by']) ?><?= $c['requested_at']?' · '.e(substr($c['requested_at'],0,10)):'' ?></div><?php endif; ?>
   <?php if (!empty($c['mgr_endorsed_at'])): ?><div><span class="k">First signature</span><?= e($c['mgr_endorsed_by']) ?> · <?= e(substr($c['mgr_endorsed_at'],0,10)) ?></div><?php endif; ?>
@@ -252,7 +252,7 @@
   <table class="kv"><tr><th>Quote</th><th>Status</th><?php if ($canSeeMoney): ?><th class="num">Value</th><?php endif; ?><th></th></tr>
     <tr><td><b><?= e($quote['quote_no']) ?><?= (int)$quote['rev']?' r'.(int)$quote['rev']:'' ?></b><?= $quote['subject']?' — '.e($quote['subject']):'' ?></td>
       <td><span class="pill p-mut"><?= e($quote['status']) ?></span></td>
-      <?php if ($canSeeMoney): ?><td class="num"><?= e(cur_sym()) ?><?= number_format((float)$quote['total_amount'],0) ?></td><?php endif; ?>
+      <?php if ($canSeeMoney): ?><td class="num"><?= e(cur_sym()) ?><?= nf((float)$quote['total_amount'],0) ?></td><?php endif; ?>
       <td class="num"><a class="btn small secondary" href="/quote?id=<?= (int)$quote['id'] ?>">Open →</a></td></tr>
   </table>
 </div>
@@ -264,7 +264,7 @@
   <table class="dt"><thead><tr><th>PO number</th><th>Title</th><?php if ($canSeeMoney): ?><th class="num">Value</th><?php endif; ?><th>Period</th><th></th></tr></thead><tbody>
   <?php foreach ($pos as $p): ?>
     <tr><td><b><?= e($p['po_number'] ?: '—') ?></b></td><td><?= e($p['title'] ?: '—') ?></td>
-      <?php if ($canSeeMoney): ?><td class="num"><?= (float)$p['value'] ? e(cur_sym()).number_format((float)$p['value'],0) : '—' ?></td><?php endif; ?>
+      <?php if ($canSeeMoney): ?><td class="num"><?= (float)$p['value'] ? e(cur_sym()).nf((float)$p['value'],0) : '—' ?></td><?php endif; ?>
       <td class="muted"><?= e(trim(($p['start_date'] ?: '').' → '.($p['end_date'] ?: ''), ' →')) ?: '—' ?></td>
       <td class="num"><a class="btn small secondary" href="/po?id=<?= (int)$p['id'] ?>">Open →</a></td></tr>
   <?php endforeach; ?>
@@ -281,7 +281,7 @@
       <td><span class="pill p-mut"><?= e($cl['status']) ?></span></td>
       <td><?= e($cl['inspection_type'] ? (INSPECTION_TYPES[$cl['inspection_type']] ?? $cl['inspection_type']) : '—') ?></td>
       <td class="num"><?= (int)$cl['job_count'] ?></td>
-      <?php if ($canSeeMoney): ?><td class="num"><?= (float)$cl['invoiced'] ? e(cur_sym()).number_format((float)$cl['invoiced'],0) : '—' ?></td><?php endif; ?>
+      <?php if ($canSeeMoney): ?><td class="num"><?= (float)$cl['invoiced'] ? e(cur_sym()).nf((float)$cl['invoiced'],0) : '—' ?></td><?php endif; ?>
       <td class="num"><a class="btn small secondary" href="/call?id=<?= (int)$cl['id'] ?>">Open →</a></td></tr>
   <?php endforeach; ?>
   </tbody></table>

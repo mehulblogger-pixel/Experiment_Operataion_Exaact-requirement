@@ -66,7 +66,7 @@ $urgent = fn($st) => in_array($st, ['OVERDUE', 'ESCALATED', 'DUE'], true);
             if ($lnk): ?><a href="<?= $e($lnk) ?>"><?= $e($s['subject'] ?: ($ent($s['entity']).' #'.$s['entity_id'])) ?></a><?php
             else: ?><?= $e($s['subject'] ?: ($ent($s['entity']).' #'.$s['entity_id'])) ?><?php endif; ?></div>
           <div class="muted" style="font-size:12.5px;margin-top:3px">
-            <?php if ((float)$s['amount']>0): ?>Value <b><?= $e($cur) ?><?= $e(number_format((float)$s['amount'],0)) ?></b> · <?php endif; ?>
+            <?php if ((float)$s['amount']>0): ?>Value <b><?= $e($cur) ?><?= $e(nf((float)$s['amount'],0)) ?></b> · <?php endif; ?>
             Approval: <b>Pending</b> · Requested by <?= $e($s['requester'] ?: '—') ?> · <?= $e($fdate($s['rcreated'] ?? '')) ?>
             <?php if (!empty($s['activated_at'])): ?> · With you since <?= $e($fdate($s['activated_at'])) ?><?php endif; ?>
             <?php if ($s['sla_due']): ?> · Due <span style="<?= $od?'color:#dc2626;font-weight:600':'' ?>"><?= $e($fdate($s['sla_due'])) ?></span><?php endif; ?>

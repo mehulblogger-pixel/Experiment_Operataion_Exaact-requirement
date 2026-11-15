@@ -27,8 +27,8 @@
       <td class="num"><b><?= (int)$r['level'] ?></b></td>
       <td><?= e($r['name'] ?: '—') ?></td>
       <td><?= crm_rule_is_unit($r) ? e(T('sbu')).': '.e(lk_options_or('sbu',OPS_SBUS)[$r['sbu']] ?? $r['sbu']) : 'Any '.e(Tl('sbu')) ?></td>
-      <td class="num"><?= number_format((float)$r['min_amount'],0) ?></td>
-      <td class="num"><?= (float)$r['max_amount']>0 ? number_format((float)$r['max_amount'],0) : '—' ?></td>
+      <td class="num"><?= nf((float)$r['min_amount'],0) ?></td>
+      <td class="num"><?= (float)$r['max_amount']>0 ? nf((float)$r['max_amount'],0) : '—' ?></td>
       <td><?= $r['approver_user_id'] ? e($nm) : ($r['approver_role'] ? e(ORG_ROLES[$r['approver_role']] ?? $r['approver_role']) : '<span class="muted">any approver</span>') ?></td>
       <td><span class="pill <?= $r['active']?'p-ok':'p-mut' ?>"><?= $r['active']?'Active':'Off' ?></span></td>
       <td class="num" style="white-space:nowrap">

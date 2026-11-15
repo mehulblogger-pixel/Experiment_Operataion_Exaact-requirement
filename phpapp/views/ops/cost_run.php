@@ -61,11 +61,11 @@ $basisLabel = [
 <?php endif; ?>
 
 <div class="kpi-row">
-  <div class="kpi"><span class="k-lab">Total cost for <?= e($mName) ?></span><span class="k-val">₹<?= number_format($preview['total'], 2) ?></span></div>
-  <div class="kpi"><span class="k-lab">Inspection <?= e(Tlp('engineer')) ?></span><span class="k-val">₹<?= number_format($byKind['INSPECTOR_WORKED'] + $byKind['INSPECTOR_IDLE'], 2) ?></span></div>
-  <div class="kpi"><span class="k-lab">Everybody else</span><span class="k-val">₹<?= number_format($byKind['STAFF_SALARY'], 2) ?></span></div>
-  <div class="kpi"><span class="k-lab">Sub-contractors</span><span class="k-val">₹<?= number_format($byKind['SUBCON'], 2) ?></span></div>
-  <div class="kpi"><span class="k-lab"><?= e(TH('office')) ?> costs</span><span class="k-val">₹<?= number_format($byKind['OFFICE_EXPENSE'], 2) ?></span></div>
+  <div class="kpi"><span class="k-lab">Total cost for <?= e($mName) ?></span><span class="k-val">₹<?= nf($preview['total'], 2) ?></span></div>
+  <div class="kpi"><span class="k-lab">Inspection <?= e(Tlp('engineer')) ?></span><span class="k-val">₹<?= nf($byKind['INSPECTOR_WORKED'] + $byKind['INSPECTOR_IDLE'], 2) ?></span></div>
+  <div class="kpi"><span class="k-lab">Everybody else</span><span class="k-val">₹<?= nf($byKind['STAFF_SALARY'], 2) ?></span></div>
+  <div class="kpi"><span class="k-lab">Sub-contractors</span><span class="k-val">₹<?= nf($byKind['SUBCON'], 2) ?></span></div>
+  <div class="kpi"><span class="k-lab"><?= e(TH('office')) ?> costs</span><span class="k-val">₹<?= nf($byKind['OFFICE_EXPENSE'], 2) ?></span></div>
 </div>
 
 <?php // Module 33 — overhead recovery: did the per-job oh% recover the actual office
@@ -80,13 +80,13 @@ $basisLabel = [
   <table class="dt">
     <tbody>
       <tr><td><b>Overhead pool entered</b> <span class="muted" style="font-size:11px">(office_expenses)</span></td>
-        <td class="num">₹<?= number_format($ovr['pool'], 2) ?></td></tr>
+        <td class="num">₹<?= nf($ovr['pool'], 2) ?></td></tr>
       <tr><td><b>Overhead recovered</b> <span class="muted" style="font-size:11px">(oh% + contingency across <?= (int)$ovr['jobs'] ?> job(s))</span></td>
-        <td class="num"><?= $ovr['recovered'] === null ? '<span class="muted">salary hidden</span>' : '₹' . number_format($ovr['recovered'], 2) ?></td></tr>
+        <td class="num"><?= $ovr['recovered'] === null ? '<span class="muted">salary hidden</span>' : '₹' . nf($ovr['recovered'], 2) ?></td></tr>
       <?php if ($ovr['variance'] !== null): ?>
       <tr style="font-weight:600;border-top:2px solid var(--line)">
         <td><?= $ovr['variance'] >= 0 ? '✓ Over-recovered' : '⚠ Under-recovered' ?> (recovered − pool)</td>
-        <td class="num <?= $ovr['variance'] >= 0 ? 'up' : 'down' ?>">₹<?= number_format($ovr['variance'], 2) ?><?= $ovr['pct'] !== null ? ' <span class="muted" style="font-weight:400">(' . ($ovr['pct'] >= 0 ? '+' : '') . e($ovr['pct']) . '%)</span>' : '' ?></td></tr>
+        <td class="num <?= $ovr['variance'] >= 0 ? 'up' : 'down' ?>">₹<?= nf($ovr['variance'], 2) ?><?= $ovr['pct'] !== null ? ' <span class="muted" style="font-weight:400">(' . ($ovr['pct'] >= 0 ? '+' : '') . e($ovr['pct']) . '%)</span>' : '' ?></td></tr>
       <?php endif; ?>
     </tbody>
   </table></div>
@@ -125,15 +125,15 @@ $basisLabel = [
     <tr>
       <td><strong><?= e($sbuLabels[$sbu] ?? $sbu) ?></strong></td>
       <?php foreach ($kindLabel as $k => $lab): ?>
-        <td style="text-align:right"><?= $cells[$k] ? '₹' . number_format($cells[$k], 2) : '<span class="muted">—</span>' ?></td>
+        <td style="text-align:right"><?= $cells[$k] ? '₹' . nf($cells[$k], 2) : '<span class="muted">—</span>' ?></td>
       <?php endforeach; ?>
-      <td style="text-align:right"><strong>₹<?= number_format($cells['total'], 2) ?></strong></td>
+      <td style="text-align:right"><strong>₹<?= nf($cells['total'], 2) ?></strong></td>
       <td><?= $preview['total'] ? round($cells['total'] / $preview['total'] * 100, 1) : 0 ?>%</td>
     </tr>
     <?php endforeach; ?>
     <tr><td><strong>All <?= e(Tlp('sbu')) ?></strong></td>
-      <?php foreach ($kindLabel as $k => $lab): ?><td style="text-align:right"><strong>₹<?= number_format($byKind[$k], 2) ?></strong></td><?php endforeach; ?>
-      <td style="text-align:right"><strong>₹<?= number_format($preview['total'], 2) ?></strong></td><td></td></tr>
+      <?php foreach ($kindLabel as $k => $lab): ?><td style="text-align:right"><strong>₹<?= nf($byKind[$k], 2) ?></strong></td><?php endforeach; ?>
+      <td style="text-align:right"><strong>₹<?= nf($preview['total'], 2) ?></strong></td><td></td></tr>
   </table>
   </div>
   <p class="muted" style="margin-top:8px">Every rupee the <?= e(Tl('office')) ?> spends appears once, in exactly one of these columns. The row total and the column total are the same number read two ways.</p>
@@ -153,7 +153,7 @@ $basisLabel = [
       <td class="muted"><?= $r['boss_id'] ? e($bossCodes[(int)$r['boss_id']] ?? ('#' . (int)$r['boss_id'])) : '—' ?></td>
       <td class="muted"><?= ($r['contract_number'] ?? '') !== '' ? e($r['contract_number']) : '—' ?></td>
       <td class="muted"><?= e($basisLabel[$r['basis']] ?? strtolower(str_replace('_', ' ', $r['basis']))) ?></td>
-      <td style="text-align:right">₹<?= number_format($r['amount'], 2) ?></td>
+      <td style="text-align:right">₹<?= nf($r['amount'], 2) ?></td>
     </tr>
     <?php endforeach; ?>
   </table>

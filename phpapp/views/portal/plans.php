@@ -4,7 +4,7 @@
   $plans = $plans ?? []; $current = $current ?? null; $enforce = !empty($enforce);
   $packs = $packs ?? []; $payOn = !empty($payOn);
   $cur = $currency ?? '₹'; $am = (int)($annualMonths ?? 10); $party = (int)($party ?? 0);
-  $money = fn($n) => e($cur) . number_format((float)$n);
+  $money = fn($n) => e($cur) . nf((float)$n);
   $limLabel = function_exists('mkt_limit_keys') ? mkt_limit_keys() : [];
 ?>
 <h2 class="ptitle">Marketplace plans</h2>

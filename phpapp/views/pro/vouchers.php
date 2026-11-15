@@ -15,7 +15,7 @@
       [$l, $c, $bg] = $m[$s] ?? $m['DRAFT'];
       return '<span style="display:inline-block;padding:3px 11px;border-radius:999px;font-size:12px;font-weight:700;color:' . $c . ';background:' . $bg . '">' . e($l) . '</span>';
   };
-  $inr = fn($n) => '₹' . number_format((int)round((float)$n));
+  $inr = fn($n) => '₹' . nf((int)round((float)$n));
 ?>
 <h1>My vouchers</h1>
 <p class="muted" style="margin:0 0 14px">Claim your days — and, when the rate is quoted <strong>fee&nbsp;only</strong>, your travel, hotel, local conveyance and allowances against receipts. An <strong>all-inclusive</strong> rate needs no expense claim.</p>

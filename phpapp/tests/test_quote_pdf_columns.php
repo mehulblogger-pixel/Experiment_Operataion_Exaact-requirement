@@ -11,10 +11,10 @@ $q = ['created_at' => date('c'), 'validity_days' => 30, 'client_name' => 'TB Cli
 $lines = [['description' => 'Man Month Deputation', 'service_type' => '', 'order_type' => '', 'qty' => 72, 'unit' => 'MAN_MONTH', 'rate' => 120000, 'amount' => 8640000]];
 $pdf = quote_pdf_build($q, $lines, []);
 $raw = is_string($pdf) ? $pdf : '';
-// Find where "120,000" and "8,640,000" start, and estimate where each ends.
+// Find where "1,20,000.00" and "86,40,000.00" start (lakh grouping and paise, DEF-SAL-001/018), and estimate where each ends.
 $x = function ($s) use ($raw) { return preg_match('/([\d.]+) [\d.]+ Td \(' . preg_quote($s, '/') . '\) Tj/', $raw, $m) ? (float) $m[1] : null; };
 $p = new SimplePDF();
-$rateX = $x('120,000'); $amtX = $x('8,640,000');
+$rateX = $x('1,20,000.00'); $amtX = $x('86,40,000.00');
 t_ok($rateX !== null && $amtX !== null, 'both figures are printed');
 if ($rateX !== null && $amtX !== null)
-    t_ok($rateX + $p->strWidth('120,000', 9, false) + 8 < $amtX, 'the rate ends well before the amount begins (no overlap)');
+    t_ok($rateX + $p->strWidth('1,20,000.00', 9, false) + 8 < $amtX, 'the rate ends well before the amount begins (no overlap)');

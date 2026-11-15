@@ -418,10 +418,10 @@ function person_weekly_hours($u) {
 function person_week_text($u) {
     $days = (float)($u['weekly_working_days'] ?? 6);
     $full = floor($days);
-    $t = $full . ' full day' . ($full == 1 ? '' : 's') . ' of ' . rtrim(rtrim(number_format(person_daily_hours($u), 2), '0'), '.') . ' h';
+    $t = $full . ' full day' . ($full == 1 ? '' : 's') . ' of ' . rtrim(rtrim(nf(person_daily_hours($u), 2), '0'), '.') . ' h';
     if ($days - $full > 0.001)
-        $t .= ' plus a half day of ' . rtrim(rtrim(number_format(person_half_day_hours($u), 2), '0'), '.') . ' h';
-    return $t . ' — ' . rtrim(rtrim(number_format(person_weekly_hours($u), 2), '0'), '.') . ' h a week';
+        $t .= ' plus a half day of ' . rtrim(rtrim(nf(person_half_day_hours($u), 2), '0'), '.') . ' h';
+    return $t . ' — ' . rtrim(rtrim(nf(person_weekly_hours($u), 2), '0'), '.') . ' h a week';
 }
 
 // ---- Work-norms master editor -------------------------------------------
@@ -810,10 +810,10 @@ function ops_run_mis_digest($period = 'weekly') {
         . "  Reports awaiting approval: $repPending\n\n"
         . "SALES / CRM\n"
         . "  Open quotations: $qOpen\n"
-        . "  Won in period: $qWon  (₹" . number_format($wonVal, 0) . ")\n"
+        . "  Won in period: $qWon  (₹" . nf($wonVal, 0) . ")\n"
         . "  Lost/expired in period: $qLost\n\n"
         . "MONEY\n"
-        . "  Unbilled (closed, not invoiced): ₹" . number_format($unbilled, 0) . "\n\n"
+        . "  Unbilled (closed, not invoiced): ₹" . nf($unbilled, 0) . "\n\n"
         . "Open the dashboard for details.\n\n" . app_name();
     ops_mail($to, "$label MIS summary — " . app_name() . " ($today)", $body, '', 'mis_digest');
     return 1;

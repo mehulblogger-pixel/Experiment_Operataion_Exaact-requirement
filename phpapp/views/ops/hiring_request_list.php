@@ -28,7 +28,7 @@ $tone = ['DRAFT'=>'p-mut','SUBMITTED'=>'p-info','UNDER_REVIEW'=>'p-info','APPROV
             //  all before, because no request carried a figure.
             $lC = function_exists('hreq_commitment') ? hreq_commitment($r) : ['has' => false]; ?>
       <td class="num"><?php if (empty($lC['has'])): ?><span class="muted">—</span>
-        <?php else: ?><?= $e(function_exists('fmoney_short') ? fmoney_short($lC['total']) : (function_exists('cur_sym') ? cur_sym() : '') . number_format($lC['total'], 0)) ?><?php endif; ?></td>
+        <?php else: ?><?= $e(function_exists('fmoney_short') ? fmoney_short($lC['total']) : (function_exists('cur_sym') ? cur_sym() : '') . nf($lC['total'], 0)) ?><?php endif; ?></td>
       <td><?= $e($r['required_by'] ?: '—') ?></td>
       <td><?= $e((function_exists('hreq_priorities') ? hreq_priorities() : [])[$r['priority']] ?? $r['priority']) ?></td>
       <td><span class="pill <?= $e($tone[$r['status']] ?? 'p-mut') ?>"><?= $e($st[$r['status']] ?? $r['status']) ?></span></td>

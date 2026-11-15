@@ -41,7 +41,7 @@
         $crep = cx_rating_summary_for_client((int)$r['poster_party_id']);
         if (($crep['count'] ?? 0) > 0): ?>
       <div style="margin-top:6px;font-size:12.5px;color:var(--muted)">Client:
-        <b style="color:var(--ink)"><?= number_format((float)$crep['avg_stars'], 1) ?>★</b>
+        <b style="color:var(--ink)"><?= nf((float)$crep['avg_stars'], 1) ?>★</b>
         <?php if (($crep['paid_fair_pct'] ?? null) !== null): ?> · <b style="color:<?= (int)$crep['paid_fair_pct'] >= 70 ? 'var(--teal)' : '#8a5a00' ?>"><?= (int)$crep['paid_fair_pct'] ?>% pay on time</b><?php endif; ?>
         <span class="muted">(<?= (int)$crep['count'] ?> review<?= (int)$crep['count']===1?'':'s' ?>)</span>
       </div>

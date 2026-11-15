@@ -39,7 +39,7 @@ $stars = function ($n) { $n=(int)$n; return str_repeat('★',$n) . str_repeat('�
           <?php if ($b['display_role']): ?><?= e($b['display_role']) ?><?php endif; ?>
           <?php if ($b['display_city']): ?> · <?= e($b['display_city']) ?><?php endif; ?>
           <?php if ((int)$b['client_rating']>0): ?> · <span title="Your rating" style="color:#c99700"><?= $stars($b['client_rating']) ?></span><?php endif; ?>
-          <?php if ((float)$b['preferred_rate']>0): ?> · your rate ₹<?= number_format((float)$b['preferred_rate']) ?><?php endif; ?>
+          <?php if ((float)$b['preferred_rate']>0): ?> · your rate ₹<?= nf((float)$b['preferred_rate']) ?><?php endif; ?>
         </div>
         <?php if (trim((string)$b['private_note'])!==''): ?><div class="rb-note">📝 <?= e($b['private_note']) ?></div><?php endif; ?>
       </div>

@@ -4,7 +4,7 @@
   // each at source from this list. Option B: the de-duplication toggle (off by default) that
   // nets the detected overlap in the profit engine as an estimate.
   $rows = $rows ?? []; $summary = $summary ?? []; $mode = $mode ?? 'off'; $modes = $modes ?? [];
-  $m = fn($n) => function_exists('fmoney_short') ? fmoney_short($n) : number_format((float)$n, 2);
+  $m = fn($n) => function_exists('fmoney_short') ? fmoney_short($n) : nf((float)$n, 2);
   $clean = empty($rows);
 ?>
 <div class="master-head">

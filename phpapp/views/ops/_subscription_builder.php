@@ -14,7 +14,7 @@ $preAdd = strtolower(trim((string) ($_GET['add'] ?? '')));
         <input type="checkbox" name="add_mods[]" value="<?= $e($k) ?>" class="sub-mod" <?= (int) $m['month'] > 0 ? '' : 'disabled' ?> data-m="<?= (int) $m['month'] ?>" data-y="<?= (int) $m['year'] ?>" <?= $k === $preAdd ? 'checked' : '' ?> style="margin-top:2px">
         <span><span style="font-weight:600"><?= $e($modLabel($k)) ?></span><br>
           <span class="sub" style="font-size:12px"><?= (int) $m['month'] > 0
-            ? $e($sym . number_format((int) $m['month'])) . '/mo' . ((int) $m['year'] > 0 ? ' · ' . $e($sym . number_format((int) $m['year'])) . '/yr' : '')
+            ? $e($sym . nf((int) $m['month'])) . '/mo' . ((int) $m['year'] > 0 ? ' · ' . $e($sym . nf((int) $m['year'])) . '/yr' : '')
             : 'Not for sale yet' ?></span></span>
       </label>
     <?php endforeach; ?>
@@ -24,7 +24,7 @@ $preAdd = strtolower(trim((string) ($_GET['add'] ?? '')));
   <div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px">
     <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px">Seats to add</label>
       <input type="number" name="add_seats" id="sub-seats" min="0" value="0" style="width:110px;padding:7px 9px;border:1px solid var(--line,#e5e7eb);border-radius:8px">
-      <span class="sub" style="font-size:12px;margin-left:6px"><?= $e($sym . number_format($seatM)) ?>/mo each</span></div>
+      <span class="sub" style="font-size:12px;margin-left:6px"><?= $e($sym . nf($seatM)) ?>/mo each</span></div>
     <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px">Billing period</label>
       <select name="period" id="sub-period" style="padding:7px 9px;border:1px solid var(--line,#e5e7eb);border-radius:8px">
         <option value="month">Monthly</option>

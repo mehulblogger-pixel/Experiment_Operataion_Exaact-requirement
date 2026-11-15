@@ -452,13 +452,13 @@ function ms_pdf_lines(array $q) {
     if (!$rows) return [];
     $out = [];
     foreach (ms_with_amounts($rows, ms_quote_base($q)) as $i => $r)
-        $out[] = ($i + 1) . '. ' . $r['title'] . ' — ' . rtrim(rtrim(number_format((float)$r['pct'], 2), '0'), '.') . '% — '
-               . number_format((float)$r['amount'], 2) . ' plus GST'
+        $out[] = ($i + 1) . '. ' . $r['title'] . ' — ' . rtrim(rtrim(nf((float)$r['pct'], 2), '0'), '.') . '% — '
+               . nf((float)$r['amount'], 2) . ' plus GST'
                . (!empty($r['releases_retention']) ? ' (retention released on this milestone)' : '');
     $ret = (float)($q['ms_retention_pct'] ?? 0);
     if ($ret > 0) {
         $relT = ''; foreach ($rows as $r) if (!empty($r['releases_retention'])) $relT = $r['title'];
-        $out[] = 'Retention: ' . rtrim(rtrim(number_format($ret, 2), '0'), '.') . '% of each milestone bill is held back by you and paid when "' . $relT . '" is reached. GST is charged on the full value of each bill.';
+        $out[] = 'Retention: ' . rtrim(rtrim(nf($ret, 2), '0'), '.') . '% of each milestone bill is held back by you and paid when "' . $relT . '" is reached. GST is charged on the full value of each bill.';
     }
     return $out;
 }

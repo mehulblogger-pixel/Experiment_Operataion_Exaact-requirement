@@ -65,7 +65,7 @@ $html = (function() use ($c,$quote,$pos,$calls,$jobs,$reports,$money,$state,$can
 t_ok(strpos($html, 'Expired') !== false, 'the 360 shows the EXPIRED state banner');
 t_ok(strpos($html, 'Request an override') !== false, 'a blocking state offers the override path');
 t_ok(strpos($html, 'Left to invoice') !== false, 'the money row shows remaining-to-invoice');
-t_ok(strpos($html, '380,000') !== false, 'remaining-to-invoice = value − invoiced is shown');
+t_ok(strpos($html, '3,80,000') !== false, 'remaining-to-invoice = value − invoiced is shown');
 
 // An over-billed contract flips the label.
 $money2 = ['value'=>100000, 'invoiced'=>140000, 'received'=>0, 'outstanding'=>140000, 'remaining'=>-40000];

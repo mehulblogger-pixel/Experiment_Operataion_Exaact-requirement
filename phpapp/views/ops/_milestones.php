@@ -8,7 +8,7 @@
 $msMode = $msMode ?? 'quote';
 $isC = $msMode === 'contract';
 $pc = fn($v) => rtrim(rtrim(number_format((float)$v, 2, '.', ''), '0'), '.');
-$money = fn($v) => e(cur_sym()) . number_format((float)$v, 0);
+$money = fn($v) => e(cur_sym()) . nf((float)$v, 0);
 $planned = array_values(array_filter($msRows, fn($r) => ($r['status'] ?? 'PLANNED') === 'PLANNED'));
 $fixedPct = array_sum(array_map(fn($r) => (float)$r['pct'], array_filter($msRows, fn($r) => ($r['status'] ?? '') === 'ACHIEVED')));
 $relTitle = ''; foreach ($msRows as $r) if (!empty($r['releases_retention'])) $relTitle = $r['title'];

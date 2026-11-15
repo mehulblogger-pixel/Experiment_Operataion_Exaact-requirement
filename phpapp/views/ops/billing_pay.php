@@ -11,7 +11,7 @@
 <div class="master-head"><div><h1>Complete your payment</h1>
   <p class="sub" style="margin:2px 0 0"><?php if (is_array($rvH)): ?><?= e($rvH['head']) ?> — <?= e($amt['period']==='year'?'yearly plan':'monthly plan') ?>
     <?php else: ?><?= (int)$amt['seats'] ?> <?= (int)$amt['seats']===1?'person':'people' ?>, <?= e($amt['period']==='year'?'annual':'monthly') ?><?php endif; ?>
-    — to pay now <strong><?= e($sym . number_format((int)$amt['major'])) ?></strong>.</p></div></div>
+    — to pay now <strong><?= e($sym . nf((int)$amt['major'])) ?></strong>.</p></div></div>
 
 <?php $rv = $review ?? null; if (is_array($rv)): ?>
 <div class="panel" style="max-width:520px">
@@ -19,28 +19,28 @@
   <p style="font-size:13.5px;margin:0 0 10px"><?= e($rv['when']) ?></p>
   <table style="width:100%;font-size:14px;border-collapse:collapse">
     <?php foreach ($rv['lines'] as $ln): ?>
-      <tr><td style="padding:4px 0"><?= e($ln['label']) ?></td><td style="text-align:right"><?= (int) $ln['amount'] < 0 ? '− ' : '' ?><?= e($sym . number_format(abs((int) $ln['amount']))) ?> / <?= e($rv['period']) ?></td></tr>
+      <tr><td style="padding:4px 0"><?= e($ln['label']) ?></td><td style="text-align:right"><?= (int) $ln['amount'] < 0 ? '− ' : '' ?><?= e($sym . nf(abs((int) $ln['amount']))) ?> / <?= e($rv['period']) ?></td></tr>
     <?php endforeach; ?>
     <?php if (!empty($rv['rows'])): $first = true; foreach ($rv['rows'] as [$lbl, $amt, $last]): if ($last) continue; ?>
-      <tr<?= $first ? ' style="border-top:1px solid var(--line,#e5e7eb)"' : '' ?>><td style="padding:4px 0"><?= e($lbl) ?></td><td style="text-align:right"><?= $amt < 0 ? '− ' : '' ?><?= e($sym . number_format(abs((int) $amt))) ?></td></tr>
+      <tr<?= $first ? ' style="border-top:1px solid var(--line,#e5e7eb)"' : '' ?>><td style="padding:4px 0"><?= e($lbl) ?></td><td style="text-align:right"><?= $amt < 0 ? '− ' : '' ?><?= e($sym . nf(abs((int) $amt))) ?></td></tr>
     <?php $first = false; endforeach; else: ?>
-    <tr style="border-top:1px solid var(--line,#e5e7eb)"><td style="padding:6px 0">Full price of this plan</td><td style="text-align:right"><?= e($sym . number_format($rv['list'])) ?></td></tr>
+    <tr style="border-top:1px solid var(--line,#e5e7eb)"><td style="padding:6px 0">Full price of this plan</td><td style="text-align:right"><?= e($sym . nf($rv['list'])) ?></td></tr>
     <?php if ($rv['credit'] > 0): ?>
-      <tr><td style="padding:4px 0">Less: unused part of your current plan</td><td style="text-align:right">− <?= e($sym . number_format($rv['credit'])) ?></td></tr>
+      <tr><td style="padding:4px 0">Less: unused part of your current plan</td><td style="text-align:right">− <?= e($sym . nf($rv['credit'])) ?></td></tr>
     <?php endif; endif; ?>
-    <tr style="font-weight:700;border-top:1px solid var(--line,#e5e7eb)"><td style="padding:6px 0">To pay now<?= !empty($rv['rows']) ? ' — ' . e(end($rv['rows'])[0]) : '' ?><?= (is_array($amt['tax'] ?? null) && !empty($amt['tax']['on'])) ? ' (before GST)' : '' ?></td><td style="text-align:right"><?= e($sym . number_format($rv['price'])) ?></td></tr>
+    <tr style="font-weight:700;border-top:1px solid var(--line,#e5e7eb)"><td style="padding:6px 0">To pay now<?= !empty($rv['rows']) ? ' — ' . e(end($rv['rows'])[0]) : '' ?><?= (is_array($amt['tax'] ?? null) && !empty($amt['tax']['on'])) ? ' (before GST)' : '' ?></td><td style="text-align:right"><?= e($sym . nf($rv['price'])) ?></td></tr>
   </table>
 </div>
 <?php endif; ?>
 <?php $tx = $amt['tax'] ?? null; if (is_array($tx) && !empty($tx['on'])): ?>
 <div class="panel" style="max-width:520px">
   <table style="width:100%;font-size:14px;border-collapse:collapse">
-    <tr><td style="padding:4px 0">Price<?= $tx['mode'] === 'inclusive' ? ' (taxable value)' : '' ?></td><td style="text-align:right"><?= e($sym . number_format((int) $tx['net'])) ?></td></tr>
-    <?php if ((int) $tx['igst'] > 0): ?><tr><td style="padding:4px 0">IGST <?= e(rtrim(rtrim(number_format((float) $tx['rate'], 2), '0'), '.')) ?>%</td><td style="text-align:right"><?= e($sym . number_format((int) $tx['igst'])) ?></td></tr>
-    <?php else: $half = rtrim(rtrim(number_format((float) $tx['rate'] / 2, 2), '0'), '.'); ?>
-      <tr><td style="padding:4px 0">CGST <?= e($half) ?>%</td><td style="text-align:right"><?= e($sym . number_format((int) $tx['cgst'])) ?></td></tr>
-      <tr><td style="padding:4px 0">SGST <?= e($half) ?>%</td><td style="text-align:right"><?= e($sym . number_format((int) $tx['sgst'])) ?></td></tr><?php endif; ?>
-    <tr style="font-weight:700;border-top:1px solid var(--line,#e5e7eb)"><td style="padding:6px 0">Total to pay</td><td style="text-align:right"><?= e($sym . number_format((int) $tx['gross'])) ?></td></tr>
+    <tr><td style="padding:4px 0">Price<?= $tx['mode'] === 'inclusive' ? ' (taxable value)' : '' ?></td><td style="text-align:right"><?= e($sym . nf((int) $tx['net'])) ?></td></tr>
+    <?php if ((int) $tx['igst'] > 0): ?><tr><td style="padding:4px 0">IGST <?= e(rtrim(rtrim(nf((float) $tx['rate'], 2), '0'), '.')) ?>%</td><td style="text-align:right"><?= e($sym . nf((int) $tx['igst'])) ?></td></tr>
+    <?php else: $half = rtrim(rtrim(nf((float) $tx['rate'] / 2, 2), '0'), '.'); ?>
+      <tr><td style="padding:4px 0">CGST <?= e($half) ?>%</td><td style="text-align:right"><?= e($sym . nf((int) $tx['cgst'])) ?></td></tr>
+      <tr><td style="padding:4px 0">SGST <?= e($half) ?>%</td><td style="text-align:right"><?= e($sym . nf((int) $tx['sgst'])) ?></td></tr><?php endif; ?>
+    <tr style="font-weight:700;border-top:1px solid var(--line,#e5e7eb)"><td style="padding:6px 0">Total to pay</td><td style="text-align:right"><?= e($sym . nf((int) $tx['gross'])) ?></td></tr>
   </table>
   <?php $bt = (array) ($amt['buyer'] ?? []); ?>
   <p style="font-size:13px;margin:10px 0 0">Invoice to <b><?= e($bt['name'] ?? '') ?></b> · <?= $tx['buyer_gstin'] !== '' ? 'GSTIN <b>' . e($tx['buyer_gstin']) . '</b>' : 'not GST-registered' ?>
@@ -50,7 +50,7 @@
 <?php endif; ?>
 <div class="panel" style="max-width:520px;text-align:center">
   <p class="sub"><?= is_array($rv) ? 'Check the figures above, then press Pay to open the secure Razorpay window.' : 'The secure Razorpay window should open automatically. If it does not, use the button below.' ?></p>
-  <button class="btn" id="paybtn" type="button">Pay <?= e($sym . number_format($amtMajor)) ?></button>
+  <button class="btn" id="paybtn" type="button">Pay <?= e($sym . nf($amtMajor)) ?></button>
   <a class="btn secondary" href="<?= e($back) ?>" style="margin-left:8px">Cancel</a>
   <p class="muted" style="margin-top:14px;font-size:12.5px">Your card details go straight to Razorpay — this application never sees them.
     Your plan activates the instant the payment is confirmed.</p>

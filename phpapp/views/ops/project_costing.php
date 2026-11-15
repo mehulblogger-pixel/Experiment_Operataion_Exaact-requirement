@@ -103,7 +103,7 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
   <div class="kpi"><span class="kic">🧾</span><div class="k">Project revenue</div><div class="v"><?= fmoney_short($T['revenue']) ?></div><div class="d">Price quoted to the <?= $e(Tl('client')) ?></div></div>
   <div class="kpi"><span class="kic">🧮</span><div class="k">Project cost</div><div class="v"><?= fmoney_short($T['cost']) ?></div><div class="d">Manpower + loadings</div></div>
   <div class="kpi <?= $T['profit']>=0?'tone-ok':'tone-bad' ?>"><span class="kic">💰</span><div class="k">Project profit</div><div class="v"><?= fmoney_short($T['profit']) ?></div><div class="d">Revenue − cost</div></div>
-  <div class="kpi <?= $T['margin']>=0?'tone-ok':'tone-bad' ?>"><span class="kic">📈</span><div class="k">Margin</div><div class="v"><?= number_format($T['margin'],1) ?>%</div><div class="d">Profit as a share of revenue</div></div>
+  <div class="kpi <?= $T['margin']>=0?'tone-ok':'tone-bad' ?>"><span class="kic">📈</span><div class="k">Margin</div><div class="v"><?= nf($T['margin'],1) ?>%</div><div class="d">Profit as a share of revenue</div></div>
 </div>
 
 <?php //  MARGIN WARNING (owner, 14 Nov 2026: "warning for both high and low margin … + or - 10%
@@ -203,15 +203,15 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
       <tr>
         <?php $lb = pc_line_basis($ln, $h); $bw = pc_basis_words($lb); //  each role in its own basis (14 Nov 2026) ?>
         <td><b><?= $e($ln['role_label']) ?></b><br><span class="muted" style="font-size:11px"><?= $e($lb === 'FIXED' ? 'lump sum' : $bw[0]) ?></span></td>
-        <?php foreach ($shownHeads as $hk=>$hl): ?><td class="num"><?= isset($lh[$hk]) ? number_format((float)$lh[$hk]) : '<span class="muted">—</span>' ?></td><?php endforeach; ?>
-        <td class="num"><?= number_format($c['direct']) ?><span class="muted" style="font-size:10px"><?= $e($bw[2]) ?></span></td>
-        <td class="num"><?= number_format($c['loaded']) ?><span class="muted" style="font-size:10px"><?= $e($bw[2]) ?></span></td>
-        <td class="num"><b><?= number_format($c['proposed']) ?></b><span class="muted" style="font-size:10px"><?= $e($bw[2]) ?></span><?= (float)$ln['target_margin']>0 && (float)$ln['rate_manual']<=0 ? '<br><span class="muted" style="font-size:10px">@'.rtrim(rtrim(number_format((float)$ln['target_margin'],1),'0'),'.').'% marg</span>' : '' ?></td>
-        <td class="num"><?= $lb==='FIXED' ? '1' : number_format((float)$ln['boq_qty'],($lb==='DAILY'?0:1)) ?> <span class="muted" style="font-size:10px"><?= $e(strtolower($bw[1])) ?></span><?= (float)$ln['oneoff']>0 ? '<br><span class="muted" style="font-size:10px">+'.fmoney_short($ln['oneoff']).' 1-off</span>' : '' ?></td>
+        <?php foreach ($shownHeads as $hk=>$hl): ?><td class="num"><?= isset($lh[$hk]) ? nf((float)$lh[$hk]) : '<span class="muted">—</span>' ?></td><?php endforeach; ?>
+        <td class="num"><?= nf($c['direct']) ?><span class="muted" style="font-size:10px"><?= $e($bw[2]) ?></span></td>
+        <td class="num"><?= nf($c['loaded']) ?><span class="muted" style="font-size:10px"><?= $e($bw[2]) ?></span></td>
+        <td class="num"><b><?= nf($c['proposed']) ?></b><span class="muted" style="font-size:10px"><?= $e($bw[2]) ?></span><?= (float)$ln['target_margin']>0 && (float)$ln['rate_manual']<=0 ? '<br><span class="muted" style="font-size:10px">@'.rtrim(rtrim(nf((float)$ln['target_margin'],1),'0'),'.').'% marg</span>' : '' ?></td>
+        <td class="num"><?= $lb==='FIXED' ? '1' : nf((float)$ln['boq_qty'],($lb==='DAILY'?0:1)) ?> <span class="muted" style="font-size:10px"><?= $e(strtolower($bw[1])) ?></span><?= (float)$ln['oneoff']>0 ? '<br><span class="muted" style="font-size:10px">+'.fmoney_short($ln['oneoff']).' 1-off</span>' : '' ?></td>
         <td class="num"><?= fmoney_short($c['revenue']) ?></td>
         <td class="num" style="color:var(--<?= $c['profit']>=0?'ok':'bad' ?>)"><?= fmoney_short($c['profit']) ?></td>
         <?php $mw = function_exists('pc_margin_check') ? pc_margin_check($ln, $h, $c) : null; ?>
-        <td class="num"><?= number_format($c['margin'],1) ?>%<?php if ($mw): ?><br><span class="pc-mflag <?= $mw['side']==='HIGH'?'hi':'lo' ?>" title="<?= $e($mw['words']) ?>">⚠ <?= $mw['side']==='HIGH' ? 'too high' : 'too low' ?></span><?php endif; ?></td>
+        <td class="num"><?= nf($c['margin'],1) ?>%<?php if ($mw): ?><br><span class="pc-mflag <?= $mw['side']==='HIGH'?'hi':'lo' ?>" title="<?= $e($mw['words']) ?>">⚠ <?= $mw['side']==='HIGH' ? 'too high' : 'too low' ?></span><?php endif; ?></td>
         <?php if ($canEdit): ?><td class="num" style="white-space:nowrap"><a class="btn btn-ghost" style="padding:2px 8px" href="/project-costing?id=<?= (int)$h['id'] ?>&amp;edit=<?= (int)$ln['id'] ?>#add-role" title="Edit this role's heads">✎ Edit</a> <form method="post" action="/project-costing-line-delete" onsubmit="return confirm('Remove this role?')" style="display:inline"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="costing_id" value="<?= (int)$h['id'] ?>"><input type="hidden" name="line_id" value="<?= (int)$ln['id'] ?>"><button class="btn btn-ghost" style="padding:2px 8px" title="Remove">✕</button></form></td><?php endif; ?>
       </tr>
     <?php endforeach; ?>
@@ -220,11 +220,11 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
     <?php if (!empty($lines)): ?>
     <tfoot><tr style="border-top:2px solid var(--line);font-weight:700">
       <td>Totals</td>
-      <?php foreach ($shownHeads as $hk=>$hl): ?><td class="num"><?= isset($byHead[$hk]) ? number_format((float)$byHead[$hk]) : '' ?></td><?php endforeach; ?>
-      <td class="num"><?= number_format($T['direct']) ?></td><td></td><td></td><td></td>
+      <?php foreach ($shownHeads as $hk=>$hl): ?><td class="num"><?= isset($byHead[$hk]) ? nf((float)$byHead[$hk]) : '' ?></td><?php endforeach; ?>
+      <td class="num"><?= nf($T['direct']) ?></td><td></td><td></td><td></td>
       <td class="num"><?= fmoney_short($T['revenue']) ?></td>
       <td class="num" style="color:var(--<?= $T['profit']>=0?'ok':'bad' ?>)"><?= fmoney_short($T['profit']) ?></td>
-      <td class="num"><?= number_format($T['margin'],1) ?>%</td><?php if ($canEdit): ?><td></td><?php endif; ?>
+      <td class="num"><?= nf($T['margin'],1) ?>%</td><?php if ($canEdit): ?><td></td><?php endif; ?>
     </tr></tfoot>
     <?php endif; ?>
   </table>
@@ -293,8 +293,8 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
       <tr>
         <td><?= !empty($ln['group_label']) ? '<span class="muted">'.$e($ln['group_label']).' / </span>' : '' ?><b><?= $e($ln['role_label']) ?></b></td>
         <td class="num"><?= (int)$ppl ?></td>
-        <td class="num"><?= number_format($c['proposed']) ?></td>
-        <td class="num"><?= number_format($c['loaded']) ?></td>
+        <td class="num"><?= nf($c['proposed']) ?></td>
+        <td class="num"><?= nf($c['loaded']) ?></td>
         <td><?php foreach ($lk['hreq'] as $x): ?><a href="/hiring-request?id=<?= (int)$x['id'] ?>"><?= $e($x['req_no']) ?></a> <span class="muted">(<?= (int)$x['quantity'] ?> · <?= $e(strtolower(str_replace('_', ' ', (string)$x['status']))) ?>)</span><br><?php endforeach; ?>
             <?php foreach ($lk['req'] as $x): ?><a href="/requisition?id=<?= (int)$x['id'] ?>"><?= $e($x['req_code']) ?></a> <span class="muted">(<?= (int)$x['quantity'] ?> · <?= $e(strtolower((string)$x['status'])) ?>)</span><br><?php endforeach; ?>
             <?php if (!$lk['hreq'] && !$lk['req']): ?><span class="muted">—</span><?php endif; ?></td>
@@ -302,8 +302,8 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
         <td style="font-size:12px;max-width:260px"><?php $lc = function_exists('pc_line_last_candidate') ? pc_line_last_candidate((int)$ln['id']) : null;
             if ($lc): $lk3 = pc_cand_check($lc); $vt = ['OK' => 'p-ok', 'LOW' => 'p-warn', 'LOSS' => 'p-bad', 'NONE' => 'p-mut'][$lk3['verdict']] ?? 'p-mut'; ?>
             <a href="/candidate?id=<?= (int)$lc['id'] ?>"><?= $e(trim(($lc['first_name'] ?? '') . ' ' . ($lc['last_name'] ?? ''))) ?></a>
-            <span class="pill <?= $vt ?>"><?= $e(rtrim(rtrim(number_format((float)$lk3['margin'], 1), '0'), '.')) ?>% vs <?= $e(rtrim(rtrim(number_format((float)$lk3['target'], 1), '0'), '.')) ?>%</span>
-            <?php if (function_exists('can_see_salary') && can_see_salary()): ?><br><span class="muted">up to <?= $e($sym . number_format($lk3['max_ctc'])) ?>/mo keeps the target</span><?php endif; ?>
+            <span class="pill <?= $vt ?>"><?= $e(rtrim(rtrim(nf((float)$lk3['margin'], 1), '0'), '.')) ?>% vs <?= $e(rtrim(rtrim(nf((float)$lk3['target'], 1), '0'), '.')) ?>%</span>
+            <?php if (function_exists('can_see_salary') && can_see_salary()): ?><br><span class="muted">up to <?= $e($sym . nf($lk3['max_ctc'])) ?>/mo keeps the target</span><?php endif; ?>
           <?php else: ?><span class="muted">no offer yet</span><?php endif; ?></td>
         <td class="num" style="white-space:nowrap"><?php if ($gate === '' && $done < $ppl): ?>
           <form method="post" action="/project-costing-to-hreq" style="display:inline"><input type="hidden" name="_csrf" value="<?= $e($csrf) ?>"><input type="hidden" name="costing_id" value="<?= (int)$h['id'] ?>"><input type="hidden" name="line_id" value="<?= (int)$ln['id'] ?>"><button class="btn" style="padding:3px 10px" title="Raise a hiring request for the <?= (int)($ppl - $done) ?> people not yet asked for">→ Hiring request (<?= (int)($ppl - $done) ?>)</button></form>
@@ -469,7 +469,7 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
         <button type="button" class="btn" id="ch_ctc_go" data-l-ctc="Build the salary break-up" data-l-rate="Work out the CTC and its break-up"><?= $rateFixed ? 'Work out the CTC and its break-up' : 'Build the salary break-up' ?></button>
       </div>
       <?php endif; ?>
-      <div class="ctcq-n muted" id="ch_ctc_note" data-ctc="The rate follows the cost heads and your margin.<?= $ctcOn ? ' Type the CTC to fill the break-up from your company\'s salary components.' : '' ?>" data-rate="The rate is the <?= $e(Tl('client')) ?>'s; your margin decides how much of it is left for the person.<?= $ctcOn ? ' Press the button to work back to the CTC you can afford and fill its break-up.' : '' ?>"><span data-ctc-hint><?= $rateFixed ? 'The rate is the client\'s; your margin decides how much of it is left for the person.' : 'The rate follows the cost heads and your margin.' ?></span><?php if ($negPct > 0): ?> <span class="muted">This costing adds <?= $e(rtrim(rtrim(number_format($negPct, 2), '0'), '.')) ?>% negotiation padding on top of the cost-based rate.</span><?php endif; ?></div>
+      <div class="ctcq-n muted" id="ch_ctc_note" data-ctc="The rate follows the cost heads and your margin.<?= $ctcOn ? ' Type the CTC to fill the break-up from your company\'s salary components.' : '' ?>" data-rate="The rate is the <?= $e(Tl('client')) ?>'s; your margin decides how much of it is left for the person.<?= $ctcOn ? ' Press the button to work back to the CTC you can afford and fill its break-up.' : '' ?>"><span data-ctc-hint><?= $rateFixed ? 'The rate is the client\'s; your margin decides how much of it is left for the person.' : 'The rate follows the cost heads and your margin.' ?></span><?php if ($negPct > 0): ?> <span class="muted">This costing adds <?= $e(rtrim(rtrim(nf($negPct, 2), '0'), '.')) ?>% negotiation padding on top of the cost-based rate.</span><?php endif; ?></div>
     </div>
 
     <p class="sub" style="margin:14px 0 6px">Cost heads — <b><?= $e($sym) ?> <span data-bw="unit"><?= $e($unitWord) ?></span></b>. Each head can be an amount, a % of other heads, quantity × rate or a formula, entered per month, per day, per year or one time. Names can be changed freely — a % keeps pointing at the right head.</p>
@@ -477,7 +477,7 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
       <?php if ($tplJs): ?><select id="ch_tpl" aria-label="Start from a template"><option value="">Start from a template…</option><?php foreach ($tplJs as $t): ?><option value="<?= (int)$t['id'] ?>"><?= $e($t['name']) ?> (<?= count($t['items']) ?> heads)</option><?php endforeach; ?></select><?php endif; ?>
       <select id="ch_lib" aria-label="Add a head from the library"><option value="">＋ Add a head from the library…</option>
         <?php foreach (CH_GROUPS as $gk => $gl): $opts = array_filter($libJs, fn($x) => $x['grp'] === $gk); if (!$opts) continue; ?>
-          <optgroup label="<?= $e($gl) ?>"><?php foreach ($opts as $x): ?><option value="<?= $e($x['code']) ?>"><?= $e($x['label']) ?><?= $x['type'] === 'PCT' ? ' — ' . $e(rtrim(rtrim(number_format((float)$x['pct'], 3), '0'), '.')) . '%' : '' ?></option><?php endforeach; ?></optgroup>
+          <optgroup label="<?= $e($gl) ?>"><?php foreach ($opts as $x): ?><option value="<?= $e($x['code']) ?>"><?= $e($x['label']) ?><?= $x['type'] === 'PCT' ? ' — ' . $e(rtrim(rtrim(nf((float)$x['pct'], 3), '0'), '.')) . '%' : '' ?></option><?php endforeach; ?></optgroup>
         <?php endforeach; ?></select>
       <button type="button" class="btn secondary" id="ch_blank">＋ Blank head</button>
       <?php if ($chManage): ?><a href="/project-costing-heads" class="muted" style="font-size:12.5px">Manage the library &amp; templates →</a><?php endif; ?>

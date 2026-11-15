@@ -113,7 +113,7 @@ function attend_anomalies($inspectorId, $from, $to) {
     }
     // 2) Excessive hours over the daily cap.
     foreach ($hoursByDay as $d => $h) if ($h > $cap + 0.001)
-        $add($d, 'excessive', rtrim(rtrim(number_format($h, 2), '0'), '.') . 'h logged — over the ' . $cap . 'h daily cap');
+        $add($d, 'excessive', rtrim(rtrim(nf($h, 2), '0'), '.') . 'h logged — over the ' . $cap . 'h daily cap');
     // 3) Presence vs hours mismatch.
     foreach ($byDay as $d => $jobs) {
         $has = false; foreach ($jobs as $p) if ($p['in'] && $p['out'] && strtotime($p['out']) > strtotime($p['in'])) $has = true;

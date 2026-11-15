@@ -515,10 +515,13 @@
 </details>
 <?php endif; ?>
 
-<?php if ($history): ?>
+<?php // DEF-SAL-030 — the History tab is always there; a new deal says how it started. ?>
 <details class="fold" data-tab="History" open>
-  <summary>How it moved <span class="sub"><?= count($history) ?> move<?= count($history) === 1 ? '' : 's' ?></span></summary>
+  <summary>How it moved <span class="sub"><?= $history ? count($history) . ' move' . (count($history) === 1 ? '' : 's') : 'no moves yet' ?></span></summary>
   <div class="fold-body">
+    <?php if (!$history): ?>
+    <p class="muted" style="margin:0">Opened<?= !empty($o['created_by']) ? ' by ' . e($o['created_by']) : '' ?><?= !empty($o['created_at']) ? ' on ' . e(fdate(substr((string)$o['created_at'], 0, 10))) : '' ?> — it has not moved to another step yet.</p>
+    <?php else: ?>
     <table class="dt">
       <caption class="sr-only">Step history</caption>
       <thead><tr><th scope="col">When</th><th scope="col">From</th><th scope="col">To</th><th scope="col" class="num">Days there</th><th scope="col">By</th></tr></thead>
@@ -530,9 +533,9 @@
       <?php endforeach; ?>
       </tbody>
     </table>
+    <?php endif; ?>
   </div>
 </details>
-<?php endif; ?>
 </div><!-- /data-tabs (opp) -->
 
 <?php // Module 49 — the activity spine, shown where the record is read (as on lead / call /

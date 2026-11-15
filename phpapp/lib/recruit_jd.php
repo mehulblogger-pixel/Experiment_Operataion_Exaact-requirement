@@ -102,7 +102,7 @@ function jd_template_text($f, $cfg) {
     }
     $L[] = '';
     $L[] = "What you'll bring";
-    if ($f['experience_min'] !== null && $f['experience_min'] > 0) $L[] = '- ' . rtrim(rtrim(number_format($f['experience_min'], 1), '0'), '.') . '+ years of relevant experience.';
+    if ($f['experience_min'] !== null && $f['experience_min'] > 0) $L[] = '- ' . rtrim(rtrim(nf($f['experience_min'], 1), '0'), '.') . '+ years of relevant experience.';
     if ($f['qualification'])  $L[] = '- ' . $f['qualification'] . '.';
     if ($f['skills'])         $L[] = '- Skills: ' . $f['skills'] . '.';
     if ($f['discipline'] && $f['discipline'] !== $f['department']) $L[] = '- Background in ' . $f['discipline'] . '.';

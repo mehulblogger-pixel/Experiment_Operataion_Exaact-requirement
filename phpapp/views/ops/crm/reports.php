@@ -35,7 +35,7 @@
       <td class="num"><?= (int)$m['raised'] ?></td>
       <td class="num up"><?= (int)$m['won'] ?></td>
       <td class="num <?= $m['lost']?'down':'' ?>"><?= (int)$m['lost'] ?></td>
-      <td class="num"><?= (float)$m['wonVal']>0?cur_sym().number_format((float)$m['wonVal'],0):'—' ?></td>
+      <td class="num"><?= (float)$m['wonVal']>0?cur_sym().nf((float)$m['wonVal'],0):'—' ?></td>
     </tr>
     <?php endforeach; ?>
     <?php if (!$months): ?><tr><td colspan="5" style="text-align:center;padding:20px" class="muted">No <?= e(Tlp('quote')) ?> in this FY yet.</td></tr><?php endif; ?>

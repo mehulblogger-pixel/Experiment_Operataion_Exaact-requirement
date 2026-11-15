@@ -222,7 +222,7 @@ $commer = $has('billing_rate') || (float)($req['expected_revenue'] ?? 0) != 0 ||
   <?php if ($has('relevant_experience')): ?><div><span class="k">Relevant experience</span><?= e($req['relevant_experience']) ?></div><?php endif; ?>
   <?php if ($has('work_model')): ?><div><span class="k">Work model</span><?= e($WM) ?></div><?php endif; ?>
   <?php if ($has('deploy_location')): ?><div><span class="k">Location</span><?= e($req['deploy_location']) ?></div><?php endif; ?>
-  <?php if ($has('start_date') || $has('end_date')): ?><div><span class="k">Period</span><?= e($req['start_date'] ?: '—') ?> → <?= e($req['end_date'] ?: '—') ?><?= (float)($req['duration_months'] ?? 0) > 0 ? ' · '.rtrim(rtrim(number_format((float)$req['duration_months'],2),'0'),'.').' mo' : '' ?></div><?php endif; ?>
+  <?php if ($has('start_date') || $has('end_date')): ?><div><span class="k">Period</span><?= e($req['start_date'] ?: '—') ?> → <?= e($req['end_date'] ?: '—') ?><?= (float)($req['duration_months'] ?? 0) > 0 ? ' · '.rtrim(rtrim(nf((float)$req['duration_months'],2),'0'),'.').' mo' : '' ?></div><?php endif; ?>
   <?php if ($has('duty_hours')): ?><div><span class="k">Duty hours</span><?= e($req['duty_hours']) ?></div><?php endif; ?>
   <?php if ($has('shift')): ?><div><span class="k">Shift</span><?= e($SH) ?></div><?php endif; ?>
   <?php // 1f — facilities and who provides each (new selectors, legacy booleans as fallback).
@@ -260,8 +260,8 @@ $commer = $has('billing_rate') || (float)($req['expected_revenue'] ?? 0) != 0 ||
   <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
     <div class="kpi"><span class="kic">💰</span><div class="k">Revenue</div><div class="v"><?= fmoney_short($rev) ?></div><div class="d"><?= e($req['quantity'] ?? 1) ?> × <?= fmoney_short($req['billing_rate'] ?? 0) ?> <?= e(REQ_RATE_BASIS[$req['rate_basis'] ?? 'MONTHLY'] ?? '') ?></div></div>
     <div class="kpi"><span class="kic">🧾</span><div class="k">Cost</div><div class="v"><?= fmoney_short($cost) ?></div><div class="d">est.</div></div>
-    <div class="kpi"><span class="kic">📈</span><div class="k">Profit</div><div class="v <?= $prof>=0?'up':'down' ?>"><?= fmoney_short($prof) ?></div><div class="d"><?= $marg>=0?'':'−' ?><?= number_format(abs($marg),1) ?>% margin</div></div>
-    <div class="kpi"><span class="kic">🎯</span><div class="k">Target / floor</div><div class="v"><?= $has('target_margin') ? number_format((float)$req['target_margin'],1).'%' : '—' ?></div><div class="d"><?= $has('negotiation_floor') ? 'floor '.fmoney_short($req['negotiation_floor']) : 'no floor set' ?></div></div>
+    <div class="kpi"><span class="kic">📈</span><div class="k">Profit</div><div class="v <?= $prof>=0?'up':'down' ?>"><?= fmoney_short($prof) ?></div><div class="d"><?= $marg>=0?'':'−' ?><?= nf(abs($marg),1) ?>% margin</div></div>
+    <div class="kpi"><span class="kic">🎯</span><div class="k">Target / floor</div><div class="v"><?= $has('target_margin') ? nf((float)$req['target_margin'],1).'%' : '—' ?></div><div class="d"><?= $has('negotiation_floor') ? 'floor '.fmoney_short($req['negotiation_floor']) : 'no floor set' ?></div></div>
   </div>
 </div>
 <?php endif; ?>
@@ -289,10 +289,10 @@ if ($seeSal && function_exists('req_cost_buildup')
       </table>
     </div>
     <div class="kpi-row" style="grid-template-columns:1fr 1fr">
-      <div class="kpi"><span class="kic">👥</span><div class="k">Project cost</div><div class="v"><?= fmoney_short($cm['cost']) ?></div><div class="d"><?= $qty ?> person(s) · <?= number_format((float)$cm['months'],1) ?> mo</div></div>
+      <div class="kpi"><span class="kic">👥</span><div class="k">Project cost</div><div class="v"><?= fmoney_short($cm['cost']) ?></div><div class="d"><?= $qty ?> person(s) · <?= nf((float)$cm['months'],1) ?> mo</div></div>
       <div class="kpi"><span class="kic">🔁</span><div class="k">Recurring</div><div class="v"><?= fmoney_short($cm['recurring_cost'] ?? 0) ?></div><div class="d"><?= fmoney_short($bu['monthly']) ?>/person·mo</div></div>
       <?php if (($cm['oneoff_total'] ?? 0) > 0): ?><div class="kpi"><span class="kic">📦</span><div class="k">One-off total</div><div class="v"><?= fmoney_short($cm['oneoff_total']) ?></div><div class="d"><?= $qty ?> × <?= fmoney_short($bu['oneoff']) ?></div></div><?php endif; ?>
-      <div class="kpi"><span class="kic">📈</span><div class="k">Project profit</div><div class="v <?= ($cm['profit']??0)>=0?'up':'down' ?>"><?= fmoney_short($cm['profit'] ?? 0) ?></div><div class="d"><?= ($cm['revenue']??0)>0 ? number_format(($cm['profit']/$cm['revenue'])*100,1).'% margin' : 'set billing rate' ?></div></div>
+      <div class="kpi"><span class="kic">📈</span><div class="k">Project profit</div><div class="v <?= ($cm['profit']??0)>=0?'up':'down' ?>"><?= fmoney_short($cm['profit'] ?? 0) ?></div><div class="d"><?= ($cm['revenue']??0)>0 ? nf(($cm['profit']/$cm['revenue'])*100,1).'% margin' : 'set billing rate' ?></div></div>
     </div>
   </div>
 </div>
@@ -308,7 +308,7 @@ if ($seeSal && !empty($rollup) && (int)($rollup['n'] ?? 0) > 0): $R = $rollup; ?
     $rtier = function($label, $rev, $prof, $marg, $sub) {
       $mc = $prof >= 0 ? 'up' : 'down';
       return '<div class="kpi"><div class="k">'.$label.'</div><div class="v">'.fmoney_short($rev).'</div>'
-        .'<div class="d"><b class="'.$mc.'">'.fmoney_short($prof).'</b> · '.($marg>=0?'':'−').number_format(abs($marg),1).'% · '.$sub.'</div></div>';
+        .'<div class="d"><b class="'.$mc.'">'.fmoney_short($prof).'</b> · '.($marg>=0?'':'−').nf(abs($marg),1).'% · '.$sub.'</div></div>';
     };
     echo $rtier('Planned <span class="muted" style="font-weight:400">(' . e(Tl('requisition')) . ')</span>', $R['plan_rev'], $R['plan_profit'], $R['plan_margin'], 'as budgeted');
     echo $rtier('Approved <span class="muted" style="font-weight:400">(locked hires)</span>', $R['appr_rev'], $R['appr_profit'], $R['appr_margin'], 'this many hires');

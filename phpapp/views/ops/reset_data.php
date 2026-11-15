@@ -23,12 +23,12 @@
       <td><input type="checkbox" name="groups[]" value="<?= e($key) ?>" id="g_<?= e($key) ?>" <?= $n ? '' : 'disabled' ?>></td>
       <td><label for="g_<?= e($key) ?>"><strong><?= e($g['label']) ?></strong></label>
           <?php if (!empty($g['danger'])): ?><div><span class="pill p-bad">think twice</span></div><?php endif; ?></td>
-      <td><?= $n ? '<strong>' . number_format($n) . '</strong>' : '<span class="muted">empty</span>' ?></td>
+      <td><?= $n ? '<strong>' . nf($n) . '</strong>' : '<span class="muted">empty</span>' ?></td>
       <td class="muted"><?= e($g['note']) ?></td>
     </tr>
     <?php endforeach; ?>
     <tr><td></td><td><strong>Everything above</strong></td>
-        <td><strong><?= number_format($grand) ?></strong></td>
+        <td><strong><?= nf($grand) ?></strong></td>
         <td><button class="btn small ghost" type="button" onclick="document.querySelectorAll('input[name=\'groups[]\']:not([disabled])').forEach(function(c){c.checked=true});return false;">Tick them all</button></td></tr>
   </table>
   </div>

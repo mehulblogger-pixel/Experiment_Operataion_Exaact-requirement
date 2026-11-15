@@ -44,7 +44,7 @@
       <?php if (!empty($d['rate'])): ?><span class="chip"><?= e($d['rate']) ?></span><?php endif; ?>
       <?php if ($dt !== ''): ?><span class="chip">📅 <?= e($dt) ?></span><?php endif; ?>
     </div>
-    <?php if ($d['total'] !== null): ?><div class="muted" style="font-size:13px;margin-top:8px">Estimated value: <strong style="color:var(--ink)">₹<?= number_format((int)$d['total']) ?></strong></div><?php endif; ?>
+    <?php if ($d['total'] !== null): ?><div class="muted" style="font-size:13px;margin-top:8px">Estimated value: <strong style="color:var(--ink)">₹<?= nf((int)$d['total']) ?></strong></div><?php endif; ?>
     <?php if (!empty($e['notes'])): ?><div class="muted" style="font-size:13px;margin-top:6px"><?= e($e['notes']) ?></div><?php endif; ?>
     <?php if (strtoupper((string)$e['status']) !== 'CANCELLED'): ?>
       <div style="margin-top:10px"><a class="btn sec" href="/pro/vouchers" style="font-size:13px">🧾 Raise / track voucher →</a></div>

@@ -8,11 +8,11 @@
 // paid (Razorpay, with the payment reference). Data: $inv.
 $e = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES);
 $inv = is_array($inv ?? null) ? $inv : [];
-$money = fn($n) => '₹' . number_format((int) $n);
+$money = fn($n) => '₹' . nf((int) $n);
 $isTax = (string) ($inv['invoice_no'] ?? '') !== '';
 $sup = (array) ($inv['supplier'] ?? []); $buy = (array) ($inv['buyer'] ?? []);
 $state = fn($c) => (defined('GST_STATES') && isset(GST_STATES[$c])) ? GST_STATES[$c] . ' (' . $c . ')' : (string) $c;
-$pct = fn($r) => rtrim(rtrim(number_format((float) $r, 2), '0'), '.') . '%';
+$pct = fn($r) => rtrim(rtrim(nf((float) $r, 2), '0'), '.') . '%';
 $lines = (array) ($inv['lines'] ?? []); $credit = (int) ($inv['credit'] ?? 0);
 $date = (string) ($inv['date'] ?? '');
 $amend = (array) ($inv['amendments'] ?? []);

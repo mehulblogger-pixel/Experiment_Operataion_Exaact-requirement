@@ -578,7 +578,7 @@ function saas_company_quote(array $mods, $seats, $period = 'month', $packs = 0) 
     if ($packs > 0 && !((float) $pb['storage_pack']['gb'] > 0 && (int) $pb['storage_pack'][$period] > 0)) { $missing[] = 'extra storage'; $packs = 0; }
     if ($packs > 0) {
         $amt = $packs * (int) $pb['storage_pack'][$period];
-        $lines[] = ['label' => $packs . ' × ' . rtrim(rtrim(number_format((float) $pb['storage_pack']['gb'], 2), '0'), '.') . ' GB extra storage', 'amount' => $amt];
+        $lines[] = ['label' => $packs . ' × ' . rtrim(rtrim(nf((float) $pb['storage_pack']['gb'], 2), '0'), '.') . ' GB extra storage', 'amount' => $amt];
         $total += $amt;
     }
     return ['period' => $period, 'currency' => $pb['currency'], 'lines' => $lines, 'total' => $total, 'seats' => $seats, 'packs' => $packs,
@@ -1456,8 +1456,8 @@ function ops_saas_admin($route, $method) {
                 // Tell the company, in writing.
                 $t = saas_tenant_get($key);
                 if ($t && (string) ($t['owner_email'] ?? '') !== '' && function_exists('ops_mail'))
-                    try { ops_mail((string) $t['owner_email'], 'Refund of ₹' . number_format((int) $res['amount']) . ' — ' . ($t['company'] ?: $key),
-                        '<p>Hello,</p><p>We have refunded <b>₹' . number_format((int) $res['amount']) . '</b> to the card / UPI your payment came from. '
+                    try { ops_mail((string) $t['owner_email'], 'Refund of ₹' . nf((int) $res['amount']) . ' — ' . ($t['company'] ?: $key),
+                        '<p>Hello,</p><p>We have refunded <b>₹' . nf((int) $res['amount']) . '</b> to the card / UPI your payment came from. '
                         . 'Banks usually show it within 5–7 working days.</p>'
                         . (!empty($res['effect']) ? '<p>' . htmlspecialchars((string) $res['effect']) . '</p>' : '')
                         . (!empty($res['credit_note']) ? '<p>GST credit note <b>' . htmlspecialchars((string) $res['credit_note']) . '</b> is in Your subscription → Payment history.</p>' : '')

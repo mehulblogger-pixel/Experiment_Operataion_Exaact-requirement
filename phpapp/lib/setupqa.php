@@ -48,7 +48,9 @@ function setupqa_save(array $set, array $post) {
         }
     }
     if ($changed && function_exists('act_log'))
-        act_log('SETTINGS', 0, 'SETUP', ucfirst($set['title']) . ' answered: ' . implode('; ', $changed), []);
+        // DEF-SAL-013 — one history line per answer. Joined into one line, several answers were cut
+        // off at the 255-character column and most never reached the history.
+        foreach ($changed as $one) act_log('SETTINGS', 0, 'SETUP', ucfirst($set['title']) . ' answered: ' . $one, ['body' => $one]);
     return $changed;
 }
 
@@ -315,7 +317,7 @@ function setupqa_sales_level_facts() {
     if (!function_exists('ops_all')) return [];
     $rows = ops_all("SELECT r.*, u.first_name, u.last_name, u.username FROM quote_approval_rules r
                      LEFT JOIN users u ON u.id = r.approver_user_id WHERE r.active=1 ORDER BY r.level, r.min_amount, r.id") ?: [];
-    $money = fn($n) => function_exists('fmoney') ? fmoney($n) : number_format((float) $n);
+    $money = fn($n) => function_exists('fmoney') ? fmoney($n) : nf((float) $n);
     $who = function ($r) {
         if (!empty($r['approver_user_id'])) return trim(($r['first_name'] ?? '') . ' ' . ($r['last_name'] ?? '')) ?: (string) $r['username'];
         $role = (string) ($r['approver_role'] ?? '');

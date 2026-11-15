@@ -51,7 +51,7 @@ foreach ($offices as $o) if ((int)$o['id'] === (int)$sel) $selOff = $o;
     <div class="master-head" style="margin-bottom:6px">
       <div><h3 class="tab-sub"><?= e($mName) ?> — <?= e($selOff['name'] ?? '') ?></h3>
         <p class="sub">Only what the <?= e(Tl('office')) ?> pays out. <strong>Do not enter salary here</strong> — salaries come off each person's own record, and entering them twice would double the cost.</p></div>
-      <div class="kpi-row" style="margin:0"><div class="kpi"><span class="k-lab">Entered this month</span><span class="k-val">₹<?= number_format((float)$spent, 2) ?></span></div></div>
+      <div class="kpi-row" style="margin:0"><div class="kpi"><span class="k-lab">Entered this month</span><span class="k-val">₹<?= nf((float)$spent, 2) ?></span></div></div>
     </div>
     <form method="post" action="/office-finance">
       <input type="hidden" name="_do" value="expenses">

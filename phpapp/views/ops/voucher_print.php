@@ -1,5 +1,5 @@
 <?php
-  $fmt = fn($n) => number_format((float)$n, 0);
+  $fmt = fn($n) => nf((float)$n, 0);
   $cols = array_keys(array_filter($sum['heads'], fn($x) => (float)$x != 0)); // heads that have any value
   $bal = $sum['grand'] - (float)$v['advance'] - (float)$v['office_incurred'];
   $natureMap = ['REVENUE'=>'Revenue','NONREV'=>'Non-Revenue','SUPPORT'=>'Support function','MD'=>'MD'];

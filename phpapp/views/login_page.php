@@ -56,6 +56,7 @@
   .help{font-size:12.5px;color:var(--muted);text-align:center;line-height:1.6;margin-top:20px}
   .ver{margin-top:20px;text-align:center;font-size:11.5px;color:var(--muted)}
   .err{background:#fee2e2;color:#991b1b;border-radius:10px;padding:10px 13px;font-size:13.5px;margin-bottom:16px}
+  .note{background:#fef3c7;color:#92400e;border-radius:10px;padding:10px 13px;font-size:13.5px;margin-bottom:16px}
   /* Mobile: the login box is the centrepiece. A slim brand strip on top, the sign-in
      card in the middle, and the pitch/footer below. We flatten the brand panel
      (display:contents) so its pieces become direct items of the column, then reorder
@@ -111,6 +112,7 @@
       <div class="hi">Welcome back</div>
       <h2>Sign in to continue</h2>
       <p class="s">Enter your credentials to reach your office dashboard.</p>
+      <?php if (!empty($note)): ?><div class="note" role="status"><?= e($note) ?></div><?php endif; ?>
       <?php if (!empty($error)): ?><div class="err"><?= e($error) ?></div><?php endif; ?>
       <form method="post" action="/login">
         <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">

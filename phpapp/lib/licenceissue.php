@@ -371,8 +371,8 @@ function buy_form_shell($rec, $install, $cfg) {
     echo '<input type="hidden" name="_csrf" value="' . $e($csrf) . '"><input type="hidden" name="install" value="' . $e($install) . '">';
     echo '<label style="' . $lab . '">How many people</label><input style="' . $inp . '" type="number" id="seats" name="seats" min="1" value="' . (int) ($rec['seats'] ?: 1) . '" oninput="c()">';
     echo '<label style="' . $lab . '">Billing</label><select style="' . $inp . '" id="period" name="period" onchange="c()">';
-    if ($pm > 0) echo '<option value="month">Monthly — ' . $e($sym) . number_format($pm) . ' / person / month</option>';
-    if ($py > 0) echo '<option value="year">Annual — ' . $e($sym) . number_format($py) . ' / person / year</option>';
+    if ($pm > 0) echo '<option value="month">Monthly — ' . $e($sym) . nf($pm) . ' / person / month</option>';
+    if ($py > 0) echo '<option value="year">Annual — ' . $e($sym) . nf($py) . ' / person / year</option>';
     echo '</select>';
     echo '<p style="margin:14px 0 4px">Total: <b id="t" style="font-size:18px"></b></p>';
     echo '<button type="submit" style="margin-top:10px;width:100%;padding:11px;background:#1e40af;color:#fff;border:0;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer">Pay with Razorpay →</button>';
@@ -387,8 +387,8 @@ function buy_pay_shell($amt, $order, $cfg, $install) {
     $csrf = function_exists('csrf_token') ? csrf_token() : '';
     buy_shell_open('Complete your payment');
     echo '<p style="color:#555">' . (int) $amt['seats'] . ' ' . ((int)$amt['seats'] === 1 ? 'person' : 'people') . ', ' . $e($amt['period'] === 'year' ? 'annual' : 'monthly')
-       . ' — <b>' . $e($sym . number_format((int) $amt['major'])) . '</b>. The Razorpay window should open automatically.</p>';
-    echo '<button id="paybtn" type="button" style="padding:10px 16px;background:#1e40af;color:#fff;border:0;border-radius:8px;font-weight:600;cursor:pointer">Pay ' . $e($sym . number_format((int) $amt['major'])) . '</button>';
+       . ' — <b>' . $e($sym . nf((int) $amt['major'])) . '</b>. The Razorpay window should open automatically.</p>';
+    echo '<button id="paybtn" type="button" style="padding:10px 16px;background:#1e40af;color:#fff;border:0;border-radius:8px;font-weight:600;cursor:pointer">Pay ' . $e($sym . nf((int) $amt['major'])) . '</button>';
     echo '<form method="post" action="/buy-verify" id="vf" style="display:none">';
     echo '<input type="hidden" name="_csrf" value="' . $e($csrf) . '"><input type="hidden" name="install" value="' . $e($install) . '">';
     echo '<input type="hidden" name="seats" value="' . (int) $amt['seats'] . '"><input type="hidden" name="period" value="' . $e($amt['period']) . '">';

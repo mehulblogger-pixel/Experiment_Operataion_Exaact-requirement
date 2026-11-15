@@ -39,7 +39,9 @@
   /* A jump from "On this quote" lands with the section's top in view, below the sticky top bar
      (owner, 14 Nov 2026: "When clicked on costing it takes one step down below the costing box"). */
   .panel[id], [id="revisions"]{scroll-margin-top:96px}
-  @media (max-width:760px){ .panel[id], [id="revisions"]{scroll-margin-top:124px} }   /* the phone's top bar is taller */
+  @media (max-width:760px){ .panel[id], [id="revisions"]{scroll-margin-top:176px} }   /* the phone's top bar is taller (~159px) */
+  /* DEF-SAL-027 — once the page has measured its own top bar, use that height, so a jump never hides a heading. */
+  :root[data-topbar-h] .panel[id], :root[data-topbar-h] [id="revisions"]{scroll-margin-top:calc(var(--topbar-h) + 16px)}
 </style>
 <nav class="quote-jump" aria-label="On this quote" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:12px 0 4px;font-size:13px">
   <span class="muted" style="font-size:12px">On this quote:</span>
@@ -315,7 +317,7 @@
   <span class="muted">🧮 Project costing:</span>
   <?php if ($pcRow): ?>
     <a class="btn small secondary" href="/project-costing?id=<?= (int)$pcRow['id'] ?>"><b><?= e($pcRow['code']) ?></b> — <?= e($pcRow['title']) ?></a>
-    <span class="muted" style="font-size:12.5px">revenue <?= fmoney_short($pcRow['exp_revenue']) ?> · margin <?= (float)$pcRow['exp_revenue']>0 ? number_format((float)$pcRow['exp_profit']/(float)$pcRow['exp_revenue']*100,1) : '0' ?>%</span>
+    <span class="muted" style="font-size:12.5px">revenue <?= fmoney_short($pcRow['exp_revenue']) ?> · margin <?= (float)$pcRow['exp_revenue']>0 ? nf((float)$pcRow['exp_profit']/(float)$pcRow['exp_revenue']*100,1) : '0' ?>%</span>
     <?php // Locked once this quotation is sent, won or has a contract (owner, 13 Nov 2026).
           $pcLock = function_exists('pc_quote_lock_reason') ? pc_quote_lock_reason($pcRow) : '';
           //  A revision being prepared whose costing is locked: one press for an editable copy (14 Nov 2026).
@@ -540,18 +542,18 @@
         <td><?= e($l['description'] ?: '—') ?></td>
         <td><?= e($l['location'] ?: '—') ?></td>
         <td><span class="pill <?= $l['order_type']==='OPEN'?'p-info':'p-mut' ?>"><?= e(lk_options_or('order_type', ORDER_TYPES)[$l['order_type']] ?? $l['order_type']) ?></span></td>
-        <td class="num"><?= rtrim(rtrim(number_format((float)$l['qty'],2),'0'),'.') ?></td>
+        <td class="num"><?= rtrim(rtrim(nf((float)$l['qty'],2),'0'),'.') ?></td>
         <td><?= e(lk_options_or('charge_unit', CHARGE_UNITS)[$l['unit']] ?? $l['unit']) ?></td>
-        <td class="num"><?= e(cur_sym()) ?><?= number_format((float)$l['rate'],0) ?></td>
-        <td class="num"><?= e(cur_sym()) ?><?= number_format((float)$l['amount'],0) ?></td>
+        <td class="num"><?= e(cur_sym()) ?><?= nf((float)$l['rate'], 2) ?></td>
+        <td class="num"><?= e(cur_sym()) ?><?= nf((float)$l['amount'], 2) ?></td>
       </tr>
       <?php endforeach; ?>
       <?php if (!$lines): ?><tr><td colspan="10" class="muted" style="text-align:center;padding:16px">No line items.</td></tr><?php endif; ?>
     </tbody>
     <tfoot>
-      <tr><td colspan="9" class="num muted">Subtotal</td><td class="num"><b><?= e(cur_sym()) ?><?= number_format((float)$q['subtotal'],0) ?></b></td></tr>
-      <tr><td colspan="9" class="num muted">GST (<?= (float)$q['gst_pct'] ?>%)</td><td class="num"><?= e(cur_sym()) ?><?= number_format((float)$q['gst_amount'],0) ?></td></tr>
-      <tr><td colspan="9" class="num"><b>Total</b></td><td class="num"><b><?= e(cur_sym()) ?><?= number_format((float)$q['total_amount'],0) ?></b></td></tr>
+      <tr><td colspan="9" class="num muted">Subtotal</td><td class="num"><b><?= e(cur_sym()) ?><?= nf((float)$q['subtotal'], 2) ?></b></td></tr>
+      <tr><td colspan="9" class="num muted">GST (<?= (float)$q['gst_pct'] ?>%)</td><td class="num"><?= e(cur_sym()) ?><?= nf((float)$q['gst_amount'], 2) ?></td></tr>
+      <tr><td colspan="9" class="num"><b>Total</b></td><td class="num"><b><?= e(cur_sym()) ?><?= nf((float)$q['total_amount'], 2) ?></b></td></tr>
     </tfoot>
   </table>
   </div>
@@ -577,8 +579,8 @@
   </div>
   <div class="chip-row" style="margin:8px 0">
     <span class="ct"><b><?= count($orderCalls) ?></b> <?= e(Tlp('call')) ?></span>
-    <span class="ct">Invoiced <b><?= e(cur_sym()) ?><?= number_format($cInv,0) ?></b></span>
-    <span class="ct">Received <b><?= e(cur_sym()) ?><?= number_format($cRec,0) ?></b></span>
+    <span class="ct">Invoiced <b><?= e(cur_sym()) ?><?= nf($cInv,0) ?></b></span>
+    <span class="ct">Received <b><?= e(cur_sym()) ?><?= nf($cRec,0) ?></b></span>
   </div>
   <table class="grid"><tr><th><?= e(T('call')) ?></th><th>Raised</th><th>Status</th><th class="num"><?= e(Tlp('job')) ?></th><th class="num">Invoiced</th><th class="num">Received</th></tr>
     <?php foreach ($orderCalls as $oc):
@@ -588,8 +590,8 @@
       <td class="muted"><?= e(fdate(substr((string)$oc['created_at'],0,10))) ?></td>
       <td><?= e($cst) ?></td>
       <td class="num"><?= (int)$oc['job_count'] ?></td>
-      <td class="num"><?= (float)$oc['invoiced']>0?cur_sym().number_format((float)$oc['invoiced'],0):'—' ?></td>
-      <td class="num"><?= (float)$oc['received']>0?cur_sym().number_format((float)$oc['received'],0):'—' ?></td>
+      <td class="num"><?= (float)$oc['invoiced']>0?cur_sym().nf((float)$oc['invoiced'],0):'—' ?></td>
+      <td class="num"><?= (float)$oc['received']>0?cur_sym().nf((float)$oc['received'],0):'—' ?></td>
     </tr>
     <?php endforeach; ?>
   </table>
@@ -602,9 +604,9 @@
 <div class="panel" data-tab="Jobs &amp; order">
   <h3 class="tab-sub" style="margin-top:0">Jobs &amp; revenue against this order</h3>
   <div class="chip-row" style="margin-bottom:8px">
-    <span class="ct">Ordered <b><?= e(cur_sym()) ?><?= number_format((float)$q['total_amount'],0) ?></b></span>
-    <span class="ct">Invoiced <b><?= e(cur_sym()) ?><?= number_format($oInv,0) ?></b></span>
-    <span class="ct">Received <b><?= e(cur_sym()) ?><?= number_format($oPaid,0) ?></b></span>
+    <span class="ct">Ordered <b><?= e(cur_sym()) ?><?= nf((float)$q['total_amount'], 2) ?></b></span>
+    <span class="ct">Invoiced <b><?= e(cur_sym()) ?><?= nf($oInv,0) ?></b></span>
+    <span class="ct">Received <b><?= e(cur_sym()) ?><?= nf($oPaid,0) ?></b></span>
     <span class="ct"><?= count($orderJobs) ?> job<?= count($orderJobs)==1?'':'s' ?></span>
   </div>
   <table class="grid"><tr><th>Job</th><th>Inspector</th><th>Stage</th><th class="num">Invoiced</th><th class="num">Received</th></tr>
@@ -612,8 +614,8 @@
     <tr><td><a href="/job?id=<?= (int)$oj['id'] ?>"><?= e($oj['job_code']) ?></a></td>
       <td><?= e($oj['inspector_name'] ?: '—') ?></td>
       <td><?= $oj['closed_flag']?'Closed':'Open' ?></td>
-      <td class="num"><?php $ojInv=(float)($oj['_invoiced'] ?? $oj['invoice_amount']); ?><?= $ojInv>0?cur_sym().number_format($ojInv,0):'—' ?></td>
-      <td class="num"><?= !empty($oj['payment_received'])?cur_sym().number_format((float)$oj['payment_amount'],0):'—' ?></td></tr>
+      <td class="num"><?php $ojInv=(float)($oj['_invoiced'] ?? $oj['invoice_amount']); ?><?= $ojInv>0?cur_sym().nf($ojInv,0):'—' ?></td>
+      <td class="num"><?= !empty($oj['payment_received'])?cur_sym().nf((float)$oj['payment_amount'],0):'—' ?></td></tr>
     <?php endforeach; ?>
   </table>
   <p class="muted" style="margin-top:6px">Revenue booked against quote <?= e($q['quote_no']) ?><?= $q['contract_number']?' / contract '.e($q['contract_number']):'' ?>. Link more jobs from the job form ("Against <?= e(Tl('quote')) ?> / contract").</p>
@@ -873,7 +875,7 @@
       <tr>
         <td><b><?= $rv['rev']>0?'Rev '.str_pad((string)$rv['rev'],2,'0',STR_PAD_LEFT):'Original' ?></b> <?= $rv['is_current']?'<span class="pill p-ok">current</span>':'' ?></td>
         <td><?= e(lk_options_or('quote_status', QUOTE_STATUS)[$rv['status']] ?? $rv['status']) ?></td>
-        <td class="num"><?= e(cur_sym()) ?><?= number_format((float)$rv['total_amount'],0) ?></td>
+        <td class="num"><?= e(cur_sym()) ?><?= nf((float)$rv['total_amount'],0) ?></td>
         <td><?= e(trim((string)($rv['created_by'] ?? '')) !== '' ? (string)$rv['created_by'] : '—') ?></td>
         <td class="muted"><?= e(substr((string)$rv['created_at'],0,10)) ?></td>
         <td><?= $rv['is_current']?'':'<a class="btn small secondary" href="/quote?id='.(int)$rv['id'].'">view</a>' ?></td>
@@ -982,7 +984,7 @@
     <form method="post" action="/quote-followup?id=<?= (int)$q['id'] ?>" style="display:flex;gap:6px;flex-wrap:wrap;align-items:end;margin-top:8px;border-top:1px solid var(--line);padding-top:10px">
       <input type="hidden" name="do" value="add">
       <div class="ff" style="margin:0"><label>Add a follow-up on</label><input class="form-control" type="date" name="due_date" value="<?= e(date('Y-m-d')) ?>"></div>
-      <div class="ff" style="margin:0;flex:1;min-width:160px"><label>Note</label><input class="form-control" name="note" placeholder="e.g. call the purchase head"></div>
+      <div class="ff" style="margin:0;flex:1;min-width:160px"><label>Note</label><input class="form-control" name="note" required placeholder="e.g. call the purchase head"></div>
       <button class="btn small secondary" type="submit">+ Add</button>
     </form>
   </div>
@@ -1020,7 +1022,7 @@
     <?php foreach ($files as $f): ?>
       <tr>
         <td><a href="/quote-file?id=<?= (int)$f['id'] ?>">⬇ <?= e($f['file_name']) ?></a>
-            <span class="muted" style="font-size:11px">(<?= e(number_format(((int)$f['b64len']) * 3 / 4 / 1024, 0)) ?> KB)</span></td>
+            <span class="muted" style="font-size:11px">(<?= e(nf(((int)$f['b64len']) * 3 / 4 / 1024, 0)) ?> KB)</span></td>
         <td><?= e($fileKinds[$f['kind']] ?? $f['kind']) ?></td>
         <td class="muted"><?= e($f['note'] ?: '—') ?></td>
         <td><?= $f['share_with_inspector'] ? '<span class="pill p-ok">yes</span>' : '<span class="pill p-mut">no</span>' ?></td>

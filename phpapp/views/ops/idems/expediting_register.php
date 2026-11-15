@@ -58,7 +58,7 @@
         <td><strong><?= e($r['irn']) ?></strong><?= $r['finalized'] ? ' 🔒' : '' ?></td>
         <td><?= e($r['vendor'] ?: '—') ?></td>
         <td><?php $poproj = trim(($r['po'] ? $r['po'] : '') . ($r['project'] ? ($r['po']?' · ':'').$r['project'] : '')); ?><?= e($poproj ?: '—') ?></td>
-        <td><?php if ($r['progress']!==null): $c=$progCol($r['progress']); ?><span style="font-weight:700;color:<?= $c ?>;font-variant-numeric:tabular-nums"><?= e(rtrim(rtrim(number_format((float)$r['progress'],1),'0'),'.')) ?><span class="muted" style="font-size:11px">%</span></span><?php else: ?><span class="muted">—</span><?php endif; ?></td>
+        <td><?php if ($r['progress']!==null): $c=$progCol($r['progress']); ?><span style="font-weight:700;color:<?= $c ?>;font-variant-numeric:tabular-nums"><?= e(rtrim(rtrim(nf((float)$r['progress'],1),'0'),'.')) ?><span class="muted" style="font-size:11px">%</span></span><?php else: ?><span class="muted">—</span><?php endif; ?></td>
         <td><span class="pill <?= $pc ?>"><?= e($pl) ?></span></td>
         <td><?php [$rk,$rl]=$riskPill($r['risk']??null); ?><span title="Predictive delivery risk<?= $r['risk_score']!==null?' — score '.(int)$r['risk_score'].'/100':'' ?>" style="font-weight:700;color:<?= $rk ?>"><?= e($rl) ?></span><?php if(($r['risk_score']??null)!==null && ($r['risk']??'')!=='LOW'): ?> <span class="muted" style="font-size:10px;font-variant-numeric:tabular-nums"><?= (int)$r['risk_score'] ?></span><?php endif; ?></td>
         <td><?= e($r['required'] ?: '—') ?></td>

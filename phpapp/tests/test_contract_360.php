@@ -45,4 +45,4 @@ t_ok(strpos($html, '/po?id=3') !== false, 'the purchase order links out');
 t_ok(strpos($html, '/call?id=11') !== false && strpos($html, 'CALL-360') !== false, 'the inspection call is listed and links out');
 t_ok(strpos($html, '/job?id=21') !== false && strpos($html, 'JOB-360') !== false, 'the job is listed and links out');
 t_ok(strpos($html, '/document?id=31') !== false && strpos($html, 'IRN-360') !== false, 'the report is listed and links out');
-t_ok(strpos($html, 'Outstanding') !== false && strpos($html, '100,000') !== false, 'the commercial rollup (invoiced / outstanding) is shown');
+t_ok(strpos($html, 'Outstanding') !== false && strpos($html, '1,00,000') !== false, 'the commercial rollup (invoiced / outstanding) is shown');

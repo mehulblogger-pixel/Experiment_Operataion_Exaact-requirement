@@ -7,7 +7,7 @@
 ?>
 <div class="master-head">
   <div><h1><?= e($po['po_number'] ?: 'Open order') ?></h1>
-    <p class="sub"><?= e($po['pdn'] ?: $po['pn']) ?> · <?= e(lk_options_or('po_type', PO_TYPES)[$po['po_type']] ?? $po['po_type']) ?><?php if ($po['value']!==null): ?> · <strong><?= e(cur_sym()) ?><?= number_format((float)$po['value'],0) ?></strong> (from line items)<?php endif; ?>
+    <p class="sub"><?= e($po['pdn'] ?: $po['pn']) ?> · <?= e(lk_options_or('po_type', PO_TYPES)[$po['po_type']] ?? $po['po_type']) ?><?php if ($po['value']!==null): ?> · <strong><?= e(cur_sym()) ?><?= nf((float)$po['value'],0) ?></strong> (from line items)<?php endif; ?>
       <?php $psb = array_filter(explode(',', $po['sbu'] ?? '')); if ($psb): ?> · <?= e(T("sbu")) ?>: <?= e(implode(', ', array_map(fn($s)=>lk_options_or('sbu',OPS_SBUS)[$s]??$s, $psb))) ?><?php endif; ?></p></div>
   <div class="row-actions" style="display:flex;gap:6px;flex-wrap:wrap">
     <a class="btn secondary" href="/partner?id=<?= (int)$po['partner_id'] ?>&amp;tab=purchase_orders">← Purchase orders — <?= e($po['pdn'] ?: $po['pn']) ?></a>
@@ -61,7 +61,7 @@
           <option value="<?= (int)$pq['id'] ?>"<?= (int)$pq['id'] === (int)($po['quotation_id'] ?? 0) ? ' selected' : '' ?>>
             <?= e($pq['quote_no']) ?><?= (int)$pq['rev'] ? ' R' . (int)$pq['rev'] : '' ?>
             · <?= (int)$pq['line_count'] ?> line(s)
-            · <?= e(cur_sym()) ?><?= number_format((float)$pq['total_amount'], 0) ?>
+            · <?= e(cur_sym()) ?><?= nf((float)$pq['total_amount'], 0) ?>
             <?= $pq['subject'] ? ' — ' . e(mb_strimwidth($pq['subject'], 0, 40, '…')) : '' ?>
           </option>
         <?php endforeach; ?>
@@ -94,14 +94,14 @@
     <td><?= (int)$li['manpower'] ?: '—' ?></td>
     <td><?= e($li['quantity']) ?></td><td><?= e($li['consumed']) ?></td><td><strong class="<?= $bal<=0?'':'' ?>"><?= e($bal) ?></strong></td>
     <td><?= $li['rate']!==null?cur_sym().e($li['rate']):'—' ?></td>
-    <td><?= e(cur_sym()) ?><?= number_format((float)$li['base_amount'],0) ?></td>
+    <td><?= e(cur_sym()) ?><?= nf((float)$li['base_amount'],0) ?></td>
     <td><?= e($li['gst_pct']) ?>%</td>
-    <td><?= e(cur_sym()) ?><?= number_format((float)$li['tax_amount'],0) ?></td>
-    <td><strong><?= e(cur_sym()) ?><?= number_format((float)$li['total_amount'],0) ?></strong></td>
+    <td><?= e(cur_sym()) ?><?= nf((float)$li['tax_amount'],0) ?></td>
+    <td><strong><?= e(cur_sym()) ?><?= nf((float)$li['total_amount'],0) ?></strong></td>
   </tr>
   <?php endforeach; ?>
   <?php if (!$items): ?><tr><td colspan="12">No line items yet.</td></tr>
-  <?php else: ?><tr><td colspan="11" style="text-align:right"><strong>PO total</strong></td><td><strong><?= e(cur_sym()) ?><?= number_format($gt,0) ?></strong></td></tr><?php endif; ?>
+  <?php else: ?><tr><td colspan="11" style="text-align:right"><strong>PO total</strong></td><td><strong><?= e(cur_sym()) ?><?= nf($gt,0) ?></strong></td></tr><?php endif; ?>
 </table>
 </div>
 

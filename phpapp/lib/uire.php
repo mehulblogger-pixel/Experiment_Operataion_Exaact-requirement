@@ -471,7 +471,7 @@ function uire_inspection_compare($doc, $prev) {
     if ($r0 !== '' || $r1 !== '') $lines[] = 'Result: ' . ($r0 ?: '—') . ' → ' . ($r1 ?: '—') . (($r0 && $r1 && $r0 !== $r1) ? ' (changed)' : '');
     foreach (['accepted_qty'=>'Accepted','rejected_qty'=>'Rejected'] as $k=>$lab) {
         $a=$n($pd[$k] ?? ''); $b=$n($d[$k] ?? '');
-        if ($a !== null || $b !== null) { $delta = ($a!==null&&$b!==null)?($b-$a):null; $lines[] = "$lab: ".($a??'—')." → ".($b??'—').($delta!==null&&$delta!=0?' ('.($delta>0?'+':'').rtrim(rtrim(number_format($delta,2),'0'),'.').')':''); }
+        if ($a !== null || $b !== null) { $delta = ($a!==null&&$b!==null)?($b-$a):null; $lines[] = "$lab: ".($a??'—')." → ".($b??'—').($delta!==null&&$delta!=0?' ('.($delta>0?'+':'').rtrim(rtrim(nf($delta,2),'0'),'.').')':''); }
     }
     return ['prev_irn'=>$prev['irn'] ?? '', 'prev_date'=>($prev['issue_date'] ?? ''), 'lines'=>$lines];
 }

@@ -87,7 +87,7 @@ function connect_engagement_billable($requirementId) {
             $qq = round($q * $positions, 2);
             $qty += $qq; $amount += round($qq * $r, 2);
             $unit = (string)($e['rate_unit'] ?: 'day');
-            $parts[] = trim((string)$e['subject_name']) . ' ' . rtrim(rtrim(number_format($q, 2), '0'), '.') . ' ' . $unit . '(s)' . ($cancelled ? ' worked' : '') . ' @ ' . rtrim(rtrim(number_format($r, 2), '0'), '.');
+            $parts[] = trim((string)$e['subject_name']) . ' ' . rtrim(rtrim(nf($q, 2), '0'), '.') . ' ' . $unit . '(s)' . ($cancelled ? ' worked' : '') . ' @ ' . rtrim(rtrim(nf($r, 2), '0'), '.');
         }
         //  Every booking ended and nothing was worked (a no-show): nothing to bill.
         if (!$live && $qty <= 0) return 0;
@@ -102,7 +102,7 @@ function connect_engagement_billable($requirementId) {
                 'rate'            => round($amount / $qty, 2),
                 'amount'          => round($amount, 2),
                 'calc_rule'       => count($parts) === 1 && $single && strtoupper((string)$single['status']) !== 'CANCELLED'
-                    ? 'Marketplace booking ' . (string)($req['ref_code'] ?? '') . ' — ' . rtrim(rtrim(number_format((float)$single['quantity'], 2), '0'), '.') . ' ' . ($single['rate_unit'] ?: 'day') . '(s) × ' . $positions . ' position(s) (finance attests the invoice)'
+                    ? 'Marketplace booking ' . (string)($req['ref_code'] ?? '') . ' — ' . rtrim(rtrim(nf((float)$single['quantity'], 2), '0'), '.') . ' ' . ($single['rate_unit'] ?: 'day') . '(s) × ' . $positions . ' position(s) (finance attests the invoice)'
                     : 'Marketplace bookings ' . (string)($req['ref_code'] ?? '') . ' — ' . implode('; ', $parts) . ' × ' . $positions . ' position(s) (finance attests the invoice)',
             ]);
         }

@@ -69,7 +69,7 @@ $stTone = ['DRAFT'=>'p-mut','SUBMITTED'=>'p-warn','APPROVED'=>'p-ok','REJECTED'=
         <td style="text-align:right"><?= fmoney_short($rev) ?></td>
         <td style="text-align:right"><?= fmoney_short($r['exp_cost']) ?></td>
         <td style="text-align:right;color:var(--<?= $pf>=0?'ok':'bad' ?>)"><?= fmoney_short($pf) ?></td>
-        <td style="text-align:right"><?= number_format($mg,1) ?>%</td>
+        <td style="text-align:right"><?= nf($mg,1) ?>%</td>
         <td><span class="pill <?= $stTone[$r['status']] ?? 'p-mut' ?>"><?= $e(PC_STATUS[$r['status']] ?? $r['status']) ?></span></td>
       </tr>
     <?php endforeach; ?>

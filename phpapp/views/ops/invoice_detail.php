@@ -143,12 +143,12 @@
       <?php endif; ?>
       <div><span class="k">Invoice total</span><span><b><?= e(fmoney($inv['total'])) ?></b></span></div>
       <?php if ((float)($inv['tds_amount'] ?? 0) > 0): ?>
-        <div><span class="k">Less TDS @ <?= e(rtrim(rtrim(number_format((float)$inv['tds_pct'],2),'0'),'.')) ?>%</span><span>− <?= e(fmoney($inv['tds_amount'])) ?></span></div>
+        <div><span class="k">Less TDS @ <?= e(rtrim(rtrim(nf((float)$inv['tds_pct'],2),'0'),'.')) ?>%</span><span>− <?= e(fmoney($inv['tds_amount'])) ?></span></div>
         <div><span class="k">Net payable</span><span><b><?= e(fmoney(function_exists('books_net_payable') ? books_net_payable($inv) : ((float)$inv['total'] - (float)$inv['tds_amount']))) ?></b></span></div>
       <?php endif; ?>
       <?php $msRetD = function_exists('ms_invoice_retention') ? (ms_invoice_retention([(int)$inv['id']])[(int)$inv['id']] ?? null) : null;
         if ($msRetD && $msRetD['amount'] > 0): ?>
-        <div><span class="k">Retention held (<?= e(rtrim(rtrim(number_format((float)$msRetD['pct'],2),'0'),'.')) ?>%)</span><span><?= e(fmoney($msRetD['amount'])) ?> — <?= $msRetD['due_on'] !== '' ? 'payable since ' . e(fdate($msRetD['due_on'])) : 'payable when “' . e($msRetD['release']) . '” is reached' ?></span></div>
+        <div><span class="k">Retention held (<?= e(rtrim(rtrim(nf((float)$msRetD['pct'],2),'0'),'.')) ?>%)</span><span><?= e(fmoney($msRetD['amount'])) ?> — <?= $msRetD['due_on'] !== '' ? 'payable since ' . e(fdate($msRetD['due_on'])) : 'payable when “' . e($msRetD['release']) . '” is reached' ?></span></div>
       <?php endif; ?>
     </div>
     <?php if ($isLive): ?>

@@ -2,7 +2,7 @@
 // Phase 3 §20 — Command Centre. Business, money and platform health as three separate bands
 // (never blended into one score). Read-only; composes attention_summary + financial_rollup + system_status.
 $sevTone = ['ok'=>'#15803d', 'warn'=>'#b45309', 'bad'=>'var(--bad,#c0392b)', 'info'=>'#2563eb', 'critical'=>'var(--bad,#c0392b)'];
-$m = fn($n) => function_exists('fmoney_short') ? fmoney_short($n) : ('₹' . number_format((float)$n));
+$m = fn($n) => function_exists('fmoney_short') ? fmoney_short($n) : ('₹' . nf((float)$n));
 $worst = $health_worst ?? 'ok';
 $worstLabel = ['ok'=>'All systems healthy', 'warn'=>'Some items need attention', 'bad'=>'Action needed'][$worst] ?? 'Healthy';
 $attnHi = 0; foreach (($business ?? []) as $b) if (($b['sev'] ?? '') === 'bad' || ($b['sev'] ?? '') === 'warn') $attnHi++;

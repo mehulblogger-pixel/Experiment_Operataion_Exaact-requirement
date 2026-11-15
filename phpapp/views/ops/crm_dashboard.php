@@ -37,8 +37,8 @@
   <div class="qcard"><div class="qic">◷</div><div class="qn"><?= $h['cycle_days'] === null ? '—' : (int)$h['cycle_days'] ?></div><div class="ql">Days to win, average</div></div>
   <?php // Effort, in man-days: what winning costs, and what the losses cost. ?>
   <?php $ef = $effort ?? []; ?>
-  <div class="qcard"><div class="qic">⏱</div><div class="qn"><?= ($ef['avg_win_md'] ?? null) === null ? '—' : number_format($ef['avg_win_md'], 1) ?></div><div class="ql">Man-days to win, average</div></div>
-  <div class="qcard <?= !empty($ef['lost_timed']) && ($ef['lost_md'] ?? 0) >= 1 ? 'tone-bad' : '' ?>"><div class="qic">⌛</div><div class="qn"><?= empty($ef['lost_timed']) ? '—' : number_format($ef['lost_md'], 1) ?></div><div class="ql">Man-days on deals lost<?= !empty($ef['lost_n']) ? ' · ' . (int)$ef['lost_n'] . ' deal' . ((int)$ef['lost_n'] === 1 ? '' : 's') : '' ?></div></div>
+  <div class="qcard"><div class="qic">⏱</div><div class="qn"><?= ($ef['avg_win_md'] ?? null) === null ? '—' : nf($ef['avg_win_md'], 1) ?></div><div class="ql">Man-days to win, average</div></div>
+  <div class="qcard <?= !empty($ef['lost_timed']) && ($ef['lost_md'] ?? 0) >= 1 ? 'tone-bad' : '' ?>"><div class="qic">⌛</div><div class="qn"><?= empty($ef['lost_timed']) ? '—' : nf($ef['lost_md'], 1) ?></div><div class="ql">Man-days on deals lost<?= !empty($ef['lost_n']) ? ' · ' . (int)$ef['lost_n'] . ' deal' . ((int)$ef['lost_n'] === 1 ? '' : 's') : '' ?></div></div>
   <div class="qcard <?= $h['stalled'] ? 'tone-bad' : '' ?>"><div class="qic">!</div><div class="qn"><?= (int)$h['stalled'] ?></div><div class="ql">Stopped moving</div></div>
   <div class="qcard <?= $h['closing_soon'] ? 'tone-warn' : '' ?>"><div class="qic">▸</div><div class="qn"><?= (int)$h['closing_soon'] ?></div><div class="ql">Due to close in 30 days</div></div>
 </div>
@@ -133,10 +133,10 @@
         <h3 style="margin-top:0">Why we lose</h3>
         <table class="dt">
           <caption class="sr-only">Loss reasons</caption>
-          <thead><tr><th scope="col">Reason</th><th scope="col" class="num">Deals</th><th scope="col" class="num">Value</th></tr></thead>
+          <thead><tr><th scope="col">Reason</th><th scope="col" class="num">Deals</th><th scope="col" class="num">Leads</th><th scope="col" class="num">Value</th></tr></thead>
           <tbody>
           <?php foreach ($losses as $l): ?>
-            <tr><td><?= e($l['reason']) ?></td><td class="num"><?= (int)$l['n'] ?></td><td class="num"><?= e(fmoney($l['value'])) ?></td></tr>
+            <tr><td><?= e($l['reason']) ?></td><td class="num"><?= (int)$l['n'] ?></td><td class="num"><?= (int)($l['leads'] ?? 0) ?></td><td class="num"><?= e(fmoney($l['value'])) ?></td></tr>
           <?php endforeach; ?>
           </tbody>
         </table>

@@ -5,7 +5,7 @@
   // insight up top, then scannable tiles and bars; plain words, semantic colour.
   $head = $head ?? []; $demand = $demand ?? []; $funnel = $funnel ?? []; $rates = $rates ?? [];
   $growth = $growth ?? []; $verif = $verif ?? []; $locs = $locs ?? []; $insight = $insight ?? '';
-  $inr = fn($n) => '₹' . number_format((int)$n);
+  $inr = fn($n) => '₹' . nf((int)$n);
   $dsMax = 1; foreach ($demand as $d) { $dsMax = max($dsMax, (int)$d['demand'], (int)$d['supply']); }
   $fMax = 1; foreach ($funnel as $f) { $fMax = max($fMax, (int)$f['value']); }
   $gMax = 1; foreach ($growth as $g) { $gMax = max($gMax, (int)$g['value']); }

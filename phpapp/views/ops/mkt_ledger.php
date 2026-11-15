@@ -5,7 +5,7 @@
   $from = $from ?? date('Y-m-01'); $to = $to ?? date('Y-m-d');
   $totals = $totals ?? []; $streams = $streams ?? []; $takeRate = (float)($takeRate ?? 0);
   $recent = $recent ?? []; $cats = $cats ?? []; $streamLabels = $streamLabels ?? []; $cur = $currency ?? '₹';
-  $money = fn($n) => e($cur) . number_format((float)$n, 0);
+  $money = fn($n) => e($cur) . nf((float)$n, 0);
 ?>
 <div class="master-head">
   <div><h1>Financial control</h1>

@@ -4,7 +4,7 @@
   // disagrees with what a committed cost run allocated to the ledger, so finance can drive
   // the drift to green. Changes nothing — no figure moves, no reader switches.
   $summary = $summary ?? []; $rows = $rows ?? []; $tol = $tol ?? 1;
-  $m = fn($n) => function_exists('fmoney_short') ? fmoney_short($n) : number_format((float)$n, 2);
+  $m = fn($n) => function_exists('fmoney_short') ? fmoney_short($n) : nf((float)$n, 2);
   $green = !empty($summary['green']);
   $mode = $mode ?? 'reconciled'; $modes = $modes ?? [];
 ?>

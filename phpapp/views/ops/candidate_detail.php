@@ -83,7 +83,7 @@ if ($dupes): ?>
     <div><span class="k">Agency</span><span class="v"><?= e($cand['agency'] ?: '—') ?></span></div>
     <div><span class="k">Email</span><span class="v"><?= e($cand['email'] ?: '—') ?></span></div>
     <div><span class="k">Mobile</span><span class="v"><?= e($cand['mobile'] ?: '—') ?></span></div>
-    <div><span class="k">Expected rate</span><span class="v"><?= $cand['expected_rate']>0 ? cur_sym().number_format((float)$cand['expected_rate'],0).' ('.e(lk_options_or('rate_type', RATE_TYPES)[$cand['rate_type']] ?? $cand['rate_type']).')' : '—' ?></span></div>
+    <div><span class="k">Expected rate</span><span class="v"><?= $cand['expected_rate']>0 ? cur_sym().nf((float)$cand['expected_rate'],0).' ('.e(lk_options_or('rate_type', RATE_TYPES)[$cand['rate_type']] ?? $cand['rate_type']).')' : '—' ?></span></div>
     <div><span class="k">CV received</span><span class="v"><?= e($cand['cv_received_date'] ?: '—') ?></span></div>
     <div><span class="k">CV file</span><span class="v"><?= $cand['cv_link'] ? '<a href="'.e($cand['cv_link']).'" target="_blank" rel="noopener">Open CV ↗</a>' : '—' ?></span></div>
     <?php if (function_exists('custom_display')) foreach (custom_display('candidate', $cand['id']) as $cf): ?>
@@ -269,7 +269,7 @@ if (!empty($asgComm) && !empty($linkReq) && $seeSal):
     return '<div class="kpi"><div class="k">'.$label.'</div>'
       .'<div class="v">'.fmoney_short($t['rev']).'</div>'
       .'<div class="d">cost '.fmoney_short($t['cost']).' · <b class="'.$mc.'">'.fmoney_short($t['profit']).'</b> · '
-      .($m>=0?'':'−').number_format(abs($m),1).'% margin</div></div>';
+      .($m>=0?'':'−').nf(abs($m),1).'% margin</div></div>';
   };
   $vChip = function($v, $unit='') use ($sym) {
     if ($v === null) return '';
@@ -279,7 +279,7 @@ if (!empty($asgComm) && !empty($linkReq) && $seeSal):
 ?>
 <div class="panel">
   <h3 class="tab-sub" style="margin-top:0">Placement commercials
-    <span class="muted">— against <a href="/requisition?id=<?= (int)$linkReq['id'] ?>"><?= e($linkReq['req_code']) ?></a> · <?= rtrim(rtrim(number_format($C['months'],2),'0'),'.') ?> mo · <?= e($basisLbl) ?></span>
+    <span class="muted">— against <a href="/requisition?id=<?= (int)$linkReq['id'] ?>"><?= e($linkReq['req_code']) ?></a> · <?= rtrim(rtrim(nf($C['months'],2),'0'),'.') ?> mo · <?= e($basisLbl) ?></span>
     <?php if ($C['status'] === 'APPROVED'): ?><span class="pill p-ok" style="font-size:11px;margin-left:6px">Approved</span>
     <?php elseif ($C['status'] === 'ACTUAL'): ?><span class="pill p-info" style="font-size:11px;margin-left:6px">Actuals in</span>
     <?php else: ?><span class="pill p-warn" style="font-size:11px;margin-left:6px">Estimate only</span><?php endif; ?>
@@ -313,9 +313,9 @@ if (!empty($asgComm) && !empty($linkReq) && $seeSal):
     <summary style="cursor:pointer;font-weight:600;font-size:13px"><?= $C['approved'] ? 'Revise approved commercials' : 'Approve the commercials for this placement' ?></summary>
     <form method="post" action="/candidate-commercial?id=<?= (int)$cand['id'] ?>" style="margin-top:8px">
       <div class="form-grid">
-        <div class="ff"><label>Billing rate to client (<?= e($sym) ?>)</label><input class="form-control" type="number" step="0.01" name="bill_rate" value="<?= e($asgV('bill_rate', $C['bill_rate']>0 ? number_format($C['bill_rate'],2,'.','') : '')) ?>" placeholder="<?= e(number_format((float)($linkReq['billing_rate'] ?? 0),0)) ?>"></div>
+        <div class="ff"><label>Billing rate to client (<?= e($sym) ?>)</label><input class="form-control" type="number" step="0.01" name="bill_rate" value="<?= e($asgV('bill_rate', $C['bill_rate']>0 ? number_format($C['bill_rate'],2,'.','') : '')) ?>" placeholder="<?= e(nf((float)($linkReq['billing_rate'] ?? 0),0)) ?>"></div>
         <div class="ff"><label>Basis</label><select class="form-control" name="bill_basis"><?php foreach (REQ_RATE_BASIS as $k=>$v): ?><option value="<?= e($k) ?>"<?= $asgV('bill_basis', $C['basis'])===$k?' selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
-        <div class="ff"><label>Our cost — monthly (<?= e($sym) ?>)</label><input class="form-control" type="number" step="0.01" name="cost_rate" value="<?= e($asgV('cost_rate', $C['cost_rate']>0 ? number_format($C['cost_rate'],2,'.','') : '')) ?>" placeholder="<?= e(number_format((float)($linkReq['budgeted_cost'] ?? 0),0)) ?>"></div>
+        <div class="ff"><label>Our cost — monthly (<?= e($sym) ?>)</label><input class="form-control" type="number" step="0.01" name="cost_rate" value="<?= e($asgV('cost_rate', $C['cost_rate']>0 ? number_format($C['cost_rate'],2,'.','') : '')) ?>" placeholder="<?= e(nf((float)($linkReq['budgeted_cost'] ?? 0),0)) ?>"></div>
         <div class="ff"><label>Duration (months)</label><input class="form-control" type="number" step="0.01" name="months" value="<?= e($asgV('months', $C['months']>0 ? rtrim(rtrim(number_format($C['months'],2,'.',''),'0'),'.') : '')) ?>"></div>
         <div class="ff"><label>One-time cost (<?= e($sym) ?>) <span class="muted">placement fee etc.</span></label><input class="form-control" type="number" step="0.01" name="onetime" value="<?= e($asgV('onetime', (float)$C['onetime']>0 ? number_format((float)$C['onetime'],2,'.','') : '')) ?>"></div>
         <div class="ff"><label>Approval ref <span class="muted">optional</span></label><input class="form-control" name="ref" maxlength="60" value="<?= e($asgV('ref', $C['ref'])) ?>"></div>
@@ -355,7 +355,7 @@ if (!empty($asgPacket) && $seeSal && !empty($asgPacket['checks'])): $P = $asgPac
     <?php endforeach; ?>
   </div>
   <?php if ($P['ready']): ?>
-    <p class="msg msg-success" style="margin-top:10px">This placement is ready to invoice at <?= e(cur_sym()).number_format($P['commercials']['appr']['rev'],0) ?> revenue<?php if (!empty($P['job'])): ?> — <a href="/job?id=<?= (int)$P['job']['id'] ?>">open the deputation</a> to raise the client bill<?php endif; ?>.</p>
+    <p class="msg msg-success" style="margin-top:10px">This placement is ready to invoice at <?= e(cur_sym()).nf($P['commercials']['appr']['rev'],0) ?> revenue<?php if (!empty($P['job'])): ?> — <a href="/job?id=<?= (int)$P['job']['id'] ?>">open the deputation</a> to raise the client bill<?php endif; ?>.</p>
   <?php else: ?>
     <p class="muted" style="font-size:12px;margin-top:8px">Clear the open items above, then this placement can be handed to billing. Chargeable-expense bills are enforced on the deputation itself.</p>
   <?php endif; ?>

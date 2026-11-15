@@ -56,7 +56,7 @@ $o = offer_get($oid);
 t_ok($ok, 'an approved offer can be issued');
 t_eq($o['status'], 'ISSUED', 'the offer is now ISSUED');
 t_ok(strpos((string)$o['letter_html'], 'Ravi') !== false, 'the offer letter is generated with the candidate name');
-t_ok(strpos((string)$o['letter_html'], number_format((float)sal_current($cid)['gross_ctc'], 0)) !== false, 'the offer letter shows the CTC');
+t_ok(strpos((string)$o['letter_html'], nf((float)sal_current($cid)['gross_ctc'], 0)) !== false, 'the offer letter shows the CTC');
 
 // Issuing coarse-syncs the candidate legacy stage to OFFERED (already there here).
 t_eq(ops_one("SELECT stage FROM candidates WHERE id=?", [$cid])['stage'], 'OFFERED', 'the candidate stage reflects OFFERED');

@@ -119,7 +119,7 @@ function _rx_offers($f, $salOK) {
             (string)($o['approved_by'] ?? ''), fdate((string)($o['issued_at'] ?? '')), $decided,
             fdate((string)($o['created_at'] ?? '')),
         ];
-        if ($salOK) array_splice($row, 4, 0, [number_format((float)($o['ctc'] ?? 0), 0)]);
+        if ($salOK) array_splice($row, 4, 0, [nf((float)($o['ctc'] ?? 0), 0)]);
         $rows[] = $row;
     }
     return $rows;

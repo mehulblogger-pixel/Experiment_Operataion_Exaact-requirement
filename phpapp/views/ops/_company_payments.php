@@ -5,7 +5,7 @@
 // mistake or paid twice — within the refund window; our own error — any time.
 // Data: $pay (saas_company_payments()), $sk (company key, escaped), $e, $modules.
 $pay = is_array($pay ?? null) ? $pay : ['ok' => false];
-$money = fn($n) => '₹' . number_format((int) $n);
+$money = fn($n) => '₹' . nf((int) $n);
 $fd = fn($d) => function_exists('fdate') ? fdate(substr((string) $d, 0, 10)) : substr((string) $d, 0, 10);
 $days = function_exists('saas_refund_days') ? saas_refund_days() : 3;
 $dupDays = function_exists('saas_refund_dup_days') ? saas_refund_dup_days() : 15;

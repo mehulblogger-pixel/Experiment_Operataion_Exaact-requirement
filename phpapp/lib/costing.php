@@ -844,7 +844,7 @@ function ops_cost_run($method) {
             redirect($back);
         }
         $res = costing_run($yr, $mon, $oid, true);
-        flash('₹' . number_format($res['total'], 2) . ' allocated for ' . $mName . '.'
+        flash('₹' . nf($res['total'], 2) . ' allocated for ' . $mName . '.'
             . ($res['warnings'] ? ' ' . count($res['warnings']) . ' thing(s) worth a look.' : ''));
         redirect($back);
     }
@@ -1018,7 +1018,7 @@ function cost_dualwrite_render($jobId) {
     $c = cost_sources((int)$jobId);
     if (!$c['both_sided']) return;
     $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
-    $m = fn($n) => function_exists('fmoney_short') ? fmoney_short($n) : number_format((float)$n, 2);
+    $m = fn($n) => function_exists('fmoney_short') ? fmoney_short($n) : nf((float)$n, 2);
     $eng = function_exists('Tl') ? Tl('engineer') : 'engineer';
     $job = function_exists('Tl') ? Tl('job') : 'job';
     echo '<div class="msg msg-warning" style="margin:0 0 10px">⚠ Reimbursables are recorded on <strong>both</strong> the closure expenses ('

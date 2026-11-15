@@ -236,7 +236,7 @@ function billunit_label($e) {
         case 'MANMONTH':
             $q = (float)($e['qty'] ?? 0);
             return 'Man-month — ' . $code . ' — ' . ($from !== '' ? date('F Y', strtotime($from)) : '') . ' (' . $fd($from) . ' to ' . $fd($to) . ')'
-                 . (abs($q - 1) > 0.0001 ? ' — ' . rtrim(rtrim(number_format($q, 4), '0'), '.') . ' month' : '');
+                 . (abs($q - 1) > 0.0001 ? ' — ' . rtrim(rtrim(nf($q, 4), '0'), '.') . ' month' : '');
         case 'MILESTONE':
             return 'Milestone — ' . ($code !== '' ? $code . ' — ' : '') . (string)($e['calc_rule'] ?? '');
         case 'ADJUSTMENT':
@@ -722,7 +722,7 @@ function billunit_add_adjustment($jobId, $amount, $reason) {
     ]);
     if (!$id) return 'The charge could not be recorded.';
     billunit_mark_due($id, date('Y-m-d'), 'Charge entered by finance');
-    if (function_exists('act_log')) try { act_log('JOB', (int)$jobId, 'BILLING_CHARGE', number_format($amount, 2) . ' — ' . $reason); } catch (Throwable $e) {}
+    if (function_exists('act_log')) try { act_log('JOB', (int)$jobId, 'BILLING_CHARGE', nf($amount, 2) . ' — ' . $reason); } catch (Throwable $e) {}
     return '';
 }
 

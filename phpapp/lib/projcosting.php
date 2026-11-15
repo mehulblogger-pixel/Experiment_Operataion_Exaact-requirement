@@ -692,11 +692,11 @@ function pc_margin_check($line, $header, $c = null) {
     $m = round(($baseRev - (float)$c['cost']) / $baseRev * 100, 2);
     $gap = round($m - $tm, 2);
     if (abs($gap) <= PC_MARGIN_BAND + 0.005) return null;
-    $p = fn($v) => rtrim(rtrim(number_format($v, 1), '0'), '.') . '%';
+    $p = fn($v) => rtrim(rtrim(nf($v, 1), '0'), '.') . '%';
     $side = $gap > 0 ? 'HIGH' : 'LOW';
     return ['side' => $side, 'margin' => $m, 'target' => $tm, 'gap' => $gap,
             'words' => ($side === 'HIGH' ? 'Margin too high: ' : 'Margin too low: ') . $p($m) . ' against the ' . $p($tm) . ' set — '
-                     . rtrim(rtrim(number_format(abs($gap), 1), '0'), '.') . ' points ' . ($side === 'HIGH' ? 'above' : 'below')
+                     . rtrim(rtrim(nf(abs($gap), 1), '0'), '.') . ' points ' . ($side === 'HIGH' ? 'above' : 'below')
                      . ' (allowed: ' . $p(max(0, $tm - PC_MARGIN_BAND)) . ' to ' . $p($tm + PC_MARGIN_BAND) . ', before negotiation padding).'];
 }
 //  Every role on the costing that is outside the band: [[role_label, check], …]
@@ -866,7 +866,7 @@ function pc_quote_candidates(array $h) {
 function pc_candidate_words(array $c) {
     $st = function_exists('lk_options_or') && defined('QUOTE_STATUS') ? (lk_options_or('quote_status', QUOTE_STATUS)[$c['status']] ?? $c['status']) : $c['status'];
     $why = ['inquiry' => 'same enquiry', 'lead' => 'same lead', 'deal' => 'same deal', 'client' => 'same client — check it is the same job'][$c['match']] ?? '';
-    return $c['quote_no'] . ' revision ' . (int)$c['rev'] . ' · ' . $st . ' · ' . (function_exists('fmoney') ? fmoney((float)$c['subtotal']) : number_format((float)$c['subtotal'])) . ' before tax'
+    return $c['quote_no'] . ' revision ' . (int)$c['rev'] . ' · ' . $st . ' · ' . (function_exists('fmoney') ? fmoney((float)$c['subtotal']) : nf((float)$c['subtotal'])) . ' before tax'
          . (trim((string)$c['subject']) !== '' ? ' · ' . $c['subject'] : '') . ' (' . $why . ')';
 }
 //  "Revise Q-…": the next revision of that quotation, priced by this costing — one line per role at its
@@ -1001,7 +1001,7 @@ function pc_raise_hiring_request($cid, $lineId) {
     $basis = pc_line_basis($ln, $h);
     $months = $basis === 'LONG' && (float)$ln['boq_qty'] > 0 ? round((float)$ln['boq_qty'] / pc_line_people($ln), 2) : null;
     $headsTxt = [];
-    foreach ((array)$c['heads'] as $k => $v) $headsTxt[] = ($c['labels'][$k] ?? $k) . ': ' . number_format((float)$v);
+    foreach ((array)$c['heads'] as $k => $v) $headsTxt[] = ($c['labels'][$k] ?? $k) . ': ' . nf((float)$v);
     [$ok, $msg, $id] = hreq_save(0, [
         'job_title' => trim(((string)$ln['group_label'] !== '' ? $ln['group_label'] . ' / ' : '') . $ln['role_label']),
         'quantity' => $left,
@@ -1011,8 +1011,8 @@ function pc_raise_hiring_request($cid, $lineId) {
         'project_ref' => trim(($q ? $q['quote_no'] . ' · ' : '') . $h['code']),
         'reason' => 'Quotation ' . ($q['quote_no'] ?? '') . ' accepted by the client — costing ' . $h['code'] . ', role "' . $ln['role_label'] . '".',
         'job_description' => 'Costed per person per ' . ($basis === 'DAILY' ? 'day' : 'month') . ': ' . implode(' · ', $headsTxt)
-                           . '. Loaded cost ' . number_format($c['loaded']) . ', billed at ' . number_format($c['proposed'])
-                           . ' (' . number_format($c['margin'], 1) . '% margin).',
+                           . '. Loaded cost ' . nf($c['loaded']) . ', billed at ' . nf($c['proposed'])
+                           . ' (' . nf($c['margin'], 1) . '% margin).',
         'est_cost_per_person' => $c['loaded'],
         'est_cost_basis' => $basis === 'DAILY' ? 'MANDAY' : ($basis === 'FIXED' ? 'FIXED' : 'MONTHLY'),
         'est_duration_months' => $months,
@@ -1175,8 +1175,8 @@ function pc_line_last_candidate($lineId) {
 }
 // One sentence for the verdict.
 function pc_cand_verdict_text(array $k, $showPay = true) {
-    $money = fn($v) => (function_exists('cur_sym') ? cur_sym() : '₹') . number_format((float)$v, 0);
-    $pct = fn($v) => rtrim(rtrim(number_format((float)$v, 1), '0'), '.') . '%';
+    $money = fn($v) => (function_exists('cur_sym') ? cur_sym() : '₹') . nf((float)$v, 0);
+    $pct = fn($v) => rtrim(rtrim(nf((float)$v, 1), '0'), '.') . '%';
     if ($k['verdict'] === 'NONE') return 'No offer or salary structure yet' . ($showPay ? ' — pay up to ' . $money($k['max_ctc']) . ' a month keeps the ' . $pct($k['target']) . ' target margin.' : '.');
     $head = $k['verdict'] === 'OK' ? 'Within the costing' : ($k['verdict'] === 'LOW' ? 'Below the target margin' : 'Loss at the quoted rate');
     return $head . ': margin ' . $pct($k['margin']) . ' against the target ' . $pct($k['target'])
@@ -1546,7 +1546,7 @@ function pc_heads_from_ctc($ctc) {
     if (!$ev['ok'] || abs((float)$ev['direct'] - $ctc) > 0.5) { [$items] = ch_items_clean($flat); }
     return ['items' => $items, 'ctc' => $ctc,
             'note' => 'Built from a CTC of ' . fmoney($ctc) . ' a month with your salary components — Basic is '
-                    . rtrim(rtrim(number_format(comp_basic_pct(), 2), '0'), '.') . '% of the CTC. Change any head; the totals follow.'];
+                    . rtrim(rtrim(nf(comp_basic_pct(), 2), '0'), '.') . '% of the CTC. Change any head; the totals follow.'];
 }
 
 //  HOW THE PRICE IS BUILT, IN RUPEES (owner, 13 Nov 2026: looking at the box of
@@ -1578,17 +1578,17 @@ function pc_buildup($id) {
     foreach ($pcts as $k => $label) {
         $p = (float)($h[$k] ?? 0); if ($p == 0) continue;
         $amt = $base * $p / 100; $loadSum += $amt;
-        $rows[] = ['kind' => 'add', 'label' => $label . ' ' . rtrim(rtrim(number_format($p, 2), '0'), '.') . '%', 'amount' => $amt,
+        $rows[] = ['kind' => 'add', 'label' => $label . ' ' . rtrim(rtrim(nf($p, 2), '0'), '.') . '%', 'amount' => $amt,
                    'note' => $onRate ? 'of the rate' : 'of the manpower cost'];
     }
     //  Whatever is left between the ladder and the costing's own total is rounding
     //  (each role is rounded to the paisa) — fold it into the total, never invent a line.
     $rows[] = ['kind' => 'total', 'label' => 'Your cost', 'amount' => $cost, 'note' => 'the "Project cost" at the top'];
-    $rows[] = ['kind' => 'add', 'label' => 'Your margin', 'amount' => $atRate - $cost, 'note' => $atRate > 0 ? rtrim(rtrim(number_format(($atRate - $cost) / $atRate * 100, 1), '0'), '.') . '% of the price before negotiation' : ''];
+    $rows[] = ['kind' => 'add', 'label' => 'Your margin', 'amount' => $atRate - $cost, 'note' => $atRate > 0 ? rtrim(rtrim(nf(($atRate - $cost) / $atRate * 100, 1), '0'), '.') . '% of the price before negotiation' : ''];
     $neg = (float)($h['negotiation_pct'] ?? 0);
     if ($neg != 0) {
         $rows[] = ['kind' => 'total', 'label' => 'Price before negotiation', 'amount' => $atRate, 'note' => ''];
-        $rows[] = ['kind' => 'add', 'label' => 'Negotiation padding ' . rtrim(rtrim(number_format($neg, 2), '0'), '.') . '%', 'amount' => $quoted - $atRate, 'note' => 'room to come down; it is price, not cost'];
+        $rows[] = ['kind' => 'add', 'label' => 'Negotiation padding ' . rtrim(rtrim(nf($neg, 2), '0'), '.') . '%', 'amount' => $quoted - $atRate, 'note' => 'room to come down; it is price, not cost'];
     }
     $rows[] = ['kind' => 'grand', 'label' => 'Price quoted to the ' . Tl('client'), 'amount' => $quoted, 'note' => 'the "Project revenue" at the top'];
     return ['rows' => $rows, 'on_rate' => $onRate, 'manpower' => $man, 'cost' => $cost, 'quoted' => $quoted, 'loadings' => $loadSum];
@@ -1620,8 +1620,8 @@ function pc_ctc_from_rate($rate, $margin, array $h, $dpm = 0) {
         $direct *= $dpm;                                     // a day's cost → the month's CTC
     }
     $ctc = floor($direct);
-    if ($ctc <= 0) return ['err' => 'At ' . fmoney($rate) . ' ' . $unit . ' with a ' . rtrim(rtrim(number_format($tm, 2), '0'), '.') . '% margin and this costing\'s loadings ('
-        . rtrim(rtrim(number_format($load, 2), '0'), '.') . '%), nothing is left for the person\'s pay. Lower the margin, or check the rate.'];
+    if ($ctc <= 0) return ['err' => 'At ' . fmoney($rate) . ' ' . $unit . ' with a ' . rtrim(rtrim(nf($tm, 2), '0'), '.') . '% margin and this costing\'s loadings ('
+        . rtrim(rtrim(nf($load, 2), '0'), '.') . '%), nothing is left for the person\'s pay. Lower the margin, or check the rate.'];
     return ['ctc' => $ctc, 'rate_manual' => round($before, 2), 'unit' => $unit, 'negotiation_pct' => $neg];
 }
 
@@ -1771,7 +1771,7 @@ function ops_projcosting($route, $method) {
             $r = pc_heads_from_ctc($b['ctc']);
             if (empty($r['err'])) {
                 $r['rate_manual'] = $b['rate_manual'];
-                $r['note'] = 'At ' . fmoney((float)$_POST['rate']) . ' ' . $b['unit'] . ' and a ' . rtrim(rtrim(number_format((float)$_POST['margin'], 2), '0'), '.')
+                $r['note'] = 'At ' . fmoney((float)$_POST['rate']) . ' ' . $b['unit'] . ' and a ' . rtrim(rtrim(nf((float)$_POST['margin'], 2), '0'), '.')
                            . '% margin, you can afford a CTC of ' . fmoney($b['ctc']) . ' a month. The break-up below adds up to it; the rate is fixed at what the ' . Tl('client') . ' pays.'
                            //  The rate is typed once, as the client pays it (14 Nov 2026) — no second "fixed rate" box to explain.
                            . '';

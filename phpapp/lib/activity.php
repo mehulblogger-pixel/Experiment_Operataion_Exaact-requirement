@@ -634,7 +634,7 @@ function act_effort_label(array $eff) {
     $h = intdiv($mins, 60); $m = $mins % 60;
     $hm = $h ? ($h . 'h' . ($m ? ' ' . $m . 'm' : '')) : ($m . 'm');
     $n  = (int)($eff['touches'] ?? 0);
-    return number_format($mins / 480.0, 1) . ' man-days (' . $hm . ' over ' . $n . ' touch' . ($n === 1 ? '' : 'es') . ')';
+    return nf($mins / 480.0, 1) . ' man-days (' . $hm . ' over ' . $n . ' touch' . ($n === 1 ? '' : 'es') . ')';
 }
 
 // ---- Reading ---------------------------------------------------------------

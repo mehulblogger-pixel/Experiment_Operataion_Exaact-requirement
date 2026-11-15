@@ -47,11 +47,11 @@ $pill = function ($s) {
 <?php endif; ?>
 <?php // K21 — platform commission: the matchmaker's revenue + the rate control ?>
 <?php $commission = $commission ?? null; $is_master = $is_master ?? false;
-  if ($commission): $cinr = fn($n) => '₹' . number_format((int)round((float)$n));
-  $crate = rtrim(rtrim(number_format((float)($commission['rate'] ?? 0), 2), '0'), '.'); ?>
+  if ($commission): $cinr = fn($n) => '₹' . nf((int)round((float)$n));
+  $crate = rtrim(rtrim(nf((float)($commission['rate'] ?? 0), 2), '0'), '.'); ?>
 <div class="panel" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:18px 26px;align-items:center;justify-content:space-between">
   <div style="display:flex;flex-wrap:wrap;gap:18px 26px;align-items:baseline">
-    <div><div class="sub" style="font-size:12px">Commission rate</div><div style="font-size:22px;font-weight:800"><?= e($crate) ?>%</div><?php $cshare = function_exists('connect_commission_client_share') ? connect_commission_client_share() : 50; $nf = fn($n) => rtrim(rtrim(number_format((float)$n, 2), '0'), '.'); ?><div class="sub" style="font-size:11px">on the fee · client <?= e($nf($cshare)) ?>% / professional <?= e($nf(100 - $cshare)) ?>%</div></div>
+    <div><div class="sub" style="font-size:12px">Commission rate</div><div style="font-size:22px;font-weight:800"><?= e($crate) ?>%</div><?php $cshare = function_exists('connect_commission_client_share') ? connect_commission_client_share() : 50; $nf = fn($n) => rtrim(rtrim(nf((float)$n, 2), '0'), '.'); ?><div class="sub" style="font-size:11px">on the fee · client <?= e($nf($cshare)) ?>% / professional <?= e($nf(100 - $cshare)) ?>%</div></div>
     <div><div class="sub" style="font-size:12px">Earned (accepted)</div><div style="font-size:22px;font-weight:800;color:#0f7d5a"><?= e($cinr($commission['earned'] ?? 0)) ?></div></div>
     <div><div class="sub" style="font-size:12px">Settled</div><div style="font-size:22px;font-weight:800"><?= e($cinr($commission['settled'] ?? 0)) ?></div></div>
     <div><div class="sub" style="font-size:12px">In review</div><div style="font-size:22px;font-weight:800;color:#8a6d0b"><?= e($cinr($commission['pipeline'] ?? 0)) ?></div></div>

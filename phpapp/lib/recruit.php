@@ -521,8 +521,8 @@ function req_cost_buildup($b) {
 
     $wageLabel = $model === 'SUBCON_AGENCY' ? 'Sub-contractor rate' : ($model === 'FREELANCER' ? 'Professional fee' : 'Base wage / salary');
     $lines[] = ['k' => $wageLabel, 'v' => $wage];
-    if ($statutory > 0) $lines[] = ['k' => 'Statutory & benefits (' . rtrim(rtrim(number_format($statP, 2), '0'), '.') . '%)', 'v' => $statutory];
-    if ($agency > 0)    $lines[] = ['k' => 'Agency service fee (' . rtrim(rtrim(number_format($agncP, 2), '0'), '.') . '%)', 'v' => $agency];
+    if ($statutory > 0) $lines[] = ['k' => 'Statutory & benefits (' . rtrim(rtrim(nf($statP, 2), '0'), '.') . '%)', 'v' => $statutory];
+    if ($agency > 0)    $lines[] = ['k' => 'Agency service fee (' . rtrim(rtrim(nf($agncP, 2), '0'), '.') . '%)', 'v' => $agency];
     if ($reimb > 0)     $lines[] = ['k' => 'Reimbursables / month', 'v' => $reimb];
 
     $monthly = $wage + $statutory + $agency + $reimb;
@@ -1268,7 +1268,7 @@ function assignment_commercial_refusal($post) {
     //  A per-period rate with no duration locks a revenue of zero.
     $perPeriod = in_array($basis, ['MONTHLY', 'MANMONTH', 'MANDAY', 'DAILY'], true);
     if ($bill > 0 && $perPeriod && $months <= 0)
-        return 'A rate of ' . (function_exists('cur_sym') ? cur_sym() : '') . number_format($bill, 0)
+        return 'A rate of ' . (function_exists('cur_sym') ? cur_sym() : '') . nf($bill, 0)
              . ' ' . strtolower((string) (REQ_RATE_BASIS[$basis] ?? $basis))
              . ' needs a duration, or the value being approved is zero. Enter the number of months.';
 

@@ -191,7 +191,7 @@ function engagement_render($contractNumber, $partnerId = 0) {
     echo '<p class="muted" style="margin:0 0 8px;font-size:12px">'
        . (int)$r['quotes'] . ' quotes · ' . (int)$r['calls'] . ' ' . $e(Tlp('call')) . ' (' . (int)$r['open_calls'] . ' open) · '
        . (int)$r['jobs'] . ' jobs (' . (int)$r['open_jobs'] . ' open) · ' . (int)$r['reports'] . ' reports · '
-       . (int)$r['invoices'] . ' invoices' . ($r['billed'] > 0 ? ' · billed ' . $e(number_format($r['billed'], 2)) : '') . '</p>';
+       . (int)$r['invoices'] . ' invoices' . ($r['billed'] > 0 ? ' · billed ' . $e(nf($r['billed'], 2)) : '') . '</p>';
     foreach ($order as $k) {
         $rows = array_values(array_filter($eng['members'], fn($m) => $m['kind'] === $k));
         if (!$rows) continue;

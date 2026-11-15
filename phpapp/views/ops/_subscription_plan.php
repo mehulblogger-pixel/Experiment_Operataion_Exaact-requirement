@@ -15,7 +15,7 @@ $seats = $mode === 'paid' && !empty($current['seats']) ? (int) $current['seats']
        : (is_array($offer) && !empty($offer['seats']) ? (int) $offer['seats'] : max(1, (int) ($sub['seats_used'] ?? 1)));
 $period = $mode === 'paid' ? (string) ($current['period'] ?? 'month') : (is_array($offer) ? (string) ($offer['period'] ?? 'month') : 'month');
 $gst = function_exists('commercial_gst_cfg') ? commercial_gst_cfg() : ['on' => false];
-$gstNote = !empty($gst['on']) ? ($gst['mode'] === 'inclusive' ? ' (GST included)' : ' + ' . rtrim(rtrim(number_format((float) $gst['rate'], 2), '0'), '.') . '% GST') : '';
+$gstNote = !empty($gst['on']) ? ($gst['mode'] === 'inclusive' ? ' (GST included)' : ' + ' . rtrim(rtrim(nf((float) $gst['rate'], 2), '0'), '.') . '% GST') : '';
 $anyYear = $seatY > 0;
 $forSale = $seatM > 0 && array_filter($pb['modules'] ?? [], fn($m) => (int) $m['month'] > 0);
 ?>
@@ -31,7 +31,7 @@ $forSale = $seatM > 0 && array_filter($pb['modules'] ?? [], fn($m) => (int) $m['
         <input type="checkbox" name="mods[]" value="<?= $e($k) ?>" class="pl-mod" data-m="<?= (int) $m['month'] ?>" data-y="<?= (int) $m['year'] ?>" <?= $priced && in_array($k, $pre, true) ? 'checked' : '' ?> <?= $priced ? '' : 'disabled' ?> style="margin-top:3px;width:18px;height:18px">
         <span><span style="font-weight:600"><?= $e($modLabel($k)) ?></span><br>
           <span class="sub" style="font-size:12px"><?= $priced
-            ? $e($sym . number_format((int) $m['month'])) . '/month' . ((int) $m['year'] > 0 ? ' · ' . $e($sym . number_format((int) $m['year'])) . '/year' : '')
+            ? $e($sym . nf((int) $m['month'])) . '/month' . ((int) $m['year'] > 0 ? ' · ' . $e($sym . nf((int) $m['year'])) . '/year' : '')
             : 'Not for sale yet' ?></span></span>
       </label>
     <?php endforeach; ?>
@@ -40,13 +40,13 @@ $forSale = $seatM > 0 && array_filter($pb['modules'] ?? [], fn($m) => (int) $m['
   <div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px">
     <div><label for="pl-seats" style="font-size:13px;font-weight:600;display:block;margin-bottom:3px">2 · How many people will sign in?</label>
       <input type="number" name="seats" id="pl-seats" min="1" value="<?= (int) $seats ?>" style="width:120px;padding:9px 10px;border:1px solid var(--line,#e5e7eb);border-radius:8px;font-size:15px">
-      <span class="sub" style="font-size:12px;margin-left:6px"><?= $e($sym . number_format($seatM)) ?>/month each · <?= (int) ($sub['seats_used'] ?? 0) ?> active today</span></div>
+      <span class="sub" style="font-size:12px;margin-left:6px"><?= $e($sym . nf($seatM)) ?>/month each · <?= (int) ($sub['seats_used'] ?? 0) ?> active today</span></div>
     <?php $pk = $pb['storage_pack'] ?? ['gb' => 0, 'month' => 0, 'year' => 0];
           if ((float) $pk['gb'] > 0 && (int) $pk['month'] > 0):
             $prePacks = $mode === 'paid' ? (int) ($current['packs'] ?? 0) : (is_array($offer) ? (int) ($offer['packs'] ?? 0) : 0); ?>
-    <div><label for="pl-packs" style="font-size:13px;font-weight:600;display:block;margin-bottom:3px">Extra storage — packs of <?= $e(rtrim(rtrim(number_format((float) $pk['gb'], 2), '0'), '.')) ?> GB</label>
+    <div><label for="pl-packs" style="font-size:13px;font-weight:600;display:block;margin-bottom:3px">Extra storage — packs of <?= $e(rtrim(rtrim(nf((float) $pk['gb'], 2), '0'), '.')) ?> GB</label>
       <input type="number" name="packs" id="pl-packs" min="0" value="<?= (int) $prePacks ?>" data-m="<?= (int) $pk['month'] ?>" data-y="<?= (int) $pk['year'] ?>" style="width:120px;padding:9px 10px;border:1px solid var(--line,#e5e7eb);border-radius:8px;font-size:15px">
-      <span class="sub" style="font-size:12px;margin-left:6px"><?= $e($sym . number_format((int) $pk['month'])) ?>/month each</span></div>
+      <span class="sub" style="font-size:12px;margin-left:6px"><?= $e($sym . nf((int) $pk['month'])) ?>/month each</span></div>
     <?php endif; ?>
     <div><label for="pl-period" style="font-size:13px;font-weight:600;display:block;margin-bottom:3px">3 · Pay</label>
       <select name="period" id="pl-period" style="padding:9px 10px;border:1px solid var(--line,#e5e7eb);border-radius:8px;font-size:15px">

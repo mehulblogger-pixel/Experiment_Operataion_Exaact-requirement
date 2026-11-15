@@ -77,7 +77,7 @@
     <h3 style="margin:0 0 8px">Latest assessment</h3>
     <?php if (($p['last_score'] ?? null) !== null && ($p['last_score'] ?? '') !== ''): $c=$scoreCol($p['last_score']); ?>
       <div style="display:flex;align-items:center;gap:16px">
-        <div style="text-align:center"><div style="font-size:30px;font-weight:800;line-height:1;color:<?= $c ?>;font-variant-numeric:tabular-nums"><?= e(rtrim(rtrim(number_format((float)$p['last_score'],1),'0'),'.')) ?><span style="font-size:14px;color:var(--muted)">/100</span></div>
+        <div style="text-align:center"><div style="font-size:30px;font-weight:800;line-height:1;color:<?= $c ?>;font-variant-numeric:tabular-nums"><?= e(rtrim(rtrim(nf((float)$p['last_score'],1),'0'),'.')) ?><span style="font-size:14px;color:var(--muted)">/100</span></div>
           <div style="font-size:11.5px;font-weight:700;color:<?= $c ?>;margin-top:2px"><?= e(strtoupper($p['last_band'] ?? '')) ?></div></div>
         <div style="font-size:12.5px;line-height:1.7">
           <div><span class="muted">Assessed:</span> <?= e($p['last_assessed_on'] ?: '—') ?></div>
@@ -134,18 +134,18 @@
   <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
     <div style="text-align:center;min-width:104px">
       <div style="font-size:13px;font-weight:700;letter-spacing:.03em;color:var(--muted)">PERFORMANCE</div>
-      <div style="font-size:34px;font-weight:800;line-height:1.1;color:<?= $pcol ?>;font-variant-numeric:tabular-nums"><?= e(rtrim(rtrim(number_format((float)$perf['score'],1),'0'),'.')) ?><span style="font-size:14px;color:var(--muted)">/100</span></div>
+      <div style="font-size:34px;font-weight:800;line-height:1.1;color:<?= $pcol ?>;font-variant-numeric:tabular-nums"><?= e(rtrim(rtrim(nf((float)$perf['score'],1),'0'),'.')) ?><span style="font-size:14px;color:var(--muted)">/100</span></div>
       <div style="font-size:12px;font-weight:700;color:<?= $pcol ?>"><?= e(strtoupper($perf['band'])) ?></div>
     </div>
     <div style="flex:1;min-width:280px;display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px">
-      <div><div class="muted" style="font-size:11px">Acceptance rate</div><div style="font-size:18px;font-weight:700"><?= $perf['reports']['acceptance_rate']===null?'—':e(rtrim(rtrim(number_format((float)$perf['reports']['acceptance_rate'],1),'0'),'.')).'%' ?></div><div class="muted" style="font-size:11px"><?= (int)$perf['reports']['accepted'] ?> ok · <?= (int)$perf['reports']['rejected'] ?> rej of <?= (int)$perf['reports']['graded'] ?></div></div>
+      <div><div class="muted" style="font-size:11px">Acceptance rate</div><div style="font-size:18px;font-weight:700"><?= $perf['reports']['acceptance_rate']===null?'—':e(rtrim(rtrim(nf((float)$perf['reports']['acceptance_rate'],1),'0'),'.')).'%' ?></div><div class="muted" style="font-size:11px"><?= (int)$perf['reports']['accepted'] ?> ok · <?= (int)$perf['reports']['rejected'] ?> rej of <?= (int)$perf['reports']['graded'] ?></div></div>
       <div><div class="muted" style="font-size:11px">Open NCRs</div><div style="font-size:18px;font-weight:700;color:<?= $perf['ncr']['open']>0?'var(--bad)':'inherit' ?>"><?= (int)$perf['ncr']['open'] ?></div><div class="muted" style="font-size:11px"><?= (int)$perf['ncr']['overdue'] ?> overdue · <?= (int)$perf['ncr']['major_open'] ?> major</div></div>
       <div><div class="muted" style="font-size:11px">Open complaints</div><div style="font-size:18px;font-weight:700;color:<?= $perf['complaints']['open']>0?'var(--bad)':'inherit' ?>"><?= (int)$perf['complaints']['open'] ?></div><div class="muted" style="font-size:11px">of <?= (int)$perf['complaints']['total'] ?> total</div></div>
-      <div><div class="muted" style="font-size:11px">Last assessment</div><div style="font-size:18px;font-weight:700"><?= $perf['assessment']['score']===null?'—':e(rtrim(rtrim(number_format((float)$perf['assessment']['score'],1),'0'),'.')) ?></div><div class="muted" style="font-size:11px"><?= e($perf['assessment']['on'] ?: 'not assessed') ?></div></div>
+      <div><div class="muted" style="font-size:11px">Last assessment</div><div style="font-size:18px;font-weight:700"><?= $perf['assessment']['score']===null?'—':e(rtrim(rtrim(nf((float)$perf['assessment']['score'],1),'0'),'.')) ?></div><div class="muted" style="font-size:11px"><?= e($perf['assessment']['on'] ?: 'not assessed') ?></div></div>
     </div>
   </div>
   <?php if (!empty($perf['penalties'])): ?>
-    <div class="muted" style="font-size:11.5px;margin-top:10px">Base <?= e(rtrim(rtrim(number_format((float)$perf['base'],1),'0'),'.')) ?> − penalties (<?php $ps=[]; foreach($perf['penalties'] as $k=>$v){$ps[]=e($k).' −'.e(rtrim(rtrim(number_format((float)$v,1),'0'),'.'));} echo implode(', ',$ps); ?>) = <?= e(rtrim(rtrim(number_format((float)$perf['score'],1),'0'),'.')) ?>. Live score from operational data; open quality issues reduce it.</div>
+    <div class="muted" style="font-size:11.5px;margin-top:10px">Base <?= e(rtrim(rtrim(nf((float)$perf['base'],1),'0'),'.')) ?> − penalties (<?php $ps=[]; foreach($perf['penalties'] as $k=>$v){$ps[]=e($k).' −'.e(rtrim(rtrim(nf((float)$v,1),'0'),'.'));} echo implode(', ',$ps); ?>) = <?= e(rtrim(rtrim(nf((float)$perf['score'],1),'0'),'.')) ?>. Live score from operational data; open quality issues reduce it.</div>
   <?php else: ?>
     <div class="muted" style="font-size:11.5px;margin-top:10px">Live score from assessment and inspection results. No open quality issues against this vendor.</div>
   <?php endif; ?>
@@ -206,10 +206,10 @@
 <div class="panel" style="margin-top:14px">
   <div style="display:flex;justify-content:space-between;align-items:baseline"><h3 style="margin:0">Expediting performance</h3><span class="muted" style="font-size:11.5px">across <?= (int)$xperf['reports'] ?> expediting report(s)</span></div>
   <div style="margin-top:8px;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">
-    <div><div class="muted" style="font-size:11px">Commitment reliability</div><div style="font-size:20px;font-weight:800;color:<?= $relCol ?>"><?= $rel===null?'—':e(rtrim(rtrim(number_format((float)$rel,1),'0'),'.')).'%' ?></div><div class="muted" style="font-size:11px"><?= (int)$xperf['commitments']['on_time'] ?> on time · <?= (int)$xperf['commitments']['late'] ?> late</div></div>
+    <div><div class="muted" style="font-size:11px">Commitment reliability</div><div style="font-size:20px;font-weight:800;color:<?= $relCol ?>"><?= $rel===null?'—':e(rtrim(rtrim(nf((float)$rel,1),'0'),'.')).'%' ?></div><div class="muted" style="font-size:11px"><?= (int)$xperf['commitments']['on_time'] ?> on time · <?= (int)$xperf['commitments']['late'] ?> late</div></div>
     <div><div class="muted" style="font-size:11px">Commitments tracked</div><div style="font-size:20px;font-weight:800"><?= (int)$xperf['commitments']['total'] ?></div><div class="muted" style="font-size:11px"><?= (int)$xperf['commitments']['open'] ?> open · <?= (int)$xperf['commitments']['revised'] ?> revised</div></div>
-    <div><div class="muted" style="font-size:11px">Forecast optimism</div><div style="font-size:20px;font-weight:800;color:<?= ($opt!==null && $opt>=50)?'var(--bad)':'inherit' ?>"><?= $opt===null?'—':e(rtrim(rtrim(number_format((float)$opt,1),'0'),'.')).'%' ?></div><div class="muted" style="font-size:11px">of <?= (int)$xperf['forecast']['compared'] ?> forecasts ran late vs the expeditor</div></div>
-    <div><div class="muted" style="font-size:11px">Avg optimism</div><div style="font-size:20px;font-weight:800"><?= (float)$xperf['forecast']['avg_optimism_days']>0 ? e(rtrim(rtrim(number_format((float)$xperf['forecast']['avg_optimism_days'],1),'0'),'.')).' d' : '—' ?></div><div class="muted" style="font-size:11px">expeditor later than vendor</div></div>
+    <div><div class="muted" style="font-size:11px">Forecast optimism</div><div style="font-size:20px;font-weight:800;color:<?= ($opt!==null && $opt>=50)?'var(--bad)':'inherit' ?>"><?= $opt===null?'—':e(rtrim(rtrim(nf((float)$opt,1),'0'),'.')).'%' ?></div><div class="muted" style="font-size:11px">of <?= (int)$xperf['forecast']['compared'] ?> forecasts ran late vs the expeditor</div></div>
+    <div><div class="muted" style="font-size:11px">Avg optimism</div><div style="font-size:20px;font-weight:800"><?= (float)$xperf['forecast']['avg_optimism_days']>0 ? e(rtrim(rtrim(nf((float)$xperf['forecast']['avg_optimism_days'],1),'0'),'.')).' d' : '—' ?></div><div class="muted" style="font-size:11px">expeditor later than vendor</div></div>
   </div>
   <?php // ---- Predictive delivery risk (Phase 6) across open POs ---- ?>
   <?php if (!empty($xrisk) && (int)($xrisk['open_pos']??0) > 0):
@@ -245,7 +245,7 @@
         <td><strong><?= e($h['irn']) ?></strong></td>
         <td><span class="pill p-mut"><?= e($h['kind'] ?? 'Assessment') ?></span></td>
         <td><?= e($h['issue_date'] ?: '—') ?></td>
-        <td><?php if ($h['score']!==null): $c=$scoreCol($h['score']); ?><span style="font-weight:700;color:<?= $c ?>"><?= e(rtrim(rtrim(number_format((float)$h['score'],1),'0'),'.')) ?></span><span class="muted" style="font-size:11px">/100 <?= e($h['band']) ?></span><?php else: ?>—<?php endif; ?></td>
+        <td><?php if ($h['score']!==null): $c=$scoreCol($h['score']); ?><span style="font-weight:700;color:<?= $c ?>"><?= e(rtrim(rtrim(nf((float)$h['score'],1),'0'),'.')) ?></span><span class="muted" style="font-size:11px">/100 <?= e($h['band']) ?></span><?php else: ?>—<?php endif; ?></td>
         <td><?= e($h['recommendation'] ?: '—') ?></td>
         <td><span class="pill <?= idems_status_pill($h['status']) ?>"><?= e(lk_options_or('report_status', IDEMS_STATUS)[$h['status']] ?? $h['status']) ?></span></td>
       </tr>
@@ -271,7 +271,7 @@
               <span class="muted"><?= e($statusOpts[$ev['old_status']] ?? $ev['old_status']) ?></span> → <?php endif; ?>
             <span class="pill <?= $nc ?>"><?= e($nl) ?></span>
             <span class="muted" style="font-size:11px">· <?= e($srcLab[$ev['source']] ?? $ev['source']) ?></span>
-            <?php if ($ev['score'] !== null && $ev['score'] !== ''): ?><span class="muted" style="font-size:11px">· score <?= e(rtrim(rtrim(number_format((float)$ev['score'],1),'0'),'.')) ?></span><?php endif; ?>
+            <?php if ($ev['score'] !== null && $ev['score'] !== ''): ?><span class="muted" style="font-size:11px">· score <?= e(rtrim(rtrim(nf((float)$ev['score'],1),'0'),'.')) ?></span><?php endif; ?>
           </div>
           <?php if (trim((string)($ev['reason'] ?? '')) !== ''): ?><div class="muted" style="font-size:12px;margin-top:2px"><?= e($ev['reason']) ?></div><?php endif; ?>
           <?php if (trim((string)($ev['actor'] ?? '')) !== ''): ?><div class="muted" style="font-size:11px">by <?= e($ev['actor']) ?></div><?php endif; ?>

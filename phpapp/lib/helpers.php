@@ -1,6 +1,32 @@
 <?php
 // Shared helpers: escaping, auth, GST logic, choice lists, flash messages.
 
+// Numbers as people in India write them: 5,00,000 · 25,00,000 · 1,23,45,678.90 (lakh / crore grouping).
+// A drop-in for number_format($n, $dec) with the default separators. Companies whose currency is not
+// the rupee (Settings → currency symbol other than ₹ / Rs / INR) keep the international 500,000 grouping.
+// Display only: it never rounds differently from number_format(), so stored amounts are untouched.
+function nf($n, $dec = 0) {
+    $dec = max(0, (int)$dec);
+    $s = number_format(abs((float)$n), $dec, '.', '');
+    $neg = (float)$n < 0 && (float)$s != 0.0;
+    [$int, $frac] = array_pad(explode('.', $s, 2), 2, '');
+    $sym = function_exists('cur_sym') ? cur_sym() : '₹';
+    if (in_array(strtoupper(trim($sym)), ['₹', 'RS', 'RS.', 'INR'], true) || $sym === '₹') {
+        if (strlen($int) > 3) {
+            $head = substr($int, 0, -3);
+            $int = preg_replace('/\B(?=(\d{2})+(?!\d))/', ',', $head) . ',' . substr($int, -3);
+        }
+    } else {
+        $int = preg_replace('/\B(?=(\d{3})+(?!\d))/', ',', $int);
+    }
+    return ($neg ? '-' : '') . $int . ($dec > 0 ? '.' . $frac : '');
+}
+// A money figure: whole rupees, or two decimals when it has paise (₹7,999.99 stays ₹7,999.99, ₹8,000 stays ₹8,000).
+function nfm($n) {
+    $v = round((float)$n, 2);
+    return nf($v, abs($v - round($v)) >= 0.005 ? 2 : 0);
+}
+
 function e($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 
 // Field-finding #9/#10 — the in-page popup ("embed") framework. A screen opened inside the modal iframe
@@ -72,9 +98,11 @@ function embed_stamp_forms($html) {
         $html = preg_replace_callback('/<a\b([^>]*?)href="(\/[^"]*)"([^>]*)>/i', function ($m) {
             [$all, $pre, $href, $post] = $m;
             if (stripos($pre . $post, 'target=') !== false) return $all;
-            if (preg_match('#^/project-costing(\?|$|#)#', $href)) {
+            // DEF-SAL-015 — the pattern used '#' as its delimiter AND inside it, so it never compiled and
+            // every costing link (✎ Edit on a role) opened in the whole window, losing the quotation screen.
+            if (preg_match('~^/project-costing(\?|$|#)~', $href)) {
                 [$h0, $frag] = array_pad(explode('#', $href, 2), 2, null);
-                $h0 .= (strpos($h0, '?') === false ? '?' : '&') . 'embed=1&amp;embed_stay=1';
+                $h0 .= (strpos($h0, '?') === false ? '?' : '&amp;') . 'embed=1&amp;embed_stay=1';
                 return '<a' . $pre . 'href="' . $h0 . ($frag !== null ? '#' . $frag : '') . '"' . $post . '>';
             }
             return '<a' . $pre . 'href="' . $href . '" target="_top"' . $post . '>';

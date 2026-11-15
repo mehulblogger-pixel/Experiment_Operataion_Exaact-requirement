@@ -23,14 +23,14 @@ $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
   <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
     <b style="font-size:15px"><?= $e($h['code']) ?></b>
     <span class="pill <?= $stTone[$h['status']] ?? 'p-mut' ?>"><?= $e(PC_STATUS[$h['status']] ?? $h['status']) ?></span>
-    <span class="muted" style="font-size:13px">revenue <?= fmoney_short($T['revenue']) ?> · cost <?= fmoney_short($T['cost']) ?> · margin <?= number_format((float)$T['margin'], 1) ?>%</span>
+    <span class="muted" style="font-size:13px">revenue <?= fmoney_short($T['revenue']) ?> · cost <?= fmoney_short($T['cost']) ?> · margin <?= nf((float)$T['margin'], 1) ?>%</span>
   </div>
   <?php if ($flags): ?><div class="msg msg-warning" style="margin:0 0 8px;font-size:12.5px">⚠ <?= count($flags) ?> role<?= count($flags) === 1 ? '' : 's' ?> outside the margin set (± <?= (int)PC_MARGIN_BAND ?> points): <?= $e(implode(', ', array_column($flags, 'role'))) ?></div><?php endif; ?>
   <div class="tbl-scroll" style="overflow-x:auto">
   <table class="dt" style="font-size:13px">
     <thead><tr><th>Role</th><th class="num">Qty</th><th>Unit</th><th class="num">Rate</th><th class="num">Amount</th></tr></thead>
     <tbody>
-    <?php foreach ($rows as $r): ?><tr><td><?= $e($r['desc']) ?></td><td class="num"><?= $e(rtrim(rtrim(number_format((float)$r['qty'], 2), '0'), '.')) ?></td><td><?= $e($r['unit']) ?></td><td class="num"><?= number_format((float)$r['rate']) ?></td><td class="num"><?= number_format((float)$r['amount']) ?></td></tr><?php endforeach; ?>
+    <?php foreach ($rows as $r): ?><tr><td><?= $e($r['desc']) ?></td><td class="num"><?= $e(rtrim(rtrim(nf((float)$r['qty'], 2), '0'), '.')) ?></td><td><?= $e($r['unit']) ?></td><td class="num"><?= nf((float)$r['rate']) ?></td><td class="num"><?= nf((float)$r['amount']) ?></td></tr><?php endforeach; ?>
     <?php if (!$rows): ?><tr><td colspan="5" class="muted">No roles yet.</td></tr><?php endif; ?>
     </tbody>
   </table>

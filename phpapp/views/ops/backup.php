@@ -47,7 +47,7 @@ $reasonLabel = ['manual' => 'You clicked Back up now', 'daily' => 'Automatic dai
     <tr>
       <td><strong><?= $fmtWhen($b['created_at']) ?></strong></td>
       <td class="muted"><?= e($reasonLabel[$b['reason']] ?? ucfirst(str_replace('_', ' ', (string) $b['reason']))) ?></td>
-      <td><?= number_format((int) $b['total_rows']) ?></td>
+      <td><?= nf((int) $b['total_rows']) ?></td>
       <td class="muted"><?= e((string) $b['size_kb']) ?> KB</td>
       <td>
         <a class="btn xs ghost" href="/backup?download=<?= e(rawurlencode($b['id'])) ?>">⬇️ Download</a>

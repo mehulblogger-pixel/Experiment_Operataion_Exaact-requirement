@@ -238,15 +238,15 @@
     <h3 class="tab-sub">Summary — particulars</h3>
     <table class="grid">
       <tr><th>Particular</th><th style="text-align:right">Amount</th></tr>
-      <tr><td>Travel charges (KM × rate)</td><td style="text-align:right"><?= e(cur_sym()) ?><?= number_format($sum['travel'],0) ?></td></tr>
+      <tr><td>Travel charges (KM × rate)</td><td style="text-align:right"><?= e(cur_sym()) ?><?= nf($sum['travel'],0) ?></td></tr>
       <?php foreach ($sum['heads'] as $code=>$amt): if ($amt==0) continue; ?>
-        <tr><td><?= e($headLabels[$code] ?? $code) ?></td><td style="text-align:right"><?= e(cur_sym()) ?><?= number_format($amt,0) ?></td></tr>
+        <tr><td><?= e($headLabels[$code] ?? $code) ?></td><td style="text-align:right"><?= e(cur_sym()) ?><?= nf($amt,0) ?></td></tr>
       <?php endforeach; ?>
-      <tr style="background:var(--soft)"><td><strong>Grand Total</strong></td><td style="text-align:right"><strong><?= e(cur_sym()) ?><?= number_format($sum['grand'],0) ?></strong></td></tr>
-      <tr><td>Less: Advance</td><td style="text-align:right"><?= e(cur_sym()) ?><?= number_format((float)$v['advance'],0) ?></td></tr>
-      <tr><td>Less: Expenses incurred by Office</td><td style="text-align:right"><?= e(cur_sym()) ?><?= number_format((float)$v['office_incurred'],0) ?></td></tr>
+      <tr style="background:var(--soft)"><td><strong>Grand Total</strong></td><td style="text-align:right"><strong><?= e(cur_sym()) ?><?= nf($sum['grand'],0) ?></strong></td></tr>
+      <tr><td>Less: Advance</td><td style="text-align:right"><?= e(cur_sym()) ?><?= nf((float)$v['advance'],0) ?></td></tr>
+      <tr><td>Less: Expenses incurred by Office</td><td style="text-align:right"><?= e(cur_sym()) ?><?= nf((float)$v['office_incurred'],0) ?></td></tr>
       <?php $bal = $sum['grand'] - (float)$v['advance'] - (float)$v['office_incurred']; ?>
-      <tr style="background:var(--soft)"><td><strong>Balance to be paid / (recovered)</strong></td><td style="text-align:right"><strong><?= e(cur_sym()) ?><?= number_format($bal,0) ?></strong></td></tr>
+      <tr style="background:var(--soft)"><td><strong>Balance to be paid / (recovered)</strong></td><td style="text-align:right"><strong><?= e(cur_sym()) ?><?= nf($bal,0) ?></strong></td></tr>
     </table>
     <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
       <a class="btn secondary" href="/voucher-print?id=<?= (int)$v['id'] ?>" target="_blank">🖨 Print / Save PDF</a>
@@ -271,8 +271,8 @@
     <?php else: ?>
       <div class="kv-grid">
         <div><span class="k">Nature</span><span class="v"><?= e($natureOpts[$v['nature']] ?? $v['nature'] ?: '—') ?></span></div>
-        <div><span class="k">Advance</span><span class="v"><?= e(cur_sym()) ?><?= number_format((float)$v['advance'],0) ?></span></div>
-        <div><span class="k">Office-incurred</span><span class="v"><?= e(cur_sym()) ?><?= number_format((float)$v['office_incurred'],0) ?></span></div>
+        <div><span class="k">Advance</span><span class="v"><?= e(cur_sym()) ?><?= nf((float)$v['advance'],0) ?></span></div>
+        <div><span class="k">Office-incurred</span><span class="v"><?= e(cur_sym()) ?><?= nf((float)$v['office_incurred'],0) ?></span></div>
       </div>
     <?php endif; ?>
     <?php if ($v['supporting_file']): ?><p style="margin-top:8px">📎 Supporting: <a href="/voucher-file?id=<?= (int)$v['id'] ?>" target="_blank"><?= e($v['supporting_name'] ?: 'file') ?></a></p><?php endif; ?>

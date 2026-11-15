@@ -65,7 +65,7 @@ $stateTone = ['OPEN'=>'p-info','TRIAL'=>'p-info','VALID'=>'p-ok','GRACE'=>'p-war
       <div class="l">Licence</div><div class="v" style="font-size:18px"><?= $e($lic['label'] ?? 'Open (unlicensed)') ?></div>
       <div class="dd"><?= isset($lic['days_left']) && $lic['days_left']!==null ? (int)$lic['days_left'].' days left' : 'no expiry set' ?></div></div>
     <div class="kpi <?= $seats>0 && $seatPct>=90 ? 'warn' : '' ?>"><div class="l">Seats used</div><div class="v tnum"><?= $used ?><?= $seats>0 ? '<span style="font-size:14px;color:var(--muted)">/'.$seats.'</span>' : '' ?></div><div class="dd"><?= $seats>0 ? $seatPct.'% of licensed' : (int)$d['active_users'].' active users' ?></div></div>
-    <div class="kpi <?= !empty($bill['enabled']) ? 'ok' : 'warn' ?>"><div class="l">Subscription</div><div class="v" style="font-size:18px"><?= !empty($bill['enabled']) ? 'Configured' : 'Not set up' ?></div><div class="dd"><?= !empty($bill['price_month']) ? $sym.number_format((float)$bill['price_month']).'/seat·mo' : 'set price + gateway' ?></div></div>
+    <div class="kpi <?= !empty($bill['enabled']) ? 'ok' : 'warn' ?>"><div class="l">Subscription</div><div class="v" style="font-size:18px"><?= !empty($bill['enabled']) ? 'Configured' : 'Not set up' ?></div><div class="dd"><?= !empty($bill['price_month']) ? $sym.nf((float)$bill['price_month']).'/seat·mo' : 'set price + gateway' ?></div></div>
     <div class="kpi"><div class="l">Delivery</div><div class="v" style="font-size:18px"><?= !empty($d['saas']) ? 'Cloud (SaaS)' : (!empty($d['self']) ? 'Self-hosted' : 'Dev') ?></div><div class="dd"><?= count($d['tenants']) ?> tenant<?= count($d['tenants'])===1?'':'s' ?> · <?= $e(strtoupper($d['db_driver'])) ?></div></div>
     <div class="kpi <?= !empty($d['books']['connected']) ? 'ok' : '' ?>"><div class="l">Books link</div><div class="v" style="font-size:18px"><?= !empty($d['books']['connected']) ? 'Connected' : (!empty($d['books']['licensed']) ? 'Licensed' : 'Off') ?></div><div class="dd">accounting sync</div></div>
   </div>
@@ -124,7 +124,7 @@ $stateTone = ['OPEN'=>'p-info','TRIAL'=>'p-info','VALID'=>'p-ok','GRACE'=>'p-war
       <div class="pb">
         <div class="kv"><span class="k">What it is</span><span>Hold client funds; release to the professional when the report is approved</span></div>
         <div class="kv"><span class="k">Status</span><span><?= (function_exists('mkt_escrow_enabled') && mkt_escrow_enabled()) ? '<span class="pill p-ok">On</span>' : '<span class="pill">Off (safe default)</span>' ?></span></div>
-        <div class="kv"><span class="k">Held now</span><span class="tnum"><?= function_exists('mkt_escrow_totals') ? e(($currency ?? '₹')) . number_format((float)(mkt_escrow_totals()['HELD'] ?? 0)) : '—' ?></span></div>
+        <div class="kv"><span class="k">Held now</span><span class="tnum"><?= function_exists('mkt_escrow_totals') ? e(($currency ?? '₹')) . nf((float)(mkt_escrow_totals()['HELD'] ?? 0)) : '—' ?></span></div>
       </div>
     </div>
     <div class="panel" style="border-left:3px solid var(--brand)"><div class="ph"><h3>Compliance rules &amp; fees</h3><span class="note"><a href="/compliance-rules">Manage ›</a></span></div>
@@ -137,7 +137,7 @@ $stateTone = ['OPEN'=>'p-info','TRIAL'=>'p-info','VALID'=>'p-ok','GRACE'=>'p-war
     <div class="panel" style="border-left:3px solid var(--brand)"><div class="ph"><h3>Financial control</h3><span class="note"><a href="/financial-control">Open ›</a></span></div>
       <div class="pb">
         <div class="kv"><span class="k">What it is</span><span>GMV vs Connect revenue vs provider cost — kept strictly separate</span></div>
-        <div class="kv"><span class="k">This month GMV</span><span class="tnum"><?= function_exists('mkt_ledger_totals') ? e(($currency ?? '₹')) . number_format((float)(mkt_ledger_totals(date('Y-m-01'))['GMV'] ?? 0)) : '—' ?></span></div>
+        <div class="kv"><span class="k">This month GMV</span><span class="tnum"><?= function_exists('mkt_ledger_totals') ? e(($currency ?? '₹')) . nf((float)(mkt_ledger_totals(date('Y-m-01'))['GMV'] ?? 0)) : '—' ?></span></div>
         <div class="kv"><span class="k">Take rate</span><span class="tnum"><?= function_exists('mkt_take_rate') ? mkt_take_rate(date('Y-m-01')) . '%' : '—' ?></span></div>
       </div>
     </div>
@@ -150,7 +150,7 @@ $stateTone = ['OPEN'=>'p-info','TRIAL'=>'p-info','VALID'=>'p-ok','GRACE'=>'p-war
     <div class="panel"><div class="ph"><h3>Subscription &amp; billing</h3><span class="note"><a href="/billing">Manage ›</a></span></div>
       <div class="pb">
         <div class="kv"><span class="k">Gateway</span><span><?= !empty($bill['enabled']) ? '<span class="pill p-ok">Razorpay set</span>' : '<span class="pill p-warn">Not configured</span>' ?></span></div>
-        <div class="kv"><span class="k">Price / seat</span><span class="tnum"><?= !empty($bill['price_month']) ? $sym.number_format((float)$bill['price_month']).' /mo' : '—' ?><?= !empty($bill['price_year']) ? ' · '.$sym.number_format((float)$bill['price_year']).' /yr' : '' ?></span></div>
+        <div class="kv"><span class="k">Price / seat</span><span class="tnum"><?= !empty($bill['price_month']) ? $sym.nf((float)$bill['price_month']).' /mo' : '—' ?><?= !empty($bill['price_year']) ? ' · '.$sym.nf((float)$bill['price_year']).' /yr' : '' ?></span></div>
         <div class="kv"><span class="k">Currency</span><span><?= $e($bill['currency'] ?? 'INR') ?></span></div>
         <div class="kv"><span class="k">Model</span><span>Per active seat · monthly or yearly</span></div>
         <?php if (empty($bill['enabled'])): ?><div class="warnbox">To start charging: set the Razorpay keys and per‑seat price under <a href="/billing">Billing</a>.</div><?php endif; ?>
@@ -180,7 +180,7 @@ $stateTone = ['OPEN'=>'p-info','TRIAL'=>'p-info','VALID'=>'p-ok','GRACE'=>'p-war
     <div class="panel" style="<?= $tk==='PRO' ? 'border:2px solid var(--brand)' : '' ?>">
       <div class="ph"><h3><?= $e($t['label']) ?><?php if ($tk==='PRO'): ?> <span class="pill p-info" style="margin-left:4px">Popular</span><?php endif; ?></h3></div>
       <div class="pb">
-        <div style="font-size:20px;font-weight:800"><?= $price>0 ? $sym.number_format($price*$mult[$tk]).' <span style="font-size:12px;font-weight:600;color:var(--muted)">/seat·mo</span>' : '<span class="muted" style="font-size:14px;font-weight:600">price in Billing</span>' ?></div>
+        <div style="font-size:20px;font-weight:800"><?= $price>0 ? $sym.nf($price*$mult[$tk]).' <span style="font-size:12px;font-weight:600;color:var(--muted)">/seat·mo</span>' : '<span class="muted" style="font-size:14px;font-weight:600">price in Billing</span>' ?></div>
         <p class="muted" style="font-size:12.5px;margin:4px 0 8px"><?= $e($t['pitch']) ?></p>
         <div class="mods">
           <?php foreach ($t['mods'] as $mk): $lbl = $ml[$mk] ?? ucfirst($mk); ?>
@@ -195,7 +195,7 @@ $stateTone = ['OPEN'=>'p-info','TRIAL'=>'p-info','VALID'=>'p-ok','GRACE'=>'p-war
 
   <!-- SEAT CLASSES / COST BREAKDOWN -->
   <?php $sc = $d['seat_classes'] ?? null; if ($sc): $cls = $sc['classes']; $cur = $sc['currency'] ?? 'INR';
-    $fmt = fn($n) => $sym.number_format((float)$n);
+    $fmt = fn($n) => $sym.nf((float)$n);
     $classTone = ['FULL'=>'p-info','FIELD'=>'p-ok','PORTAL'=>'p-mut']; ?>
   <div class="band"><h2>Seat classes &amp; monthly cost</h2><span class="bd">roles are priced by class, so a field inspector never costs what a manager does · <a href="/billing">set prices ›</a></span></div>
   <div class="g2">

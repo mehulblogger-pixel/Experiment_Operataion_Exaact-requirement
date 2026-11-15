@@ -1,5 +1,5 @@
 <?php
-  $m  = fn($n) => cur_sym() . number_format((float)$n, 2);
+  $m  = fn($n) => cur_sym() . nf((float)$n, 2);
   $qn = fn($n) => rtrim(rtrim(number_format((float)$n, 3, '.', ''), '0'), '.');
   // Seller identity comes from the one "Your company" profile (Admin → Company
   // profile), the same source the quote letterhead and GST export already use.
@@ -138,7 +138,7 @@
     <?php endif; ?>
     <tr class="tot"><td colspan="7" class="r">Total</td><td class="r"><?= $m($inv['total']) ?></td></tr>
     <?php if ((float)($inv['tds_amount'] ?? 0) > 0): ?>
-      <tr><td colspan="7" class="r">Less: TDS @ <?= e(rtrim(rtrim(number_format((float)$inv['tds_pct'],2),'0'),'.')) ?>% (on taxable value)</td><td class="r">− <?= $m($inv['tds_amount']) ?></td></tr>
+      <tr><td colspan="7" class="r">Less: TDS @ <?= e(rtrim(rtrim(nf((float)$inv['tds_pct'],2),'0'),'.')) ?>% (on taxable value)</td><td class="r">− <?= $m($inv['tds_amount']) ?></td></tr>
       <tr class="tot"><td colspan="7" class="r">Net payable</td><td class="r"><?= $m(function_exists('books_net_payable') ? books_net_payable($inv) : ((float)$inv['total'] - (float)$inv['tds_amount'])) ?></td></tr>
     <?php endif; ?>
     <?php // Retention on a milestone bill (owner, 12 Nov 2026): part of the value, payable later.
@@ -146,10 +146,10 @@
       if ($msRet && $msRet['amount'] > 0):
         $netNow = (function_exists('books_net_payable') ? books_net_payable($inv) : (float)$inv['total']) - $msRet['amount']; ?>
       <?php if ($msRet['due_on'] === ''): ?>
-        <tr><td colspan="7" class="r">Less: retention <?= e(rtrim(rtrim(number_format((float)$msRet['pct'],2),'0'),'.')) ?>% — payable when “<?= e($msRet['release']) ?>” is reached</td><td class="r">− <?= $m($msRet['amount']) ?></td></tr>
+        <tr><td colspan="7" class="r">Less: retention <?= e(rtrim(rtrim(nf((float)$msRet['pct'],2),'0'),'.')) ?>% — payable when “<?= e($msRet['release']) ?>” is reached</td><td class="r">− <?= $m($msRet['amount']) ?></td></tr>
         <tr class="tot"><td colspan="7" class="r">Payable now</td><td class="r"><?= $m($netNow) ?></td></tr>
       <?php else: ?>
-        <tr><td colspan="7" class="r">Includes retention <?= e(rtrim(rtrim(number_format((float)$msRet['pct'],2),'0'),'.')) ?>% (<?= $m($msRet['amount']) ?>) — payable now: “<?= e($msRet['release']) ?>” reached <?= e(fdate($msRet['due_on'])) ?></td><td class="r"></td></tr>
+        <tr><td colspan="7" class="r">Includes retention <?= e(rtrim(rtrim(nf((float)$msRet['pct'],2),'0'),'.')) ?>% (<?= $m($msRet['amount']) ?>) — payable now: “<?= e($msRet['release']) ?>” reached <?= e(fdate($msRet['due_on'])) ?></td><td class="r"></td></tr>
       <?php endif; ?>
     <?php endif; ?>
   </tfoot>

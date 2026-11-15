@@ -1521,7 +1521,7 @@ function crm_quote_rule_steps($q) {
 // that unit (test book SAL-005, "Industrial only: Business Unit Head").
 function crm_approval_band_problem(array $cand, $excludeId = 0) {
     if (empty($cand['active'])) return '';                  // a level not in use cannot clash
-    $money = fn($n) => function_exists('fmoney') ? fmoney($n) : number_format((float)$n);
+    $money = fn($n) => function_exists('fmoney') ? fmoney($n) : nf((float)$n);
     $range = fn($r) => (float)$r['max_amount'] > 0 ? $money($r['min_amount']) . ' to ' . $money($r['max_amount']) : $money($r['min_amount']) . ' upward';
     $inf = fn($r) => (float)$r['max_amount'] > 0 ? (float)$r['max_amount'] : INF;
     $cUnit = crm_rule_is_unit($cand);
@@ -2099,6 +2099,10 @@ function ops_crm_inquiries($route, $method) {
             $funnel[(string)$fr['status']] = ($funnel[(string)$fr['status']] ?? 0) + (int)$fr['n']; $funnel['ALL'] += (int)$fr['n'];
         }
         if ($stW !== null) { $w[] = 'i.status=?'; $args[] = $stW; }
+        // DEF-SAL-024 — the cards count groups of statuses, so their links filter by the same groups:
+        // "Quoted" = ever quoted (awaiting an answer, won or lost); "Lost · Dropped" = both.
+        $stGroups = ['QUOTED_ANY' => ['QUOTED', 'WON', 'LOST'], 'LOST_DROPPED' => ['LOST', 'DROPPED']];
+        if ($stW === null && isset($stGroups[$st])) { $w[] = 'i.status IN (' . implode(',', array_fill(0, count($stGroups[$st]), '?')) . ')'; $args = array_merge($args, $stGroups[$st]); }
         // origin_ref = the lead this inquiry was converted from (if any), so the
         // register shows where it came from.
         //  l.owner_name: an enquiry raised before 12 Nov from a lead whose owner
@@ -2544,6 +2548,18 @@ function ops_crm_quotes($route, $method) {
             // D-12 — a blacklisted, inactive, on-hold or blocked customer gets no
             // quotation (new, or moved onto them by an edit).
             elseif ($cid && ($tb = partner_trade_block($cid)) !== '') $refused = $tb;
+            // DEF-SAL-037 — browser Back brings the form again with a FRESH one-time key (pages are not
+            // cached), so the key alone cannot see the repeat. The same person, for the same customer and
+            // subject, within 15 minutes, is treated as the same quotation: say so and link to it. A real
+            // second quotation is one tick away ("Save it as a separate quotation").
+            if ($refused === null && !$q && ($b['dup_ok'] ?? '') !== '1') {
+                $dupName = $cid ? '' : trim((string)($b['client_name'] ?? ''));
+                $dupOf = ops_one("SELECT id, quote_no, created_at FROM quotations WHERE created_by=? AND subject=? AND "
+                    . ($cid ? "client_id=?" : "client_id IS NULL AND COALESCE(client_name,'')=?") . " AND created_at>=? ORDER BY id DESC LIMIT 1",
+                    [user_name(current_user()), trim((string)($b['subject'] ?? '')), $cid ? (int)$cid : $dupName, date('c', time() - 900)]) ?: null;
+                if ($dupOf) $refused = 'You saved this same ' . Tl('quote') . ' (' . $dupOf['quote_no'] . ') a few minutes ago, so it was not saved again. Open '
+                    . $dupOf['quote_no'] . ' below — or, if this really is a separate ' . Tl('quote') . ', tick "Save it as a separate ' . Tl('quote') . '" and press Create again.';
+            }
             // D-11 A — prices changed away from the costing need the creator and a note.
             if ($refused === null && $q) { [$cep, $costingOf] = crm_quote_costing_edit_problem($q, $b); if ($cep !== '') $refused = $cep; }
         }
@@ -2665,7 +2681,7 @@ function ops_crm_quotes($route, $method) {
                 $preClient = ['client_id' => $pc];
         }
         view('ops/crm/quote_form', ['q' => $q, 'lines' => $pLines ?? ($q ? crm_quote_lines($q['id']) : []), 'preInq' => $preInq, 'preLead' => $preLead, 'preClient' => $preClient,
-            'locations' => $pLocs ?? ($q ? crm_quote_locations($q['id']) : []), 'posted' => $posted,
+            'locations' => $pLocs ?? ($q ? crm_quote_locations($q['id']) : []), 'posted' => $posted, 'dupOf' => $dupOf ?? null,
             'clients' => clients_list(), 'vendors' => vendors_list(), 'offices' => offices_list(), 'sbuOpts' => lk_options_or('sbu', OPS_SBUS),
             'svcOpts' => lk_options_or('inspection_type', INSPECTION_TYPES), 'unitOpts' => lk_options_or('charge_unit', CHARGE_UNITS),
             'orderOpts' => lk_options_or('order_type', ORDER_TYPES), 'locTypes' => lk_options_or('site_location_type', SITE_LOCATION_TYPES),
@@ -3344,6 +3360,7 @@ function ops_crm_quotes($route, $method) {
                 //  (Admin → Approvals → Sales → Contract). With none, it is open now.
                 $openStatus = function_exists('contract_after_register') ? contract_after_register($contractId, (int)$q['id']) : 'PENDING';
                 $isNew = $openStatus === 'PENDING';
+                $openedNow = $openStatus === 'OPEN';   // a new contract the company's rule ("None") opened at once
             }
         }
         // Point 3 — the order the contract was read from is attached to it, so the
@@ -3367,7 +3384,12 @@ function ops_crm_quotes($route, $method) {
         }
         // Existing OPEN contract (rate-contract draw-down) — float straight away.
         $ok = $openStatus === 'OPEN' ? crm_float_ops_packet(crm_quote_get($q['id'])) : false;
-        if ($openStatus === 'OPEN') {
+        if ($openStatus === 'OPEN' && !empty($openedNow)) {
+            // DEF-SAL-010 — a NEW contract opened at once because the company asks for no approval:
+            // say that, not the rate-contract draw-down sentence.
+            flash('Contract ' . $contractNo . ' registered and open — your company asks for no approval to open a contract. '
+                . ($ok ? 'The operations packet has been e-mailed to the team.' : 'The operations packet was logged (set up e-mail in Settings to send it).'), $ok ? 'success' : 'warning');
+        } elseif ($openStatus === 'OPEN') {
             flash($ok ? 'Client & contract registered — the operations packet has been e-mailed to the team.' : 'Client & contract registered. The ops packet was logged (configure SMTP in Settings to e-mail it).', $ok ? 'success' : 'warning');
         } else {
             flash('Registered against contract ' . $contractNo . ', which is still ' . strtolower(CONTRACT_OPEN_STATES[$openStatus] ?? $openStatus) . '.', 'warning');
@@ -3548,7 +3570,10 @@ function ops_crm_quotes($route, $method) {
         $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
         ops_require(can('crm.quote.send') || can('crm.quote.create') || is_master(), 'You cannot change follow-ups.');
         $do = $_POST['do'] ?? 'save';
-        if ($do === 'add') {
+        if ($do === 'add' && trim((string)($_POST['note'] ?? '')) === '') {
+            // DEF-SAL-033 — an empty "+ Add" saved a blank follow-up row.
+            flash('Say what the follow-up is (for example "Call Ravi about the PO") — nothing was added.', 'error');
+        } elseif ($do === 'add') {
             $due = trim($_POST['due_date'] ?? '') ?: date('Y-m-d');
             $pdo->prepare("INSERT INTO quote_followups (quote_id,kind,due_date,status,note,created_at) VALUES (?,?,?, 'PENDING', ?, ?)")
                 ->execute([$q['id'], trim($_POST['kind'] ?? 'MANUAL') ?: 'MANUAL', $due, trim($_POST['note'] ?? ''), date('c')]);
@@ -3996,14 +4021,14 @@ function crm_float_ops_packet($q) {
         . "Contact: " . trim($q['contact_name'] . ' · ' . $q['contact_email'] . ' · ' . $q['contact_mobile'], ' ·') . "\n"
         . "Business Unit: " . (lk_options_or('sbu', OPS_SBUS)[$q['sbu']] ?? $q['sbu']) . "\n"
         . "Location: " . ($q['site_location'] ?: '—') . " (" . (lk_options_or('quote_location_type', QUOTE_LOCATION_TYPES)[$q['location_type']] ?? $q['location_type']) . ")\n"
-        . "Value: " . cur_sym() . number_format((float)$q['total_amount'], 0) . "\n"
-        . ($q['advance_required'] ? "** ADVANCE REQUIRED before scheduling (" . rtrim(rtrim(number_format((float)$q['advance_pct'], 2), '0'), '.') . "%) **\n" : "")
+        . "Value: " . cur_sym() . nf((float)$q['total_amount'], 2) . "\n"
+        . ($q['advance_required'] ? "** ADVANCE REQUIRED before scheduling (" . rtrim(rtrim(nf((float)$q['advance_pct'], 2), '0'), '.') . "%) **\n" : "")
         . ($q['report_vs_payment'] ? "** Deliverable/report only against payment **\n" : "")
         . "\nService requirement:\n" . $svc . "\n\nOrder lines:\n";
     foreach ($lines as $i => $l) {
         $b .= ($i + 1) . ". [" . (lk_options_or('order_type', ORDER_TYPES)[$l['order_type']] ?? $l['order_type']) . "] " . $l['description']
-            . " — " . rtrim(rtrim(number_format((float)$l['qty'], 2), '0'), '.') . " " . (lk_options_or('charge_unit', CHARGE_UNITS)[$l['unit']] ?? $l['unit'])
-            . " x " . cur_sym() . number_format((float)$l['rate'], 0) . " = " . cur_sym() . number_format((float)$l['amount'], 0) . "\n";
+            . " — " . rtrim(rtrim(nf((float)$l['qty'], 2), '0'), '.') . " " . (lk_options_or('charge_unit', CHARGE_UNITS)[$l['unit']] ?? $l['unit'])
+            . " x " . cur_sym() . nf((float)$l['rate'], 2) . " = " . cur_sym() . nf((float)$l['amount'], 2) . "\n";
     }
     $att = [];
     $tpl = ops_one("SELECT * FROM crm_templates WHERE kind='QUOTE_DOC' AND active=1 ORDER BY is_default DESC, id DESC");
@@ -4498,7 +4523,7 @@ function crm_fill_email($text, $q) {
     $m = [
         'quote_no' => $q['quote_no'], 'quote_label' => quote_label($q), 'subject' => $q['subject'],
         'client_name' => $q['client_name'], 'contact_name' => $q['contact_name'],
-        'total_amount' => cur_sym() . number_format((float)$q['total_amount'], 0), 'validity_days' => $q['validity_days'],
+        'total_amount' => cur_sym() . nf((float)$q['total_amount'], 2), 'validity_days' => $q['validity_days'],
         'sbu' => lk_options_or('sbu', OPS_SBUS)[$q['sbu']] ?? $q['sbu'], 'app_name' => app_name(),
     ];
     foreach ($m as $k => $v) $text = str_replace('{{' . $k . '}}', (string)$v, $text);
@@ -4507,13 +4532,13 @@ function crm_fill_email($text, $q) {
 function crm_default_quote_email($q) {
     return "Dear " . ($q['contact_name'] ?: 'Sir/Madam') . ",\n\n"
         . "Please find attached our quotation " . quote_label($q) . " for " . ($q['subject'] ?: 'your requirement') . ".\n"
-        . "Total value: " . cur_sym() . number_format((float)$q['total_amount'], 0) . " (valid " . (int)$q['validity_days'] . " days).\n\n"
+        . "Total value: " . cur_sym() . nf((float)$q['total_amount'], 2) . " (valid " . (int)$q['validity_days'] . " days).\n\n"
         . "We look forward to your confirmation.\n\nBest regards,\n" . app_name();
 }
 function crm_default_followup_email($q, $kind = '') {
     return "Dear " . ($q['contact_name'] ?: 'Sir/Madam') . ",\n\n"
         . "Gentle follow-up on our quotation " . quote_label($q) . " for " . ($q['subject'] ?: 'your requirement')
-        . " (" . cur_sym() . number_format((float)$q['total_amount'], 0) . ").\n"
+        . " (" . cur_sym() . nf((float)$q['total_amount'], 2) . ").\n"
         . "We would be glad to address any questions or revise as needed.\n\nBest regards,\n" . app_name();
 }
 // Subject + body for a quotation e-mail, from the template if one is set up.
@@ -4711,9 +4736,9 @@ function docx_line_map($l, $i) {
         'l_service' => lk_options_or('inspection_type', INSPECTION_TYPES)[$l['service_type']] ?? $l['service_type'],
         'l_subtypes' => $l['subtypes'], 'l_desc' => $l['description'], 'l_location' => $l['location'],
         'l_order' => lk_options_or('order_type', ORDER_TYPES)[$l['order_type']] ?? $l['order_type'],
-        'l_qty' => rtrim(rtrim(number_format((float)$l['qty'], 2), '0'), '.'),
+        'l_qty' => rtrim(rtrim(nf((float)$l['qty'], 2), '0'), '.'),
         'l_unit' => lk_options_or('charge_unit', CHARGE_UNITS)[$l['unit']] ?? $l['unit'],
-        'l_rate' => number_format((float)$l['rate'], 2), 'l_amount' => number_format((float)$l['amount'], 2),
+        'l_rate' => nf((float)$l['rate'], 2), 'l_amount' => nf((float)$l['amount'], 2),
     ];
 }
 // If a table row contains {{l_desc}}, clone that row once per line item.
@@ -4767,10 +4792,10 @@ function quote_doc_map($q, $tpl) {
         'sbu' => lk_options_or('sbu', OPS_SBUS)[$q['sbu']] ?? $q['sbu'], 'subject' => $q['subject'],
         'site_location' => $q['site_location'], 'location_type' => lk_options_or('quote_location_type', QUOTE_LOCATION_TYPES)[$q['location_type']] ?? $q['location_type'],
         'validity_days' => $q['validity_days'], 'payment_terms' => $q['payment_terms'],
-        'advance_pct' => rtrim(rtrim(number_format((float)$q['advance_pct'], 2), '0'), '.'),
+        'advance_pct' => rtrim(rtrim(nf((float)$q['advance_pct'], 2), '0'), '.'),
         'currency' => $q['currency'], 'office_name' => $off ?: '',
-        'subtotal' => number_format((float)$q['subtotal'], 2), 'gst_pct' => rtrim(rtrim(number_format((float)$q['gst_pct'], 2), '0'), '.'),
-        'gst_amount' => number_format((float)$q['gst_amount'], 2), 'total_amount' => number_format((float)$q['total_amount'], 2),
+        'subtotal' => nf((float)$q['subtotal'], 2), 'gst_pct' => rtrim(rtrim(nf((float)$q['gst_pct'], 2), '0'), '.'),
+        'gst_amount' => nf((float)$q['gst_amount'], 2), 'total_amount' => nf((float)$q['total_amount'], 2),
         'total_in_words' => amount_in_words_inr((float)$q['total_amount']),
         // Controlled-document identity carried from the uploaded FORMAT
         'doc_number' => $tpl['document_number'] ?? '', 'format_number' => $tpl['format_number'] ?? '',

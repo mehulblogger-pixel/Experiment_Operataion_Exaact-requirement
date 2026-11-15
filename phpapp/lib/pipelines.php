@@ -143,7 +143,12 @@ function pipe_update($id, array $b) {
     $name = trim((string)($b['pipeline_name'] ?? $p['name']));
     if ($name === '') return 'A pipeline needs a name.';
     if (is_array($b['pipeline_name'] ?? null)) return 'The pipeline name came through as a list, which means a form field is misnamed.';
-    $active = !empty($b['active']) ? 1 : 0;
+    // DEF-SAL-032 — the pipeline's own "In use" box is pipe_active. It used to be called `active`,
+    // the same name as the stage boxes active[<stage>], so PHP merged them into one non-empty list and
+    // an unticked pipeline always read as "in use". A plain (non-list) `active` is still honoured.
+    $active = array_key_exists('pipe_active', $b) || !array_key_exists('active', $b) || is_array($b['active'])
+        ? (!empty($b['pipe_active']) ? 1 : 0)
+        : (!empty($b['active']) ? 1 : 0);
     // Retiring the default would leave new deals with nowhere to land.
     if (!$active && (int)$p['is_default'])
         return 'This is the default pipeline. Make another one the default first, then retire this.';
@@ -191,6 +196,20 @@ function pipe_stages_save($pipelineId, array $b) {
     if (!$p) return 'That pipeline no longer exists.';
     $names = (array)($b['name'] ?? []);
     if (!$names) return 'Nothing to save.';
+    // DEF-SAL-023 — each row carries an Order box. Rows are saved in that order (ties keep
+    // their place on screen), so a new stage added at the end can be moved before Won / Lost.
+    $ord = (array)($b['order'] ?? []);
+    if ($ord) {
+        $pos = 0; $keyed = [];
+        // A row whose number was changed goes IN FRONT of a row that already held that number
+        // (typing 2 on the new stage makes it second); untouched rows keep their order.
+        foreach ($names as $sid => $nm) {
+            $o = $ord[$sid] ?? ''; $o = is_numeric($o) ? (float)$o : (float)($pos + 1);
+            $keyed[] = [$o, $o == $pos + 1 ? 1 : 0, $pos, $sid, $nm]; $pos++;
+        }
+        usort($keyed, fn($x, $y) => [$x[0], $x[1], $x[2]] <=> [$y[0], $y[1], $y[2]]);
+        $names = []; foreach ($keyed as $k) $names[$k[3]] = $k[4];
+    }
     $seq = 0;
     foreach ($names as $sid => $nm) {
         $sid = (int)$sid;

@@ -54,8 +54,8 @@
         <input class="form-control" type="number" name="seats" id="seats" min="1" max="1000" value="<?= max(1, $used, (int)($grant['seats'] ?? 0)) ?>" oninput="calc()"></div>
       <div class="ff"><label>Billing</label>
         <select class="form-control" name="period" id="period" onchange="calc()">
-          <?php if ($pm > 0): ?><option value="month">Monthly — <?= e($sym) ?><?= number_format($pm) ?> / person / month</option><?php endif; ?>
-          <?php if ($py > 0): ?><option value="year">Annual — <?= e($sym) ?><?= number_format($py) ?> / person / year</option><?php endif; ?>
+          <?php if ($pm > 0): ?><option value="month">Monthly — <?= e($sym) ?><?= nf($pm) ?> / person / month</option><?php endif; ?>
+          <?php if ($py > 0): ?><option value="year">Annual — <?= e($sym) ?><?= nf($py) ?> / person / year</option><?php endif; ?>
         </select></div>
     </div>
     <p class="sub" style="margin:10px 0 4px">Total: <strong id="total" style="font-size:18px"></strong> <span class="muted" id="totnote"></span></p>
@@ -104,7 +104,7 @@
     <?php foreach ($history as $h): ?>
       <tr><td class="muted"><?= e(fdate(substr((string)$h['created_at'],0,10))) ?></td>
         <td><?= (int)$h['seats'] ?></td><td class="muted"><?= e($h['period']) ?></td>
-        <td><?= e(($h['currency']==='INR'?'₹':$h['currency'].' ') . number_format((int)$h['amount'])) ?></td>
+        <td><?= e(($h['currency']==='INR'?'₹':$h['currency'].' ') . nf((int)$h['amount'])) ?></td>
         <td class="muted"><?= e(fdate($h['paid_until'])) ?></td><td class="muted"><?= e($h['by_user']) ?></td></tr>
     <?php endforeach; ?>
     </tbody>

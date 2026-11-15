@@ -34,7 +34,7 @@ try {
     $odd = ms_with_amounts([['pct' => 33.3333], ['pct' => 33.3333], ['pct' => 33.3334]], 1000);
     t_eq(round(array_sum(array_column($odd, 'amount')), 2), 1000.0, 'thirds still add up to the price exactly (the last share takes the rounding)');
     $pdf = implode("\n", ms_pdf_lines(crm_quote_get($qid)));
-    t_ok(strpos($pdf, 'Design approved — 40% — 400,000.00 plus GST') !== false && strpos($pdf, 'Retention: 10%') !== false, 'the printed quotation lists the milestones and the retention');
+    t_ok(strpos($pdf, 'Design approved — 40% — 4,00,000.00 plus GST') !== false && strpos($pdf, 'Retention: 10%') !== false, 'the printed quotation lists the milestones and the retention');
 
     $pdo->prepare("INSERT INTO quotations (quote_no, rev, is_current, client_id, status, subtotal, created_at) VALUES (?, 1, 1, ?, 'DRAFT', 1000000, ?)")->execute(['MSB-Q-' . getmypid(), $pid, date('c')]);
     $rev = (int)$pdo->lastInsertId();

@@ -29,7 +29,7 @@ $total = $from !== '' ? max(1, (int) round((strtotime($until) - strtotime($from)
                       : max(1, (int) round((strtotime($until) - strtotime($until . ($per === 'year' ? ' -1 year' : ' -1 month'))) / 86400));
 $share = min(1, $left / $total);
 $gst = function_exists('commercial_gst_cfg') ? commercial_gst_cfg() : ['on' => false];
-$gstNote = !empty($gst['on']) ? ($gst['mode'] === 'inclusive' ? ' (GST included)' : ' + ' . rtrim(rtrim(number_format((float) $gst['rate'], 2), '0'), '.') . '% GST') : '';
+$gstNote = !empty($gst['on']) ? ($gst['mode'] === 'inclusive' ? ' (GST included)' : ' + ' . rtrim(rtrim(nf((float) $gst['rate'], 2), '0'), '.') . '% GST') : '';
 $fd = fn($d) => function_exists('fdate') ? fdate($d) : $d;
 $renewOn = date('Y-m-d', strtotime($until . ' +1 day'));
 $ren = $next ?: ['mods' => $have, 'seats' => (int) $current['seats'], 'packs' => (int) ($current['packs'] ?? 0), 'period' => $per];
@@ -50,18 +50,18 @@ $inp = 'width:110px;padding:9px 10px;border:1px solid var(--line,#e5e7eb);border
         <?php if ($own): ?><span style="color:#047857;font-weight:800;margin-top:1px">✓</span>
         <?php else: ?><input type="checkbox" name="add_mods[]" value="<?= $e($k) ?>" class="ad-mod" data-p="<?= $p ?>" <?= $p > 0 ? '' : 'disabled' ?> style="margin-top:3px;width:18px;height:18px"><?php endif; ?>
         <span><span style="font-weight:600"><?= $e($modLabel($k)) ?></span><br>
-          <span class="sub" style="font-size:12px"><?= $own ? 'In your plan' : ($p > 0 ? 'Add · ' . $e($sym . number_format($p)) . ' / ' . $perWord : 'Not for sale yet') ?></span></span>
+          <span class="sub" style="font-size:12px"><?= $own ? 'In your plan' : ($p > 0 ? 'Add · ' . $e($sym . nf($p)) . ' / ' . $perWord : 'Not for sale yet') ?></span></span>
       </label>
     <?php endforeach; ?>
   </div>
   <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px">
     <div><label for="ad-logins" style="font-size:13px;font-weight:600;display:block;margin-bottom:3px">Add logins</label>
       <input type="number" name="add_logins" id="ad-logins" min="0" value="0" style="<?= $inp ?>">
-      <span class="sub" style="font-size:12px;margin-left:6px">you have <?= (int) $current['seats'] ?>, <?= $used ?> in use · <?= $e($sym . number_format($seatP)) ?> / <?= $perWord ?> each</span></div>
+      <span class="sub" style="font-size:12px;margin-left:6px">you have <?= (int) $current['seats'] ?>, <?= $used ?> in use · <?= $e($sym . nf($seatP)) ?> / <?= $perWord ?> each</span></div>
     <?php if ($packP > 0): ?>
-    <div><label for="ad-packs" style="font-size:13px;font-weight:600;display:block;margin-bottom:3px">Add storage packs (<?= $e(rtrim(rtrim(number_format((float) $pk['gb'], 2), '0'), '.')) ?> GB each)</label>
+    <div><label for="ad-packs" style="font-size:13px;font-weight:600;display:block;margin-bottom:3px">Add storage packs (<?= $e(rtrim(rtrim(nf((float) $pk['gb'], 2), '0'), '.')) ?> GB each)</label>
       <input type="number" name="add_packs" id="ad-packs" min="0" value="0" style="<?= $inp ?>">
-      <span class="sub" style="font-size:12px;margin-left:6px">you have <?= (int) ($current['packs'] ?? 0) ?> · <?= $e($sym . number_format($packP)) ?> / <?= $perWord ?> each</span></div>
+      <span class="sub" style="font-size:12px;margin-left:6px">you have <?= (int) ($current['packs'] ?? 0) ?> · <?= $e($sym . nf($packP)) ?> / <?= $perWord ?> each</span></div>
     <?php endif; ?>
   </div>
   <?php include __DIR__ . '/_billto.php'; ?>
@@ -78,7 +78,7 @@ $inp = 'width:110px;padding:9px 10px;border:1px solid var(--line,#e5e7eb);border
   <h3 style="margin:0 0 2px;font-size:15px">Your renewal</h3>
   <p style="margin:0 0 10px;font-size:13.5px">On <b><?= $e($fd($renewOn)) ?></b> your plan renews as:
     <b><?= $e(implode(', ', array_map($modLabel, (array) $ren['mods']))) ?></b> + Administration, <?= (int) $ren['seats'] ?> logins<?= (int) ($ren['packs'] ?? 0) ? ', ' . (int) $ren['packs'] . ' storage pack' . ((int) $ren['packs'] === 1 ? '' : 's') : '' ?>,
-    <?= $renPer === 'year' ? 'yearly' : 'monthly' ?> — <b><?= $e($sym . number_format((int) $renQ['total'])) ?></b> / <?= $renPer ?><?= $e($gstNote) ?>.
+    <?= $renPer === 'year' ? 'yearly' : 'monthly' ?> — <b><?= $e($sym . nf((int) $renQ['total'])) ?></b> / <?= $renPer ?><?= $e($gstNote) ?>.
     <?= $next && !empty($next['paid']) ? '<span style="color:#047857;font-weight:600">Already paid.</span>' : '' ?></p>
   <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
     <?php if (!($next && !empty($next['paid']))): ?>

@@ -21,7 +21,7 @@
         <td><b><?= e($a['person_name'] ?: '—') ?></b><?= $a['job_code'] ? '<br><span style="color:var(--muted,#888);font-size:12px">'.e($a['job_code']).'</span>' : '' ?></td>
         <td><?= e($fmt($a['period_from'])) ?> – <?= e($fmt($a['period_to'])) ?></td>
         <td><?= e($a['basis'] ?: '—') ?></td>
-        <td><?= (float)$a['billable_days'] ? e(rtrim(rtrim(number_format((float)$a['billable_days'],1),'0'),'.')).' days' : '' ?><?= (float)$a['billable_hours'] ? ' '.e(rtrim(rtrim(number_format((float)$a['billable_hours'],1),'0'),'.')).' h' : '' ?></td>
+        <td><?= (float)$a['billable_days'] ? e(rtrim(rtrim(nf((float)$a['billable_days'],1),'0'),'.')).' days' : '' ?><?= (float)$a['billable_hours'] ? ' '.e(rtrim(rtrim(nf((float)$a['billable_hours'],1),'0'),'.')).' h' : '' ?></td>
         <td>
           <form method="post" action="/portal/dep-approve" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
             <input type="hidden" name="id" value="<?= (int)$a['id'] ?>">
@@ -86,7 +86,7 @@
       <tr>
         <td><?= e($a['person_name'] ?: '—') ?></td>
         <td><?= e($fmt($a['period_from'])) ?> – <?= e($fmt($a['period_to'])) ?></td>
-        <td><?= (float)$a['billable_days'] ? e(rtrim(rtrim(number_format((float)$a['billable_days'],1),'0'),'.')).' days' : '—' ?></td>
+        <td><?= (float)$a['billable_days'] ? e(rtrim(rtrim(nf((float)$a['billable_days'],1),'0'),'.')).' days' : '—' ?></td>
         <td><?php $c = $a['status']==='APPROVED'?'var(--ok)':($a['status']==='REJECTED'?'var(--bad)':'inherit'); ?>
           <b style="color:<?= $c ?>"><?= e($apLabel[$a['status']] ?? $a['status']) ?></b></td>
         <td><?= e($a['client_rep'] ?: '—') ?><?= $a['approved_on'] ? '<br><span style="color:var(--muted,#888);font-size:12px">'.e($fmt($a['approved_on'])).'</span>' : '' ?></td>

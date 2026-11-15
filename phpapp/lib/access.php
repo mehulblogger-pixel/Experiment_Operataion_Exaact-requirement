@@ -2120,6 +2120,9 @@ function fy_options($n = 6) {
         ['calls', ['inspection_required_date', 'call_received_date', 'created_at']],
         ['crm_inquiries', ['created_at']],
         ['quotations', ['created_at']],
+        // DEF-SAL-026 — a year with only leads or deals could not be picked on the Leads board.
+        ['leads', ['created_at']],
+        ['opportunities', ['created_at']],
     ];
     foreach ($spans as [$table, $cols]) {
         foreach ($cols as $c) {

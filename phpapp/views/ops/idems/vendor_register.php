@@ -54,7 +54,7 @@
         <td><?= e($typeOpts[$r['vendor_type']] ?? ($r['vendor_type'] ?: '—')) ?></td>
         <td><?= e($r['product_category'] ? (lk_options_or('vendor_product_category',[])[$r['product_category']] ?? $r['product_category']) : '—') ?></td>
         <td><?php $rk=$r['risk_class']; ?><?= $rk ? '<span class="pill '.($rk==='CRITICAL'||$rk==='HIGH'?'p-bad':($rk==='MEDIUM'?'p-warn':'p-mut')).'">'.e($riskOpts[$rk] ?? $rk).'</span>' : '—' ?></td>
-        <td><?php if ($r['last_score']!==null && $r['last_score']!==''): $c=$scoreCol($r['last_score']); ?><span style="font-weight:700;color:<?= $c ?>;font-variant-numeric:tabular-nums"><?= e(rtrim(rtrim(number_format((float)$r['last_score'],1),'0'),'.')) ?></span><span class="muted" style="font-size:11px">/100</span><?php else: ?><span class="muted">—</span><?php endif; ?></td>
+        <td><?php if ($r['last_score']!==null && $r['last_score']!==''): $c=$scoreCol($r['last_score']); ?><span style="font-weight:700;color:<?= $c ?>;font-variant-numeric:tabular-nums"><?= e(rtrim(rtrim(nf((float)$r['last_score'],1),'0'),'.')) ?></span><span class="muted" style="font-size:11px">/100</span><?php else: ?><span class="muted">—</span><?php endif; ?></td>
         <td><span class="pill <?= $pc ?>"><?= e($pl) ?></span></td>
         <td><?= e($r['last_assessed_on'] ?: '—') ?></td>
         <td><?php $re=$r['reassess_on']; $over = $re && $re < $today && in_array($r['approval_status'],['APPROVED','CONDITIONAL'],true); ?>

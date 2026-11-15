@@ -3,7 +3,7 @@
   // Statutory config: master only. Nothing here is hard-coded; every rate is a dated rule.
   $ruleTypes = $ruleTypes ?? []; $rules = $rules ?? []; $feeRules = $feeRules ?? [];
   $feePayers = $feePayers ?? []; $feeBases = $feeBases ?? []; $cur = $currency ?? '₹';
-  $money = fn($n) => e($cur) . number_format((float)$n, 2);
+  $money = fn($n) => e($cur) . nf((float)$n, 2);
 ?>
 <div class="master-head">
   <div><h1>Compliance rules &amp; fees</h1>
@@ -27,7 +27,7 @@
           <td><b><?= e($ruleTypes[$r['rule_type']] ?? $r['rule_type']) ?></b></td>
           <td class="mono" style="font-family:monospace"><?= e($r['code']) ?></td>
           <td class="muted" style="font-size:13px"><?= e($r['label']) ?></td>
-          <td><b><?= rtrim(rtrim(number_format((float)$r['rate'],2),'0'),'.') ?>%</b></td>
+          <td><b><?= rtrim(rtrim(nf((float)$r['rate'],2),'0'),'.') ?>%</b></td>
           <td class="muted" style="font-size:13px"><?= e($r['effective_from']) ?><?= $r['effective_until'] ? ' → ' . e($r['effective_until']) : '' ?></td>
           <td class="muted"><?= (int)$r['version'] ?></td>
           <td class="muted" style="font-size:11.5px"><?= e($r['source_ref']) ?></td>
@@ -64,7 +64,7 @@
           <td><b><?= e($f['name']) ?></b><br><span class="muted" style="font-size:11px"><?= e($f['code']) ?></span></td>
           <td><?= e($feePayers[$f['payer']] ?? $f['payer']) ?></td>
           <td class="muted" style="font-size:12.5px"><?= e($f['method']) ?></td>
-          <td><?= (float)$f['percent'] > 0 ? rtrim(rtrim(number_format((float)$f['percent'],2),'0'),'.').'%' : '' ?><?= (float)$f['fixed']>0 ? ' +'.$money($f['fixed']) : '' ?></td>
+          <td><?= (float)$f['percent'] > 0 ? rtrim(rtrim(nf((float)$f['percent'],2),'0'),'.').'%' : '' ?><?= (float)$f['fixed']>0 ? ' +'.$money($f['fixed']) : '' ?></td>
           <td class="muted" style="font-size:12.5px"><?= e($feeBases[$f['base']] ?? $f['base']) ?></td>
           <td class="muted" style="font-size:12px"><?= (float)$f['min_fee']>0?$money($f['min_fee']):'—' ?> / <?= (float)$f['max_fee']>0?$money($f['max_fee']):'—' ?></td>
           <td class="muted" style="font-size:12px"><?= e($f['effective_from']) ?></td>

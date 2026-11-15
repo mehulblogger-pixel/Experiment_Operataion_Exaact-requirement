@@ -51,10 +51,10 @@
 <?php endif; ?>
 
 <div class="kpi-row">
-  <div class="kpi"><span class="kic">🛡️</span><div class="k">Total events</div><div class="v"><?= number_format($stats['total']) ?></div><div class="d">since go-live</div></div>
-  <div class="kpi"><span class="kic">📅</span><div class="k">Today</div><div class="v"><?= number_format($stats['today']) ?></div><div class="d">events logged</div></div>
-  <div class="kpi"><span class="kic">⚠️</span><div class="k">High-risk (30d)</div><div class="v <?= $stats['risk30'] ? 'down' : '' ?>"><a href="<?= e($qs(['risk'=>1,'action'=>''])) ?>"><?= number_format($stats['risk30']) ?></a></div><div class="d">need review</div></div>
-  <div class="kpi"><span class="kic">👥</span><div class="k">Active users (30d)</div><div class="v"><?= number_format($stats['users30']) ?></div><div class="d">recorded activity</div></div>
+  <div class="kpi"><span class="kic">🛡️</span><div class="k">Total events</div><div class="v"><?= nf($stats['total']) ?></div><div class="d">since go-live</div></div>
+  <div class="kpi"><span class="kic">📅</span><div class="k">Today</div><div class="v"><?= nf($stats['today']) ?></div><div class="d">events logged</div></div>
+  <div class="kpi"><span class="kic">⚠️</span><div class="k">High-risk (30d)</div><div class="v <?= $stats['risk30'] ? 'down' : '' ?>"><a href="<?= e($qs(['risk'=>1,'action'=>''])) ?>"><?= nf($stats['risk30']) ?></a></div><div class="d">need review</div></div>
+  <div class="kpi"><span class="kic">👥</span><div class="k">Active users (30d)</div><div class="v"><?= nf($stats['users30']) ?></div><div class="d">recorded activity</div></div>
 </div>
 
 <?php if ($checks): ?>
@@ -116,7 +116,7 @@
 </form>
 
 <div class="panel" style="padding:0;overflow:hidden">
-  <div class="ctitle" style="padding:10px 14px 0"><h3>Audit log <span class="muted">(<?= number_format($total) ?> match<?= $total===1?'':'es' ?><?= $total > count($rows) ? ', showing latest '.count($rows) : '' ?>)</span></h3></div>
+  <div class="ctitle" style="padding:10px 14px 0"><h3>Audit log <span class="muted">(<?= nf($total) ?> match<?= $total===1?'':'es' ?><?= $total > count($rows) ? ', showing latest '.count($rows) : '' ?>)</span></h3></div>
   <div class="tbl-scroll" style="overflow-x:auto">
   <table class="dt">
     <thead><tr><th>When</th><th>IRN / ref</th><th>Action</th><th>By</th><th>Role</th><th>Detail</th><th>IP</th></tr></thead>

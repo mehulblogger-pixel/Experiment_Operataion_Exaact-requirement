@@ -15,5 +15,13 @@
   </nav>
 <?php endif; ?>
 <?php endif; ?>
+<?php
+  // DEF-SAL-036 — what was typed before a session time-out (or a stale-page refusal) is put back
+  // into the boxes of the form it came from. Only for the same screen, within 15 minutes; never
+  // passwords or security tokens (form_stash() drops them).
+  $__retry = function_exists('form_retry_data') ? form_retry_data() : [];
+  if ($__retry): ?>
+<script>window.__formRetry = <?= json_encode($__retry, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>;</script>
+<?php endif; ?>
 <script src="/assets/js/app.js"></script>
 </body></html>
