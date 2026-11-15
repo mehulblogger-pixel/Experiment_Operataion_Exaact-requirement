@@ -25,7 +25,8 @@ const NODE_MODULES = process.env.QA_NODE_MODULES || '/tmp/claude-0/-home-user-Ex
 
 const STATUSES = ['NOT STARTED', 'IN PROGRESS', 'COMPLETED – PASS', 'COMPLETED – FAIL', 'BLOCKED', 'NOT IMPLEMENTED',
   'CANNOT TEST', 'CANNOT DO – AI / TOOL LIMITATION', 'NOT APPLICABLE – WITH JUSTIFICATION', 'FIXED – RETEST PENDING',
-  'RETEST PASSED', 'RETEST FAILED', 'OWNER ACCEPTANCE PENDING', 'OWNER ACCEPTED'];
+  'RETEST PASSED', 'RETEST FAILED', 'OWNER ACCEPTANCE PENDING', 'OWNER ACCEPTED',
+  'OWNER DECISION REQUIRED'];   // added on the owner's instruction, 15 Nov 2026: a business-rule ambiguity stops that activity only
 const MODULES = ['Setup and Masters', 'Directory', 'CRM and Sales', 'Operations', 'People and Organisation', 'Reporting / IDEMS',
   'Quality and Accreditation', 'Money and Finance', 'Insights and Dashboards', 'Licensing and SaaS', 'Client Portal',
   'Admin and Security', 'Marketplace (found in app; not in the 12-module list)', 'End-to-end (spans modules)'];
@@ -80,7 +81,7 @@ async function build() {
   };
   const COLOR = { 'COMPLETED – PASS': 'FFE8F5E9', 'RETEST PASSED': 'FFE8F5E9', 'OWNER ACCEPTED': 'FFE8F5E9', 'COMPLETED – FAIL': 'FFFDECEA', 'RETEST FAILED': 'FFFDECEA',
     'BLOCKED': 'FFFFF4E5', 'CANNOT TEST': 'FFEEEEEE', 'CANNOT DO – AI / TOOL LIMITATION': 'FFEEEEEE', 'NOT IMPLEMENTED': 'FFF3E5F5', 'IN PROGRESS': 'FFE3F2FD',
-    'OWNER ACCEPTANCE PENDING': 'FFFFF8E1', 'FIXED – RETEST PENDING': 'FFE3F2FD' };
+    'OWNER ACCEPTANCE PENDING': 'FFFFF8E1', 'FIXED – RETEST PENDING': 'FFE3F2FD', 'OWNER DECISION REQUIRED': 'FFFFE0B2' };
   const add = (ws, row, statusKey = 'status') => { const r = ws.addRow(row); r.alignment = { wrapText: true, vertical: 'top' }; const c = COLOR[row[statusKey]]; if (c) { const cell = r.getCell(statusKey); cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c } }; } return r; };
 
   // 1 — Live Dashboard
@@ -98,7 +99,7 @@ async function build() {
    ['Total passed', passed.length], ['Total failed', executed.length - passed.length],
    ['Total pending (NOT STARTED / IN PROGRESS)', cnt(tests, 'NOT STARTED') + cnt(tests, 'IN PROGRESS')], ['Total blocked', cnt(tests, 'BLOCKED')],
    ['Total not implemented', cnt(tests, 'NOT IMPLEMENTED')], ['Total cannot test (incl. AI / tool limitation)', cnt(tests, 'CANNOT TEST') + cnt(tests, 'CANNOT DO – AI / TOOL LIMITATION')],
-   ['Total owner acceptance pending', cnt(tests, 'OWNER ACCEPTANCE PENDING')],
+   ['Total owner acceptance pending', cnt(tests, 'OWNER ACCEPTANCE PENDING')], ['Total owner decision required', cnt(tests, 'OWNER DECISION REQUIRED')],
    ['Total defects identified', defects.length], ['Total defects fixed', fixes.length], ['Defects awaiting retest', cnt(defects, 'FIXED – RETEST PENDING')],
    ['Retests passed', cnt(defects, 'RETEST PASSED')], ['Retests failed', cnt(defects, 'RETEST FAILED')],
    ['Testing completion %', pct(executed.length, applicable.length) + ' %', 'Applicable test cases executed ÷ applicable test cases × 100. Blocked, pending, not implemented and cannot-test are NOT counted as completed.'],
@@ -128,7 +129,7 @@ async function build() {
 
   // 5 — Test cases
   const t5 = wb.addWorksheet('5 Test Case Register');
-  hdr(t5, [['Test ID', 'id', 13], ['Module', 'module', 22], ['Submodule', 'submodule', 22], ['Test scenario', 'title', 50], ['Preconditions', 'pre', 40], ['Test steps', 'steps', 60], ['Expected result', 'expected', 50], ['Actual result', 'actual', 60], ['Status', 'status', 22], ['Agent', 'by', 14], ['Evidence', 'evidence', 30], ['Execution date', 'date', 16], ['Defect ID', 'defect', 12], ['Retest status', 'retest', 16]]);
+  hdr(t5, [['Test ID', 'id', 13], ['Module', 'module', 22], ['Submodule', 'submodule', 22], ['Test scenario', 'title', 50], ['Preconditions', 'pre', 40], ['Test steps', 'steps', 60], ['Expected result', 'expected', 50], ['Actual result', 'actual', 60], ['Status', 'status', 22], ['How tested', 'method', 20], ['Agent', 'by', 14], ['Evidence', 'evidence', 30], ['Execution date', 'date', 16], ['Defect ID', 'defect', 12], ['Retest status', 'retest', 16]]);
   tests.sort((a, b) => a.id.localeCompare(b.id)).forEach(t => add(t5, { ...t, date: t.executed ? t.ts.slice(0, 10) : '' }));
 
   // 6 — Incomplete

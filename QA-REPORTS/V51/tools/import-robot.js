@@ -28,7 +28,7 @@ for (const f of fs.readdirSync(dir).filter(f => f.endsWith('.json'))) {
   if (prev && prev.status === st && prev.ranAt === r.ranAt) continue;
   const actual = r.steps.map(s => `${s.n}. ${word[s.status] || s.status} — ${s.observed || ''}${s.reason ? ' [why: ' + s.reason + ']' : ''}${s.proposed ? ' [proposed: ' + s.proposed + ']' : ''}${s.suggest ? ' [new wording: ' + s.suggest + ']' : ''}`).join('\n');
   const shots = r.steps.filter(s => s.shot && s.status !== 'pass').map(s => s.shot);
-  qa.append('test', { id: r.id, by: 'A04', status: st, executed: ['COMPLETED – PASS', 'COMPLETED – FAIL'].includes(st), ranAt: r.ranAt,
+  qa.append('test', { id: r.id, by: 'A04', status: st, method: 'Browser (robot, Playwright) + database checks where the step needs them', executed: ['COMPLETED – PASS', 'COMPLETED – FAIL'].includes(st), ranAt: r.ranAt,
     actual: actual.length > 30000 ? actual.slice(0, 30000) + ' …' : actual, retest: '',
     evidence: [r.finalShot, ...shots].filter(Boolean).map(s => 'robot shots/' + s).join('\n') + (r.crash ? '\nStopped early: ' + r.crash : ''),
     note: st === 'BLOCKED' && r.status === 'OUT_OF_DATE' ? 'Blocked: the screen was changed on purpose after the test was written — the test wording must be updated (suggested wording recorded in Actual result).' : '' });
