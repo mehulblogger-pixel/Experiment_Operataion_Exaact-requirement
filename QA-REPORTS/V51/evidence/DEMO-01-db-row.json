@@ -1,0 +1,15 @@
+[
+ {
+  "id": 1,
+  "inquiry_no": "INQ-00001",
+  "subject": "QA DEMO-01 — shutdown TPI, columns C-101/102",
+  "status": "OPEN",
+  "client_id": 666,
+  "client": "TB Refinery Ltd",
+  "contact_email": "demo.patel@tbrefinery.test",
+  "sbu": "OGC",
+  "source": "EMAIL",
+  "received_date": "2026-11-15",
+  "created_by": "Test MktExec"
+ }
+]

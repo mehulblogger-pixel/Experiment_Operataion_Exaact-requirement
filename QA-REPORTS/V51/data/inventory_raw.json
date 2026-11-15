@@ -1,0 +1,3428 @@
+{
+    "routes": [
+        {
+            "route": "calls",
+            "module": "calls",
+            "area": "Operations",
+            "label": "Calls"
+        },
+        {
+            "route": "call",
+            "module": "calls",
+            "area": "Operations",
+            "label": "Call"
+        },
+        {
+            "route": "call-new",
+            "module": "calls",
+            "area": "Operations",
+            "label": "New"
+        },
+        {
+            "route": "call-edit",
+            "module": "calls",
+            "area": "Operations",
+            "label": "Edit"
+        },
+        {
+            "route": "call-delete",
+            "module": "calls",
+            "area": "Operations",
+            "label": "Call delete"
+        },
+        {
+            "route": "jobs",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Jobs"
+        },
+        {
+            "route": "job",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Job"
+        },
+        {
+            "route": "job-new",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "New"
+        },
+        {
+            "route": "job-edit",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Edit"
+        },
+        {
+            "route": "job-close",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Job close"
+        },
+        {
+            "route": "job-unlock",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Job unlock"
+        },
+        {
+            "route": "job-invoice",
+            "module": "invoicing",
+            "area": "Money",
+            "label": "Job invoice"
+        },
+        {
+            "route": "job-bill",
+            "module": "invoicing",
+            "area": "Money",
+            "label": "Job bill"
+        },
+        {
+            "route": "job-advance",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Job advance"
+        },
+        {
+            "route": "job-reassign",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Job reassign"
+        },
+        {
+            "route": "job-visit-close",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Job visit close"
+        },
+        {
+            "route": "job-qap-upload",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Job qap upload"
+        },
+        {
+            "route": "job-qap",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Job qap"
+        },
+        {
+            "route": "job-qap-del",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Job qap del"
+        },
+        {
+            "route": "job-forward-report",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Job forward report"
+        },
+        {
+            "route": "report-approve",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Report approve"
+        },
+        {
+            "route": "expense-delete",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Expense delete"
+        },
+        {
+            "route": "bill-add",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "New"
+        },
+        {
+            "route": "bill-delete",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Bill delete"
+        },
+        {
+            "route": "bill-file",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Bill file"
+        },
+        {
+            "route": "invoicing",
+            "module": "invoicing",
+            "area": "Money",
+            "label": "Invoicing"
+        },
+        {
+            "route": "tally",
+            "module": "invoicing",
+            "area": "Money",
+            "label": "Tally"
+        },
+        {
+            "route": "tally-export",
+            "module": "invoicing",
+            "area": "Money",
+            "label": "Tally export"
+        },
+        {
+            "route": "tally-settings",
+            "module": "invoicing",
+            "area": "Money",
+            "label": "Tally settings"
+        },
+        {
+            "route": "tally-undo",
+            "module": "invoicing",
+            "area": "Money",
+            "label": "Tally undo"
+        },
+        {
+            "route": "receivables",
+            "module": "invoicing",
+            "area": "Money",
+            "label": "Receivables"
+        },
+        {
+            "route": "invoices",
+            "module": "invoicing",
+            "area": "Money",
+            "label": "Invoices"
+        },
+        {
+            "route": "invoice",
+            "module": "invoicing",
+            "area": "Money",
+            "label": "Invoice"
+        },
+        {
+            "route": "invoice-new",
+            "module": "invoicing",
+            "area": "Money",
+            "label": "New"
+        },
+        {
+            "route": "invoice-line-add",
+            "module": "invoicing",
+            "area": "Money",
+            "label": "New"
+        },
+        {
+            "route": "invoice-line-delete",
+            "module": "invoicing",
+            "area": "Money",
+            "label": "Invoice line delete"
+        },
+        {
+            "route": "invoice-issue",
+            "module": "invoicing",
+            "area": "Money",
+            "label": "Invoice issue"
+        },
+        {
+            "route": "invoice-cancel",
+            "module": "invoicing",
+            "area": "Money",
+            "label": "Invoice cancel"
+        },
+        {
+            "route": "to-bill",
+            "module": "invoicing",
+            "area": "Money",
+            "label": "To bill"
+        },
+        {
+            "route": "receipts",
+            "module": "invoicing",
+            "area": "Money",
+            "label": "Receipts"
+        },
+        {
+            "route": "receipt",
+            "module": "invoicing",
+            "area": "Money",
+            "label": "Receipt"
+        },
+        {
+            "route": "receipt-new",
+            "module": "invoicing",
+            "area": "Money",
+            "label": "New"
+        },
+        {
+            "route": "receipt-allocate",
+            "module": "invoicing",
+            "area": "Money",
+            "label": "Receipt allocate"
+        },
+        {
+            "route": "receipt-unallocate",
+            "module": "invoicing",
+            "area": "Money",
+            "label": "Receipt unallocate"
+        },
+        {
+            "route": "credit-note-new",
+            "module": "invoicing",
+            "area": "Money",
+            "label": "New"
+        },
+        {
+            "route": "ledger",
+            "module": "invoicing",
+            "area": "Money",
+            "label": "Ledger"
+        },
+        {
+            "route": "customer",
+            "module": "clients",
+            "area": "Directory",
+            "label": "Customer"
+        },
+        {
+            "route": "customer-parent",
+            "module": "clients",
+            "area": "Directory",
+            "label": "Customer parent"
+        },
+        {
+            "route": "profitability",
+            "module": "profitability",
+            "area": "Money",
+            "label": "Profitability"
+        },
+        {
+            "route": "boss-renew",
+            "module": "profitability",
+            "area": "Money",
+            "label": "Boss renew"
+        },
+        {
+            "route": "candidates",
+            "module": "hiring",
+            "area": "Recruitment",
+            "label": "Candidates"
+        },
+        {
+            "route": "candidate",
+            "module": "hiring",
+            "area": "Recruitment",
+            "label": "Candidate"
+        },
+        {
+            "route": "candidate-new",
+            "module": "hiring",
+            "area": "Recruitment",
+            "label": "New"
+        },
+        {
+            "route": "candidate-edit",
+            "module": "hiring",
+            "area": "Recruitment",
+            "label": "Edit"
+        },
+        {
+            "route": "candidate-stage",
+            "module": "hiring",
+            "area": "Recruitment",
+            "label": "Candidate stage"
+        },
+        {
+            "route": "candidate-joined",
+            "module": "hiring",
+            "area": "Recruitment",
+            "label": "Candidate joined"
+        },
+        {
+            "route": "candidate-cv",
+            "module": "hiring",
+            "area": "Recruitment",
+            "label": "Candidate cv"
+        },
+        {
+            "route": "candidate-client",
+            "module": "hiring",
+            "area": "Recruitment",
+            "label": "Candidate client"
+        },
+        {
+            "route": "candidate-credential",
+            "module": "hiring",
+            "area": "Recruitment",
+            "label": "Candidate credential"
+        },
+        {
+            "route": "candidate-erase",
+            "module": "hiring",
+            "area": "Recruitment",
+            "label": "Candidate erase"
+        },
+        {
+            "route": "candidate-commercial",
+            "module": "hiring",
+            "area": "Recruitment",
+            "label": "Candidate commercial"
+        },
+        {
+            "route": "candidate-link-person",
+            "module": "hiring",
+            "area": "Recruitment",
+            "label": "Candidate link person"
+        },
+        {
+            "route": "candidate-link-pro",
+            "module": "hiring",
+            "area": "Recruitment",
+            "label": "Candidate link pro"
+        },
+        {
+            "route": "candidate-unlink-pro",
+            "module": "hiring",
+            "area": "Recruitment",
+            "label": "Candidate unlink pro"
+        },
+        {
+            "route": "hiring-requests",
+            "module": "hiring",
+            "area": "Recruitment",
+            "label": "Hiring requests"
+        },
+        {
+            "route": "hiring-request",
+            "module": "hiring",
+            "area": "Recruitment",
+            "label": "Hiring request"
+        },
+        {
+            "route": "approval-delegations",
+            "module": "hiring",
+            "area": "Recruitment",
+            "label": "Approval delegations"
+        },
+        {
+            "route": "requisitions",
+            "module": "hiring",
+            "area": "Recruitment",
+            "label": "Requisitions"
+        },
+        {
+            "route": "requisition",
+            "module": "hiring",
+            "area": "Recruitment",
+            "label": "Requisition"
+        },
+        {
+            "route": "requisition-new",
+            "module": "hiring",
+            "area": "Recruitment",
+            "label": "New"
+        },
+        {
+            "route": "requisition-edit",
+            "module": "hiring",
+            "area": "Recruitment",
+            "label": "Edit"
+        },
+        {
+            "route": "requisition-allocations",
+            "module": "hiring",
+            "area": "Recruitment",
+            "label": "Requisition allocations"
+        },
+        {
+            "route": "recruitment",
+            "module": "hiring",
+            "area": "Recruitment",
+            "label": "Recruitment"
+        },
+        {
+            "route": "recruitment-cc",
+            "module": "hiring",
+            "area": "Recruitment",
+            "label": "Command centre"
+        },
+        {
+            "route": "candidate-pool",
+            "module": "hiring",
+            "area": "Recruitment",
+            "label": "Candidate pool"
+        },
+        {
+            "route": "req-ai-extract",
+            "module": "hiring",
+            "area": "Recruitment",
+            "label": "Req ai extract"
+        },
+        {
+            "route": "recruit-config",
+            "module": "hiring",
+            "area": "Recruitment",
+            "label": "Recruit config"
+        },
+        {
+            "route": "client-contacts",
+            "module": "hiring",
+            "area": "Recruitment",
+            "label": "Client contacts"
+        },
+        {
+            "route": "recruit-export",
+            "module": "hiring",
+            "area": "Recruitment",
+            "label": "Recruit export"
+        },
+        {
+            "route": "careers-admin",
+            "module": "hiring",
+            "area": "Recruitment",
+            "label": "Careers admin"
+        },
+        {
+            "route": "jd-generate",
+            "module": "hiring",
+            "area": "Recruitment",
+            "label": "Jd generate"
+        },
+        {
+            "route": "cert-add",
+            "module": "hiring",
+            "area": "Recruitment",
+            "label": "New"
+        },
+        {
+            "route": "positions-import",
+            "module": "hiring",
+            "area": "Recruitment",
+            "label": "Positions import"
+        },
+        {
+            "route": "leads",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Leads"
+        },
+        {
+            "route": "lead",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Lead"
+        },
+        {
+            "route": "lead-new",
+            "module": "leads",
+            "area": "Sales",
+            "label": "New"
+        },
+        {
+            "route": "lead-edit",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Edit"
+        },
+        {
+            "route": "lead-move",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Lead move"
+        },
+        {
+            "route": "lead-convert",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Lead convert"
+        },
+        {
+            "route": "leads-bulk",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Leads bulk"
+        },
+        {
+            "route": "lead-delete",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Lead delete"
+        },
+        {
+            "route": "lead-contact",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Lead contact"
+        },
+        {
+            "route": "lead-files",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Lead files"
+        },
+        {
+            "route": "lead-file",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Lead file"
+        },
+        {
+            "route": "lead-file-delete",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Lead file delete"
+        },
+        {
+            "route": "opportunities",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Opportunities"
+        },
+        {
+            "route": "opportunity",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Opportunity"
+        },
+        {
+            "route": "opportunity-new",
+            "module": "leads",
+            "area": "Sales",
+            "label": "New"
+        },
+        {
+            "route": "opportunity-edit",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Edit"
+        },
+        {
+            "route": "opportunity-delete",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Opportunity delete"
+        },
+        {
+            "route": "opportunity-move",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Opportunity move"
+        },
+        {
+            "route": "opportunity-reopen",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Opportunity reopen"
+        },
+        {
+            "route": "lead-reopen",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Lead reopen"
+        },
+        {
+            "route": "opportunity-quote",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Opportunity quote"
+        },
+        {
+            "route": "opportunity-from-lead",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Opportunity from lead"
+        },
+        {
+            "route": "opportunity-raise-order",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Opportunity raise order"
+        },
+        {
+            "route": "opportunity-send-to-accounts",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Opportunity send to accounts"
+        },
+        {
+            "route": "opportunity-contract",
+            "module": "quotes",
+            "area": "Sales",
+            "label": "Opportunity contract"
+        },
+        {
+            "route": "contracts-to-register",
+            "module": "quotes",
+            "area": "Sales",
+            "label": "Contracts to register"
+        },
+        {
+            "route": "opportunity-add-customer",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Opportunity add customer"
+        },
+        {
+            "route": "opportunity-generate-quote",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Opportunity generate quote"
+        },
+        {
+            "route": "pipelines",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Pipelines"
+        },
+        {
+            "route": "pipeline",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Pipeline"
+        },
+        {
+            "route": "pipeline-new",
+            "module": "leads",
+            "area": "Sales",
+            "label": "New"
+        },
+        {
+            "route": "pipeline-save",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Pipeline save"
+        },
+        {
+            "route": "pipeline-stage-add",
+            "module": "leads",
+            "area": "Sales",
+            "label": "New"
+        },
+        {
+            "route": "pipeline-stage-delete",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Pipeline stage delete"
+        },
+        {
+            "route": "pipeline-default",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Pipeline default"
+        },
+        {
+            "route": "industry",
+            "module": "settings",
+            "area": "Admin",
+            "label": "Industry"
+        },
+        {
+            "route": "industry-apply",
+            "module": "settings",
+            "area": "Admin",
+            "label": "Industry apply"
+        },
+        {
+            "route": "crm-dashboard",
+            "module": "crm_reports",
+            "area": "Sales",
+            "label": "Sales reports"
+        },
+        {
+            "route": "approval-act",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Approval act"
+        },
+        {
+            "route": "adspro",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Adspro"
+        },
+        {
+            "route": "adspro-save",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Adspro save"
+        },
+        {
+            "route": "adspro-test",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Adspro test"
+        },
+        {
+            "route": "adspro-import",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Adspro import"
+        },
+        {
+            "route": "adspro-spend",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Adspro spend"
+        },
+        {
+            "route": "ads-roi",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Ads roi"
+        },
+        {
+            "route": "adspro-sync",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Adspro sync"
+        },
+        {
+            "route": "adspro-backfill",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Adspro backfill"
+        },
+        {
+            "route": "stage-gates",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Stage gates"
+        },
+        {
+            "route": "stage-gate-save",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Stage gate save"
+        },
+        {
+            "route": "stage-gate-delete",
+            "module": "leads",
+            "area": "Sales",
+            "label": "Stage gate delete"
+        },
+        {
+            "route": "inquiries",
+            "module": "inquiries",
+            "area": "Sales",
+            "label": "Inquiries"
+        },
+        {
+            "route": "inquiry-new",
+            "module": "inquiries",
+            "area": "Sales",
+            "label": "New"
+        },
+        {
+            "route": "inquiry-edit",
+            "module": "inquiries",
+            "area": "Sales",
+            "label": "Edit"
+        },
+        {
+            "route": "inquiry-delete",
+            "module": "inquiries",
+            "area": "Sales",
+            "label": "Inquiry delete"
+        },
+        {
+            "route": "inquiry-drop",
+            "module": "inquiries",
+            "area": "Sales",
+            "label": "Inquiry drop"
+        },
+        {
+            "route": "inquiry-reopen",
+            "module": "inquiries",
+            "area": "Sales",
+            "label": "Inquiry reopen"
+        },
+        {
+            "route": "quotes",
+            "module": "quotes",
+            "area": "Sales",
+            "label": "Quotes"
+        },
+        {
+            "route": "quote",
+            "module": "quotes",
+            "area": "Sales",
+            "label": "Quote"
+        },
+        {
+            "route": "quote-new",
+            "module": "quotes",
+            "area": "Sales",
+            "label": "New"
+        },
+        {
+            "route": "quote-edit",
+            "module": "quotes",
+            "area": "Sales",
+            "label": "Edit"
+        },
+        {
+            "route": "quote-revise",
+            "module": "quotes",
+            "area": "Sales",
+            "label": "Quote revise"
+        },
+        {
+            "route": "quote-status",
+            "module": "quotes",
+            "area": "Sales",
+            "label": "Quote status"
+        },
+        {
+            "route": "quote-doc",
+            "module": "quotes",
+            "area": "Sales",
+            "label": "Quote doc"
+        },
+        {
+            "route": "quote-pdf",
+            "module": "quotes",
+            "area": "Sales",
+            "label": "Quote pdf"
+        },
+        {
+            "route": "quote-approve",
+            "module": "quotes",
+            "area": "Sales",
+            "label": "Quote approve"
+        },
+        {
+            "route": "quote-unapprove",
+            "module": "quotes",
+            "area": "Sales",
+            "label": "Quote unapprove"
+        },
+        {
+            "route": "quote-approval-rules",
+            "module": "quotes",
+            "area": "Sales",
+            "label": "Quotation approval rules"
+        },
+        {
+            "route": "quote-contract",
+            "module": "quotes",
+            "area": "Sales",
+            "label": "Quote contract"
+        },
+        {
+            "route": "quote-add-contract",
+            "module": "quotes",
+            "area": "Sales",
+            "label": "Quote add contract"
+        },
+        {
+            "route": "quote-float",
+            "module": "quotes",
+            "area": "Sales",
+            "label": "Quote float"
+        },
+        {
+            "route": "client-quotes",
+            "module": "calls",
+            "area": "Operations",
+            "label": "Client quotes"
+        },
+        {
+            "route": "quote-context",
+            "module": "calls",
+            "area": "Operations",
+            "label": "Quote context"
+        },
+        {
+            "route": "quote-client",
+            "module": "quotes",
+            "area": "Sales",
+            "label": "Quote client"
+        },
+        {
+            "route": "quote-files",
+            "module": "quotes",
+            "area": "Sales",
+            "label": "Quote files"
+        },
+        {
+            "route": "quote-file",
+            "module": "quotes",
+            "area": "Sales",
+            "label": "Quote file"
+        },
+        {
+            "route": "quote-file-delete",
+            "module": "quotes",
+            "area": "Sales",
+            "label": "Quote file delete"
+        },
+        {
+            "route": "quote-unlock",
+            "module": "quotes",
+            "area": "Sales",
+            "label": "Quote unlock"
+        },
+        {
+            "route": "quote-followup",
+            "module": "quotes",
+            "area": "Sales",
+            "label": "Quote followup"
+        },
+        {
+            "route": "quote-external",
+            "module": "quotes",
+            "area": "Sales",
+            "label": "Quote external"
+        },
+        {
+            "route": "quotes-export",
+            "module": "quotes",
+            "area": "Sales",
+            "label": "Quotes export"
+        },
+        {
+            "route": "quote-final",
+            "module": "quotes",
+            "area": "Sales",
+            "label": "Quote final"
+        },
+        {
+            "route": "quote-compose",
+            "module": "quotes",
+            "area": "Sales",
+            "label": "Quote compose"
+        },
+        {
+            "route": "quote-costing-card",
+            "module": "quotes",
+            "area": "Sales",
+            "label": "Quote costing card"
+        },
+        {
+            "route": "quote-costing-lines",
+            "module": "quotes",
+            "area": "Sales",
+            "label": "Quote costing lines"
+        },
+        {
+            "route": "followup-compose",
+            "module": "quotes",
+            "area": "Sales",
+            "label": "Followup compose"
+        },
+        {
+            "route": "quote-preorder-save",
+            "module": "quotes",
+            "area": "Sales",
+            "label": "Quote preorder save"
+        },
+        {
+            "route": "quote-milestones",
+            "module": "quotes",
+            "area": "Sales",
+            "label": "Quote milestones"
+        },
+        {
+            "route": "preorder-checklist",
+            "module": "quotes",
+            "area": "Sales",
+            "label": "Preorder checklist"
+        },
+        {
+            "route": "sales-setup",
+            "module": "quotes",
+            "area": "Sales",
+            "label": "Sales setup"
+        },
+        {
+            "route": "quote-delegations",
+            "module": "quotes",
+            "area": "Sales",
+            "label": "Quote delegations"
+        },
+        {
+            "route": "attendance-recon",
+            "module": "reconcile",
+            "area": "Operations",
+            "label": "Attendance reconcile"
+        },
+        {
+            "route": "availability",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Availability"
+        },
+        {
+            "route": "schedule",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Schedule"
+        },
+        {
+            "route": "documents",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Documents"
+        },
+        {
+            "route": "document",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Document"
+        },
+        {
+            "route": "document-new",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "New"
+        },
+        {
+            "route": "document-edit",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Edit"
+        },
+        {
+            "route": "document-submit",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Document submit"
+        },
+        {
+            "route": "document-finalize",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Document finalize"
+        },
+        {
+            "route": "document-delete",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Document delete"
+        },
+        {
+            "route": "document-fill",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Document fill"
+        },
+        {
+            "route": "release-notes",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Release notes"
+        },
+        {
+            "route": "document-ai-review",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Document ai review"
+        },
+        {
+            "route": "document-rn-flag",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Document rn flag"
+        },
+        {
+            "route": "document-scope-from-qap",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Document scope from qap"
+        },
+        {
+            "route": "document-polish-text",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Document polish text"
+        },
+        {
+            "route": "vendors",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Vendors"
+        },
+        {
+            "route": "vendor-profile",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Vendor profile"
+        },
+        {
+            "route": "vendor-profile-save",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Vendor profile save"
+        },
+        {
+            "route": "expediting",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Expediting"
+        },
+        {
+            "route": "expediting-projects",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Expediting projects"
+        },
+        {
+            "route": "report-types",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Report types"
+        },
+        {
+            "route": "report-type-edit",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Edit"
+        },
+        {
+            "route": "report-builder",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Report builder"
+        },
+        {
+            "route": "report-preview",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Report preview"
+        },
+        {
+            "route": "report-field-edit",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Edit"
+        },
+        {
+            "route": "report-file",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Report file"
+        },
+        {
+            "route": "irn-rules",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Irn rules"
+        },
+        {
+            "route": "audit-log",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Audit log"
+        },
+        {
+            "route": "notifications",
+            "module": "admin",
+            "area": "",
+            "label": "Notifications"
+        },
+        {
+            "route": "integrations",
+            "module": "admin",
+            "area": "",
+            "label": "Integrations"
+        },
+        {
+            "route": "system-status",
+            "module": "admin",
+            "area": "",
+            "label": "System status"
+        },
+        {
+            "route": "document-approve",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Document approve"
+        },
+        {
+            "route": "document-vet",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Document vet"
+        },
+        {
+            "route": "document-vet-review",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Document vet review"
+        },
+        {
+            "route": "vetting-checklist",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Review & issue rules"
+        },
+        {
+            "route": "approver-map",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Approver map"
+        },
+        {
+            "route": "idems-approval-rules",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Report approval rules"
+        },
+        {
+            "route": "idems-approval-rule-edit",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Edit"
+        },
+        {
+            "route": "document-pdf",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Document pdf"
+        },
+        {
+            "route": "document-timestamp",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Document timestamp"
+        },
+        {
+            "route": "document-docx",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Document docx"
+        },
+        {
+            "route": "report-type-preview",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Report type preview"
+        },
+        {
+            "route": "report-template-preview",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Report template preview"
+        },
+        {
+            "route": "report-templates",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Report templates"
+        },
+        {
+            "route": "report-template-edit",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Edit"
+        },
+        {
+            "route": "report-template-download",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Report template download"
+        },
+        {
+            "route": "report-form-from-template",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Report form from template"
+        },
+        {
+            "route": "report-autoform",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Report autoform"
+        },
+        {
+            "route": "endorsements",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Endorsements"
+        },
+        {
+            "route": "endorsement",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Endorsement"
+        },
+        {
+            "route": "endorsement-new",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "New"
+        },
+        {
+            "route": "endorsement-edit",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Edit"
+        },
+        {
+            "route": "endorsement-submit",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Endorsement submit"
+        },
+        {
+            "route": "endorsement-approve",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Endorsement approve"
+        },
+        {
+            "route": "endorsement-delete",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Endorsement delete"
+        },
+        {
+            "route": "endorsement-file",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Endorsement file"
+        },
+        {
+            "route": "endorsement-cert",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Endorsement cert"
+        },
+        {
+            "route": "phrase-library",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Phrase library"
+        },
+        {
+            "route": "phrase-edit",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Edit"
+        },
+        {
+            "route": "learning",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Learning"
+        },
+        {
+            "route": "document-smart",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Document smart"
+        },
+        {
+            "route": "document-release-note",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Document release note"
+        },
+        {
+            "route": "document-review",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Document review"
+        },
+        {
+            "route": "document-evidence",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Document evidence"
+        },
+        {
+            "route": "portal-users",
+            "module": "portal",
+            "area": "Directory",
+            "label": "Client portal users"
+        },
+        {
+            "route": "portal-user-toggle",
+            "module": "portal",
+            "area": "Directory",
+            "label": "Portal user toggle"
+        },
+        {
+            "route": "portal-user-reinvite",
+            "module": "portal",
+            "area": "Directory",
+            "label": "Portal user reinvite"
+        },
+        {
+            "route": "portal-user-perms",
+            "module": "portal",
+            "area": "Directory",
+            "label": "Portal user perms"
+        },
+        {
+            "route": "vendor-users",
+            "module": "portal",
+            "area": "Directory",
+            "label": "Vendor users"
+        },
+        {
+            "route": "vendor-user-toggle",
+            "module": "portal",
+            "area": "Directory",
+            "label": "Vendor user toggle"
+        },
+        {
+            "route": "vendor-user-reinvite",
+            "module": "portal",
+            "area": "Directory",
+            "label": "Vendor user reinvite"
+        },
+        {
+            "route": "vendor-settings",
+            "module": "portal",
+            "area": "Directory",
+            "label": "Vendor settings"
+        },
+        {
+            "route": "vendor-share",
+            "module": "portal",
+            "area": "Directory",
+            "label": "Vendor share"
+        },
+        {
+            "route": "portal-settings",
+            "module": "portal",
+            "area": "Directory",
+            "label": "Portal settings"
+        },
+        {
+            "route": "portal-request",
+            "module": "portal",
+            "area": "Directory",
+            "label": "Portal request"
+        },
+        {
+            "route": "masters",
+            "module": "masters",
+            "area": "Directory",
+            "label": "Masters"
+        },
+        {
+            "route": "work-norms",
+            "module": "masters",
+            "area": "Directory",
+            "label": "Work norms"
+        },
+        {
+            "route": "office-finance",
+            "module": "overheads",
+            "area": "Money",
+            "label": "Office finance"
+        },
+        {
+            "route": "cost-run",
+            "module": "overheads",
+            "area": "Money",
+            "label": "Cost run"
+        },
+        {
+            "route": "sbu-pl",
+            "module": "profitability",
+            "area": "Money",
+            "label": "Sbu pl"
+        },
+        {
+            "route": "call-profit",
+            "module": "profitability",
+            "area": "Money",
+            "label": "Call profit"
+        },
+        {
+            "route": "mis",
+            "module": "reports",
+            "area": "Insights",
+            "label": "Mis"
+        },
+        {
+            "route": "reports",
+            "module": "reports",
+            "area": "Insights",
+            "label": "Reports"
+        },
+        {
+            "route": "analytics",
+            "module": "reports",
+            "area": "Insights",
+            "label": "Analytics"
+        },
+        {
+            "route": "analytics-kpis",
+            "module": "reports",
+            "area": "Insights",
+            "label": "Analytics kpis"
+        },
+        {
+            "route": "analytics-kpi-edit",
+            "module": "reports",
+            "area": "Insights",
+            "label": "Edit"
+        },
+        {
+            "route": "analytics-quality",
+            "module": "reports",
+            "area": "Insights",
+            "label": "Analytics quality"
+        },
+        {
+            "route": "analytics-drill",
+            "module": "reports",
+            "area": "Insights",
+            "label": "Analytics drill"
+        },
+        {
+            "route": "analytics-scorecard",
+            "module": "reports",
+            "area": "Insights",
+            "label": "Analytics scorecard"
+        },
+        {
+            "route": "analytics-alerts",
+            "module": "reports",
+            "area": "Insights",
+            "label": "Analytics alerts"
+        },
+        {
+            "route": "analytics-export",
+            "module": "reports",
+            "area": "Insights",
+            "label": "Analytics export"
+        },
+        {
+            "route": "analytics-review",
+            "module": "reports",
+            "area": "Insights",
+            "label": "Analytics review"
+        },
+        {
+            "route": "analytics-snapshot",
+            "module": "reports",
+            "area": "Insights",
+            "label": "Analytics snapshot"
+        },
+        {
+            "route": "users",
+            "module": "users",
+            "area": "Admin",
+            "label": "Users"
+        },
+        {
+            "route": "user-new",
+            "module": "users",
+            "area": "Admin",
+            "label": "New"
+        },
+        {
+            "route": "user-edit",
+            "module": "users",
+            "area": "Admin",
+            "label": "Edit"
+        },
+        {
+            "route": "hierarchy",
+            "module": "users",
+            "area": "Admin",
+            "label": "Hierarchy"
+        },
+        {
+            "route": "org-template",
+            "module": "users",
+            "area": "Admin",
+            "label": "Org template"
+        },
+        {
+            "route": "user-unlock",
+            "module": "users",
+            "area": "Admin",
+            "label": "User unlock"
+        },
+        {
+            "route": "user-2fa-reset",
+            "module": "users",
+            "area": "Admin",
+            "label": "User 2fa reset"
+        },
+        {
+            "route": "user-retire",
+            "module": "users",
+            "area": "Admin",
+            "label": "User retire"
+        },
+        {
+            "route": "contract-overrides",
+            "module": "calls",
+            "area": "Operations",
+            "label": "Contract overrides"
+        },
+        {
+            "route": "contract-override",
+            "module": "calls",
+            "area": "Operations",
+            "label": "Contract override"
+        },
+        {
+            "route": "contract-open",
+            "module": "calls",
+            "area": "Operations",
+            "label": "Contract open"
+        },
+        {
+            "route": "settings",
+            "module": "settings",
+            "area": "Admin",
+            "label": "Settings"
+        },
+        {
+            "route": "access",
+            "module": "settings",
+            "area": "Admin",
+            "label": "Access"
+        },
+        {
+            "route": "ai-settings",
+            "module": "settings",
+            "area": "Admin",
+            "label": "Ai settings"
+        },
+        {
+            "route": "terminology",
+            "module": "settings",
+            "area": "Admin",
+            "label": "Terminology"
+        },
+        {
+            "route": "form-designer",
+            "module": "settings",
+            "area": "Admin",
+            "label": "Form designer"
+        },
+        {
+            "route": "form-designer-save",
+            "module": "settings",
+            "area": "Admin",
+            "label": "Form designer save"
+        },
+        {
+            "route": "form-designer-field-add",
+            "module": "settings",
+            "area": "Admin",
+            "label": "New"
+        },
+        {
+            "route": "form-designer-field-edit",
+            "module": "settings",
+            "area": "Admin",
+            "label": "Edit"
+        },
+        {
+            "route": "form-designer-field-del",
+            "module": "settings",
+            "area": "Admin",
+            "label": "Form designer field del"
+        },
+        {
+            "route": "form-designer-option-add",
+            "module": "settings",
+            "area": "Admin",
+            "label": "New"
+        },
+        {
+            "route": "form-designer-option-del",
+            "module": "settings",
+            "area": "Admin",
+            "label": "Form designer option del"
+        },
+        {
+            "route": "connect-capabilities",
+            "module": "settings",
+            "area": "Admin",
+            "label": "Connect capabilities"
+        },
+        {
+            "route": "service-scope",
+            "module": "settings",
+            "area": "Admin",
+            "label": "Service scope"
+        },
+        {
+            "route": "service-formats",
+            "module": "settings",
+            "area": "Admin",
+            "label": "Service formats"
+        },
+        {
+            "route": "deputations",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Deputations"
+        },
+        {
+            "route": "billable-events",
+            "module": "invoicing",
+            "area": "Money",
+            "label": "Billable events"
+        },
+        {
+            "route": "billable-sync",
+            "module": "invoicing",
+            "area": "Money",
+            "label": "Billable sync"
+        },
+        {
+            "route": "billable-approve",
+            "module": "invoicing",
+            "area": "Money",
+            "label": "Billable approve"
+        },
+        {
+            "route": "billable-invoice",
+            "module": "invoicing",
+            "area": "Money",
+            "label": "Billable invoice"
+        },
+        {
+            "route": "job-billing",
+            "module": "invoicing",
+            "area": "Money",
+            "label": "Job billing"
+        },
+        {
+            "route": "contract-billing",
+            "module": "invoicing",
+            "area": "Money",
+            "label": "Contract billing"
+        },
+        {
+            "route": "billable-cancel",
+            "module": "invoicing",
+            "area": "Money",
+            "label": "Billable cancel"
+        },
+        {
+            "route": "billable-dispute",
+            "module": "invoicing",
+            "area": "Money",
+            "label": "Billable dispute"
+        },
+        {
+            "route": "billable-bill",
+            "module": "invoicing",
+            "area": "Money",
+            "label": "Billable bill"
+        },
+        {
+            "route": "billable-bill-partial",
+            "module": "invoicing",
+            "area": "Money",
+            "label": "Billable bill partial"
+        },
+        {
+            "route": "call-status",
+            "module": "calls",
+            "area": "Operations",
+            "label": "Call status"
+        },
+        {
+            "route": "call-attrs",
+            "module": "calls",
+            "area": "Operations",
+            "label": "Call attrs"
+        },
+        {
+            "route": "call-override",
+            "module": "calls",
+            "area": "Operations",
+            "label": "Call override"
+        },
+        {
+            "route": "call-clar-new",
+            "module": "calls",
+            "area": "Operations",
+            "label": "New"
+        },
+        {
+            "route": "call-clar-respond",
+            "module": "calls",
+            "area": "Operations",
+            "label": "Call clar respond"
+        },
+        {
+            "route": "call-clar-status",
+            "module": "calls",
+            "area": "Operations",
+            "label": "Call clar status"
+        },
+        {
+            "route": "assign-hold",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Assign hold"
+        },
+        {
+            "route": "assign-accept",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Assign accept"
+        },
+        {
+            "route": "assign-reassign",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Assign reassign"
+        },
+        {
+            "route": "assign-reschedule",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Assign reschedule"
+        },
+        {
+            "route": "assign-cancel",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Assign cancel"
+        },
+        {
+            "route": "assign-noshow",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Assign noshow"
+        },
+        {
+            "route": "job-ready-seed",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Job ready seed"
+        },
+        {
+            "route": "job-ready-set",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Job ready set"
+        },
+        {
+            "route": "job-confirm",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Job confirm"
+        },
+        {
+            "route": "job-confirm-req",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Job confirm req"
+        },
+        {
+            "route": "delay-add",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "New"
+        },
+        {
+            "route": "sla-targets",
+            "module": "settings",
+            "area": "Admin",
+            "label": "Sla targets"
+        },
+        {
+            "route": "recurring",
+            "module": "calls",
+            "area": "Operations",
+            "label": "Recurring"
+        },
+        {
+            "route": "capacity-outlook",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Capacity outlook"
+        },
+        {
+            "route": "ops-desk",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Ops desk"
+        },
+        {
+            "route": "comm-add",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "New"
+        },
+        {
+            "route": "assign-issue",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Assign issue"
+        },
+        {
+            "route": "xo-nudge",
+            "module": "calls",
+            "area": "Operations",
+            "label": "Xo nudge"
+        },
+        {
+            "route": "dep-status",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Dep status"
+        },
+        {
+            "route": "dep-check-seed",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Dep check seed"
+        },
+        {
+            "route": "dep-check-set",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Dep check set"
+        },
+        {
+            "route": "dep-site-log",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Dep site log"
+        },
+        {
+            "route": "dep-site-log-close",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Dep site log close"
+        },
+        {
+            "route": "dep-timesheet",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Dep timesheet"
+        },
+        {
+            "route": "dep-approval",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Dep approval"
+        },
+        {
+            "route": "dep-approval-status",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Dep approval status"
+        },
+        {
+            "route": "dep-manpower-add",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "New"
+        },
+        {
+            "route": "dep-manpower-update",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Dep manpower update"
+        },
+        {
+            "route": "dep-manpower-del",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Dep manpower del"
+        },
+        {
+            "route": "issues",
+            "module": "ncr",
+            "area": "Quality & Accreditation",
+            "label": "Issues"
+        },
+        {
+            "route": "departures",
+            "module": "ncr",
+            "area": "Quality & Accreditation",
+            "label": "Departures"
+        },
+        {
+            "route": "issue-classify",
+            "module": "ncr",
+            "area": "Quality & Accreditation",
+            "label": "Issue classify"
+        },
+        {
+            "route": "departure-new",
+            "module": "ncr",
+            "area": "Quality & Accreditation",
+            "label": "New"
+        },
+        {
+            "route": "departure-status",
+            "module": "ncr",
+            "area": "Quality & Accreditation",
+            "label": "Departure status"
+        },
+        {
+            "route": "dispute-new",
+            "module": "ncr",
+            "area": "Quality & Accreditation",
+            "label": "New"
+        },
+        {
+            "route": "dispute-decide",
+            "module": "ncr",
+            "area": "Quality & Accreditation",
+            "label": "Dispute decide"
+        },
+        {
+            "route": "issue-extend",
+            "module": "ncr",
+            "area": "Quality & Accreditation",
+            "label": "Issue extend"
+        },
+        {
+            "route": "extension-approve",
+            "module": "ncr",
+            "area": "Quality & Accreditation",
+            "label": "Extension approve"
+        },
+        {
+            "route": "preflight",
+            "module": "settings",
+            "area": "Admin",
+            "label": "Preflight"
+        },
+        {
+            "route": "trace-thread",
+            "module": "settings",
+            "area": "Admin",
+            "label": "Trace thread"
+        },
+        {
+            "route": "trace-thread-remove",
+            "module": "settings",
+            "area": "Admin",
+            "label": "Trace thread remove"
+        },
+        {
+            "route": "trace-audit",
+            "module": "settings",
+            "area": "Admin",
+            "label": "Trace audit"
+        },
+        {
+            "route": "trace-audit-remove",
+            "module": "settings",
+            "area": "Admin",
+            "label": "Trace audit remove"
+        },
+        {
+            "route": "evidence-review",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Evidence review"
+        },
+        {
+            "route": "evidence-reviewed",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Evidence reviewed"
+        },
+        {
+            "route": "checkin-photo",
+            "module": "jobs",
+            "area": "Operations",
+            "label": "Checkin photo"
+        },
+        {
+            "route": "checkin-settings",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Checkin settings"
+        },
+        {
+            "route": "data-control",
+            "module": "datacontrol",
+            "area": "Quality & Accreditation",
+            "label": "Data & information control"
+        },
+        {
+            "route": "data-check-run",
+            "module": "datacontrol",
+            "area": "Quality & Accreditation",
+            "label": "Data check run"
+        },
+        {
+            "route": "sw-validation-add",
+            "module": "datacontrol",
+            "area": "Quality & Accreditation",
+            "label": "New"
+        },
+        {
+            "route": "failure-add",
+            "module": "datacontrol",
+            "area": "Quality & Accreditation",
+            "label": "New"
+        },
+        {
+            "route": "failure-update",
+            "module": "datacontrol",
+            "area": "Quality & Accreditation",
+            "label": "Failure update"
+        },
+        {
+            "route": "failure-resolve",
+            "module": "datacontrol",
+            "area": "Quality & Accreditation",
+            "label": "Failure resolve"
+        },
+        {
+            "route": "failure-capa",
+            "module": "datacontrol",
+            "area": "Quality & Accreditation",
+            "label": "Failure capa"
+        },
+        {
+            "route": "report-reviews",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Report reviews"
+        },
+        {
+            "route": "report-ack",
+            "module": "idems",
+            "area": "Reporting",
+            "label": "Report ack"
+        },
+        {
+            "route": "activities",
+            "module": "clients",
+            "area": "Directory",
+            "label": "Activities"
+        },
+        {
+            "route": "activity-add",
+            "module": "clients",
+            "area": "Directory",
+            "label": "New"
+        },
+        {
+            "route": "packs-save",
+            "module": "settings",
+            "area": "Admin",
+            "label": "Packs save"
+        },
+        {
+            "route": "confidentiality",
+            "module": "confidentiality",
+            "area": "Quality & Accreditation",
+            "label": "Confidentiality"
+        },
+        {
+            "route": "conf-undertaking-add",
+            "module": "confidentiality",
+            "area": "Quality & Accreditation",
+            "label": "New"
+        },
+        {
+            "route": "conf-nda-add",
+            "module": "confidentiality",
+            "area": "Quality & Accreditation",
+            "label": "New"
+        },
+        {
+            "route": "conf-breach",
+            "module": "confidentiality",
+            "area": "Quality & Accreditation",
+            "label": "Conf breach"
+        },
+        {
+            "route": "conf-breach-add",
+            "module": "confidentiality",
+            "area": "Quality & Accreditation",
+            "label": "New"
+        },
+        {
+            "route": "conf-breach-close",
+            "module": "confidentiality",
+            "area": "Quality & Accreditation",
+            "label": "Conf breach close"
+        },
+        {
+            "route": "site-docs",
+            "module": "identity",
+            "area": "Quality & Accreditation",
+            "label": "Site docs"
+        },
+        {
+            "route": "site-docs-add",
+            "module": "identity",
+            "area": "Quality & Accreditation",
+            "label": "New"
+        },
+        {
+            "route": "site-docs-delete",
+            "module": "identity",
+            "area": "Quality & Accreditation",
+            "label": "Site docs delete"
+        },
+        {
+            "route": "hold-points",
+            "module": "hold-points",
+            "area": "",
+            "label": "Hold points"
+        },
+        {
+            "route": "hw-point-new",
+            "module": "hold-points",
+            "area": "",
+            "label": "New"
+        },
+        {
+            "route": "hw-point-clear",
+            "module": "hold-points",
+            "area": "",
+            "label": "Hw point clear"
+        },
+        {
+            "route": "hw-point-waive",
+            "module": "hold-points",
+            "area": "",
+            "label": "Hw point waive"
+        },
+        {
+            "route": "hw-point-cancel",
+            "module": "hold-points",
+            "area": "",
+            "label": "Hw point cancel"
+        },
+        {
+            "route": "hw-point-reopen",
+            "module": "hold-points",
+            "area": "",
+            "label": "Hw point reopen"
+        },
+        {
+            "route": "hw-point-derive",
+            "module": "hold-points",
+            "area": "",
+            "label": "Hw point derive"
+        },
+        {
+            "route": "ncr",
+            "module": "ncr",
+            "area": "Quality & Accreditation",
+            "label": "Ncr"
+        },
+        {
+            "route": "ncr-item",
+            "module": "ncr",
+            "area": "Quality & Accreditation",
+            "label": "Ncr item"
+        },
+        {
+            "route": "ncr-new",
+            "module": "ncr",
+            "area": "Quality & Accreditation",
+            "label": "New"
+        },
+        {
+            "route": "ncr-contain",
+            "module": "ncr",
+            "area": "Quality & Accreditation",
+            "label": "Ncr contain"
+        },
+        {
+            "route": "ncr-disposition",
+            "module": "ncr",
+            "area": "Quality & Accreditation",
+            "label": "Ncr disposition"
+        },
+        {
+            "route": "ncr-capa",
+            "module": "ncr",
+            "area": "Quality & Accreditation",
+            "label": "Ncr capa"
+        },
+        {
+            "route": "ncr-assign",
+            "module": "ncr",
+            "area": "Quality & Accreditation",
+            "label": "Ncr assign"
+        },
+        {
+            "route": "ncr-close",
+            "module": "ncr",
+            "area": "Quality & Accreditation",
+            "label": "Ncr close"
+        },
+        {
+            "route": "ncr-reopen",
+            "module": "ncr",
+            "area": "Quality & Accreditation",
+            "label": "Ncr reopen"
+        },
+        {
+            "route": "capa",
+            "module": "capa",
+            "area": "Quality & Accreditation",
+            "label": "Capa"
+        },
+        {
+            "route": "capa-item",
+            "module": "capa",
+            "area": "Quality & Accreditation",
+            "label": "Capa item"
+        },
+        {
+            "route": "capa-new",
+            "module": "capa",
+            "area": "Quality & Accreditation",
+            "label": "New"
+        },
+        {
+            "route": "capa-cause",
+            "module": "capa",
+            "area": "Quality & Accreditation",
+            "label": "Capa cause"
+        },
+        {
+            "route": "capa-plan",
+            "module": "capa",
+            "area": "Quality & Accreditation",
+            "label": "Capa plan"
+        },
+        {
+            "route": "capa-done",
+            "module": "capa",
+            "area": "Quality & Accreditation",
+            "label": "Capa done"
+        },
+        {
+            "route": "capa-verify",
+            "module": "capa",
+            "area": "Quality & Accreditation",
+            "label": "Capa verify"
+        },
+        {
+            "route": "capa-close",
+            "module": "capa",
+            "area": "Quality & Accreditation",
+            "label": "Capa close"
+        },
+        {
+            "route": "capa-escalate",
+            "module": "capa",
+            "area": "Quality & Accreditation",
+            "label": "Capa escalate"
+        },
+        {
+            "route": "capa-settings",
+            "module": "capa",
+            "area": "Quality & Accreditation",
+            "label": "Capa settings"
+        },
+        {
+            "route": "capa-from-complaint",
+            "module": "capa",
+            "area": "Quality & Accreditation",
+            "label": "Capa from complaint"
+        },
+        {
+            "route": "capa-action-add",
+            "module": "capa",
+            "area": "Quality & Accreditation",
+            "label": "New"
+        },
+        {
+            "route": "capa-action-done",
+            "module": "capa",
+            "area": "Quality & Accreditation",
+            "label": "Capa action done"
+        },
+        {
+            "route": "capa-action-cancel",
+            "module": "capa",
+            "area": "Quality & Accreditation",
+            "label": "Capa action cancel"
+        },
+        {
+            "route": "capa-action-reopen",
+            "module": "capa",
+            "area": "Quality & Accreditation",
+            "label": "Capa action reopen"
+        },
+        {
+            "route": "internal-audits",
+            "module": "audits",
+            "area": "Quality & Accreditation",
+            "label": "Internal audits"
+        },
+        {
+            "route": "internal-audit",
+            "module": "audits",
+            "area": "Quality & Accreditation",
+            "label": "Internal audit"
+        },
+        {
+            "route": "internal-audit-new",
+            "module": "audits",
+            "area": "Quality & Accreditation",
+            "label": "New"
+        },
+        {
+            "route": "audit-record",
+            "module": "audits",
+            "area": "Quality & Accreditation",
+            "label": "Audit record"
+        },
+        {
+            "route": "audit-finding-add",
+            "module": "audits",
+            "area": "Quality & Accreditation",
+            "label": "New"
+        },
+        {
+            "route": "audit-finding-delete",
+            "module": "audits",
+            "area": "Quality & Accreditation",
+            "label": "Audit finding delete"
+        },
+        {
+            "route": "audit-finding-capa",
+            "module": "audits",
+            "area": "Quality & Accreditation",
+            "label": "Audit finding capa"
+        },
+        {
+            "route": "audit-close",
+            "module": "audits",
+            "area": "Quality & Accreditation",
+            "label": "Audit close"
+        },
+        {
+            "route": "audit-settings",
+            "module": "audits",
+            "area": "Quality & Accreditation",
+            "label": "Audit settings"
+        },
+        {
+            "route": "management-reviews",
+            "module": "audits",
+            "area": "Quality & Accreditation",
+            "label": "Management reviews"
+        },
+        {
+            "route": "management-review",
+            "module": "audits",
+            "area": "Quality & Accreditation",
+            "label": "Management review"
+        },
+        {
+            "route": "management-review-new",
+            "module": "audits",
+            "area": "Quality & Accreditation",
+            "label": "New"
+        },
+        {
+            "route": "review-refresh",
+            "module": "audits",
+            "area": "Quality & Accreditation",
+            "label": "Review refresh"
+        },
+        {
+            "route": "review-header",
+            "module": "audits",
+            "area": "Quality & Accreditation",
+            "label": "Review header"
+        },
+        {
+            "route": "review-input",
+            "module": "audits",
+            "area": "Quality & Accreditation",
+            "label": "Review input"
+        },
+        {
+            "route": "review-action-add",
+            "module": "audits",
+            "area": "Quality & Accreditation",
+            "label": "New"
+        },
+        {
+            "route": "review-action-done",
+            "module": "audits",
+            "area": "Quality & Accreditation",
+            "label": "Review action done"
+        },
+        {
+            "route": "review-complete",
+            "module": "audits",
+            "area": "Quality & Accreditation",
+            "label": "Review complete"
+        },
+        {
+            "route": "review-action-capa",
+            "module": "audits",
+            "area": "Quality & Accreditation",
+            "label": "Review action capa"
+        },
+        {
+            "route": "complaints",
+            "module": "complaints",
+            "area": "Quality & Accreditation",
+            "label": "Complaints"
+        },
+        {
+            "route": "complaint",
+            "module": "complaints",
+            "area": "Quality & Accreditation",
+            "label": "Complaint"
+        },
+        {
+            "route": "complaint-new",
+            "module": "complaints",
+            "area": "Quality & Accreditation",
+            "label": "New"
+        },
+        {
+            "route": "complaint-ack",
+            "module": "complaints",
+            "area": "Quality & Accreditation",
+            "label": "Complaint ack"
+        },
+        {
+            "route": "complaint-validity",
+            "module": "complaints",
+            "area": "Quality & Accreditation",
+            "label": "Complaint validity"
+        },
+        {
+            "route": "complaint-investigate",
+            "module": "complaints",
+            "area": "Quality & Accreditation",
+            "label": "Complaint investigate"
+        },
+        {
+            "route": "complaint-decide",
+            "module": "complaints",
+            "area": "Quality & Accreditation",
+            "label": "Complaint decide"
+        },
+        {
+            "route": "complaint-notify",
+            "module": "complaints",
+            "area": "Quality & Accreditation",
+            "label": "Complaint notify"
+        },
+        {
+            "route": "complaint-capa",
+            "module": "complaints",
+            "area": "Quality & Accreditation",
+            "label": "Complaint capa"
+        },
+        {
+            "route": "complaint-close",
+            "module": "complaints",
+            "area": "Quality & Accreditation",
+            "label": "Complaint close"
+        },
+        {
+            "route": "complaint-reopen",
+            "module": "complaints",
+            "area": "Quality & Accreditation",
+            "label": "Complaint reopen"
+        },
+        {
+            "route": "complaint-settings",
+            "module": "complaints",
+            "area": "Quality & Accreditation",
+            "label": "Complaint settings"
+        },
+        {
+            "route": "identity",
+            "module": "identity",
+            "area": "Quality & Accreditation",
+            "label": "Identity"
+        },
+        {
+            "route": "iddoc-add",
+            "module": "identity",
+            "area": "Quality & Accreditation",
+            "label": "New"
+        },
+        {
+            "route": "iddoc-file",
+            "module": "identity",
+            "area": "Quality & Accreditation",
+            "label": "Iddoc file"
+        },
+        {
+            "route": "agency-staff",
+            "module": "identity",
+            "area": "Quality & Accreditation",
+            "label": "Agency staff"
+        },
+        {
+            "route": "iddoc-reveal",
+            "module": "identity",
+            "area": "Quality & Accreditation",
+            "label": "Iddoc reveal"
+        },
+        {
+            "route": "iddoc-share",
+            "module": "identity",
+            "area": "Quality & Accreditation",
+            "label": "Iddoc share"
+        },
+        {
+            "route": "iddoc-redact",
+            "module": "identity",
+            "area": "Quality & Accreditation",
+            "label": "Iddoc redact"
+        },
+        {
+            "route": "iddoc-retention",
+            "module": "identity",
+            "area": "Quality & Accreditation",
+            "label": "Iddoc retention"
+        },
+        {
+            "route": "iddoc-access",
+            "module": "identity",
+            "area": "Quality & Accreditation",
+            "label": "Iddoc access"
+        },
+        {
+            "route": "impartiality",
+            "module": "impartiality",
+            "area": "Quality & Accreditation",
+            "label": "Impartiality"
+        },
+        {
+            "route": "imp-type",
+            "module": "impartiality",
+            "area": "Quality & Accreditation",
+            "label": "Imp type"
+        },
+        {
+            "route": "imp-declare",
+            "module": "impartiality",
+            "area": "Quality & Accreditation",
+            "label": "Imp declare"
+        },
+        {
+            "route": "imp-threat-add",
+            "module": "impartiality",
+            "area": "Quality & Accreditation",
+            "label": "New"
+        },
+        {
+            "route": "imp-threat-decide",
+            "module": "impartiality",
+            "area": "Quality & Accreditation",
+            "label": "Imp threat decide"
+        },
+        {
+            "route": "competence",
+            "module": "competence",
+            "area": "Quality & Accreditation",
+            "label": "Competence"
+        },
+        {
+            "route": "auth-add",
+            "module": "competence",
+            "area": "Quality & Accreditation",
+            "label": "New"
+        },
+        {
+            "route": "auth-status",
+            "module": "competence",
+            "area": "Quality & Accreditation",
+            "label": "Auth status"
+        },
+        {
+            "route": "auth-enforce",
+            "module": "competence",
+            "area": "Quality & Accreditation",
+            "label": "Auth enforce"
+        },
+        {
+            "route": "witness-add",
+            "module": "competence",
+            "area": "Quality & Accreditation",
+            "label": "New"
+        },
+        {
+            "route": "cert-verify",
+            "module": "competence",
+            "area": "Quality & Accreditation",
+            "label": "Cert verify"
+        },
+        {
+            "route": "credential-req-init",
+            "module": "competence",
+            "area": "Quality & Accreditation",
+            "label": "Credential req init"
+        },
+        {
+            "route": "equipment",
+            "module": "equipment",
+            "area": "Quality & Accreditation",
+            "label": "Equipment"
+        },
+        {
+            "route": "equip-new",
+            "module": "equipment",
+            "area": "Quality & Accreditation",
+            "label": "New"
+        },
+        {
+            "route": "equip-edit",
+            "module": "equipment",
+            "area": "Quality & Accreditation",
+            "label": "Edit"
+        },
+        {
+            "route": "equip-cal-add",
+            "module": "equipment",
+            "area": "Quality & Accreditation",
+            "label": "New"
+        },
+        {
+            "route": "equip-cal-del",
+            "module": "equipment",
+            "area": "Quality & Accreditation",
+            "label": "Equip cal del"
+        },
+        {
+            "route": "equip-cert",
+            "module": "equipment",
+            "area": "Quality & Accreditation",
+            "label": "Equip cert"
+        },
+        {
+            "route": "report-equip-add",
+            "module": "equipment",
+            "area": "Quality & Accreditation",
+            "label": "New"
+        },
+        {
+            "route": "report-equip-del",
+            "module": "equipment",
+            "area": "Quality & Accreditation",
+            "label": "Report equip del"
+        },
+        {
+            "route": "reset-data",
+            "module": "settings",
+            "area": "Admin",
+            "label": "Reset data"
+        },
+        {
+            "route": "partner-import",
+            "module": "clients",
+            "area": "Directory",
+            "label": "Partner import"
+        },
+        {
+            "route": "partner-template",
+            "module": "clients",
+            "area": "Directory",
+            "label": "Partner template"
+        },
+        {
+            "route": "duplicates",
+            "module": "clients",
+            "area": "Directory",
+            "label": "Duplicates"
+        },
+        {
+            "route": "partner-contact",
+            "module": "clients",
+            "area": "Directory",
+            "label": "Partner contact"
+        },
+        {
+            "route": "partner-address",
+            "module": "clients",
+            "area": "Directory",
+            "label": "Partner address"
+        },
+        {
+            "route": "partner-sites",
+            "module": "clients",
+            "area": "Directory",
+            "label": "Partner sites"
+        },
+        {
+            "route": "partner-meta",
+            "module": "clients",
+            "area": "Directory",
+            "label": "Partner meta"
+        },
+        {
+            "route": "partner-pos",
+            "module": "clients",
+            "area": "Directory",
+            "label": "Partner pos"
+        },
+        {
+            "route": "partner-gaps",
+            "module": "clients",
+            "area": "Directory",
+            "label": "Partner gaps"
+        },
+        {
+            "route": "po-lines",
+            "module": "clients",
+            "area": "Directory",
+            "label": "Po lines"
+        },
+        {
+            "route": "contract-no-check",
+            "module": "clients",
+            "area": "Directory",
+            "label": "Contract no check"
+        }
+    ],
+    "tables": [
+        "activities",
+        "ads_leads",
+        "ads_outbox",
+        "ads_spend",
+        "ads_sync_log",
+        "agencies",
+        "analytics_periods",
+        "approval_delegations",
+        "assessment_criteria",
+        "assessment_criteria_packs",
+        "assessment_disqual_rules",
+        "asset_issues",
+        "assignment_events",
+        "attendance",
+        "audit_conclusion_rules",
+        "audit_criteria",
+        "audit_criteria_packs",
+        "audit_findings",
+        "authorisations",
+        "back_office_staff",
+        "billable_bills",
+        "billable_events",
+        "billing_milestones",
+        "billing_orders",
+        "books_outbox",
+        "boss_numbers",
+        "business_partners",
+        "call_clarifications",
+        "call_nudges",
+        "call_status_events",
+        "calls",
+        "candidate_docs",
+        "candidate_events",
+        "candidate_reviews",
+        "candidate_stage_data",
+        "candidates",
+        "capa",
+        "capa_actions",
+        "capa_events",
+        "client_ndas",
+        "client_users",
+        "company_capabilities",
+        "complaint_events",
+        "complaints",
+        "confidentiality_breaches",
+        "confidentiality_undertakings",
+        "contract_amendments",
+        "contract_line_items",
+        "contract_overrides",
+        "controlled_docs",
+        "cost_allocations",
+        "cost_runs",
+        "costing_head_library",
+        "costing_head_templates",
+        "credit_notes",
+        "credit_recon",
+        "crm_inquiries",
+        "crm_templates",
+        "custom_fields",
+        "custom_forms",
+        "custom_records",
+        "custom_values",
+        "cx_access_requests",
+        "cx_applications",
+        "cx_bench",
+        "cx_bench_alloc",
+        "cx_certifications_registry",
+        "cx_channel_messages",
+        "cx_channel_templates",
+        "cx_client_bench",
+        "cx_client_saved_search",
+        "cx_disciplines",
+        "cx_disputes",
+        "cx_engagement_reports",
+        "cx_engagement_voucher_files",
+        "cx_engagement_voucher_lines",
+        "cx_engagement_vouchers",
+        "cx_engagements",
+        "cx_equipment_groups",
+        "cx_equipment_types",
+        "cx_geo_places",
+        "cx_identity_link",
+        "cx_inspection_stages",
+        "cx_iti_trades",
+        "cx_job_families",
+        "cx_materials",
+        "cx_message_reads",
+        "cx_messages",
+        "cx_org_capabilities",
+        "cx_organisations",
+        "cx_positions",
+        "cx_pro_certs",
+        "cx_pro_contact_reveals",
+        "cx_pro_files",
+        "cx_pro_projects",
+        "cx_prof_certifications",
+        "cx_professionals",
+        "cx_profile_places",
+        "cx_profile_tax",
+        "cx_qualification_levels",
+        "cx_qualtax_versions",
+        "cx_rating_disputes",
+        "cx_ratings",
+        "cx_readiness",
+        "cx_req_templates",
+        "cx_requirements",
+        "cx_roles",
+        "cx_sectors",
+        "cx_standards",
+        "cx_tax_aliases",
+        "cx_tax_edges",
+        "cx_tax_nodes",
+        "cx_taxonomy_versions",
+        "cx_terms",
+        "cx_verifications",
+        "data_check_runs",
+        "data_consents",
+        "data_requests",
+        "decision_rules",
+        "dep_att_approval",
+        "dep_checklist",
+        "dep_gate_pass",
+        "dep_manpower",
+        "dep_site_history",
+        "dep_site_log",
+        "dep_status_events",
+        "dep_timesheet",
+        "disclosure_consents",
+        "doc_templates",
+        "email_log",
+        "endorsement_files",
+        "endorsements",
+        "engagements",
+        "equipment",
+        "equipment_calibrations",
+        "evidence_chain",
+        "expense_heads",
+        "expenses",
+        "form_field_layout",
+        "form_tokens",
+        "hiring_requests",
+        "holidays",
+        "hr_discussions",
+        "hw_points",
+        "idems_approval_rules",
+        "idems_approver_map",
+        "idems_audit",
+        "idems_counters",
+        "impartiality_declarations",
+        "impartiality_threats",
+        "inspection_criteria",
+        "inspection_criteria_packs",
+        "inspector_allowances",
+        "inspector_certs",
+        "inspector_day_status",
+        "inspectors",
+        "install_beats",
+        "integration_outbox",
+        "internal_audits",
+        "interview_scores",
+        "interviews",
+        "invoice_lines",
+        "invoices",
+        "issue_departures",
+        "issue_disputes",
+        "issue_extensions",
+        "issued_licences",
+        "job_bills",
+        "job_delays",
+        "job_offers",
+        "job_qaps",
+        "job_readiness",
+        "job_visits",
+        "jobs",
+        "kpi_alerts",
+        "kpi_defs",
+        "kpi_snapshots",
+        "kpi_targets",
+        "kpi_versions",
+        "lead_files",
+        "lead_reassign_requests",
+        "lead_stage_history",
+        "leads",
+        "learned_suggestions",
+        "login_attempts",
+        "lookup_terms",
+        "lookup_types",
+        "lookup_values",
+        "methods",
+        "mgmt_reviews",
+        "mkt_coupons",
+        "mkt_credit_balance",
+        "mkt_credit_packs",
+        "mkt_credit_purchases",
+        "mkt_escrow",
+        "mkt_fee_rules",
+        "mkt_ledger",
+        "mkt_orders",
+        "mkt_plans",
+        "mkt_rules",
+        "mkt_snapshots",
+        "mkt_subscriptions",
+        "mkt_usage",
+        "mr_actions",
+        "mr_inputs",
+        "ncr_events",
+        "nonconformities",
+        "office_expense_heads",
+        "office_expenses",
+        "offices",
+        "opportunities",
+        "opportunity_quotes",
+        "opportunity_stage_history",
+        "partner_addresses",
+        "partner_contacts",
+        "partner_contracts",
+        "partner_notes",
+        "partner_purchase_orders",
+        "partner_registrations",
+        "partner_relationships",
+        "password_resets",
+        "person_document_access",
+        "person_documents",
+        "person_sbu_split",
+        "pipeline_stages",
+        "pipelines",
+        "po_line_items",
+        "portal_audit",
+        "portal_notifications",
+        "portal_requests",
+        "positions",
+        "project_costing_approvals",
+        "project_costing_lines",
+        "project_costings",
+        "qap_scope_cache",
+        "qualifications",
+        "quotations",
+        "quote_approval_rules",
+        "quote_approvals",
+        "quote_edit_requests",
+        "quote_files",
+        "quote_followups",
+        "quote_lines",
+        "quote_locations",
+        "quote_revisions",
+        "receipt_allocations",
+        "receipts",
+        "recruit_approval_levels",
+        "recruit_approval_requests",
+        "recruit_approval_rules",
+        "recruit_approval_steps",
+        "recruit_pipelines",
+        "recruit_stages",
+        "recruiter_assignments",
+        "recurring_services",
+        "release_inspections",
+        "release_rules",
+        "report_approvals",
+        "report_client_reviews",
+        "report_doc_review",
+        "report_docs",
+        "report_equipment",
+        "report_fields",
+        "report_files",
+        "report_lib_fields",
+        "report_lib_section_fields",
+        "report_lib_sections",
+        "report_sections",
+        "report_statuses",
+        "report_templates",
+        "report_types",
+        "report_vetting",
+        "requirement_change_proposals",
+        "requirement_versions",
+        "requisition_allocation_events",
+        "requisition_allocations",
+        "requisition_groups",
+        "requisitions",
+        "retention_rules",
+        "risk_items",
+        "saas_deletions",
+        "saas_logins",
+        "saas_orders",
+        "saas_payment_extras",
+        "saas_refunds",
+        "saas_tenants",
+        "salary_component_defs",
+        "salary_structures",
+        "sample_custody",
+        "sample_items",
+        "satisfaction_surveys",
+        "schema_guards",
+        "scorecard_items",
+        "scorecards",
+        "security_incidents",
+        "selfserve_signups",
+        "service_catalog",
+        "service_dependencies",
+        "service_report_map",
+        "service_scope",
+        "settings",
+        "site_doc_requirements",
+        "site_visits",
+        "sla_targets",
+        "sso_attempts",
+        "stage_gate_requests",
+        "stage_gates",
+        "subcon_rates",
+        "subcons",
+        "sw_validations",
+        "system_failures",
+        "tally_exports",
+        "tech_phrases",
+        "tenant_requests",
+        "travel_modes",
+        "user_prefs",
+        "user_tasks",
+        "users",
+        "vendor_audit",
+        "vendor_km_memory",
+        "vendor_profiles",
+        "vendor_qualifications",
+        "vendor_status_events",
+        "vendor_users",
+        "voucher_entries",
+        "vouchers",
+        "witness_assessments",
+        "work_norms"
+    ],
+    "navgroups": {
+        "Sales": [
+            "crm.quote.create",
+            "crm.quote.approve",
+            "crm.quote.send",
+            "crm.followup.manage",
+            "crm.contract.register",
+            "crm.template.manage",
+            "mod.leads.view",
+            "mod.leads.add",
+            "mod.leads.edit",
+            "mod.leads.archive",
+            "mod.leads.delete",
+            "mod.inquiries.view",
+            "mod.inquiries.add",
+            "mod.inquiries.edit",
+            "mod.inquiries.archive",
+            "mod.inquiries.delete",
+            "mod.quotes.view",
+            "mod.quotes.add",
+            "mod.quotes.edit",
+            "mod.quotes.archive",
+            "mod.quotes.delete",
+            "mod.crm_orders.view",
+            "mod.crm_orders.add",
+            "mod.crm_orders.edit",
+            "mod.crm_orders.archive",
+            "mod.crm_orders.delete",
+            "mod.crm_reports.view",
+            "mod.crm_reports.add",
+            "mod.crm_reports.edit",
+            "mod.crm_reports.archive",
+            "mod.crm_reports.delete"
+        ],
+        "Operations": [
+            "ops.call.create",
+            "ops.job.allocate",
+            "ops.job.close",
+            "ops.call.delete",
+            "workforce.availability",
+            "workforce.report.approve",
+            "mod.calls.view",
+            "mod.calls.add",
+            "mod.calls.edit",
+            "mod.calls.archive",
+            "mod.calls.delete",
+            "mod.jobs.view",
+            "mod.jobs.add",
+            "mod.jobs.edit",
+            "mod.jobs.archive",
+            "mod.jobs.delete",
+            "mod.vouchers.view",
+            "mod.vouchers.add",
+            "mod.vouchers.edit",
+            "mod.vouchers.archive",
+            "mod.vouchers.delete",
+            "mod.reconcile.view",
+            "mod.reconcile.add",
+            "mod.reconcile.edit",
+            "mod.reconcile.archive",
+            "mod.reconcile.delete"
+        ],
+        "Recruitment": [
+            "hiring.admin",
+            "hiring.material_change.propose",
+            "hiring.review.clear",
+            "mod.hiring.view",
+            "mod.hiring.add",
+            "mod.hiring.edit",
+            "mod.hiring.archive",
+            "mod.hiring.delete"
+        ],
+        "Reporting": [
+            "idems.finalize",
+            "idems.type.manage",
+            "idems.timestamp.edit",
+            "idems.template.approve",
+            "mod.idems.view",
+            "mod.idems.add",
+            "mod.idems.edit",
+            "mod.idems.archive",
+            "mod.idems.delete"
+        ],
+        "Money": [
+            "data.credit",
+            "data.revenue",
+            "data.salary",
+            "data.profitability",
+            "finance.reconcile",
+            "mod.invoicing.view",
+            "mod.invoicing.add",
+            "mod.invoicing.edit",
+            "mod.invoicing.archive",
+            "mod.invoicing.delete",
+            "mod.profitability.view",
+            "mod.profitability.add",
+            "mod.profitability.edit",
+            "mod.profitability.archive",
+            "mod.profitability.delete",
+            "mod.overheads.view",
+            "mod.overheads.add",
+            "mod.overheads.edit",
+            "mod.overheads.archive",
+            "mod.overheads.delete"
+        ],
+        "Quality & Accreditation": [
+            "idems.audit.view",
+            "person.iddoc.view",
+            "person.iddoc.manage",
+            "complaints.decide",
+            "capa.close",
+            "ncr.close",
+            "mod.equipment.view",
+            "mod.equipment.add",
+            "mod.equipment.edit",
+            "mod.equipment.archive",
+            "mod.equipment.delete",
+            "mod.competence.view",
+            "mod.competence.add",
+            "mod.competence.edit",
+            "mod.competence.archive",
+            "mod.competence.delete",
+            "mod.impartiality.view",
+            "mod.impartiality.add",
+            "mod.impartiality.edit",
+            "mod.impartiality.archive",
+            "mod.impartiality.delete",
+            "mod.identity.view",
+            "mod.identity.add",
+            "mod.identity.edit",
+            "mod.identity.archive",
+            "mod.identity.delete",
+            "mod.complaints.view",
+            "mod.complaints.add",
+            "mod.complaints.edit",
+            "mod.complaints.archive",
+            "mod.complaints.delete",
+            "mod.ncr.view",
+            "mod.ncr.add",
+            "mod.ncr.edit",
+            "mod.ncr.archive",
+            "mod.ncr.delete",
+            "mod.confidentiality.view",
+            "mod.confidentiality.add",
+            "mod.confidentiality.edit",
+            "mod.confidentiality.archive",
+            "mod.confidentiality.delete",
+            "mod.capa.view",
+            "mod.capa.add",
+            "mod.capa.edit",
+            "mod.capa.archive",
+            "mod.capa.delete",
+            "mod.audits.view",
+            "mod.audits.add",
+            "mod.audits.edit",
+            "mod.audits.archive",
+            "mod.audits.delete",
+            "mod.datacontrol.view",
+            "mod.datacontrol.add",
+            "mod.datacontrol.edit",
+            "mod.datacontrol.archive",
+            "mod.datacontrol.delete"
+        ],
+        "Insights": [
+            "dash.operations",
+            "dash.financial",
+            "dash.utilization",
+            "dash.people",
+            "mod.reports.view",
+            "mod.reports.add",
+            "mod.reports.edit",
+            "mod.reports.archive",
+            "mod.reports.delete"
+        ],
+        "Directory": [
+            "master.manage",
+            "mod.clients.view",
+            "mod.clients.add",
+            "mod.clients.edit",
+            "mod.clients.archive",
+            "mod.clients.delete",
+            "mod.vendors.view",
+            "mod.vendors.add",
+            "mod.vendors.edit",
+            "mod.vendors.archive",
+            "mod.vendors.delete",
+            "mod.masters.view",
+            "mod.masters.add",
+            "mod.masters.edit",
+            "mod.masters.archive",
+            "mod.masters.delete",
+            "mod.portal.view",
+            "mod.portal.add",
+            "mod.portal.edit",
+            "mod.portal.archive",
+            "mod.portal.delete"
+        ],
+        "Admin": [
+            "users.manage.branch",
+            "users.manage.global",
+            "settings.manage",
+            "org.hierarchy.view",
+            "mod.users.view",
+            "mod.users.add",
+            "mod.users.edit",
+            "mod.users.archive",
+            "mod.users.delete",
+            "mod.settings.view",
+            "mod.settings.add",
+            "mod.settings.edit",
+            "mod.settings.archive",
+            "mod.settings.delete"
+        ]
+    }
+}
