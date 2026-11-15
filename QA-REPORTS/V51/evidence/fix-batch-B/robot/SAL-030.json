@@ -1,0 +1,55 @@
+{
+ "id": "SAL-030",
+ "title": "Open a deal and move it to Won",
+ "area": "Sales",
+ "module": "Opportunities",
+ "persona": "BUSINESS_DEV_MANAGER",
+ "kind": "scenario",
+ "status": "PASSED",
+ "steps": [
+  {
+   "n": 1,
+   "do": "Left menu → Sales → Opportunities → \"+ New opportunity\".",
+   "expect": "Form \"New opportunity\".",
+   "status": "pass",
+   "observed": "Form \"New opportunity\"."
+  },
+  {
+   "n": 2,
+   "do": "What is the opportunity? \"Refinery shutdown TPI 2026\", Customer = TB Refinery Ltd, Pipeline = default, Estimated value ₹12,00,000, Expected close next month, Branch Ahmedabad, Where it came from = An existing customer, Competing against \"Bureau X\", Contact \"Mr Patel\", Next action \"Site visit\", By when tomorrow → \"Open the opportunity\".",
+   "expect": "The deal opens with tabs Overview · Quotes · Actions · History at the first stage.",
+   "status": "pass",
+   "observed": "Opened at \"Enquiry received\" with tabs Overview · Quotes · History · Actions.",
+   "shot": "SAL-030-2.jpg",
+   "note": "After the first move a History tab does appear (Overview · Quotes · History · Actions); it is missing only while the deal has never moved."
+  },
+  {
+   "n": 3,
+   "do": "Actions tab → \"Move it to\" = Quotation sent (50%) → \"Move it\".",
+   "expect": "Message \"Moved.\" Probability shows 50%.",
+   "status": "pass",
+   "observed": "\"Moved.\" Probability shows 50%."
+  },
+  {
+   "n": 4,
+   "do": "Move it to Won (100%).",
+   "expect": "Message \"Won — TB Refinery Ltd said yes. Next: on the Actions tab, send it to Accounts to register the contract.\" Banner \"Won — TB Refinery Ltd said yes. 🎉\" with the same next step, and the Actions tab offers \"Send to Accounts to register the contract\" (owner, 12 Nov 2026: the old message contradicted the banner).",
+   "status": "pass",
+   "observed": "\"Won — TB Refinery Ltd said yes. Next: on the Actions tab, send it to Accounts to register the contract.\" Banner \"Won — TB Refinery Ltd said yes. 🎉\"; Actions offers \"Send to Accounts to register the contract\".",
+   "shot": "SAL-030-4.jpg"
+  },
+  {
+   "n": 5,
+   "do": "Left menu → Insights → Sales dashboard.",
+   "expect": "Won value includes ₹12,00,000; \"Who is selling\" credits Test BDM.",
+   "status": "pass",
+   "observed": "Won value shows ₹12 L; \"Who is selling\": \"Test BDM 0 ₹0 1 ₹12,00,000 0\".",
+   "shot": "SAL-030-5.jpg"
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-030-end.jpg",
+ "seconds": 6,
+ "ranAt": "2026-11-15T15:50:57.236Z"
+}

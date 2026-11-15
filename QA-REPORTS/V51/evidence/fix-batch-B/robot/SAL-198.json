@@ -1,0 +1,51 @@
+{
+ "id": "SAL-198",
+ "title": "Assigned work: the assignee and the people above them work on it; others view",
+ "area": "Sales",
+ "module": "Enquiries",
+ "persona": "several",
+ "kind": "scenario",
+ "status": "PASSED",
+ "steps": [
+  {
+   "n": 1,
+   "do": "[BDM] open the enquiry.",
+   "expect": "It shows, read-only: \"🔒 This enquiry is assigned to <MktExec> — <MktExec> and the people <MktExec> reports to work on it; you can view it.\" No Save, no Drop, no Quote button on the register.",
+   "status": "pass",
+   "observed": "Test BDM sees \"🔒 This inquiry is assigned to Test MktExec — Test MktExec and the people Test MktExec reports to work on it; you can view it.\" — no Save, no Drop; no Quote button on the register row."
+  },
+  {
+   "n": 2,
+   "do": "[MktMgr] open it → make a quotation from it.",
+   "expect": "Allowed. The quotation is assigned to <MktExec>.",
+   "status": "pass",
+   "observed": "Test MktMgr (whom Test MktExec reports to) made Q-00001 from it (\"Q-00001 created.\"); the quotation is assigned to Test MktExec."
+  },
+  {
+   "n": 3,
+   "do": "[BDM] open that quotation.",
+   "expect": "Viewable; the next-step line says who works on it; no Submit / Edit / Revise / sending buttons. A forced edit is refused with the same words.",
+   "status": "pass",
+   "observed": "Viewable; the line reads \"Still a draft. This quote is assigned to Test MktExec — Test MktExec and the people Test MktExec reports to work on it; you can view it.\"; no Submit / Edit / Revise / sending buttons. Typing /quote-edit?id=1 is refused: \"This quote is assigned to Test MktExec — Test MktExec and the people Test MktExec reports to work on it; you can view it.\"."
+  },
+  {
+   "n": 4,
+   "do": "[MktExec] open it.",
+   "expect": "Edit, Submit, Revise as usual.",
+   "status": "pass",
+   "observed": "Test MktExec has Edit and Submit on the draft and, once it was approved, \"Revise (new rev)\" — as usual."
+  },
+  {
+   "n": 5,
+   "do": "EDGE · Unassigned enquiry, or the assignee left the company.",
+   "expect": "The whole team works on it, as before.",
+   "status": "pass",
+   "observed": "Test BDM may Save and Quote both the unassigned enquiry (INQ-00002) and the one whose assignee has left (INQ-00003)."
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-198-end.jpg",
+ "seconds": 10,
+ "ranAt": "2026-11-15T16:12:01.124Z"
+}

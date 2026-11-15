@@ -1,0 +1,114 @@
+{
+ "id": "SAL-160",
+ "title": "Lead to opened contract — every hand-off, every number carried over",
+ "area": "Sales",
+ "module": "Sales flow",
+ "persona": "several",
+ "kind": "flow",
+ "status": "FAILED",
+ "steps": [
+  {
+   "n": 1,
+   "do": "[Test MktExec] New lead \"TB Ports Ltd\", value ₹6,00,000.",
+   "expect": "Lead at first stage.",
+   "status": "pass",
+   "observed": "Lead TB Ports Ltd, ₹6,00,000, at the first stage \"New enquiry\"."
+  },
+  {
+   "n": 2,
+   "do": "[Test MktExec] Log a contact; move to Qualified → Proposal sent.",
+   "expect": "History shows both moves.",
+   "status": "outdated",
+   "observed": "Moves offered: Contact made, Qualified, Won — customer →, Not pursued. Moved to Qualified — History shows \"Qualified\" (stage history: Qualified). The Inspection profile's lead pipeline (New enquiry → Contact made → Qualified → Won — customer / Not pursued) has no \"Proposal sent\" stage; the quotation itself is the proposal step.",
+   "suggest": "[Test MktExec] Log a contact; move to Qualified. → History shows the contact and the move.",
+   "shot": "SAL-160-2-old.jpg"
+  },
+  {
+   "n": 3,
+   "do": "[Test MktExec] Won → Convert (new customer, State Gujarat).",
+   "expect": "Customer + enquiry created; enquiry assigned to you, branch Ahmedabad.",
+   "status": "pass",
+   "observed": "\"Done — TB Ports Ltd is now a customer, and an inquiry is raised for what they want. The in\" — customer created; enquiry INQ-00001 assigned to Test MktExec, branch Ahmedabad."
+  },
+  {
+   "n": 4,
+   "do": "[Test BDM] Open a deal for TB Ports Ltd, value ₹6,00,000; create a quotation from the deal.",
+   "expect": "Draft quotation linked to the deal.",
+   "status": "pass",
+   "observed": "Draft Q-00001 created from the deal and linked to it."
+  },
+  {
+   "n": 5,
+   "do": "[Test BDM] Lines 60 Man-day × ₹10,000 = ₹6,00,000 subtotal; GST 18% = ₹1,08,000; total ₹7,08,000.",
+   "expect": "Totals exact.",
+   "status": "pass",
+   "observed": "₹6,00,000 + ₹1,08,000 = ₹7,08,000."
+  },
+  {
+   "n": 6,
+   "do": "[Test BDM] Submit for approval.",
+   "expect": "Chain: Level 2 (Marketing Manager) because ₹6,00,000 is above ₹5,00,000 before tax.",
+   "status": "outdated",
+   "observed": "\"Submitted for approval — 2 step(s). Now with Test BranchMgr (Branch Manager); then, last, level 2: Test MktMgr (Marketing Manager).\" Chain: Level 1 BRANCH_MANAGER → Level 2 MARKETING_MANAGER — since 24 Oct 2026 a quotation is signed by the level its value falls in AND every level below it (docs/03, 19n).",
+   "suggest": "Chain: Level 1 (Branch Manager), then Level 2 (Marketing Manager) — ₹6,00,000 is above ₹5,00,000 before tax, so it climbs through both levels.",
+   "shot": "SAL-160-6-old.jpg"
+  },
+  {
+   "n": 7,
+   "do": "[Test MktMgr] Tick the checklist (7/7), Approve.",
+   "expect": "Approved.",
+   "status": "pass",
+   "observed": "Approved — Test BranchMgr (ticked 5/5): \"Your approval is recorded. Now with Test MktMgr (Marketing Manager).\"; Test MktMgr: \"All approvals complete — quote approved and ready to send.\"",
+   "note": "The copy's checklist has 5 points, so it reads 5/5, not 7/7."
+  },
+  {
+   "n": 8,
+   "do": "[Test BDM] Send to client.",
+   "expect": "Sent; follow-up offered.",
+   "status": "pass",
+   "observed": "\"Marked sent and follow-ups scheduled; no customer e-mail on \" — 5 follow-ups scheduled."
+  },
+  {
+   "n": 9,
+   "do": "[Test BDM] Mark accepted (won).",
+   "expect": "Accepted. Deal → Won. Lead → Won — customer.",
+   "status": "pass",
+   "observed": "Accepted; deal WON; lead \"Won — customer Won — customer 🎉 Won — TB Ports Lt\" (CONVERTED)."
+  },
+  {
+   "n": 10,
+   "do": "[Test Finance] Register the contract & request opening.",
+   "expect": "Contract Pending, value ₹6,00,000 (before tax).",
+   "status": "fail",
+   "observed": "Contract AHM/C/2026-27/00001 is Pending, but its value is ₹7,08,000 — the total WITH GST — not ₹6,00,000 before tax",
+   "shot": "SAL-160-10-fail.jpg"
+  },
+  {
+   "n": 11,
+   "do": "[Test OpsMgr] Give the first signature. [Test BranchMgr] Approve & open the contract.",
+   "expect": "Contract OPEN; order floated to Operations.",
+   "status": "pass",
+   "observed": "\"Contract AHM/C/2026-27/00001 opened and floated to operations.\""
+  },
+  {
+   "n": 12,
+   "do": "[Test Coord] Left menu → Operations → work orders.",
+   "expect": "A work order can be raised under this contract number with the customer, sites and lines carried over — nothing retyped.",
+   "status": "pass",
+   "observed": "Operations → raise: the form for AHM/C/2026-27/00001 carries TB Ports Ltd, the accepted quotation and contract number, and offers the line \"Crane inspection\" to draw on — nothing retyped. (The quotation had no site, so none to carry.)"
+  },
+  {
+   "n": 13,
+   "do": "Insights → Sales dashboard.",
+   "expect": "Won value includes ₹6,00,000; Test BDM credited.",
+   "status": "pass",
+   "observed": "Sales dashboard shows the ₹6 L win and credits Test BDM.",
+   "shot": "SAL-160-13.jpg"
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-160-end.jpg",
+ "seconds": 22,
+ "ranAt": "2026-11-15T15:34:34.329Z"
+}

@@ -1,0 +1,79 @@
+{
+ "id": "SAL-195",
+ "title": "A revision is worked on one screen — its costing is in a Costing tab, changed in place",
+ "area": "Sales",
+ "module": "Quotations",
+ "persona": "BUSINESS_DEV_MANAGER",
+ "kind": "scenario",
+ "status": "NEEDS_YOU",
+ "steps": [
+  {
+   "n": 1,
+   "do": "On the quotation: \"Revise (new rev)\" → why \"Client asked for two more engineers\" → Create revision.",
+   "expect": "You land on \"Edit — Q-… Rev 01\" with every tab. Message: \"… Its costing <number> Rev 01 was made from … Rev 00 as a draft — change it in the Costing tab here, then submit it for approval.\"",
+   "status": "pass",
+   "observed": "Landed on \"Edit — Q-00001 Rev 01\" with tabs Client & header · Offices · Sites · Commercials · Line items · Costing · Terms. Message: \"Created revision 01 with 1 line(s) and 0 site(s) carried over. Edit it below. Its costing AHM/PC/2026-27/11/0001 Rev 01 was made from AHM/PC/2026-27/11/0001 Rev 00 as a draft — change it in the Costing tab here, then submit it for approval.\""
+  },
+  {
+   "n": 2,
+   "do": "Open the \"Costing\" tab.",
+   "expect": "The revision's costing number (… Rev 01), Draft, revenue / cost / margin, and its roles with quantity, unit, rate and amount.",
+   "status": "pass",
+   "observed": "Costing tab: \"AHM/PC/2026-27/11/0001 Rev 01 Draft revenue ₹7.73 L · cost ₹5.89 L · margin 23.8% ROLE QTY UNIT RATE AMOUNT Site Engineer 12 MANMONTH 64,378 7,72,538 ✎ Change the costing Opens over this screen — change roles, rates and margins, a…\"",
+   "note": "The Unit column shows the stored code \"MANMONTH\" instead of the word \"Man-month\".",
+   "shot": "SAL-195-2.jpg"
+  },
+  {
+   "n": 3,
+   "do": "\"✎ Change the costing\".",
+   "expect": "The costing opens OVER the quotation (no new page, no menu inside). Change a role's quantity to 18, or Negotiation %, and press Save — the box stays open on the costing with your change.",
+   "status": "pass",
+   "observed": "Opened over the quotation; Negotiation % and the role quantity 18 both saved with the box staying open.",
+   "shot": "SAL-195-3.jpg"
+  },
+  {
+   "n": 4,
+   "do": "Submit the costing for approval inside the box, then close it (×).",
+   "expect": "Back on the quotation's Costing tab — which now shows the new figures and status. Nothing you typed on the quotation was lost.",
+   "status": "pass",
+   "observed": "Submitted inside the box (no message seen), closed with ×: the Costing tab now reads \"AHM/PC/2026-27/11/0001 Rev 01 Submitted for approval revenue ₹11.81 L · cost ₹8.83 L · margin 25.2% ROLE QTY UNIT RATE AMOUNT Site Engineer 18 MANMONTH 65,604 11,80,879 O…\" (with the negotiation changed in step 3); the contact typed on the quotation (\"Meera Patel\") is still there."
+  },
+  {
+   "n": 5,
+   "do": "\"⇣ Take the costing's prices into the line items\".",
+   "expect": "A message: \"N line(s) now carry the prices of costing … Press Save to keep them.\" The Line items tab opens with the roles, quantities and rates filled; lines that are not in the costing are left as they are.",
+   "status": "pass",
+   "observed": "Message: \"1 line(s) now carry the prices of costing AHM/PC/2026-27/11/0001 Rev 01. Press \"Save\" to keep them.\". The Line items tab opened with Site Engineer 18 at ₹65604.38 (the costing's new rate). (No line outside the costing on this revision, so \"left as they are\" was not exercised.)"
+  },
+  {
+   "n": 6,
+   "do": "Save the quotation.",
+   "expect": "Saved; no \"why the prices differ\" note is needed — they are the costing's prices.",
+   "status": "pass",
+   "observed": "Saved (\"Costing submitted for approval — 2 levels to pass, in order: Level 1 — Branch Manager (Test BranchMgr): ⏳ waiting — with them now; Level 2 — Marketing Manager (Test MktMgr) — signs last: after the levels before it. | Quote saved.\") with no \"why the prices differ\" note asked; the line holds 18 at ₹65604.38."
+  },
+  {
+   "n": 7,
+   "do": "EDGE · A quotation whose costing is approved and not held by it.",
+   "expect": "The tab shows \"Open the costing\" (read-only in the box).",
+   "status": "pass",
+   "observed": "The Costing tab offers \"Open the costing\" (no change button); in the box the approved costing is read-only."
+  },
+  {
+   "n": 8,
+   "do": "EDGE · A revision raised by someone who does not work on costings.",
+   "expect": "The tab shows \"✎ Make this revision's costing\" — pressed by a colleague who does, it makes the copy and opens it in the box.",
+   "status": "needs",
+   "observed": "Every role on the test copy that may raise a revision also works on costings, so a revision raised by someone who does not cannot be produced with the standard users.",
+   "reason": "Needs a custom role (may revise quotations, may not work on costings) set up by the owner.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SAL-195-8-needs.jpg"
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-195-end.jpg",
+ "seconds": 32,
+ "ranAt": "2026-11-15T15:40:14.602Z"
+}

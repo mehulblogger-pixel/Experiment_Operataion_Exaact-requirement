@@ -1,0 +1,55 @@
+{
+ "id": "SAL-191",
+ "title": "A button is shown only to someone it works for: \"Submit for approval\", \"Approve\" and the sending buttons",
+ "area": "Sales",
+ "module": "Quotations",
+ "persona": "several",
+ "kind": "scenario",
+ "status": "FAILED",
+ "steps": [
+  {
+   "n": 1,
+   "do": "[Branch Manager] open the draft quotation.",
+   "expect": "No \"Submit for approval\" button and no \"Actions\" box. The top line reads \"Still a draft. Next: <name> prepares it and submits it for approval — that is not yours to do.\"",
+   "status": "pass",
+   "observed": "Test BranchMgr: no Submit button, no Actions box; top line \"Still a draft. Test BDM prepares it and submits it for approval — that is not yours to do. You will see it here when it comes to you.\"",
+   "note": "The line reads \"Still a draft. Test BDM prepares it …\" — without the word \"Next:\" the test shows.",
+   "suggest": "Still a draft. <name> prepares it and submits it for approval — that is not yours to do. You will see it here when it comes to you."
+  },
+  {
+   "n": 2,
+   "do": "[BDM who prepared it] open it.",
+   "expect": "\"Submit for approval\" is there.",
+   "status": "pass",
+   "observed": "Test BDM (who prepared it) sees \"Submit for approval\"."
+  },
+  {
+   "n": 3,
+   "do": "[BDM] remove every line (or leave a man-month quotation whose costing is still a draft) and open it again.",
+   "expect": "In place of the button: \"⚠ Not ready to submit: …\" saying exactly what to fix (e.g. \"needs at least one line with a quantity and a rate\").",
+   "status": "pass",
+   "observed": "With the only line's rate cleared (saved: \"Quote saved.\"), the button is replaced by: \"⚠ Not ready to submit: Before it can go further this quote needs at least one line with a quantity and a rate. Edit it to add them.\""
+  },
+  {
+   "n": 4,
+   "do": "[Marketing Executive] open the approved quotation they prepared; then Test BDM's approved quotation. Then [Branch Manager, whom the executive reports to] open the executive's quotation.",
+   "expect": "Their own: sending is offered — \"✉ Send to client\", \"Open in Gmail\", \"Outlook (.eml)\", \"Three ways to send this\" (owner, 15 Nov 2026, F1: the preparer sends). Test BDM's: no sending buttons; it reads \"Test BDM … sends it to the client — sending is not yours to do.\" Test BranchMgr, within 24 hours of approval: no sending buttons; it reads \"… sends it first. If it is still unsent 24 hours after its approval (from <date, time>), you may send it.\"",
+   "status": "fail",
+   "observed": "on the quotation Test MktExec prepared, sending offers only: nothing",
+   "shot": "SAL-191-4-fail.jpg"
+  },
+  {
+   "n": 5,
+   "do": "NEGATIVE · [Marketing Executive] type /quote-compose?id=<Test BDM's quotation> in the address bar.",
+   "expect": "Refused: \"Test BDM … sends it to the client — sending is not yours to do.\"",
+   "status": "fail",
+   "observed": "typed address: HTTP 200 text/html; charset=UTF-8 — TEST COPY — not the live system. No e-mail is sent from here. Payments: Razorpay test keys only. T TB Inspection Services (TEST) « 🏠 Dashboard 🔍 Search record",
+   "shot": "SAL-191-5-fail.jpg"
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-191-end.jpg",
+ "seconds": 14,
+ "ranAt": "2026-11-15T16:11:20.488Z"
+}

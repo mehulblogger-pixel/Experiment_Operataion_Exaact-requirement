@@ -1,0 +1,426 @@
+{
+ "id": "SCR-pipeline",
+ "title": "Screen check — Sales pipeline",
+ "area": "Sales",
+ "module": "Pipelines & funnels",
+ "persona": "MASTER_ADMIN",
+ "kind": "screen",
+ "status": "OUT_OF_DATE",
+ "steps": [
+  {
+   "n": 1,
+   "do": "Open the screen: Go to Sales → Leads & pipeline → Sales pipeline (or type /pipeline?id=1 after the site address).",
+   "expect": "The page heading reads \"Sales pipeline\"; the breadcrumb reads Home › Sales › Leads & pipeline; the page loads in under 3 seconds with no error.",
+   "status": "pass",
+   "observed": "Opened without error in 72 ms; heading \"Inspection, testing & certification — leads\" (this record's own name); breadcrumb Home › Sales › Leads & pipeline › Pipeline.",
+   "note": "The heading names the record itself: here \"Inspection, testing & certification — leads\"; the test was written with another record (\"Sales pipeline\"). That is the data, not a change to the screen.",
+   "shot": "SCR-pipeline-1.jpg"
+  },
+  {
+   "n": 2,
+   "do": "Read the line under the heading.",
+   "expect": "It says: \"Lead pipeline Default\" — and it is true for what you see.",
+   "status": "pass",
+   "observed": "The line reads as the test says. (Whether it is true for what you see is checked by the other steps.)"
+  },
+  {
+   "n": 3,
+   "do": "Form “Save the funnel”: fill every field with valid values and press “Save the funnel”.",
+   "expect": "Saved with a confirmation message; the saved values show exactly as typed when reopened.",
+   "status": "pass",
+   "observed": "Saved — \"Saved.\"; the values show as typed when reopened."
+  },
+  {
+   "n": 4,
+   "do": "Same form: press “Save the funnel” with everything empty.",
+   "expect": "Refused with one clear sentence naming what is missing; no half-saved record.",
+   "status": "pass",
+   "observed": "Refused: \"A pipeline needs a name.\". Nothing was saved."
+  },
+  {
+   "n": 5,
+   "do": "Field \"Name\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Saved.\"); empty: refused — \"A pipeline needs a name.\"; 300 characters: accepted (\"Saved.\"); special characters: accepted (\"Saved.\"); Hindi/Gujarati: accepted (\"Saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 6,
+   "do": "Field \"In use\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Saved.\"); unticked: refused — \"This is the default pipeline. Make another one the default first, then retire this.\". Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 7,
+   "do": "Field \"Stage name\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Saved.\"); empty: accepted (\"Saved.\"); 300 characters: accepted (\"Saved.\"); special characters: accepted (\"Saved.\"); Hindi/Gujarati: accepted (\"Saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 8,
+   "do": "Field \"What it means\" (select) — try each choice in turn: Still in play, Won — closes the deal, Lost — closes the deal, and asks why (3 choices).",
+   "expect": "Each choice saves and is still selected when the record is reopened.",
+   "status": "pass",
+   "observed": "Tried — \"Still in play\": accepted; \"Won — closes the deal\": accepted; \"Lost — closes the deal, and asks why\": accepted. Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 9,
+   "do": "Field \"Probability\" (number) — try a normal value; then 0; then a negative number (-1); then a decimal (0.5); then a very large number (9999999999); then letters.",
+   "expect": "Normal value saves. 0 and negatives are accepted only where they make sense, otherwise refused with a message. Decimals keep their paise. Very large numbers show with Indian grouping (99,99,99,999). Letters are refused.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Saved.\"); 0: accepted (\"Saved.\"); -1: refused by the form (\"Value must be greater than or equal to 0.\"); 0.5: refused by the form (\"Please enter a valid value. The two nearest valid values are 0 and 1.\"); 9999999999: refused by the form (\"Value must be less than or equal to 100.\"); letters: the box is a number box — letters cannot be typed in. Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 10,
+   "do": "Field \"Days allowed\" (number) — try a normal value; then 0; then a negative number (-1); then a decimal (0.5); then a very large number (9999999999); then letters.",
+   "expect": "Normal value saves. 0 and negatives are accepted only where they make sense, otherwise refused with a message. Decimals keep their paise. Very large numbers show with Indian grouping (99,99,99,999). Letters are refused.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Saved.\"); 0: accepted (\"Saved.\"); -1: refused by the form (\"Value must be greater than or equal to 0.\"); 0.5: refused by the form (\"Please enter a valid value. The two nearest valid values are 0 and 1.\"); 9999999999: accepted (\"Saved.\"); letters: the box is a number box — letters cannot be typed in. Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 11,
+   "do": "Field \"In use\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Saved.\"); unticked: refused — \"This is the default pipeline. Make another one the default first, then retire this.\". Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 12,
+   "do": "Field \"Stage name\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Saved.\"); empty: accepted (\"Saved.\"); 300 characters: accepted (\"Saved.\"); special characters: accepted (\"Saved.\"); Hindi/Gujarati: accepted (\"Saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 13,
+   "do": "Field \"What it means\" (select) — try each choice in turn: Still in play, Won — closes the deal, Lost — closes the deal, and asks why (3 choices).",
+   "expect": "Each choice saves and is still selected when the record is reopened.",
+   "status": "pass",
+   "observed": "Tried — \"Still in play\": accepted; \"Won — closes the deal\": accepted; \"Lost — closes the deal, and asks why\": accepted. Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 14,
+   "do": "Field \"Probability\" (number) — try a normal value; then 0; then a negative number (-1); then a decimal (0.5); then a very large number (9999999999); then letters.",
+   "expect": "Normal value saves. 0 and negatives are accepted only where they make sense, otherwise refused with a message. Decimals keep their paise. Very large numbers show with Indian grouping (99,99,99,999). Letters are refused.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Saved.\"); 0: accepted (\"Saved.\"); -1: refused by the form (\"Value must be greater than or equal to 0.\"); 0.5: refused by the form (\"Please enter a valid value. The two nearest valid values are 0 and 1.\"); 9999999999: refused by the form (\"Value must be less than or equal to 100.\"); letters: the box is a number box — letters cannot be typed in. Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 15,
+   "do": "Field \"Days allowed\" (number) — try a normal value; then 0; then a negative number (-1); then a decimal (0.5); then a very large number (9999999999); then letters.",
+   "expect": "Normal value saves. 0 and negatives are accepted only where they make sense, otherwise refused with a message. Decimals keep their paise. Very large numbers show with Indian grouping (99,99,99,999). Letters are refused.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Saved.\"); 0: accepted (\"Saved.\"); -1: refused by the form (\"Value must be greater than or equal to 0.\"); 0.5: refused by the form (\"Please enter a valid value. The two nearest valid values are 0 and 1.\"); 9999999999: accepted (\"Saved.\"); letters: the box is a number box — letters cannot be typed in. Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 16,
+   "do": "Field \"In use\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Saved.\"); unticked: refused — \"This is the default pipeline. Make another one the default first, then retire this.\". Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 17,
+   "do": "Field \"Stage name\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Saved.\"); empty: accepted (\"Saved.\"); 300 characters: accepted (\"Saved.\"); special characters: accepted (\"Saved.\"); Hindi/Gujarati: accepted (\"Saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 18,
+   "do": "Field \"What it means\" (select) — try each choice in turn: Still in play, Won — closes the deal, Lost — closes the deal, and asks why (3 choices).",
+   "expect": "Each choice saves and is still selected when the record is reopened.",
+   "status": "pass",
+   "observed": "Tried — \"Still in play\": accepted; \"Won — closes the deal\": accepted; \"Lost — closes the deal, and asks why\": accepted. Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 19,
+   "do": "Field \"Probability\" (number) — try a normal value; then 0; then a negative number (-1); then a decimal (0.5); then a very large number (9999999999); then letters.",
+   "expect": "Normal value saves. 0 and negatives are accepted only where they make sense, otherwise refused with a message. Decimals keep their paise. Very large numbers show with Indian grouping (99,99,99,999). Letters are refused.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Saved.\"); 0: accepted (\"Saved.\"); -1: refused by the form (\"Value must be greater than or equal to 0.\"); 0.5: refused by the form (\"Please enter a valid value. The two nearest valid values are 0 and 1.\"); 9999999999: refused by the form (\"Value must be less than or equal to 100.\"); letters: the box is a number box — letters cannot be typed in. Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 20,
+   "do": "Field \"Days allowed\" (number) — try a normal value; then 0; then a negative number (-1); then a decimal (0.5); then a very large number (9999999999); then letters.",
+   "expect": "Normal value saves. 0 and negatives are accepted only where they make sense, otherwise refused with a message. Decimals keep their paise. Very large numbers show with Indian grouping (99,99,99,999). Letters are refused.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Saved.\"); 0: accepted (\"Saved.\"); -1: refused by the form (\"Value must be greater than or equal to 0.\"); 0.5: refused by the form (\"Please enter a valid value. The two nearest valid values are 0 and 1.\"); 9999999999: accepted (\"Saved.\"); letters: the box is a number box — letters cannot be typed in. Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 21,
+   "do": "Field \"In use\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Saved.\"); unticked: refused — \"This is the default pipeline. Make another one the default first, then retire this.\". Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 22,
+   "do": "Field \"Stage name\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Saved.\"); empty: accepted (\"Saved.\"); 300 characters: accepted (\"Saved.\"); special characters: accepted (\"Saved.\"); Hindi/Gujarati: accepted (\"Saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 23,
+   "do": "Field \"What it means\" (select) — try each choice in turn: Still in play, Won — closes the deal, Lost — closes the deal, and asks why (3 choices).",
+   "expect": "Each choice saves and is still selected when the record is reopened.",
+   "status": "pass",
+   "observed": "Tried — \"Still in play\": accepted; \"Won — closes the deal\": accepted; \"Lost — closes the deal, and asks why\": accepted. Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 24,
+   "do": "Field \"Probability\" (number) — try a normal value; then 0; then a negative number (-1); then a decimal (0.5); then a very large number (9999999999); then letters.",
+   "expect": "Normal value saves. 0 and negatives are accepted only where they make sense, otherwise refused with a message. Decimals keep their paise. Very large numbers show with Indian grouping (99,99,99,999). Letters are refused.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Saved.\"); 0: accepted (\"Saved.\"); -1: refused by the form (\"Value must be greater than or equal to 0.\"); 0.5: refused by the form (\"Please enter a valid value. The two nearest valid values are 0 and 1.\"); 9999999999: refused by the form (\"Value must be less than or equal to 100.\"); letters: the box is a number box — letters cannot be typed in. Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 25,
+   "do": "Field \"Days allowed\" (number) — try a normal value; then 0; then a negative number (-1); then a decimal (0.5); then a very large number (9999999999); then letters.",
+   "expect": "Normal value saves. 0 and negatives are accepted only where they make sense, otherwise refused with a message. Decimals keep their paise. Very large numbers show with Indian grouping (99,99,99,999). Letters are refused.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Saved.\"); 0: accepted (\"Saved.\"); -1: refused by the form (\"Value must be greater than or equal to 0.\"); 0.5: refused by the form (\"Please enter a valid value. The two nearest valid values are 0 and 1.\"); 9999999999: accepted (\"Saved.\"); letters: the box is a number box — letters cannot be typed in. Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 26,
+   "do": "Field \"In use\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Saved.\"); unticked: refused — \"This is the default pipeline. Make another one the default first, then retire this.\". Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 27,
+   "do": "Field \"Stage name\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Saved.\"); empty: accepted (\"Saved.\"); 300 characters: accepted (\"Saved.\"); special characters: accepted (\"Saved.\"); Hindi/Gujarati: accepted (\"Saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 28,
+   "do": "Field \"What it means\" (select) — try each choice in turn: Still in play, Won — closes the deal, Lost — closes the deal, and asks why (3 choices).",
+   "expect": "Each choice saves and is still selected when the record is reopened.",
+   "status": "pass",
+   "observed": "Tried — \"Still in play\": accepted; \"Won — closes the deal\": accepted; \"Lost — closes the deal, and asks why\": accepted. Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 29,
+   "do": "Field \"Probability\" (number) — try a normal value; then 0; then a negative number (-1); then a decimal (0.5); then a very large number (9999999999); then letters.",
+   "expect": "Normal value saves. 0 and negatives are accepted only where they make sense, otherwise refused with a message. Decimals keep their paise. Very large numbers show with Indian grouping (99,99,99,999). Letters are refused.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Saved.\"); 0: accepted (\"Saved.\"); -1: refused by the form (\"Value must be greater than or equal to 0.\"); 0.5: refused by the form (\"Please enter a valid value. The two nearest valid values are 0 and 1.\"); 9999999999: refused by the form (\"Value must be less than or equal to 100.\"); letters: the box is a number box — letters cannot be typed in. Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 30,
+   "do": "Field \"Days allowed\" (number) — try a normal value; then 0; then a negative number (-1); then a decimal (0.5); then a very large number (9999999999); then letters.",
+   "expect": "Normal value saves. 0 and negatives are accepted only where they make sense, otherwise refused with a message. Decimals keep their paise. Very large numbers show with Indian grouping (99,99,99,999). Letters are refused.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Saved.\"); 0: accepted (\"Saved.\"); -1: refused by the form (\"Value must be greater than or equal to 0.\"); 0.5: refused by the form (\"Please enter a valid value. The two nearest valid values are 0 and 1.\"); 9999999999: accepted (\"Saved.\"); letters: the box is a number box — letters cannot be typed in. Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 31,
+   "do": "Field \"In use\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Saved.\"); unticked: refused — \"This is the default pipeline. Make another one the default first, then retire this.\". Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 32,
+   "do": "Field \"Stage name\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Saved.\"); empty: accepted (\"Saved.\"); 300 characters: accepted (\"Saved.\"); special characters: accepted (\"Saved.\"); Hindi/Gujarati: accepted (\"Saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 33,
+   "do": "Field \"What it means\" (select) — try each choice in turn: Still in play, Won — closes the deal, Lost — closes the deal, and asks why (3 choices).",
+   "expect": "Each choice saves and is still selected when the record is reopened.",
+   "status": "pass",
+   "observed": "Tried — \"Still in play\": accepted; \"Won — closes the deal\": accepted; \"Lost — closes the deal, and asks why\": accepted. Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 34,
+   "do": "Field \"Probability\" (number) — try a normal value; then 0; then a negative number (-1); then a decimal (0.5); then a very large number (9999999999); then letters.",
+   "expect": "Normal value saves. 0 and negatives are accepted only where they make sense, otherwise refused with a message. Decimals keep their paise. Very large numbers show with Indian grouping (99,99,99,999). Letters are refused.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Saved.\"); 0: accepted (\"Saved.\"); -1: refused by the form (\"Value must be greater than or equal to 0.\"); 0.5: refused by the form (\"Please enter a valid value. The two nearest valid values are 0 and 1.\"); 9999999999: refused by the form (\"Value must be less than or equal to 100.\"); letters: the box is a number box — letters cannot be typed in. Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 35,
+   "do": "Field \"Days allowed\" (number) — try a normal value; then 0; then a negative number (-1); then a decimal (0.5); then a very large number (9999999999); then letters.",
+   "expect": "Normal value saves. 0 and negatives are accepted only where they make sense, otherwise refused with a message. Decimals keep their paise. Very large numbers show with Indian grouping (99,99,99,999). Letters are refused.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Saved.\"); 0: accepted (\"Saved.\"); -1: refused by the form (\"Value must be greater than or equal to 0.\"); 0.5: refused by the form (\"Please enter a valid value. The two nearest valid values are 0 and 1.\"); 9999999999: accepted (\"Saved.\"); letters: the box is a number box — letters cannot be typed in. Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 36,
+   "do": "Field \"In use\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Saved.\"); unticked: refused — \"This is the default pipeline. Make another one the default first, then retire this.\". Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 37,
+   "do": "Field \"Stage name\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Saved.\"); empty: accepted (\"Saved.\"); 300 characters: accepted (\"Saved.\"); special characters: accepted (\"Saved.\"); Hindi/Gujarati: accepted (\"Saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 38,
+   "do": "Field \"What it means\" (select) — try each choice in turn: Still in play, Won — closes the deal, Lost — closes the deal, and asks why (3 choices).",
+   "expect": "Each choice saves and is still selected when the record is reopened.",
+   "status": "pass",
+   "observed": "Tried — \"Still in play\": accepted; \"Won — closes the deal\": accepted; \"Lost — closes the deal, and asks why\": accepted. Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 39,
+   "do": "Field \"Probability\" (number) — try a normal value; then 0; then a negative number (-1); then a decimal (0.5); then a very large number (9999999999); then letters.",
+   "expect": "Normal value saves. 0 and negatives are accepted only where they make sense, otherwise refused with a message. Decimals keep their paise. Very large numbers show with Indian grouping (99,99,99,999). Letters are refused.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Saved.\"); 0: accepted (\"Saved.\"); -1: refused by the form (\"Value must be greater than or equal to 0.\"); 0.5: refused by the form (\"Please enter a valid value. The two nearest valid values are 0 and 1.\"); 9999999999: refused by the form (\"Value must be less than or equal to 100.\"); letters: the box is a number box — letters cannot be typed in. Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 40,
+   "do": "Field \"Days allowed\" (number) — try a normal value; then 0; then a negative number (-1); then a decimal (0.5); then a very large number (9999999999); then letters.",
+   "expect": "Normal value saves. 0 and negatives are accepted only where they make sense, otherwise refused with a message. Decimals keep their paise. Very large numbers show with Indian grouping (99,99,99,999). Letters are refused.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Saved.\"); 0: accepted (\"Saved.\"); -1: refused by the form (\"Value must be greater than or equal to 0.\"); 0.5: refused by the form (\"Please enter a valid value. The two nearest valid values are 0 and 1.\"); 9999999999: accepted (\"Saved.\"); letters: the box is a number box — letters cannot be typed in. Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 41,
+   "do": "Field \"In use\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Saved.\"); unticked: refused — \"This is the default pipeline. Make another one the default first, then retire this.\". Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 42,
+   "do": "Same form: press “Save the funnel” twice quickly (double-click).",
+   "expect": "Saved once — never two records.",
+   "status": "pass",
+   "observed": "Pressed twice quickly: nothing new was stored twice."
+  },
+  {
+   "n": 43,
+   "do": "Button \"Remove\" — press it.",
+   "expect": "It does what its words say and asks to confirm first, because it deletes or cannot be undone; a message confirms what happened.",
+   "status": "pass",
+   "observed": "Message: \"Stage removed.\""
+  },
+  {
+   "n": 44,
+   "do": "Button \"Remove\" — press it.",
+   "expect": "It does what its words say and asks to confirm first, because it deletes or cannot be undone; a message confirms what happened.",
+   "status": "pass",
+   "observed": "Message: \"Stage removed.\""
+  },
+  {
+   "n": 45,
+   "do": "Button \"Remove\" — press it.",
+   "expect": "It does what its words say and asks to confirm first, because it deletes or cannot be undone; a message confirms what happened.",
+   "status": "pass",
+   "observed": "Message: \"Stage removed.\""
+  },
+  {
+   "n": 46,
+   "do": "Button \"Remove\" — press it.",
+   "expect": "It does what its words say and asks to confirm first, because it deletes or cannot be undone; a message confirms what happened.",
+   "status": "pass",
+   "observed": "Message: \"Stage removed.\""
+  },
+  {
+   "n": 47,
+   "do": "Button \"Remove\" — press it.",
+   "expect": "It does what its words say and asks to confirm first, because it deletes or cannot be undone; a message confirms what happened.",
+   "status": "pass",
+   "observed": "Message: \"Stage removed.\""
+  },
+  {
+   "n": 48,
+   "do": "Button \"Remove\" — press it.",
+   "expect": "It does what its words say and asks to confirm first, because it deletes or cannot be undone; a message confirms what happened.",
+   "status": "pass",
+   "observed": "Message: \"Stage removed.\""
+  },
+  {
+   "n": 49,
+   "do": "Form “Add it”: fill every field with valid values and press “Add it”.",
+   "expect": "Saved with a confirmation message; the saved values show exactly as typed when reopened.",
+   "status": "pass",
+   "observed": "Saved (new: pipeline_stages); the values show as typed when reopened."
+  },
+  {
+   "n": 50,
+   "do": "Same form: press “Add it” with everything empty.",
+   "expect": "Refused with one clear sentence naming what is missing; no half-saved record.",
+   "status": "pass",
+   "observed": "Refused before sending — the browser points at the first missing box: \"Please fill out this field. — name\". Nothing was saved."
+  },
+  {
+   "n": 51,
+   "do": "Field \"Name *\" (text · required) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. It is required: leaving it empty is refused with a message saying so. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Saved.\"); empty: refused — \"A pipeline needs a name.\"; 300 characters: accepted (\"Saved.\"); special characters: accepted (\"Saved.\"); Hindi/Gujarati: accepted (\"Saved.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 52,
+   "do": "Field \"What it means\" (select) — try each choice in turn: Still in play, Won — closes the deal, Lost — closes the deal, and asks why (3 choices).",
+   "expect": "Each choice saves and is still selected when the record is reopened.",
+   "status": "pass",
+   "observed": "Tried — \"Still in play\": accepted; \"Won — closes the deal\": accepted; \"Lost — closes the deal, and asks why\": accepted. Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 53,
+   "do": "Field \"Probability\" (number) — try a normal value; then 0; then a negative number (-1); then a decimal (0.5); then a very large number (9999999999); then letters.",
+   "expect": "Normal value saves. 0 and negatives are accepted only where they make sense, otherwise refused with a message. Decimals keep their paise. Very large numbers show with Indian grouping (99,99,99,999). Letters are refused.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Saved.\"); 0: accepted (\"Saved.\"); -1: refused by the form (\"Value must be greater than or equal to 0.\"); 0.5: refused by the form (\"Please enter a valid value. The two nearest valid values are 0 and 1.\"); 9999999999: refused by the form (\"Value must be less than or equal to 100.\"); letters: the box is a number box — letters cannot be typed in. Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 54,
+   "do": "Field \"Days allowed\" (number) — try a normal value; then 0; then a negative number (-1); then a decimal (0.5); then a very large number (9999999999); then letters.",
+   "expect": "Normal value saves. 0 and negatives are accepted only where they make sense, otherwise refused with a message. Decimals keep their paise. Very large numbers show with Indian grouping (99,99,99,999). Letters are refused.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Saved.\"); 0: accepted (\"Saved.\"); -1: refused by the form (\"Value must be greater than or equal to 0.\"); 0.5: refused by the form (\"Please enter a valid value. The two nearest valid values are 0 and 1.\"); 9999999999: accepted (\"Saved.\"); letters: the box is a number box — letters cannot be typed in. Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 55,
+   "do": "Same form: press “Add it” twice quickly (double-click).",
+   "expect": "Saved once — never two records.",
+   "status": "pass",
+   "observed": "Pressed twice quickly: saved once (pipeline_stages +1)."
+  },
+  {
+   "n": 56,
+   "do": "Table with columns: Order, Stage name, What it means, Probability, Days allowed, In use, On it now.",
+   "expect": "Every column has a value or a dash; numbers line up; long text wraps; an empty list says so in words; on a phone the table scrolls inside itself.",
+   "status": "pass",
+   "observed": "Columns: Order, Stage name, What it means, Probability, Days allowed, In use, On it now."
+  },
+  {
+   "n": 57,
+   "do": "Narrow the window to phone width (about 390 pixels) or open on a phone.",
+   "expect": "Readable and usable without the whole page scrolling sideways; buttons big enough to tap.",
+   "status": "pass",
+   "observed": "On a phone (735 px) the page does not scroll sideways; buttons are big enough to tap.",
+   "shot": "SCR-pipeline-57.jpg"
+  },
+  {
+   "n": 58,
+   "do": "Who may open it: sign in as each role (or ask your administrator) and open this screen.",
+   "expect": "Measured on a test copy today — opened for: Business Development Manager, Business Director, Key Accounts Manager, Marketing Executive, Marketing Manager. Refused for: Asst. Manager, Branch Application Manager, Branch Manager, Coordinator, Finance, Inspector, Operation Manager, Quality Head, Business Unit Head, Senior Inspector, Technical Head. Check this against what your business wants (docs/02-permission-matrix.md). Record any surprise. Note: this was measured on one sample record, so a refusal can be the branch wall.",
+   "status": "outdated",
+   "observed": "Who may open it has changed since 20 Oct: now refused for Business Director, Marketing Manager, Business Development Manager, Key Accounts Manager, Marketing Executive. Check it against the permission list (docs/02).",
+   "suggest": "Opened for: ."
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SCR-pipeline-end.jpg",
+ "seconds": 490,
+ "ranAt": "2026-11-15T15:59:07.651Z"
+}

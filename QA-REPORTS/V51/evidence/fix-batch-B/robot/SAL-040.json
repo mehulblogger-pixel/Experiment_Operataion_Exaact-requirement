@@ -1,0 +1,49 @@
+{
+ "id": "SAL-040",
+ "title": "Record an enquiry — best case",
+ "area": "Sales",
+ "module": "Inquiries",
+ "persona": "MARKETING_EXECUTIVE",
+ "kind": "scenario",
+ "status": "OUT_OF_DATE",
+ "steps": [
+  {
+   "n": 1,
+   "do": "Left menu → Sales → Inquiries → \"+ New inquiry\".",
+   "expect": "Page \"New client inquiry\".",
+   "status": "pass",
+   "observed": "Page \"New client inquiry\"."
+  },
+  {
+   "n": 2,
+   "do": "client = TB Refinery Ltd, Received date today, Contact person \"Mr Patel\", Contact email patel@tbrefinery.test, Business Unit = Oil, Gas & Chemicals, Source = Email, Status Open, Assigned to = yourself, Subject \"Shutdown TPI — columns C-101/102\", Service requirement \"Stage + final inspection, 20 man-days\", Notes \"Tender closes 30th\" → \"Create inquiry\".",
+   "expect": "Message \"INQ-… created. You can now raise a quotation against it.\"",
+   "status": "pass",
+   "observed": "\"INQ-00001 created. You can now raise a quotation against it.\"",
+   "note": "The new-enquiry form has no Status box (an enquiry starts Open and then follows its quotation — set by itself); the robot left it as is.",
+   "shot": "SAL-040-2.jpg"
+  },
+  {
+   "n": 3,
+   "do": "Inquiry register.",
+   "expect": "The row shows Inquiry no., Received, Client, Subject, Business Unit, Owner, Source, Status = Open, and under the number the branch \"Ahmedabad\".",
+   "status": "outdated",
+   "observed": "Every value is there, Status Open — but \"Owner\" is now headed \"Assigned to\", and the branch has its own \"Branch\" column instead of sitting under the enquiry number (owner, 12 Nov 2026: Status, Assigned to and Branch \"each in its own column\", see SAL-016). Row: INQ-00001 | 2026-11-15 | TB Refinery Ltd | Shutdown TPI — columns C-101/102 | Open | Test MktExec | Ahmedabad | Oil, Gas & Chemicals | Email | Edit Quote",
+   "shot": "SAL-040-3-old.jpg",
+   "suggest": "The row shows Inquiry no., Received, Client, Subject, Status = Open, Assigned to, Branch \"Ahmedabad\", Business Unit and Source, each in its own column."
+  },
+  {
+   "n": 4,
+   "do": "Press \"Quote\" on the row.",
+   "expect": "A new quotation opens pre-filled with the client and subject.",
+   "status": "pass",
+   "observed": "A new quotation opened with client TB Refinery Ltd and subject \"Shutdown TPI — columns C-101/102\".",
+   "shot": "SAL-040-4.jpg"
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-040-end.jpg",
+ "seconds": 4,
+ "ranAt": "2026-11-15T16:08:24.206Z"
+}

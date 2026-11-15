@@ -1,0 +1,91 @@
+{
+ "id": "SAL-062",
+ "title": "Numbers on a quotation at their limits",
+ "area": "Sales",
+ "module": "Quotes",
+ "persona": "BUSINESS_DEV_MANAGER",
+ "kind": "edge",
+ "status": "FAILED",
+ "steps": [
+  {
+   "n": 1,
+   "do": "Validity (days) = -5 → Save quote.",
+   "expect": "Refused with a message about Validity (days) (allowed 0–3650). Nothing saved; typing kept.",
+   "status": "pass",
+   "observed": "Refused: \"Validity (days) cannot be negative. Nothing was saved.\"; nothing saved; the box still holds -5.",
+   "note": "The refusal says \"cannot be negative\" rather than naming the allowed range 0–3650."
+  },
+  {
+   "n": 2,
+   "do": "Validity 0.",
+   "expect": "Accepted — 0 means the quotation never expires.",
+   "status": "pass",
+   "observed": "Accepted (\"Quote saved.\"); Validity shows 0 days. (0 = no expiry: the expiry sweep only touches validity_days > 0 — SAL-094 step 3 checks it on a sent quotation.)"
+  },
+  {
+   "n": 3,
+   "do": "Validity 4000.",
+   "expect": "Refused (above 3650).",
+   "status": "pass",
+   "observed": "Refused: \"Validity (days) cannot be more than 3650. Nothing was saved.\""
+  },
+  {
+   "n": 4,
+   "do": "GST % = 500.",
+   "expect": "Refused (GST % must be 0–100).",
+   "status": "pass",
+   "observed": "Refused: \"Nothing has been saved — GST % cannot be above 100.\""
+  },
+  {
+   "n": 5,
+   "do": "Advance % = 120.",
+   "expect": "Refused (0–100).",
+   "status": "pass",
+   "observed": "Refused: \"Advance % cannot be more than 100. Nothing was saved.\""
+  },
+  {
+   "n": 6,
+   "do": "A line Qty = -2.",
+   "expect": "Refused with a message naming \"the quantity on line 1\"; nothing saved.",
+   "status": "fail",
+   "observed": "Refused and nothing saved, but the screen says \"Nothing has been saved — Qty cannot be below 0.\" — it does not name the quantity on line 1 or say it cannot be negative. (A form that gets past the browser check is refused by the server with \"The quantity on line 1 cannot be negative. Nothing was saved.\".)",
+   "shot": "SAL-062-6-fail.jpg"
+  },
+  {
+   "n": 7,
+   "do": "Add a discount line with Rate -5,000 on a ₹80,000 quotation.",
+   "expect": "Accepted; subtotal ₹75,000.",
+   "status": "pass",
+   "observed": "Accepted; subtotal ₹75,000 on the quotation."
+  },
+  {
+   "n": 8,
+   "do": "A discount line larger than the total (Rate -1,00,000).",
+   "expect": "Refused: \"The lines total less than nothing. A discount line can reduce the quotation, not take it below zero.\"",
+   "status": "pass",
+   "observed": "Refused: \"The lines total less than nothing. A discount line can reduce the quotation, not take it below zero. Nothing was saved.\""
+  },
+  {
+   "n": 9,
+   "do": "Qty 0.5 man-day, Rate 7,999.99.",
+   "expect": "Amount ₹3,999.995 is shown rounded to paise consistently on screen, PDF and Word.",
+   "status": "fail",
+   "observed": "Amounts are rounded to whole rupees, not paise: Stored amount ₹4000. On the form the line shows 4,000; the quotation row reads \"1 — Inspection (third-party / TPI) Stage inspection — Line-item order 0.5 Man-day ₹7,999.99 ₹4,000\"; the PDF line shows (7,999.99) × → (4,000) and its totals with paise. The rate 7,999.99 is printed as ₹8,000.",
+   "shot": "SAL-062-9-fail.jpg",
+   "note": "Word not compared: no quotation Word template in the test data."
+  },
+  {
+   "n": 10,
+   "do": "Rate 9,99,99,999 (a very large value).",
+   "expect": "Shown with Indian grouping on screen and in the PDF.",
+   "status": "pass",
+   "observed": "Shown as ₹9,99,99,999 on screen and in the PDF.",
+   "shot": "SAL-062-10.jpg"
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-062-end.jpg",
+ "seconds": 26,
+ "ranAt": "2026-11-15T15:33:39.086Z"
+}

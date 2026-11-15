@@ -1,0 +1,55 @@
+{
+ "id": "SAL-110",
+ "title": "A blocked customer gets nothing new — only payment reminders",
+ "area": "Sales",
+ "module": "Client holds",
+ "persona": "several",
+ "kind": "scenario",
+ "status": "FAILED",
+ "steps": [
+  {
+   "n": 1,
+   "do": "New lead → convert for TB Defaulter Co.",
+   "expect": "Refused with the block sentence.",
+   "status": "fail",
+   "observed": "Converting a lead for blocked TB Defaulter Co was not refused: \"Done — TB Defaulter Co is now a customer, and an inquiry is raised for what they want. The inquiry is in Sales → inquiries.\" — the lead is CONVERTED and enquiry INQ-00001 was raised for the blocked customer.",
+   "shot": "SAL-110-1-fail.jpg"
+  },
+  {
+   "n": 2,
+   "do": "New enquiry, new quotation, Submit, Approve, Send, Mark accepted, register contract — each for TB Defaulter Co.",
+   "expect": "Each refused with one sentence naming the block and where it is cleared.",
+   "status": "fail",
+   "observed": "new enquiry: refused; new quotation: refused; Submit: refused; Approve: NOT refused as expected — \"All approvals complete — quote approved and ready to send. (it was APPROVED)\"; Send: refused; Mark accepted: refused; register contract: refused",
+   "shot": "SAL-110-2-fail.jpg"
+  },
+  {
+   "n": 3,
+   "do": "Mark its old quotation Lost.",
+   "expect": "Allowed — closing business is fine.",
+   "status": "pass",
+   "observed": "Allowed: \"Quotation moved to Lost / regretted.\""
+  },
+  {
+   "n": 4,
+   "do": "Money: invoice for work already done; payment reminder; receipt.",
+   "expect": "Still allowed (owner: invoicing work already done stays open).",
+   "status": "pass",
+   "observed": "Still allowed: a draft invoice started (\"Draft invoice started. Check the lines, then issue it.\"); the night job wrote the overdue reminder naming TB Defaulter Co; the receipt was recorded (\"Receipt RCP/2627/0001 recorded. Now say which invoices it settles.\")."
+  },
+  {
+   "n": 5,
+   "do": "As a manager: Left menu → Directory → Client holds → set Active.",
+   "expect": "Everything works again.",
+   "status": "pass",
+   "observed": "Status \"Active (no hold)\" saved (\"Hold cleared.\"); a new quotation for TB Defaulter Co is created again.",
+   "shot": "SAL-110-5.jpg",
+   "note": "Signed in as Test BranchMgr (a manager) for the Client holds screen."
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-110-end.jpg",
+ "seconds": 18,
+ "ranAt": "2026-11-15T16:09:26.051Z"
+}

@@ -1,0 +1,717 @@
+{
+ "id": "SCR-quote",
+ "title": "Screen check — Q-2607-001 Accepted / closed-won 🕑 Rev 00 · 1 version",
+ "area": "Sales",
+ "module": "Quotes",
+ "persona": "MASTER_ADMIN",
+ "kind": "screen",
+ "status": "OUT_OF_DATE",
+ "steps": [
+  {
+   "n": 1,
+   "do": "Open the screen: Go to Sales → CRM — Quotations → Q-2607-001 Accepted / closed-won 🕑 Rev 00 · 1 version (or type /quote?id=1 after the site address).",
+   "expect": "The page heading reads \"Q-2607-001 Accepted / closed-won 🕑 Rev 00 · 1 version\"; the breadcrumb reads Home › Sales › CRM — Quotations; the page loads in under 3 seconds with no error.",
+   "status": "pass",
+   "observed": "Opened without error in 78 ms; heading \"Q-00001 Draft 🕑 Rev 00 · 1 version\" (this record's own name); breadcrumb Home › Sales › CRM — Quotations › Quote.",
+   "note": "The heading names the record itself: here \"Q-00001 Draft 🕑 Rev 00 · 1 version\"; the test was written with another record (\"Q-2607-001 Accepted / closed-won 🕑 Rev 00 · 1 version\"). That is the data, not a change to the screen.",
+   "shot": "SCR-quote-1.jpg"
+  },
+  {
+   "n": 2,
+   "do": "Read the line under the heading.",
+   "expect": "It says: \"TPI — 12 pressure vessels\" — and it is true for what you see.",
+   "status": "pass",
+   "observed": "The line under the heading reads \"Robot test subject\" — this record's own details.",
+   "note": "This line describes the record itself (its number, client, stage), so it differs from the record the test was written with (\"TPI — 12 pressure vessels\")."
+  },
+  {
+   "n": 3,
+   "do": "Tab \"Overview\" — open it.",
+   "expect": "It opens to its own content; nothing typed on another tab is lost; switching back keeps the content.",
+   "status": "pass",
+   "observed": "The \"Overview\" tab opens to its own content."
+  },
+  {
+   "n": 4,
+   "do": "Tab \"Jobs & order\" — open it.",
+   "expect": "It opens to its own content; nothing typed on another tab is lost; switching back keeps the content.",
+   "status": "outdated",
+   "observed": "There is no \"Jobs & order\" tab on this screen any more. Tabs now: Overview History Sites & docs"
+  },
+  {
+   "n": 5,
+   "do": "Tab \"History\" — open it.",
+   "expect": "It opens to its own content; nothing typed on another tab is lost; switching back keeps the content.",
+   "status": "pass",
+   "observed": "The \"History\" tab opens to its own content."
+  },
+  {
+   "n": 6,
+   "do": "Tab \"Sites & docs\" — open it.",
+   "expect": "It opens to its own content; nothing typed on another tab is lost; switching back keeps the content.",
+   "status": "pass",
+   "observed": "The \"Sites & docs\" tab opens to its own content."
+  },
+  {
+   "n": 7,
+   "do": "Open the fold-out section \"Register a contract for another group company\".",
+   "expect": "It opens and closes; its content belongs to it.",
+   "status": "needs",
+   "observed": "",
+   "reason": "The fold-out \"Register a contract for another group company\" is not shown for the copy's record — the app shows it only in some situations. A person checks it where it appears.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-7-needs.jpg"
+  },
+  {
+   "n": 8,
+   "do": "Open the fold-out section \"Revisions & change history 1 version · 1 follow-up\".",
+   "expect": "It opens and closes; its content belongs to it.",
+   "status": "pass",
+   "observed": "It opens and closes."
+  },
+  {
+   "n": 9,
+   "do": "Button \"＋ Create costing for this quotation\" — press it.",
+   "expect": "It does what its words say; a message confirms what happened.",
+   "status": "pass",
+   "observed": "It opened /project-costing?id=1 — \"AHM/PC/2026-27/11/0001 Rev 00 created from the quotation — its 1 line are in, at the quoted rate and quantity. Add each \" without error."
+  },
+  {
+   "n": 10,
+   "do": "Form “Attach”: fill every field with valid values and press “Attach”.",
+   "expect": "Saved with a confirmation message; the saved values show exactly as typed when reopened.",
+   "status": "needs",
+   "observed": "Refused: \"Nothing uploaded.\"",
+   "reason": "The robot's ordinary values were refused — a person must choose values that suit this form.",
+   "rule": false,
+   "shot": "SCR-quote-10-needs.jpg"
+  },
+  {
+   "n": 11,
+   "do": "Same form: press “Attach” with everything empty.",
+   "expect": "Refused with one clear sentence naming what is missing; no half-saved record.",
+   "status": "pass",
+   "observed": "Refused: \"Nothing uploaded.\". Nothing was saved."
+  },
+  {
+   "n": 12,
+   "do": "Field \"attach existing…\" (select) — try each choice in turn: attach existing…, PC-DEMO-03 — Pressure-vessel stage inspection — lump-sum campaign, PC-DEMO-02 — Hazira refinery — shutdown QA/QC & HSE (daily), PC-DEMO-01 — Mundra Solar — module & cell line manpower (4 choices).",
+   "expect": "Each choice saves and is still selected when the record is reopened.",
+   "status": "needs",
+   "observed": "",
+   "reason": "The box \"attach existing…\" is not on the screen with the copy's data — the app shows it only in some cases. A person checks it where it appears.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-12-needs.jpg"
+  },
+  {
+   "n": 13,
+   "do": "Same form: press “Attach” twice quickly (double-click).",
+   "expect": "Saved once — never two records.",
+   "status": "pass",
+   "observed": "Pressed twice quickly: nothing new was stored twice."
+  },
+  {
+   "n": 14,
+   "do": "Form “Cancel”: fill every field with valid values and press “Cancel”.",
+   "expect": "Saved with a confirmation message; the saved values show exactly as typed when reopened.",
+   "status": "needs",
+   "observed": "",
+   "reason": "The form with the \"Cancel\" button is not on the screen for the copy's record — the app shows it only in some situations (another status or kind of record). A person checks it where it appears.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-14-needs.jpg"
+  },
+  {
+   "n": 15,
+   "do": "Same form: press “Cancel” with everything empty.",
+   "expect": "Refused with one clear sentence naming what is missing; no half-saved record.",
+   "status": "needs",
+   "observed": "",
+   "reason": "Depends on the form in the step before, which the app shows only in some situations — not for the copy's record.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-15-needs.jpg"
+  },
+  {
+   "n": 16,
+   "do": "Field \"Reason *\" (select · required) — try each choice in turn: — pick a reason —, Price too high / lost on price, Awarded to a competitor, Client budget withdrawn / on hold, Project cancelled or postponed, No response / went cold, Scope / technical mismatch, Could not meet timeline / availability, Payment / credit terms not agreed, Accreditation / approval not held, Client handled it in-house, Duplicate / erroneous inquiry, Other (specify) (13 choices).",
+   "expect": "Each choice saves and is still selected when the record is reopened. It is required: leaving it empty is refused with a message saying so.",
+   "status": "needs",
+   "observed": "",
+   "reason": "The form refuses even the robot’s ordinary values (\"Please select an item in the list. — lost_reason\"), so trying values in \"Reason\" cannot be judged. A person (or a screen-specific set-up for the robot) must give values this form accepts.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-16-needs.jpg"
+  },
+  {
+   "n": 17,
+   "do": "Field \"Other — please specify\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "needs",
+   "observed": "",
+   "reason": "The form refuses even the robot’s ordinary values (\"Please select an item in the list. — lost_reason\"), so trying values in \"Other — please specify\" cannot be judged. A person (or a screen-specific set-up for the robot) must give values this form accepts.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-17-needs.jpg"
+  },
+  {
+   "n": 18,
+   "do": "Same form: press “Cancel” twice quickly (double-click).",
+   "expect": "Saved once — never two records.",
+   "status": "needs",
+   "observed": "",
+   "reason": "Depends on the form in the step before, which the app shows only in some situations — not for the copy's record.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-18-needs.jpg"
+  },
+  {
+   "n": 19,
+   "do": "Button \"Confirm lost\" — press it.",
+   "expect": "It does what its words say; a message confirms what happened.",
+   "status": "pass",
+   "observed": "It acted on the page without error."
+  },
+  {
+   "n": 20,
+   "do": "Form “Cancel”: fill every field with valid values and press “Cancel”.",
+   "expect": "Saved with a confirmation message; the saved values show exactly as typed when reopened.",
+   "status": "needs",
+   "observed": "",
+   "reason": "The form with the \"Cancel\" button is not on the screen for the copy's record — the app shows it only in some situations (another status or kind of record). A person checks it where it appears.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-20-needs.jpg"
+  },
+  {
+   "n": 21,
+   "do": "Same form: press “Cancel” with everything empty.",
+   "expect": "Refused with one clear sentence naming what is missing; no half-saved record.",
+   "status": "needs",
+   "observed": "",
+   "reason": "Depends on the form in the step before, which the app shows only in some situations — not for the copy's record.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-21-needs.jpg"
+  },
+  {
+   "n": 22,
+   "do": "Field \"What changed? (logged in history)\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "needs",
+   "observed": "",
+   "reason": "The form refuses even the robot’s ordinary values (\"Please select an item in the list. — lost_reason\"), so trying values in \"What changed? (logged in history)\" cannot be judged. A person (or a screen-specific set-up for the robot) must give values this form accepts.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-22-needs.jpg"
+  },
+  {
+   "n": 23,
+   "do": "Same form: press “Cancel” twice quickly (double-click).",
+   "expect": "Saved once — never two records.",
+   "status": "needs",
+   "observed": "",
+   "reason": "Depends on the form in the step before, which the app shows only in some situations — not for the copy's record.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-23-needs.jpg"
+  },
+  {
+   "n": 24,
+   "do": "Button \"Create revision\" — press it.",
+   "expect": "It does what its words say; a message confirms what happened.",
+   "status": "pass",
+   "observed": "It acted on the page without error."
+  },
+  {
+   "n": 25,
+   "do": "Form “Register group contract”: fill every field with valid values and press “Register group contract”.",
+   "expect": "Saved with a confirmation message; the saved values show exactly as typed when reopened.",
+   "status": "needs",
+   "observed": "",
+   "reason": "The form with the \"Register group contract\" button is not on the screen for the copy's record — the app shows it only in some situations (another status or kind of record). A person checks it where it appears.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-25-needs.jpg"
+  },
+  {
+   "n": 26,
+   "do": "Same form: press “Register group contract” with everything empty.",
+   "expect": "Refused with one clear sentence naming what is missing; no half-saved record.",
+   "status": "needs",
+   "observed": "",
+   "reason": "Depends on the form in the step before, which the app shows only in some situations — not for the copy's record.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-26-needs.jpg"
+  },
+  {
+   "n": 27,
+   "do": "Field \"Group company\" (select · required) — try each choice in turn: — pick a related company —, Narmada (2 choices).",
+   "expect": "Each choice saves and is still selected when the record is reopened. It is required: leaving it empty is refused with a message saying so.",
+   "status": "needs",
+   "observed": "",
+   "reason": "The box \"Group company\" is not on the screen with the copy's data — the app shows it only in some cases. A person checks it where it appears.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-27-needs.jpg"
+  },
+  {
+   "n": 28,
+   "do": "Field \"Contract number\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "needs",
+   "observed": "",
+   "reason": "The box \"Contract number\" is not on the screen with the copy's data — the app shows it only in some cases. A person checks it where it appears.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-28-needs.jpg"
+  },
+  {
+   "n": 29,
+   "do": "Field \"Generate automatically\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "needs",
+   "observed": "",
+   "reason": "The box \"Generate automatically\" is not on the screen with the copy's data — the app shows it only in some cases. A person checks it where it appears.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-29-needs.jpg"
+  },
+  {
+   "n": 30,
+   "do": "Field \"Value (₹)\" (number) — try a normal value; then 0; then a negative number (-1); then a decimal (0.5); then a very large number (9999999999); then letters.",
+   "expect": "Normal value saves. 0 and negatives are accepted only where they make sense, otherwise refused with a message. Decimals keep their paise. Very large numbers show with Indian grouping (99,99,99,999). Letters are refused.",
+   "status": "outdated",
+   "observed": "There is no box called \"Value (₹)\" on this screen any more.",
+   "suggest": "",
+   "shot": "SCR-quote-30-old.jpg"
+  },
+  {
+   "n": 31,
+   "do": "Field \"Start\" (date) — try today; then a past date (01-01-2019); then a far future date (31-12-2035); then leave it empty.",
+   "expect": "Dates save and show in your date format. Past and future dates are accepted only where they make sense. Where there is a matching end/\"to\" date, an end before the start is refused.",
+   "status": "needs",
+   "observed": "",
+   "reason": "The box \"Start\" is not on the screen with the copy's data — the app shows it only in some cases. A person checks it where it appears.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-31-needs.jpg"
+  },
+  {
+   "n": 32,
+   "do": "Field \"End\" (date) — try today; then a past date (01-01-2019); then a far future date (31-12-2035); then leave it empty.",
+   "expect": "Dates save and show in your date format. Past and future dates are accepted only where they make sense. Where there is a matching end/\"to\" date, an end before the start is refused.",
+   "status": "needs",
+   "observed": "",
+   "reason": "The box \"End\" is not on the screen with the copy's data — the app shows it only in some cases. A person checks it where it appears.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-32-needs.jpg"
+  },
+  {
+   "n": 33,
+   "do": "Same form: press “Register group contract” twice quickly (double-click).",
+   "expect": "Saved once — never two records.",
+   "status": "needs",
+   "observed": "",
+   "reason": "Depends on the form in the step before, which the app shows only in some situations — not for the copy's record.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-33-needs.jpg"
+  },
+  {
+   "n": 34,
+   "do": "Form “Save follow-ups”: fill every field with valid values and press “Save follow-ups”.",
+   "expect": "Saved with a confirmation message; the saved values show exactly as typed when reopened.",
+   "status": "needs",
+   "observed": "",
+   "reason": "The form with the \"Save follow-ups\" button is not on the screen for the copy's record — the app shows it only in some situations (another status or kind of record). A person checks it where it appears.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-34-needs.jpg"
+  },
+  {
+   "n": 35,
+   "do": "Same form: press “Save follow-ups” with everything empty.",
+   "expect": "Refused with one clear sentence naming what is missing; no half-saved record.",
+   "status": "needs",
+   "observed": "",
+   "reason": "Depends on the form in the step before, which the app shows only in some situations — not for the copy's record.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-35-needs.jpg"
+  },
+  {
+   "n": 36,
+   "do": "Field \"Due\" (date) — try today; then a past date (01-01-2019); then a far future date (31-12-2035); then leave it empty.",
+   "expect": "Dates save and show in your date format. Past and future dates are accepted only where they make sense. Where there is a matching end/\"to\" date, an end before the start is refused.",
+   "status": "needs",
+   "observed": "",
+   "reason": "The box \"Due\" is not on the screen with the copy's data — the app shows it only in some cases. A person checks it where it appears.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-36-needs.jpg"
+  },
+  {
+   "n": 37,
+   "do": "Field \"Status Pending Done Sent Skipped\" (select) — try each choice in turn: Pending, Done, Sent, Skipped (4 choices).",
+   "expect": "Each choice saves and is still selected when the record is reopened.",
+   "status": "outdated",
+   "observed": "There is no box called \"Status Pending Done Sent Skipped\" on this screen any more.",
+   "suggest": "",
+   "shot": "SCR-quote-37-old.jpg"
+  },
+  {
+   "n": 38,
+   "do": "Field \"Done on\" (date) — try today; then a past date (01-01-2019); then a far future date (31-12-2035); then leave it empty.",
+   "expect": "Dates save and show in your date format. Past and future dates are accepted only where they make sense. Where there is a matching end/\"to\" date, an end before the start is refused.",
+   "status": "needs",
+   "observed": "",
+   "reason": "The box \"Done on\" is not on the screen with the copy's data — the app shows it only in some cases. A person checks it where it appears.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-38-needs.jpg"
+  },
+  {
+   "n": 39,
+   "do": "Field \"What was said\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "needs",
+   "observed": "",
+   "reason": "The box \"What was said\" is not on the screen with the copy's data — the app shows it only in some cases. A person checks it where it appears.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-39-needs.jpg"
+  },
+  {
+   "n": 40,
+   "do": "Same form: press “Save follow-ups” twice quickly (double-click).",
+   "expect": "Saved once — never two records.",
+   "status": "needs",
+   "observed": "",
+   "reason": "Depends on the form in the step before, which the app shows only in some situations — not for the copy's record.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-40-needs.jpg"
+  },
+  {
+   "n": 41,
+   "do": "Form “+ Add”: fill every field with valid values and press “+ Add”.",
+   "expect": "Saved with a confirmation message; the saved values show exactly as typed when reopened.",
+   "status": "needs",
+   "observed": "",
+   "reason": "The robot filled every box with ordinary values, but the form still refused: Please fill out this field. — note. A person must choose values that suit this form.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-41-needs.jpg"
+  },
+  {
+   "n": 42,
+   "do": "Same form: press “+ Add” with everything empty.",
+   "expect": "Refused with one clear sentence naming what is missing; no half-saved record.",
+   "status": "pass",
+   "observed": "Refused before sending — the browser points at the first missing box: \"Please fill out this field. — note\". Nothing was saved."
+  },
+  {
+   "n": 43,
+   "do": "Field \"Add a follow-up on\" (date) — try today; then a past date (01-01-2019); then a far future date (31-12-2035); then leave it empty.",
+   "expect": "Dates save and show in your date format. Past and future dates are accepted only where they make sense. Where there is a matching end/\"to\" date, an end before the start is refused.",
+   "status": "needs",
+   "observed": "",
+   "reason": "The form refuses even the robot’s ordinary values (\"Please select an item in the list. — lost_reason\"), so trying values in \"Add a follow-up on\" cannot be judged. A person (or a screen-specific set-up for the robot) must give values this form accepts.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-43-needs.jpg"
+  },
+  {
+   "n": 44,
+   "do": "Field \"Note\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "needs",
+   "observed": "",
+   "reason": "The form refuses even the robot’s ordinary values (\"Please select an item in the list. — lost_reason\"), so trying values in \"Note\" cannot be judged. A person (or a screen-specific set-up for the robot) must give values this form accepts.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-44-needs.jpg"
+  },
+  {
+   "n": 45,
+   "do": "Same form: press “+ Add” twice quickly (double-click).",
+   "expect": "Saved once — never two records.",
+   "status": "needs",
+   "observed": "",
+   "reason": "The form refused the robot's ordinary values (Please fill out this field. — note), so a double save could not be tried.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-45-needs.jpg"
+  },
+  {
+   "n": 46,
+   "do": "Form “Attach”: fill every field with valid values and press “Attach”.",
+   "expect": "Saved with a confirmation message; the saved values show exactly as typed when reopened.",
+   "status": "needs",
+   "observed": "Refused: \"Nothing uploaded.\"",
+   "reason": "The robot's ordinary values were refused — a person must choose values that suit this form.",
+   "rule": false,
+   "shot": "SCR-quote-46-needs.jpg"
+  },
+  {
+   "n": 47,
+   "do": "Same form: press “Attach” with everything empty.",
+   "expect": "Refused with one clear sentence naming what is missing; no half-saved record.",
+   "status": "pass",
+   "observed": "Refused: \"Nothing uploaded.\". Nothing was saved."
+  },
+  {
+   "n": 48,
+   "do": "Field \"Kind\" (select) — try each choice in turn: Our quotation (the copy sent), General attachment, Client's document / enquiry, Purchase order, Inspection document (spec, drawing, QAP) (5 choices).",
+   "expect": "Each choice saves and is still selected when the record is reopened.",
+   "status": "needs",
+   "observed": "",
+   "reason": "The form refuses even the robot’s ordinary values (\"Please select an item in the list. — lost_reason\"), so trying values in \"Kind\" cannot be judged. A person (or a screen-specific set-up for the robot) must give values this form accepts.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-48-needs.jpg"
+  },
+  {
+   "n": 49,
+   "do": "Field \"Files — several at once, 8 MB each\" (file) — try one allowed file; then several at once; then a file that is too large; then a file type that should not be allowed (.exe).",
+   "expect": "Allowed files attach and are listed. Too-large and wrong-type files are refused with a message naming the limit.",
+   "status": "needs",
+   "observed": "",
+   "reason": "The form refuses even the robot’s ordinary values (\"Please select an item in the list. — lost_reason\"), so trying values in \"Files — several at once, 8 MB each\" cannot be judged. A person (or a screen-specific set-up for the robot) must give values this form accepts.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-49-needs.jpg"
+  },
+  {
+   "n": 50,
+   "do": "Field \"Note\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "needs",
+   "observed": "",
+   "reason": "The form refuses even the robot’s ordinary values (\"Please select an item in the list. — lost_reason\"), so trying values in \"Note\" cannot be judged. A person (or a screen-specific set-up for the robot) must give values this form accepts.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-50-needs.jpg"
+  },
+  {
+   "n": 51,
+   "do": "Field \"PO number\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "needs",
+   "observed": "",
+   "reason": "The form refuses even the robot’s ordinary values (\"Please select an item in the list. — lost_reason\"), so trying values in \"PO number\" cannot be judged. A person (or a screen-specific set-up for the robot) must give values this form accepts.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-51-needs.jpg"
+  },
+  {
+   "n": 52,
+   "do": "Field \"PO date\" (date) — try today; then a past date (01-01-2019); then a far future date (31-12-2035); then leave it empty.",
+   "expect": "Dates save and show in your date format. Past and future dates are accepted only where they make sense. Where there is a matching end/\"to\" date, an end before the start is refused.",
+   "status": "needs",
+   "observed": "",
+   "reason": "The form refuses even the robot’s ordinary values (\"Please select an item in the list. — lost_reason\"), so trying values in \"PO date\" cannot be judged. A person (or a screen-specific set-up for the robot) must give values this form accepts.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-52-needs.jpg"
+  },
+  {
+   "n": 53,
+   "do": "Field \"Share with the team member on every work order from this quote\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "outdated",
+   "observed": "There is no box called \"Share with the team member on every work order from this quote\" on this screen any more.",
+   "suggest": "",
+   "shot": "SCR-quote-53-old.jpg"
+  },
+  {
+   "n": 54,
+   "do": "Same form: press “Attach” twice quickly (double-click).",
+   "expect": "Saved once — never two records.",
+   "status": "pass",
+   "observed": "Pressed twice quickly: nothing new was stored twice."
+  },
+  {
+   "n": 55,
+   "do": "Button / link \"⬇ PDF (for client)\" — press it.",
+   "expect": "It opens the screen at /quote-pdf?id=…; Back returns here.",
+   "status": "pass",
+   "observed": "It downloads \"Quote-Q-00001.pdf\"."
+  },
+  {
+   "n": 56,
+   "do": "Button / link \"Word (editable)\" — press it.",
+   "expect": "It opens the screen at /quote-doc?id=…; Back returns here.",
+   "status": "outdated",
+   "observed": "It now goes to /quote?id=1 (the test says /quote-doc?id=…).",
+   "suggest": "It opens /quote?id=1."
+  },
+  {
+   "n": 57,
+   "do": "Button / link \"📎 Documents\" — press it.",
+   "expect": "It opens the screen at #quote-docs; Back returns here.",
+   "status": "pass",
+   "observed": "It opened /quote?id=1#quote-docs without error."
+  },
+  {
+   "n": 58,
+   "do": "Button / link \"← CRM — Quotations\" — press it.",
+   "expect": "It opens the screen at /quotes; Back returns here.",
+   "status": "pass",
+   "observed": "Opened /quotes; Back returns here."
+  },
+  {
+   "n": 59,
+   "do": "Button / link \"Actions\" — press it.",
+   "expect": "It opens the screen at #actions; Back returns here.",
+   "status": "pass",
+   "observed": "It opened /quote?id=1#actions without error."
+  },
+  {
+   "n": 60,
+   "do": "Button / link \"Approval chain\" — press it.",
+   "expect": "It opens the screen at #approval; Back returns here.",
+   "status": "needs",
+   "observed": "Button not shown: nothing to act on yet.",
+   "reason": "\"Approval chain\" is not on the screen with the copy's data — the app shows it only when there is something for it to act on (the test was measured on a copy with demo data). A person checks it on a screen that has data, or the robot gets data for it.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-60-needs.jpg"
+  },
+  {
+   "n": 61,
+   "do": "Button / link \"Contract\" — press it.",
+   "expect": "It opens the screen at #contract; Back returns here.",
+   "status": "needs",
+   "observed": "Button not shown: nothing to act on yet.",
+   "reason": "\"Contract\" is not on the screen with the copy's data — the app shows it only when there is something for it to act on (the test was measured on a copy with demo data). A person checks it on a screen that has data, or the robot gets data for it.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-61-needs.jpg"
+  },
+  {
+   "n": 62,
+   "do": "Button / link \"Costing\" — press it.",
+   "expect": "It opens the screen at #costing; Back returns here.",
+   "status": "pass",
+   "observed": "It opened /quote?id=1#costing without error."
+  },
+  {
+   "n": 63,
+   "do": "Button / link \"Raise a revision\" — press it.",
+   "expect": "It opens what its words say; Back returns here.",
+   "status": "needs",
+   "observed": "Button not shown: nothing to act on yet.",
+   "reason": "\"Raise a revision\" is not on the screen with the copy's data — the app shows it only when there is something for it to act on (the test was measured on a copy with demo data). A person checks it on a screen that has data, or the robot gets data for it.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-63-needs.jpg"
+  },
+  {
+   "n": 64,
+   "do": "Button / link \"Revise (new rev)\" — press it.",
+   "expect": "It opens what its words say; Back returns here.",
+   "status": "needs",
+   "observed": "Button not shown: nothing to act on yet.",
+   "reason": "\"Revise (new rev)\" is not on the screen with the copy's data — the app shows it only when there is something for it to act on (the test was measured on a copy with demo data). A person checks it on a screen that has data, or the robot gets data for it.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-64-needs.jpg"
+  },
+  {
+   "n": 65,
+   "do": "Button / link \"⬇ PDF\" — press it.",
+   "expect": "It opens the screen at /quote-pdf?id=…; Back returns here.",
+   "status": "pass",
+   "observed": "It downloads \"Quote-Q-00001.pdf\"."
+  },
+  {
+   "n": 66,
+   "do": "Button / link \"⬇ Word\" — press it.",
+   "expect": "It opens the screen at /quote-doc?id=…; Back returns here.",
+   "status": "needs",
+   "observed": "Button not shown: nothing to act on yet.",
+   "reason": "\"⬇ Word\" is not on the screen with the copy's data — the app shows it only when there is something for it to act on (the test was measured on a copy with demo data). A person checks it on a screen that has data, or the robot gets data for it.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-66-needs.jpg"
+  },
+  {
+   "n": 67,
+   "do": "Button / link \"✉️ Chase\" — press it.",
+   "expect": "It opens the screen at /followup-compose?id=…; Back returns here.",
+   "status": "needs",
+   "observed": "Button not shown: nothing to act on yet.",
+   "reason": "\"✉️ Chase\" is not on the screen with the copy's data — the app shows it only when there is something for it to act on (the test was measured on a copy with demo data). A person checks it on a screen that has data, or the robot gets data for it.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-67-needs.jpg"
+  },
+  {
+   "n": 68,
+   "do": "Table with columns: Level, With whom, Status, Acted, Comment.",
+   "expect": "Every column has a value or a dash; numbers line up; long text wraps; an empty list says so in words; on a phone the table scrolls inside itself.",
+   "status": "outdated",
+   "observed": "Columns now: #, Business Unit, Service, Description, Location, Order, Qty, Unit, Rate, Amount, Milestone — what has to happen, Share %, Releases retention, Rev — not found: Level, With whom, Acted, Comment",
+   "suggest": "Table with columns: #, Business Unit, Service, Description, Location, Order, Qty, Unit, Rate, Amount, Milestone — what has to happen, Share %, Releases retention, Rev"
+  },
+  {
+   "n": 69,
+   "do": "Table with columns: #, Business Unit, Service, Description, Location, Order, Qty, Unit, Rate, Amount.",
+   "expect": "Every column has a value or a dash; numbers line up; long text wraps; an empty list says so in words; on a phone the table scrolls inside itself.",
+   "status": "pass",
+   "observed": "Columns: #, Business Unit, Service, Description, Location, Order, Qty, Unit, Rate, Amount."
+  },
+  {
+   "n": 70,
+   "do": "Table with columns: Rev, Status, Total, When.",
+   "expect": "Every column has a value or a dash; numbers line up; long text wraps; an empty list says so in words; on a phone the table scrolls inside itself.",
+   "status": "pass",
+   "observed": "Columns: Rev, Status, Total, When."
+  },
+  {
+   "n": 71,
+   "do": "Table with columns: Site, Type, Address, Contact, Nearest Office.",
+   "expect": "Every column has a value or a dash; numbers line up; long text wraps; an empty list says so in words; on a phone the table scrolls inside itself.",
+   "status": "pass",
+   "observed": "Columns: Site, Type, Address, Contact, Nearest Office."
+  },
+  {
+   "n": 72,
+   "do": "Table with columns: File, Kind, Note, Shared with team member, Added.",
+   "expect": "Every column has a value or a dash; numbers line up; long text wraps; an empty list says so in words; on a phone the table scrolls inside itself.",
+   "status": "needs",
+   "observed": "",
+   "reason": "This table is not on the screen for the copy's data — the app draws it only when it has rows to show (the copy has none yet). A person checks it where there is data.",
+   "proposed": "",
+   "rule": false,
+   "shot": "SCR-quote-72-needs.jpg"
+  },
+  {
+   "n": 73,
+   "do": "Narrow the window to phone width (about 390 pixels) or open on a phone.",
+   "expect": "Readable and usable without the whole page scrolling sideways; buttons big enough to tap.",
+   "status": "pass",
+   "observed": "On a phone (390 px) the page does not scroll sideways; buttons are big enough to tap.",
+   "shot": "SCR-quote-73.jpg"
+  },
+  {
+   "n": 74,
+   "do": "Who may open it: sign in as each role (or ask your administrator) and open this screen.",
+   "expect": "Measured on a test copy today — opened for: Business Director, Finance, Marketing Manager, Business Unit Head. Refused for: Asst. Manager, Branch Application Manager, Branch Manager, Business Development Manager, Coordinator, Inspector, Key Accounts Manager, Marketing Executive, Operation Manager, Quality Head, Senior Inspector, Technical Head. Check this against what your business wants (docs/02-permission-matrix.md). Record any surprise. Note: this was measured on one sample record, so a refusal can be the branch wall.",
+   "status": "outdated",
+   "observed": "Who may open it has changed since 20 Oct: now also opened for Branch Manager, Business Development Manager, Marketing Executive. Check it against the permission list (docs/02).",
+   "suggest": "Opened for: Business Director, Business Unit Head, Finance, Marketing Manager, Branch Manager, Business Development Manager, Marketing Executive."
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SCR-quote-end.jpg",
+ "seconds": 58,
+ "ranAt": "2026-11-15T16:00:06.064Z"
+}

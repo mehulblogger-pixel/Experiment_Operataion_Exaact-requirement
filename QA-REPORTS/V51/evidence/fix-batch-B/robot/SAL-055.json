@@ -1,0 +1,53 @@
+{
+ "id": "SAL-055",
+ "title": "Changing a costing-based quotation's prices needs its creator and a note",
+ "area": "Sales",
+ "module": "Project costing",
+ "persona": "several",
+ "kind": "scenario",
+ "status": "OUT_OF_DATE",
+ "steps": [
+  {
+   "n": 1,
+   "do": "As Test MktMgr: Edit → change only Contact person and Payment terms → Save quote.",
+   "expect": "Saved; no note asked for.",
+   "status": "pass",
+   "observed": "Changed only Contact person and Payment terms → \"Quote saved.\" — no note asked."
+  },
+  {
+   "n": 2,
+   "do": "Edit → change a Rate ₹ on a line → Save quote, leaving \"Why the prices differ from the costing\" empty.",
+   "expect": "Refused: \"This quote was priced from costing PC-…. Say why its prices now differ, in \"Why the prices differ from the costing\" — the note is kept in its history. Nothing was saved.\" Everything you typed is still on the form.",
+   "status": "pass",
+   "observed": "Refused: \"This quote was priced from costing AHM/PC/2026-27/11/0001 Rev 00. Say why its prices now differ, in \"Why the prices differ from the costing\" — the note is kept in its history. Nothing was saved.\" The typed rate 55,000 is still on the form."
+  },
+  {
+   "n": 3,
+   "do": "Type the note \"Customer agreed ₹55,000 a month in the meeting of 18 Oct\" → Save quote.",
+   "expect": "Saved. History: \"Prices changed away from costing PC-… — note: Customer agreed …\".",
+   "status": "pass",
+   "observed": "Saved (\"Quote saved.\"). History: \"Prices changed away from costing AHM/PC/2026-27/11/0001 Rev 00 — note: Customer agreed ₹55,000 a month in the meeting of 18 Oct\"."
+  },
+  {
+   "n": 4,
+   "do": "As Test BDM (not the creator): change a rate with a note.",
+   "expect": "Refused: \"Only the person who made it can change its prices away from the costing.\"",
+   "status": "outdated",
+   "observed": "Test BDM cannot open the quotation for editing at all: \"This quote is assigned to Test MktMgr — Test MktMgr and the people Test MktMgr reports to work on it; you can view it.\" (assigned work, SAL-198, 14 Nov 2026) — so \"Only the person who made it can change its prices away from the costing.\" is not reached by Test BDM (and nobody above Test MktMgr on the test copy may edit quotations, so the creator rule cannot be reached at all with the standard users).",
+   "suggest": "As Test BDM (not the creator, not in Test MktMgr's reporting line): open the quotation → it is view-only: \"This quote is assigned to Test MktMgr — … you can view it.\" (The creator rule, \"Only the person who made it can change its prices away from the costing.\", applies to someone above the creator who may edit quotations.)",
+   "shot": "SAL-055-4-old.jpg"
+  },
+  {
+   "n": 5,
+   "do": "Change the rate back exactly to the costing's rate.",
+   "expect": "Saved without a note (back in line with the costing).",
+   "status": "pass",
+   "observed": "The rate set back to the costing's ₹57225 saved without a note (\"Quote saved.\")."
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-055-end.jpg",
+ "seconds": 11,
+ "ranAt": "2026-11-15T16:08:48.072Z"
+}

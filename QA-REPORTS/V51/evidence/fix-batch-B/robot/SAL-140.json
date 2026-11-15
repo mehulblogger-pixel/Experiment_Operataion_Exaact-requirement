@@ -1,0 +1,43 @@
+{
+ "id": "SAL-140",
+ "title": "Sales on a phone (salespeople in the field)",
+ "area": "Sales",
+ "module": "Phone & working conditions",
+ "persona": "BUSINESS_DEV_MANAGER",
+ "kind": "phone",
+ "status": "NEEDS_YOU",
+ "steps": [
+  {
+   "n": 1,
+   "do": "Leads list, a lead, \"Log a contact\".",
+   "expect": "Usable without sideways scrolling of the page; buttons big enough to tap.",
+   "status": "pass",
+   "observed": "Leads list: width 390 px, page sideways scroll 0 px, every button at least 32 px | Lead: width 390 px, page sideways scroll 0 px, every button at least 32 px | Log a contact: width 390 px, page sideways scroll 0 px, every button at least 32 px, Save button 320×44 | saved: \"Logged. Add the next step whenever you know it.\"",
+   "shot": "SAL-140-1.jpg"
+  },
+  {
+   "n": 2,
+   "do": "Open a quotation and its PDF.",
+   "expect": "Readable; tables scroll inside themselves.",
+   "status": "needs",
+   "observed": "Quotation page: width 390 px, page sideways scroll 0 px, every button at least 32 px; the PDF downloads as a real PDF (6 kB).",
+   "shot": "SAL-140-2-needs.jpg",
+   "reason": "Whether the PDF itself is readable on a phone screen is its printed look — a person has to open it once on a phone.",
+   "proposed": "",
+   "rule": false
+  },
+  {
+   "n": 3,
+   "do": "New quote — the Line items tab.",
+   "expect": "Usable; record any field that cannot be reached.",
+   "status": "pass",
+   "observed": "Every line field (business unit, activity, service, description, site, order, qty, unit, rate) can be reached and typed; amount ₹10,000 shows; width 390 px, page sideways scroll 0 px, every button at least 32 px, wide tables: 1500px (scrolls inside itself).",
+   "shot": "SAL-140-3.jpg"
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-140-end.jpg",
+ "seconds": 10,
+ "ranAt": "2026-11-15T16:11:06.893Z"
+}

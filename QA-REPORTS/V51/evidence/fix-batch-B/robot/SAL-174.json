@@ -1,0 +1,47 @@
+{
+ "id": "SAL-174",
+ "title": "The Sales home and \"Your next actions\"",
+ "area": "Sales",
+ "module": "Sales home",
+ "persona": "BUSINESS_DEV_MANAGER",
+ "kind": "scenario",
+ "status": "PASSED",
+ "steps": [
+  {
+   "n": 1,
+   "do": "Left menu → Sales.",
+   "expect": "Page \"Sales\" with tiles: Leads, Opportunities, Inquiries, Quotes, Quote templates, Pre-order checklist, Project costing, Approvals, Pipelines & funnels, Set up Sales; and \"Your next actions\".",
+   "status": "pass",
+   "observed": "Sales page tiles: Leads, Opportunities, Inquiries, Quotes, Project costing, Approvals, Pipelines & funnels (no Quote templates, Pre-order checklist, Set up Sales — not the BDM's: templates are the Marketing Manager's, the checklist and Set up Sales need the quotation-approve right). \"Your next actions\": shown",
+   "shot": "SAL-174-1.jpg",
+   "note": "Tile list: the three set-up tiles (Quote templates, Pre-order checklist, Set up Sales) are not a BDM's per the permission matrix, so the expected list should depend on the role.",
+   "suggest": "BDM: Leads, Opportunities, Inquiries, Quotes, Project costing, Approvals, Pipelines & funnels; \"Your next actions\" when something is due."
+  },
+  {
+   "n": 2,
+   "do": "\"Your next actions\".",
+   "expect": "Lists what needs doing next (for example overdue follow-ups, enquiries waiting for a quote, quotations waiting for my approval) — each one a link. Record what it shows.",
+   "status": "pass",
+   "observed": "Your next actions: NEEDS ATTENTION 1 → /command-centre; OUTSTANDING ₹0 → /command-centre; Command Centre → → /command-centre; My Work → → /my-work; Follow up Overdue Lead Co — Call back about rates overdue → /lead?id=1; Chase TB Refinery Ltd on Q-00001 overdue → /quote?id=1#revisions; Chase TB Refinery Ltd on Q-00001 overdue → /quote?id=1#revisions; Chase TB Refinery Ltd on Q-00001 overdue → /quote?id=1#revisions"
+  },
+  {
+   "n": 3,
+   "do": "Open each link.",
+   "expect": "It goes to the exact record.",
+   "status": "pass",
+   "observed": "/command-centre → /command-centre; /command-centre → /command-centre; /command-centre → /command-centre; /lead?id=1 → /lead?id=1; /quote?id=1#revisions → /quote?id=1#revisions; /quote?id=1#revisions → /quote?id=1#revisions; /quote?id=1#revisions → /quote?id=1#revisions"
+  },
+  {
+   "n": 4,
+   "do": "The number of quotations \"waiting for me\".",
+   "expect": "Equals the list Quotes → awaiting my approval (including delegated and escalated ones, own branch only).",
+   "status": "pass",
+   "observed": "Test BDM: 0 waiting = 0 in the list (a BDM approves nothing); Test BranchMgr: \"1 quotes to approve\" = 1 in Quotes → Awaiting your approval (Ahmedabad only; Mumbai's is not counted). Delegated / escalated steps were not set up here."
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-174-end.jpg",
+ "seconds": 25,
+ "ranAt": "2026-11-15T15:49:23.908Z"
+}

@@ -1,0 +1,45 @@
+{
+ "id": "SAL-138",
+ "title": "Coordinator — what they may and may not do in Sales",
+ "area": "Sales",
+ "module": "Who may do what",
+ "persona": "COORDINATOR",
+ "kind": "access",
+ "status": "PASSED",
+ "steps": [
+  {
+   "n": 1,
+   "do": "Open Left menu → Sales and each tile in turn: Leads, Opportunities, Inquiries, Quotes, Quote templates, Pre-order checklist, Project costing, Approvals, Pipelines & funnels, Set up Sales.",
+   "expect": "Opens exactly what the matrix allows; anything else is refused with a sentence (never a blank page or an error).",
+   "status": "pass",
+   "observed": "Leads: refused (\"Sales & CRM — restricted You don’t have permission to open Leads & pip\") [no tile — address typed]; Opportunities: refused (\"Sales & CRM — restricted You don’t have permission to open Leads & pip\") [no tile — address typed]; Inquiries: refused (\"Sales & CRM — restricted You don’t have permission to open CRM — Inqui\") [no tile — address typed]; Quotes: refused (\"Sales & CRM — restricted You don’t have permission to open CRM — Quota\") [no tile — address typed]; Quote templates: refused (\"You cannot manage report templates.\") [no tile — address typed]; Pre-order checklist: refuse"
+  },
+  {
+   "n": 2,
+   "do": "Try what the permission matrix says they may do: Customer and work-order side.",
+   "expect": "Each works.",
+   "status": "pass",
+   "observed": "Client register opens (TB Valves listed); dashboard \"contract opened — raise the inspection call\" opens the new-call form with TB Valves and AHM/C/2026-27/00001 filled in.",
+   "shot": "SAL-138-2.jpg"
+  },
+  {
+   "n": 3,
+   "do": "Try what the matrix says they may NOT do: Leads, Opportunities, Quotes.",
+   "expect": "Each is refused (button absent, or a refusal sentence when the address is typed).",
+   "status": "pass",
+   "observed": "No Leads / Opportunities / Quotes tiles; /leads refused, /opportunities refused, /quotes refused with \"Sales & CRM — restricted\"."
+  },
+  {
+   "n": 4,
+   "do": "Type the address of a refused screen directly.",
+   "expect": "Refused the same way — hiding the button is not enough.",
+   "status": "pass",
+   "observed": "/quote?id=1 → \"Sales & CRM — restricted You don’t have permission\"; /lead-new → \"Sales & CRM — restricted You don’t have permission\"; /opportunity-new → \"Sales & CRM — restricted You don’t have permission\"; /quote-new → \"Sales & CRM — restricted You don’t have permission\"; /sales-setup → \"Sales & CRM — restricted You don’t have permission\""
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-138-end.jpg",
+ "seconds": 17,
+ "ranAt": "2026-11-15T16:10:54.244Z"
+}

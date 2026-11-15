@@ -1,0 +1,40 @@
+{
+ "id": "SAL-045",
+ "title": "Deleting an enquiry",
+ "area": "Sales",
+ "module": "Inquiries",
+ "persona": "several",
+ "kind": "access",
+ "status": "OUT_OF_DATE",
+ "steps": [
+  {
+   "n": 1,
+   "do": "As Test MktExec, look for Delete on the register.",
+   "expect": "Not offered (administrators only).",
+   "status": "pass",
+   "observed": "No Delete on the register for Test MktExec."
+  },
+  {
+   "n": 2,
+   "do": "As Master Admin, press Delete on the enquiry WITH a quotation.",
+   "expect": "Refused: \"A quote has been raised against INQ-…, so it is part of the record and cannot be deleted. Set its status to Dropped instead.\"",
+   "status": "outdated",
+   "observed": "Delete is not offered on the quoted enquiry; forcing it is refused: \"A quote has been raised against INQ-00001, so it is part of the record and cannot be deleted. It follows that quotation; mark the quotation lost if the work is not coming.\" — since 12–13 Nov 2026 an enquiry follows its quotation (Won / Lost by itself; Dropped only with a reason, and not once quoted), so the advice is no longer \"Set its status to Dropped\".",
+   "note": "The register does not draw Delete on an enquiry that has a quotation (status Quoted); the robot forced the delete request to see the refusal.",
+   "shot": "SAL-045-2-old.jpg",
+   "suggest": "As Master Admin: an enquiry WITH a quotation offers no Delete. (If forced: \"A quote has been raised against INQ-…, so it is part of the record and cannot be deleted. It follows that quotation; mark the quotation lost if the work is not coming.\")"
+  },
+  {
+   "n": 3,
+   "do": "Delete the one without a quotation.",
+   "expect": "\"Inquiry INQ-… deleted.\" and an activity entry is written.",
+   "status": "pass",
+   "observed": "\"Inquiry INQ-00002 deleted.\" Activity: \"Inquiry INQ-00002 deleted.\""
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-045-end.jpg",
+ "seconds": 8,
+ "ranAt": "2026-11-15T16:08:37.146Z"
+}

@@ -1,0 +1,45 @@
+{
+ "id": "SAL-137",
+ "title": "Operation Manager — what they may and may not do in Sales",
+ "area": "Sales",
+ "module": "Who may do what",
+ "persona": "OPERATION_MANAGER",
+ "kind": "access",
+ "status": "PASSED",
+ "steps": [
+  {
+   "n": 1,
+   "do": "Open Left menu → Sales and each tile in turn: Leads, Opportunities, Inquiries, Quotes, Quote templates, Pre-order checklist, Project costing, Approvals, Pipelines & funnels, Set up Sales.",
+   "expect": "Opens exactly what the matrix allows; anything else is refused with a sentence (never a blank page or an error).",
+   "status": "pass",
+   "observed": "Leads: refused (\"Sales & CRM — restricted You don’t have permission to open Leads & pip\") [no tile — address typed]; Opportunities: refused (\"Sales & CRM — restricted You don’t have permission to open Leads & pip\") [no tile — address typed]; Inquiries: refused (\"Sales & CRM — restricted You don’t have permission to open CRM — Inqui\") [no tile — address typed]; Quotes: refused (\"Sales & CRM — restricted You don’t have permission to open CRM — Quota\") [no tile — address typed]; Quote templates: refused (\"You cannot manage report templates.\") [no tile — address typed]; Pre-order checklist: refuse"
+  },
+  {
+   "n": 2,
+   "do": "Try what the permission matrix says they may do: Endorse contract opening and amendments (Work orders).",
+   "expect": "Each works.",
+   "status": "pass",
+   "observed": "Endorsed opening AHM/C/2026-27/00001 (\"First signature given. Waiting for the final approval — Test BAM, Test\") and the amendment on the contract page (\"First signature given on the amendment. Waiting for the final approval\").",
+   "shot": "SAL-137-2.jpg"
+  },
+  {
+   "n": 3,
+   "do": "Try what the matrix says they may NOT do: Quotations.",
+   "expect": "Each is refused (button absent, or a refusal sentence when the address is typed).",
+   "status": "pass",
+   "observed": "No Quotes tile; /quotes → \"Sales & CRM — restricted You don’t have permission to open CRM — Quotations. Ask\"."
+  },
+  {
+   "n": 4,
+   "do": "Type the address of a refused screen directly.",
+   "expect": "Refused the same way — hiding the button is not enough.",
+   "status": "pass",
+   "observed": "/quote?id=1 → \"Sales & CRM — restricted You don’t have permission to o\"; /quote-new → \"Sales & CRM — restricted You don’t have permission to o\"; /inquiries → \"Sales & CRM — restricted You don’t have permission to o\"; /leads → \"Sales & CRM — restricted You don’t have permission to o\"; /sales-setup → \"Sales & CRM — restricted You don’t have permission to o\""
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-137-end.jpg",
+ "seconds": 18,
+ "ranAt": "2026-11-15T16:10:37.559Z"
+}

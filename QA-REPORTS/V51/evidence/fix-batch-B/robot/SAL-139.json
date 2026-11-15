@@ -1,0 +1,45 @@
+{
+ "id": "SAL-139",
+ "title": "Inspector — what they may and may not do in Sales",
+ "area": "Sales",
+ "module": "Who may do what",
+ "persona": "INSPECTOR",
+ "kind": "access",
+ "status": "PASSED",
+ "steps": [
+  {
+   "n": 1,
+   "do": "Open Left menu → Sales and each tile in turn: Leads, Opportunities, Inquiries, Quotes, Quote templates, Pre-order checklist, Project costing, Approvals, Pipelines & funnels, Set up Sales.",
+   "expect": "Opens exactly what the matrix allows; anything else is refused with a sentence (never a blank page or an error).",
+   "status": "pass",
+   "observed": "No Sales item in the inspector's menu (field screen); every tile address typed. Leads: refused (\"Sales & CRM — restricted You don’t have permission to open Leads & pip\") [no tile — address typed]; Opportunities: refused (\"Sales & CRM — restricted You don’t have permission to open Leads & pip\") [no tile — address typed]; Inquiries: refused (\"Sales & CRM — restricted You don’t have permission to open CRM — Inqui\") [no tile — address typed]; Quotes: refused (\"Sales & CRM — restricted You don’t have permission to open CRM — Quota\") [no tile — address typed]; Quote templates: refused (\"You cannot m",
+   "note": "The \"Approvals\" address opens the inspector's own approvals inbox (\"Everything waiting on your decision\") — empty, no Sales data; it is not a Sales screen for them."
+  },
+  {
+   "n": 2,
+   "do": "Try what the permission matrix says they may do: Own jobs only.",
+   "expect": "Each works.",
+   "status": "pass",
+   "observed": "My jobs opens (\"My Jobs\") — the inspector's own jobs screen; no job was allocated in this copy, so only that it opens (and holds no Sales data) was checked."
+  },
+  {
+   "n": 3,
+   "do": "Try what the matrix says they may NOT do: Any Sales screen.",
+   "expect": "Each is refused (button absent, or a refusal sentence when the address is typed).",
+   "status": "pass",
+   "observed": "/sales: open (\"Sales\"); /crm-dashboard: refused (\"Sales & CRM — restricted You don’t have permission\"); /quotes: refused (\"Sales & CRM — restricted You don’t have permission\"); /leads: refused (\"Sales & CRM — restricted You don’t have permission\")"
+  },
+  {
+   "n": 4,
+   "do": "Type the address of a refused screen directly.",
+   "expect": "Refused the same way — hiding the button is not enough.",
+   "status": "pass",
+   "observed": "/quote-new → \"Sales & CRM — restricted You don’t have permission\"; /lead-new → \"Sales & CRM — restricted You don’t have permission\"; /inquiry-new → \"Sales & CRM — restricted You don’t have permission\"; /project-costings → \"You do not have access to project costing.\"; /pipelines → \"Sales & CRM — restricted You don’t have permission\"; /sales-setup → \"Sales & CRM — restricted You don’t have permission\""
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-139-end.jpg",
+ "seconds": 3,
+ "ranAt": "2026-11-15T16:10:57.340Z"
+}

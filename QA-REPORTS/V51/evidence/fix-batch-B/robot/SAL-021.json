@@ -1,0 +1,55 @@
+{
+ "id": "SAL-021",
+ "title": "Leads board and list — filters, year, CSV",
+ "area": "Sales",
+ "module": "Leads",
+ "persona": "MARKETING_MANAGER",
+ "kind": "scenario",
+ "status": "PASSED",
+ "steps": [
+  {
+   "n": 1,
+   "do": "Left menu → Sales → Leads → Board.",
+   "expect": "One column per stage; each lead appears once.",
+   "status": "pass",
+   "observed": "One column per stage (New enquiry, Contact made, Qualified); 8 TB test leads, none twice.",
+   "shot": "SAL-021-1.jpg"
+  },
+  {
+   "n": 2,
+   "do": "Year = previous FY → Find.",
+   "expect": "Only leads created in that FY.",
+   "status": "pass",
+   "observed": "FY 2025-26 → only the leads created in that year: TB FY25 India, TB FY25 Hotel, TB FY25 Golf, TB FY25 Foxtrot.",
+   "shot": "SAL-021-2.jpg"
+  },
+  {
+   "n": 3,
+   "do": "Year = All years.",
+   "expect": "Every lead.",
+   "status": "pass",
+   "observed": "All years → every lead (all 10 test leads, including the two closed ones)."
+  },
+  {
+   "n": 4,
+   "do": "Press \"⬇ CSV\".",
+   "expect": "A file downloads with the same rows as on screen.",
+   "status": "pass",
+   "observed": "Downloaded leads-all-years-2026-11-15.csv with the same 10 test leads as the screen.",
+   "note": "The \"⬇ CSV\" was pressed on the List view with All years; the board view's CSV holds the board's own leads (commit \"Leads board CSV holds the board's own leads\")."
+  },
+  {
+   "n": 5,
+   "do": "Sign in as Test KAM (Mumbai branch).",
+   "expect": "Ahmedabad leads are NOT shown; leads with no branch are shown to everyone.",
+   "status": "pass",
+   "observed": "Test KAM sees the Mumbai leads and \"TB FY26 NoBranch\"; no Ahmedabad lead.",
+   "shot": "SAL-021-5.jpg"
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-021-end.jpg",
+ "seconds": 6,
+ "ranAt": "2026-11-15T15:50:31.083Z"
+}

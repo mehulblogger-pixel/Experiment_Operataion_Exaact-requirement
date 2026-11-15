@@ -1,0 +1,161 @@
+{
+ "id": "SAL-182",
+ "title": "Journey 3 — Deal with no lead → won without a quotation → Accounts → contract number",
+ "area": "Sales",
+ "module": "Sales flow",
+ "persona": "several",
+ "kind": "flow",
+ "status": "PASSED",
+ "steps": [
+  {
+   "n": 1,
+   "do": "[BDM] Sales → Opportunities → \"+ New opportunity\": Name \"Kiln shell inspection — PO received\", Customer (typed), Value 3,00,000 → \"Open the opportunity\".",
+   "expect": "\"Opportunity OPP-… opened.\" \"This deal is at Qualified.\" The Quotes tab says the customer \"is not on the client master yet — that is fine\" — there is no yellow warning. (Fixed 13 Nov 2026.)",
+   "status": "pass",
+   "observed": "\"Opportunity OPP-2026-0001 opened.\" \"This deal is at Enquiry received.\" Quotes tab: \"Kiln Works Pvt Ltd is not on the client master yet — that is fine\"; no yellow warning.",
+   "note": "The deal starts at the default funnel's first stage: \"This deal is at Enquiry received.\" (Inspection profile), not \"Qualified\"."
+  },
+  {
+   "n": 2,
+   "do": "[BDM] \"Move it on\" → stage \"Won (100%) — closes it as a sale\" → \"Move it\".",
+   "expect": "\"Won — <customer> said yes. Next: add the customer to the master (Actions tab), then send it to Accounts to register the contract.\"",
+   "status": "pass",
+   "observed": "\"Won — Kiln Works Pvt Ltd said yes. Next: add the customer to the master (Actions tab), then send it to Accounts to register the contract.\""
+  },
+  {
+   "n": 3,
+   "do": "[BDM] Read the yellow box on the deal.",
+   "expect": "\"It has no customer on the master yet, so an order has nowhere to point. Add them as a customer first.\" Below it: Customer name (already filled), State, and \"＋ Add as a customer\" — and, as before, \"Or pick one already on the master\" + \"Set the customer\".",
+   "status": "pass",
+   "observed": "Yellow box: \"It has no customer on the master yet… Add them as a customer first.\" with Customer name (filled \"Kiln Works Pvt Ltd\"), State and \"＋ Add as a customer\"; also \"Or pick one already on the master\" + \"Set the customer\"."
+  },
+  {
+   "n": 4,
+   "do": "[BDM] Type State \"Maharashtra\" → \"＋ Add as a customer\".",
+   "expect": "\"<Name> is now a customer (C-…). Next: send the deal to Accounts to register the contract. The customer record is short — GSTIN or PAN, address and e-mail are completed before the first work order.\" The top line: \"Next: on the Actions tab, send it to Accounts to register the contract.\" (Fixed 13 Nov 2026 — there used to be no way to add the customer from here.)",
+   "status": "pass",
+   "observed": "\"Kiln Works Pvt Ltd is now a customer (C-KILNWORK-0009). Next: send the deal to Accounts to register the contract. The customer record is short — GSTIN or PAN, address and e-mail are completed before t\"; top line \"Next: on the Actions tab, send it to Accounts to register the contract.\"",
+   "note": "Message reads: \"Kiln Works Pvt Ltd is now a customer (C-KILNWORK-0009). Next: send the deal to Accounts to register the contract. The customer record is short — GSTIN or PAN, address and e-mail are completed before the first inspection call.\""
+  },
+  {
+   "n": 5,
+   "do": "[BDM] Tab \"Actions\" → \"Send to Accounts to register the contract\".",
+   "expect": "\"Sent to Accounts — they will register the contract for this deal, and the order opens to operations once it is approved. Nothing more for Sales to do here.\"",
+   "status": "pass",
+   "observed": "\"Sent to Accounts — they will register the contract for this deal, and the order opens to operations once it is approved. Nothing more for Sales to do here.\""
+  },
+  {
+   "n": 6,
+   "do": "[Finance] Dashboard → task \"won deals to register\" (or \"Register\" on the panel \"N won deals without a quote are waiting for a contract\").",
+   "expect": "Screen \"Contracts to register\": the deal with its reference, name, customer and agreed value, and one button \"✓ Register the contract — next number\". Accepted quotations waiting for a number are listed below it. (Fixed 13 Nov 2026 — \"Register\" used to open the deal page: \"Sales & CRM — restricted\".)",
+   "status": "pass",
+   "observed": "task \"won deals to register\" → \"Contracts to register\": OPP-2026-0001, the name, Kiln Works Pvt Ltd, ₹3,00,000 and \"✓ Register the contract — next number\".",
+   "shot": "SAL-182-6.jpg"
+  },
+  {
+   "n": 7,
+   "do": "[Finance] \"✓ Register the contract — next number\".",
+   "expect": "Stays on Contracts to register. \"Contract AHM/C/2026-27/0000N registered — it is waiting for approval. Waiting for the first signature — <names>. Then the final approval — <names>. The work orders are raised from it once it is open.\" The deal has left the list.",
+   "status": "pass",
+   "observed": "Stayed on Contracts to register: \"Contract AHM/C/2026-27/00001 registered — it is waiting for approval. Waiting for the first signature — Test BAM, Test BranchMgr, Test Director and 3 more. Then the final approval — Test BAM, Test BranchMgr, Test BranchMgr2. The inspection calls are raised from it once it is open.\"; the deal left the list."
+  },
+  {
+   "n": 8,
+   "do": "[BDM] Open the deal.",
+   "expect": "\"The contract is registered and waiting for approval; then the orders are raised from it.\" with the contract number and who it waits for.",
+   "status": "pass",
+   "observed": "\"The contract is registered and waiting for approval; then the orders are raised from it.\" with AHM/C/2026-27/00001 and the signers named."
+  },
+  {
+   "n": 9,
+   "do": "[Operation Manager] then [Branch Manager] sign from Contract openings.",
+   "expect": "Contract OPEN. The deal reads \"The contract is registered and open — the orders are raised from it.\" It has left Finance's \"won deals\" panel.",
+   "status": "pass",
+   "observed": "Contract AHM/C/2026-27/00001 OPEN; the deal reads \"The contract is registered and open — the orders are raised from it.\"; Finance's won-deals panel no longer counts it."
+  },
+  {
+   "n": 10,
+   "do": "[Coordinator] Dashboard.",
+   "expect": "A task: \"contract opened — raise the work order\". It opens the work-order form filled in from the contract (several contracts: the list \"Newly opened — no work order raised yet\", one \"▶ Raise work order\" each). (New 13 Nov 2026.)",
+   "status": "pass",
+   "observed": "Task \"contract opened — raise the inspection call\" opens the order form filled in from AHM/C/2026-27/00001 (Kiln Works Pvt Ltd)."
+  },
+  {
+   "n": 11,
+   "do": "EDGE · Register the same deal a second time.",
+   "expect": "Refused — a deal cannot be registered to a second contract.",
+   "status": "pass",
+   "observed": "Refused: \"A contract has already been registered for this deal.\""
+  },
+  {
+   "n": 12,
+   "do": "EDGE · Type a contract number that another customer already uses.",
+   "expect": "Refused — a number identifies one contract.",
+   "status": "pass",
+   "observed": "Typing AHM/C/2026-27/00001 (Kiln Works' number) for TB Valves is refused: \"Contract number AHM/C/2026-27/00001 is already registered against Kiln Works Pvt Ltd. A contract number must identify one contract.\""
+  },
+  {
+   "n": 13,
+   "do": "EDGE · [BDM] Try \"Send to Accounts\" before a customer is set.",
+   "expect": "The button is not offered until the customer is on the master.",
+   "status": "pass",
+   "observed": "No \"Send to Accounts\" button while the deal has no customer on the master."
+  },
+  {
+   "n": 14,
+   "do": "EDGE · [Finance] On Contracts to register open \"Enter it differently\" → type the client's own number, Start and End dates → \"Register with these details\".",
+   "expect": "The contract carries that number and those dates.",
+   "status": "pass",
+   "observed": "Registered as PHARMA/PO/7781 from 2026-11-15 to 2027-11-15 (\"Contract PHARMA/PO/7781 registered — it is waiting for approval. Waiting for the\")."
+  },
+  {
+   "n": 15,
+   "do": "EDGE · [Finance] Try to open the deal itself (/opportunity?id=…).",
+   "expect": "Still \"Sales & CRM — restricted\" — Finance registers the contract without needing the deal, and cannot change a deal.",
+   "status": "pass",
+   "observed": "\"Sales & CRM — restricted You don’t have permission to open Leads & pipeline. Ask your work\""
+  },
+  {
+   "n": 16,
+   "do": "EDGE · [BDM] \"＋ Add as a customer\" with a name that a customer on the master already has.",
+   "expect": "It stops once: \"A customer with this name is already on file: C-… — <name>. If it is the same company, pick it from the list below. If it really is a different company, tick \"It is a different company\" and press again.\" A tick-box appears; ticking it and pressing again adds the new customer on purpose.",
+   "status": "pass",
+   "observed": "Stopped once: \"A customer with this name is already on file: C-KILNWORK-0009 — Kiln Works Pvt Ltd. If it is the same company, pick it f…\"; the tick-box appeared; ticked + pressed again → \"Kiln Works Pvt Ltd is now a customer (C-KILNWORK-0010). Next\" (2 customers with that name)."
+  },
+  {
+   "n": 17,
+   "do": "EDGE · [BDM] Press \"＋ Add as a customer\" twice (two tabs).",
+   "expect": "One customer only; the second press says the deal already has its customer.",
+   "status": "pass",
+   "observed": "One customer only; first tab \"Two Tabs Traders is now a customer (C-TWOTABST-001…\", second tab \"This deal already has its customer.\""
+  },
+  {
+   "n": 18,
+   "do": "EDGE · A one-off job with no contract.",
+   "expect": "On the won deal, \"Or raise a work order directly — a one-off with no contract — set the rate on the order\" (folded). The deal then reads \"The work order is raised — open it from this deal.\"",
+   "status": "pass",
+   "observed": "Folded \"Or raise a work order directly…\" raised the order (\"Order CALL-00001 raised, with no quotation attached — set th\"); the deal reads \"The work order is raised — open it. Over\" (the test's wording adds \"from this deal\").",
+   "note": "The fold is not offered to the BDM (only to someone who may raise operations orders — here the administrator); the step does not say who.",
+   "suggest": "[Coordinator / manager who raises orders] On the won deal, \"Or raise a work order directly…\""
+  },
+  {
+   "n": 19,
+   "do": "EDGE · Traceability wanted later.",
+   "expect": "\"＋ Generate quotation\" on the won deal drafts a quotation-of-record for it (one only).",
+   "status": "pass",
+   "observed": "\"Quotation Q-00001 generated as a draft — finish the lines and rate here, then it is on record for th\" — one quotation-of-record; the button is gone afterwards."
+  },
+  {
+   "n": 20,
+   "do": "EDGE · The company's contract rule is \"None\".",
+   "expect": "The contract is open the moment it is registered; no signer is asked (SAL-179).",
+   "status": "pass",
+   "observed": "Rule \"None\": registered and OPEN at once — \"Contract AHM/C/2026-27/00002 registered and open — your company asks for no approval to open a contr\""
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-182-end.jpg",
+ "seconds": 85,
+ "ranAt": "2026-11-15T15:37:25.938Z"
+}

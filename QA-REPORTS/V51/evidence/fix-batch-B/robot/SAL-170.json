@@ -1,0 +1,71 @@
+{
+ "id": "SAL-170",
+ "title": "Create a pipeline and edit its stages",
+ "area": "Sales",
+ "module": "Pipelines & funnels",
+ "persona": "MASTER_ADMIN",
+ "kind": "scenario",
+ "status": "NEEDS_YOU",
+ "steps": [
+  {
+   "n": 1,
+   "do": "Left menu → Sales → Pipelines & funnels → \"Create one\": Name \"Export deals\", What is it for = Opportunity funnel, Start from = a plain four-stage, tick \"Make it the default for new work\" → \"Create it\".",
+   "expect": "Listed with its stages; Default = yes; the previous default is no longer default.",
+   "status": "pass",
+   "observed": "Listed: \"Export deals 4 0 Default Active Edit stages\"; the previous default \"Inspection, testing & certification — new business\" now offers \"Make default\".",
+   "shot": "SAL-170-1.jpg"
+  },
+  {
+   "n": 2,
+   "do": "\"Edit stages\": rename a stage, set Probability 30 and Days allowed 14 → Save.",
+   "expect": "Saved; deals on that stage keep their place.",
+   "status": "pass",
+   "observed": "\"\" — stage renamed \"First contact\", 30%, 14 days; the deal on it stays there (its page now reads \"First contact\")."
+  },
+  {
+   "n": 3,
+   "do": "\"Add a stage\": Name \"Technical clarification\", What it means = Still in play, Probability 40, Days allowed 7 → \"Add it\".",
+   "expect": "Added at the end; order can be changed.",
+   "status": "pass",
+   "observed": "Added at the end; the order can be changed.",
+   "shot": "SAL-170-3.jpg"
+  },
+  {
+   "n": 4,
+   "do": "Probability 150 or -10.",
+   "expect": "Refused or capped — record what happens.",
+   "status": "pass",
+   "observed": "Typing 150: the browser refuses to send it (\"Value must be less than or equal to 100.\"), stays 30%. Sent anyway: 150 is stored as 100% (\"Saved.\"); −10 is stored as 0%."
+  },
+  {
+   "n": 5,
+   "do": "Remove a stage that has deals on it.",
+   "expect": "Refused or the deals are protected — record what happens; deals must never vanish.",
+   "status": "pass",
+   "observed": "The stage with the deal shows \"has records\" instead of Remove (untick \"in use\" to retire it); a re-sent remove form → \"1 record is sitting on “First contact”. Move them to another stage first, or untick it to \"; stage kept, deal still there on stage 31."
+  },
+  {
+   "n": 6,
+   "do": "Two stages both \"Won — closes the deal\".",
+   "expect": "Record what happens.",
+   "status": "needs",
+   "observed": "Set \"Technical clarification\" to \"Won — closes the deal\" beside the existing Won stage and saved: \"Saved.\". Won stages now: Won (100%), Technical clarification (100%).",
+   "reason": "The test asks to record what happens with two Won stages.",
+   "proposed": "Refuse a second \"Won\" (and a second \"Lost\") stage in one funnel with a sentence — a deal moved to \"Won\" must land on one stage, and the dashboard's won count should not split across two.",
+   "rule": true,
+   "shot": "SAL-170-6-needs.jpg"
+  },
+  {
+   "n": 7,
+   "do": "As Test MktExec: open Pipelines & funnels.",
+   "expect": "Can view; cannot edit (pipe_can = company setup).",
+   "status": "pass",
+   "observed": "Opens for viewing; no \"Create one\", stage boxes disabled, no Save; a re-sent save → \"You cannot change the pipelines.\" (name unchanged)."
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-170-end.jpg",
+ "seconds": 10,
+ "ranAt": "2026-11-15T15:49:33.486Z"
+}

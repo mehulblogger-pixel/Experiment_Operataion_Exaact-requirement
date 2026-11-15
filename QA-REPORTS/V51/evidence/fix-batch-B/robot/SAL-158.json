@@ -1,0 +1,119 @@
+{
+ "id": "SAL-158",
+ "title": "Construction / EPC: bill a project by milestones, with retention",
+ "area": "Sales",
+ "module": "Company types",
+ "persona": "several",
+ "kind": "scenario",
+ "status": "PASSED",
+ "steps": [
+  {
+   "n": 1,
+   "do": "[BDM] Quotation → Overview → \"Billing by milestones\" → \"Set up milestones\" → \"Fill a common example\". Retention % 10; tick \"Releases retention\" on \"After the warranty period\". Press \"Save the schedule\".",
+   "expect": "\"Adds up to 100% ✓\" before saving; then \"Billing schedule saved — 4 milestone(s).\" The table shows 10% ₹1,00,000 · 40% ₹4,00,000 · 40% ₹4,00,000 · 10% ₹1,00,000 and the retention sentence.",
+   "status": "pass",
+   "observed": "\"Adds up to 100% ✓\" → \"Billing schedule saved — 4 milestone(s).\"; table 10% ₹1,00,000 · 40% ₹4,00,000 · 40% ₹4,00,000 · 10% ₹1,00,000 and the retention sentence.",
+   "shot": "SAL-158-1.jpg"
+  },
+  {
+   "n": 2,
+   "do": "Change one share so they add up to 90% and save.",
+   "expect": "Refused: \"The milestones add up to 90% — they must add up to 100% of the price. Nothing was saved.\"",
+   "status": "pass",
+   "observed": "Refused: \"The milestones add up to 90% — they must add up to 100% of the price. Nothing was saved.\" (the form itself warned \"Adds up to 90% — it must add up to 100%.\")."
+  },
+  {
+   "n": 3,
+   "do": "Download the quotation PDF.",
+   "expect": "A \"Payment milestones\" section lists each milestone with its share and amount \"plus GST\", and the retention sentence.",
+   "status": "pass",
+   "observed": "PDF \"Payment milestones\": 1. Advance — with the order — 10% — 1,00,000.00 plus GST | 2. Design / drawings approved — 40% — 4,00,000.00 plus GST | 3. Delivery / completion — 40% — 4,00,000.00 plus GST | 4. After the warranty period — 10% — 1,00,000.00 plus GST (retention released on thi"
+  },
+  {
+   "n": 4,
+   "do": "Submit for approval, then change the schedule.",
+   "expect": "Saved with \"…the approval was cancelled — submit it again.\"",
+   "status": "pass",
+   "observed": "\"Billing schedule saved — 4 milestone(s). The billing schedule is part of what is approved, so the approval was cancelled — submit it again.\" — back to Draft."
+  },
+  {
+   "n": 5,
+   "do": "Approve, send, mark accepted; Finance registers the contract; manager endorses, branch manager approves (contract Open). Open the contract.",
+   "expect": "\"Billing by milestones\" shows the same four milestones, all \"Planned\", with \"✓ Mark reached\".",
+   "status": "pass",
+   "observed": "Contract AHM/C/2026-27/00001 OPEN; its \"Billing by milestones\" shows the four milestones (10/35/45/10 after step 4), all Planned, each with \"✓ Mark reached\".",
+   "shot": "SAL-158-5.jpg"
+  },
+  {
+   "n": 6,
+   "do": "[Finance] On the contract.",
+   "expect": "No \"Mark reached\" button — Finance bills milestones, it does not confirm them.",
+   "status": "pass",
+   "observed": "Finance sees the milestones with no \"Mark reached\"."
+  },
+  {
+   "n": 7,
+   "do": "[Coordinator] \"✓ Mark reached\" on the advance: date tomorrow.",
+   "expect": "Refused: a milestone cannot be reached in the future.",
+   "status": "pass",
+   "observed": "The calendar stops at today (max 2026-11-15); a date tomorrow sent anyway is refused: \"A milestone cannot be reached in the future — give the date it actually happened. | In force. Within its term and quantity. quantity 0 of 1 used\""
+  },
+  {
+   "n": 8,
+   "do": "Date today, \"What shows it is reached?\" = \"PO received 12 Nov\", attach the PO PDF → \"Confirm — ready to bill\".",
+   "expect": "\"Marked reached. Finance sees it under Billing → Due to bill.\" The row shows \"Reached — ready to bill\", who, when, the note and a 📎 link that opens the file.",
+   "status": "pass",
+   "observed": "\"Marked reached. Finance sees it under Billing → Due to bill. | In force. Within its term and quantity. quantity 0 of 1 used\" Row: \"1 Advance — with the order Reached 15 Nov 2026 · Test Coord — PO received 12 Nov · 📎 po.pdf 10% ₹1,00,000 Reached — ready to bill Undo\"; the 📎 link opens the PDF.",
+   "shot": "SAL-158-8.jpg"
+  },
+  {
+   "n": 9,
+   "do": "[Finance] Money → Billable events → Due to bill.",
+   "expect": "The milestone is listed for the client, \"Milestone reached: Advance — with the order\". Tick it → \"Raise one invoice for the ticked units\".",
+   "status": "pass",
+   "observed": "Money → Billable events → Due to bill: TB Group Parent, \"Milestone reached: Advance — with the order\"; ticked → \"Raise one invoice for the ticked units\" → \"1 unit(s) put on a draft invoice — review it and issue.\"",
+   "shot": "SAL-158-9.jpg"
+  },
+  {
+   "n": 10,
+   "do": "Open the draft invoice → print.",
+   "expect": "Line \"Milestone — <contract> — Advance — with the order (10%)\" ₹1,00,000 + GST = ₹1,18,000; then \"Less: retention 10% — payable when “After the warranty period” is reached − ₹10,000\" and \"Payable now ₹1,08,000\".",
+   "status": "pass",
+   "observed": "\"Milestone — AHM/C/2026-27/00001 — Advance — with the order (10%)\" ₹1,00,000 + GST = ₹1,18,000; \"Less: retention 10% … − ₹10,000\"; \"Payable now ₹1,08,000\".",
+   "shot": "SAL-158-10.jpg"
+  },
+  {
+   "n": 11,
+   "do": "Issue it; open Receivables.",
+   "expect": "The invoice is aged for ₹1,08,000 only — the ₹10,000 retention is not due and not chased.",
+   "status": "pass",
+   "observed": "\"Invoice issued. It is now in the customer's ledger and in th\"; Receivables: \"TB Group Parent 1 ₹1,08,000 — — — — ₹1,08,000 —\" — aged for ₹1,08,000 only."
+  },
+  {
+   "n": 12,
+   "do": "[Coordinator] Try \"Undo\" on the billed advance.",
+   "expect": "No Undo offered (it is billed). On a reached milestone not yet invoiced, Undo with a reason sets it back to Planned and off the Due to bill list.",
+   "status": "pass",
+   "observed": "No Undo on the billed advance; \"Design / drawings approved\" reached (listed due: true), then Undo with a reason → \"Set back to planned — it is no longer due to bill.\" — back to Planned and off Due to bill."
+  },
+  {
+   "n": 13,
+   "do": "[Finance] On the open contract, \"Change the schedule\" → change shares → \"Request the amendment\" with a reason.",
+   "expect": "An amendment waits for two signatures; the current schedule stays until approved; reached milestones never change.",
+   "status": "pass",
+   "observed": "\"Request the amendment\" (3 planned rows editable) → \"Amendment requested. It needs two signatures — first Operation Manager, Business Unit Head, Admin (legacy), Bu\"; the current schedule stays until both signatures; the reached advance is unchanged (true)."
+  },
+  {
+   "n": 14,
+   "do": "[Coordinator] Mark \"After the warranty period\" reached; open Receivables.",
+   "expect": "The retention on the earlier invoices is now due and counted.",
+   "status": "pass",
+   "observed": "\"Marked reached. Finance sees it under Billing → Due to bill.\"; Receivables now counts the retention: \"TB Group Parent 1 ₹1,18,000 — — — — ₹1,18,000 —\"; contract: \"Held so far: ₹10,000 · still to collect: ₹10,000 · payable since 15 Nov 2026 Change the schedule\""
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-158-end.jpg",
+ "seconds": 25,
+ "ranAt": "2026-11-15T15:34:11.893Z"
+}

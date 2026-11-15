@@ -1,0 +1,159 @@
+{
+ "id": "SCR-crm-template-new",
+ "title": "Screen check — Add quote / e-mail template",
+ "area": "Sales",
+ "module": "Quote templates",
+ "persona": "MASTER_ADMIN",
+ "kind": "screen",
+ "status": "FAILED",
+ "steps": [
+  {
+   "n": 1,
+   "do": "Open the screen: Go to Sales → CRM — Sales reports → Add quote / e-mail template (or type /crm-template-new after the site address).",
+   "expect": "The page heading reads \"Add quote / e-mail template\"; the breadcrumb reads Home › Sales › CRM — Sales reports; the page loads in under 3 seconds with no error.",
+   "status": "pass",
+   "observed": "Opened without error in 85 ms; heading \"Add quote / e-mail template\"; breadcrumb Home › Sales › CRM — Sales reports › New.",
+   "shot": "SCR-crm-template-new-1.jpg"
+  },
+  {
+   "n": 2,
+   "do": "Read the line under the heading.",
+   "expect": "It says: \"Type these exactly (with the double braces) anywhere in your .docx — including the header/footer. For the line-item table, put the l_ tokens inside one table row; that row repeats for every line autom\" — and it is true for what you see.",
+   "status": "pass",
+   "observed": "The line reads as the test says. (Whether it is true for what you see is checked by the other steps.)"
+  },
+  {
+   "n": 3,
+   "do": "Form “Add template”: fill every field with valid values and press “Add template”.",
+   "expect": "Saved with a confirmation message; the saved values show exactly as typed when reopened.",
+   "status": "pass",
+   "observed": "Saved — \"Template added.\" (new: crm_templates); the values show as typed when reopened."
+  },
+  {
+   "n": 4,
+   "do": "Same form: press “Add template” with everything empty.",
+   "expect": "Refused with one clear sentence naming what is missing; no half-saved record.",
+   "status": "pass",
+   "observed": "Refused before sending — the browser points at the first missing box: \"Please fill out this field. — name\". Nothing was saved."
+  },
+  {
+   "n": 5,
+   "do": "Field \"Template name *\" (text · required) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. It is required: leaving it empty is refused with a message saying so. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Template added.\"); empty: refused by the form (\"Please fill out this field.\"); 300 characters: accepted (\"Template added.\"); special characters: accepted (\"Template added.\"); Hindi/Gujarati: accepted (\"Template added.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 6,
+   "do": "Field \"Kind\" (select) — try each choice in turn: Quotation document (.docx template), Email — quotation covering note, Email — follow-up reminder, Email — candidate credential request (4 choices).",
+   "expect": "Each choice saves and is still selected when the record is reopened.",
+   "status": "pass",
+   "observed": "Tried — \"Quotation document (.docx template)\": accepted (\"Template added.\"); \"Email — quotation covering note\": accepted (\"Template added.\"); \"Email — follow-up reminder\": accepted (\"Template added.\"); \"Email — candidate credential request\": accepted (\"Template added.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 7,
+   "do": "Field \"Default for this kind\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Template added.\"); unticked: accepted (\"Template added.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 8,
+   "do": "Field \"Active\" (checkbox) — try tick it, save; untick it, save.",
+   "expect": "The tick is remembered both ways.",
+   "status": "pass",
+   "observed": "Tried — ticked: accepted (\"Template added.\"); unticked: accepted (\"Template added.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 9,
+   "do": "Field \"Document number (from this format)\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Template added.\"); empty: accepted (\"Template added.\"); 300 characters: accepted (\"Template added.\"); special characters: accepted (\"Template added.\"); Hindi/Gujarati: accepted (\"Template added.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 10,
+   "do": "Field \"Format number\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Template added.\"); empty: accepted (\"Template added.\"); 300 characters: accepted (\"Template added.\"); special characters: accepted (\"Template added.\"); Hindi/Gujarati: accepted (\"Template added.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 11,
+   "do": "Field \"Format revision\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Template added.\"); empty: accepted (\"Template added.\"); 300 characters: accepted (\"Template added.\"); special characters: accepted (\"Template added.\"); Hindi/Gujarati: accepted (\"Template added.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 12,
+   "do": "Field \"Issue / effective date\" (date) — try today; then a past date (01-01-2019); then a far future date (31-12-2035); then leave it empty.",
+   "expect": "Dates save and show in your date format. Past and future dates are accepted only where they make sense. Where there is a matching end/\"to\" date, an end before the start is refused.",
+   "status": "pass",
+   "observed": "Tried — today: accepted (\"Template added.\"); 01-01-2019: accepted (\"Template added.\"); 31-12-2035: accepted (\"Template added.\"); empty: accepted (\"Template added.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 13,
+   "do": "Field \"Word format file (.docx)\" (file) — try one allowed file; then several at once; then a file that is too large; then a file type that should not be allowed (.exe).",
+   "expect": "Allowed files attach and are listed. Too-large and wrong-type files are refused with a message naming the limit.",
+   "status": "fail",
+   "observed": "too large (30 MB) was accepted. Tried — one allowed file: accepted (\"Template added.\"); several at once: the box takes one file at a time; too large (30 MB): accepted (\"Template added.\"); an .exe: refused — \"\"robot-sample.exe\" is a program file. Attach a document or a picture instead. Nothing else on the form was saved either \"",
+   "shot": "SCR-crm-template-new-13-fail.jpg"
+  },
+  {
+   "n": 14,
+   "do": "Field \"E-mail subject (for e-mail templates)\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Template added.\"); empty: accepted (\"Template added.\"); 300 characters: accepted (\"Template added.\"); special characters: accepted (\"Template added.\"); Hindi/Gujarati: accepted (\"Template added.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 15,
+   "do": "Field \"E-mail body\" (textarea) — try several lines with line breaks; then 3,000 characters; then leave it empty.",
+   "expect": "Line breaks are kept when the record is reopened and printed. Very long text is kept or refused with a message — never a blank page.",
+   "status": "pass",
+   "observed": "Tried — several lines: accepted (\"Template added.\"); 3,000 characters: accepted (\"Template added.\"); empty: accepted (\"Template added.\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 16,
+   "do": "Same form: press “Add template” twice quickly (double-click).",
+   "expect": "Saved once — never two records.",
+   "status": "pass",
+   "observed": "Pressed twice quickly: saved once (crm_templates +1)."
+  },
+  {
+   "n": 17,
+   "do": "Button / link \"← CRM — Sales reports\" — press it.",
+   "expect": "It opens the screen at /crm-dashboard; Back returns here.",
+   "status": "pass",
+   "observed": "Opened /crm-dashboard; Back returns here."
+  },
+  {
+   "n": 18,
+   "do": "Button / link \"Cancel\" — press it.",
+   "expect": "It opens the screen at /crm-templates; Back returns here.",
+   "status": "pass",
+   "observed": "Opened /crm-templates; Back returns here."
+  },
+  {
+   "n": 19,
+   "do": "Narrow the window to phone width (about 390 pixels) or open on a phone.",
+   "expect": "Readable and usable without the whole page scrolling sideways; buttons big enough to tap.",
+   "status": "pass",
+   "observed": "On a phone (390 px) the page does not scroll sideways; buttons are big enough to tap.",
+   "shot": "SCR-crm-template-new-19.jpg"
+  },
+  {
+   "n": 20,
+   "do": "Who may open it: sign in as each role (or ask your administrator) and open this screen.",
+   "expect": "Measured on a test copy today — opened for: Marketing Manager. Refused for: Asst. Manager, Branch Application Manager, Branch Manager, Business Development Manager, Business Director, Coordinator, Finance, Inspector, Key Accounts Manager, Marketing Executive, Operation Manager, Quality Head, Business Unit Head, Senior Inspector, Technical Head. Check this against what your business wants (docs/02-permission-matrix.md). Record any surprise.",
+   "status": "pass",
+   "observed": "Opened for: Marketing Manager. Refused for the others — as the test says."
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SCR-crm-template-new-end.jpg",
+ "seconds": 88,
+ "ranAt": "2026-11-15T15:43:06.709Z"
+}

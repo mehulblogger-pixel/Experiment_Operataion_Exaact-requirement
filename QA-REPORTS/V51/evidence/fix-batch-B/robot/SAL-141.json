@@ -1,0 +1,42 @@
+{
+ "id": "SAL-141",
+ "title": "Losing the connection or the session mid-form",
+ "area": "Sales",
+ "module": "Phone & working conditions",
+ "persona": "BUSINESS_DEV_MANAGER",
+ "kind": "edge",
+ "status": "NEEDS_YOU",
+ "steps": [
+  {
+   "n": 1,
+   "do": "Leave the form open longer than the sign-in timeout, then press Create quote.",
+   "expect": "You are asked to sign in; record whether the typing is kept.",
+   "status": "needs",
+   "observed": "Create quote after the timeout went to the sign-in page (\"You were away for more than 60 minutes, so you were signed out. Sign in again to carry on where you were.\"); nothing was saved (0 quotations). After signing in again the app opened /quote-new; the typing was KEPT — the form refilled itself.",
+   "shot": "SAL-141-1-needs.jpg",
+   "reason": "The test asks to record whether the typing is kept — there is no fixed answer.",
+   "proposed": "After signing in again the person should land back on the same form with everything they typed (the app already does this for a refused save — form_stash — but not across a timed-out session); until then, losing it should at least be warned about before the timeout.",
+   "rule": true
+  },
+  {
+   "n": 2,
+   "do": "Turn off the network, press Save, turn it back on.",
+   "expect": "The browser shows an error; pressing Save again saves ONE quotation.",
+   "status": "pass",
+   "observed": "Offline: the browser showed its own error (chrome-error page), nothing saved (0 new); back online, Save again → exactly one quotation (the browser had kept the typing).",
+   "shot": "SAL-141-2.jpg"
+  },
+  {
+   "n": 3,
+   "do": "Press the browser Back button after saving.",
+   "expect": "No second quotation is created.",
+   "status": "pass",
+   "observed": "After saving (/quote?id=1), Back went to /quote-new#quoteform=terms; still 1 quotations — none added."
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-141-end.jpg",
+ "seconds": 14,
+ "ranAt": "2026-11-15T16:00:19.770Z"
+}

@@ -1,0 +1,40 @@
+{
+ "id": "SAL-020",
+ "title": "Log a contact and the next step",
+ "area": "Sales",
+ "module": "Leads",
+ "persona": "MARKETING_EXECUTIVE",
+ "kind": "scenario",
+ "status": "PASSED",
+ "steps": [
+  {
+   "n": 1,
+   "do": "Contacts tab → \"＋ Log a contact\": How = Telephone call, Which way = We contacted them, When = today, Who you spoke to \"Ravi\", What was said \"Wants revised rate\", How it went \"Positive\", Time it took = 15 minutes, Next thing to do \"Send revised rate\", By when = tomorrow → \"Save this contact\".",
+   "expect": "You land back on the Contacts tab. The list shows it at the top: 📞 Telephone call · we contacted them · with Ravi · \"Positive\" · today · you; \"Wants revised rate\"; ⏱ 15 minutes · ➜ Next: Send revised rate — by tomorrow. The lead shows Next: Send revised rate by tomorrow (owner, 12 Nov 2026: every contact as a list, with its details).",
+   "status": "pass",
+   "observed": "\"Logged. The next step is on the lead.\" On the Contacts tab: \"📞 Telephone call ⭢ we contacted them with Ravi Positive 15 Nov 2026 · Test MktExec Wants revised rate ⏱ 15 minutes ➜ Next: Send revised rate — by 16 Nov 2026\". The lead shows Next: Send revised rate (16 Nov 2026).",
+   "shot": "SAL-020-1.jpg"
+  },
+  {
+   "n": 2,
+   "do": "Log a second contact (an e-mail, they contacted us, no next step).",
+   "expect": "It appears above the first; each keeps its own details. History → \"What's happened\" lists both, with the time taken and the next step.",
+   "status": "pass",
+   "observed": "The e-mail is above the call, each with its own details. History: \"15 Nov 2026 Telephone call ⭢ out Ravi Positive Wants revised rate ⏱ 15 minutes · ➜ Next: Send revised rate — by 16 Nov 2\" and \"15 Nov 2026 E-mail ⭠ in Ravi Asked us to email Sent drawings Test MktExec\"."
+  },
+  {
+   "n": 3,
+   "do": "Set By when to yesterday.",
+   "expect": "The lead shows as overdue on the Leads board and in \"Your next actions\" on the Sales home.",
+   "status": "pass",
+   "observed": "Board: \"1 lead need attention\"; Sales home \"Your next actions\" lists TB Contact Log Co (due 14 Nov 2026).",
+   "shot": "SAL-020-3.jpg",
+   "note": "The robot set \"By when\" to yesterday on the lead's details form (Actions → Edit the details)."
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-020-end.jpg",
+ "seconds": 8,
+ "ranAt": "2026-11-15T15:48:58.839Z"
+}

@@ -1,0 +1,53 @@
+{
+ "id": "SAL-044",
+ "title": "An enquiry belongs to the branch that recorded it",
+ "area": "Sales",
+ "module": "Inquiries",
+ "persona": "several",
+ "kind": "access",
+ "status": "OUT_OF_DATE",
+ "steps": [
+  {
+   "n": 1,
+   "do": "As Test KAM: Left menu → Sales → Inquiries (Financial year: All years).",
+   "expect": "The Ahmedabad enquiry is NOT listed.",
+   "status": "pass",
+   "observed": "INQ-00001 (Ahmedabad) is not listed; the Mumbai enquiry is."
+  },
+  {
+   "n": 2,
+   "do": "Type /inquiry-edit?id=<that enquiry> in the address bar.",
+   "expect": "Refused: \"This inquiry belongs to another branch.\"",
+   "status": "pass",
+   "observed": "Refused: \"This inquiry belongs to another branch.\""
+  },
+  {
+   "n": 3,
+   "do": "Start a quotation from it: /quote-new?inquiry=<id>.",
+   "expect": "The new quotation is NOT filled from that enquiry.",
+   "status": "pass",
+   "observed": "The new quotation is not filled from it (client \"empty\", subject \"\")."
+  },
+  {
+   "n": 4,
+   "do": "As Test Director.",
+   "expect": "Every branch's enquiries.",
+   "status": "pass",
+   "observed": "Test Director sees the Ahmedabad, Mumbai and no-branch enquiries."
+  },
+  {
+   "n": 5,
+   "do": "An older enquiry with no branch.",
+   "expect": "Every branch sees it, marked \"No branch — every branch sees it\".",
+   "status": "outdated",
+   "observed": "Every branch sees it (checked as Test KAM and Test MktExec); since the 12 Nov 2026 register change (Branch in its own column) it is marked \"All branches\" in the Branch column, not \"No branch — every branch sees it\". Row: INQ-OLD-01 2026-04-10 TB Legacy Client Old enquiry with no branch Open ⏳ 219d Nobody yet All branches Industrial Email Edit Quote",
+   "shot": "SAL-044-5-old.jpg",
+   "suggest": "Every branch sees it; its Branch column reads \"All branches\"."
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-044-end.jpg",
+ "seconds": 5,
+ "ranAt": "2026-11-15T16:08:28.870Z"
+}

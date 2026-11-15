@@ -1,0 +1,111 @@
+{
+ "id": "SAL-179",
+ "title": "One button per person — and it always says who the contract is waiting for",
+ "area": "Sales",
+ "module": "Contracts",
+ "persona": "several",
+ "kind": "scenario",
+ "status": "PASSED",
+ "steps": [
+  {
+   "n": 1,
+   "do": "As Test BranchMgr open the won quotation → Contract.",
+   "expect": "\"Contract waiting for approval.\" No main button. It reads \"Waiting for the first signature — <names>. Then the final approval — <names>.\" and, in bold, \"You give the final approval, after the first signature. (You can give the first signature instead — but then someone else must give the final approval.)\" with a quiet button \"Give the first signature instead\".",
+   "status": "pass",
+   "observed": "Panel: \"Give the first signature instead Reject Waiting for the first signature — Test BAM, Test BranchMgr, Test Director and 3 more. Then the final approval — Test BAM, Test BranchMgr, Test BranchMgr2. You give the final approval, after the first signature. (You can \" — buttons [Give the first signature instead, Reject], the first-signature one quiet (btn small secondary).",
+   "shot": "SAL-179-1.jpg",
+   "note": "A \"Reject\" button is also shown beside the quiet first-signature button."
+  },
+  {
+   "n": 2,
+   "do": "As Test Finance (signs nothing) open the same quotation.",
+   "expect": "No buttons at all — only who it is waiting for.",
+   "status": "pass",
+   "observed": "No buttons; only \"Waiting for the first signature — Test BAM, Test BranchMgr, Test Director and 3 more. Then the final approval — Test BAM, Test BranchMgr, Test BranchMgr2.\"."
+  },
+  {
+   "n": 3,
+   "do": "As Test OpsMgr → /contract-openings → \"Give the first signature\".",
+   "expect": "\"First signature given. Waiting for the final approval — <Branch Managers by name>.\"",
+   "status": "pass",
+   "observed": "\"First signature given. Waiting for the final approval — Test BAM, Test BranchMgr, Test BranchMgr2.\""
+  },
+  {
+   "n": 4,
+   "do": "As Test BranchMgr again.",
+   "expect": "One main button: \"Approve & open the contract\". Press it → contract OPEN.",
+   "status": "pass",
+   "observed": "One main button \"Approve & open the contract\" (plus Reject); pressed → \"Contract AHM/C/2026-27/00001 opened and floated to operations.\""
+  },
+  {
+   "n": 5,
+   "do": "New Pending contract. As Test BranchMgr press \"Give the first signature instead\".",
+   "expect": "\"First signature given. Waiting for the final approval — <the OTHER Branch Manager>\" — their own name is not in the list.",
+   "status": "pass",
+   "observed": "\"First signature given. Waiting for the final approval — Test BAM, Test BranchMgr2.\" — Test BranchMgr's own name is not in the list.",
+   "note": "The test speaks of \"the OTHER Branch Manager\"; the list also names Test BAM (Branch Application Manager), who may give the final approval under the standard rule."
+  },
+  {
+   "n": 6,
+   "do": "Still as Test BranchMgr look at it again.",
+   "expect": "No Approve button: \"You gave the first signature, so the final approval must come from someone else.\"",
+   "status": "pass",
+   "observed": "No Approve button; the panel says \"You gave the first signature, so the final approval must come from someone else.\""
+  },
+  {
+   "n": 7,
+   "do": "(Careful testers) Re-send an old \"approve\" form as Test BranchMgr.",
+   "expect": "Refused with the same sentence; the contract stays Pending.",
+   "status": "pass",
+   "observed": "Refused: \"You gave the first signature, so the final approval must come from someone else. First signature given. Waiting for the final approval — Test BAM, Test BranchMgr2.\"; the contract stays Pending."
+  },
+  {
+   "n": 8,
+   "do": "Admin → Approvals → Sales → Contract: \"may one person give both?\" = Yes → Save. Repeat the last two steps on a new contract.",
+   "expect": "After giving the first signature the same person is offered \"Approve & open the contract\", and it opens.",
+   "status": "pass",
+   "observed": "\"Saved — With two approvals, may one person give both? → Yes — one person may give both. It applies from now on.\" Then Test BranchMgr gave the first signature (\"Give the first signature\") and was offered \"Approve & open the contract\": \"Contract AHM/C/2026-27/00003 opened and floated to operations.\""
+  },
+  {
+   "n": 9,
+   "do": "Set the rule to \"One — a single approval\". Register a contract.",
+   "expect": "Message \"… waiting for approval. Waiting for approval — <names>.\" Test OpsMgr sees no button; Test BranchMgr sees \"Approve & open the contract\".",
+   "status": "pass",
+   "observed": "\"Saved — How many approvals does a new contract need before it opens? → One — a single approval. It applies from now on.\" Registering: \"Contract AHM/C/2026-27/00004 registered — it is waiting for approval. Waiting for approval — Test BAM, Test BranchMgr, Test BranchMgr2. The order goes to operations once it is open.\" Test OpsMgr: /contract-openings says \"You are not part of the contract-opening approval.\"; Test BranchMgr: \"Approve & open the contract\"."
+  },
+  {
+   "n": 10,
+   "do": "Set the rule to \"None\". Register a contract.",
+   "expect": "Message \"Contract … registered and open — your company asks for no approval to open a contract.\" The order goes to Operations at once.",
+   "status": "pass",
+   "observed": "\"Saved — How many approvals does a new contract need before it opens? → None — it opens as soon as it is registered. It applies from now on.\" Registering: \"Contract AHM/C/2026-27/00005 registered and open — your company asks for no approval to open a contract. The operations packet was logged (set up e-mail in Settings to send it).\" — open at once; Test Coord's dashboard shows it to raise the inspection call."
+  },
+  {
+   "n": 11,
+   "do": "With \"None\": change the value of that open contract (an amendment).",
+   "expect": "It still waits for one approval — \"It needs one approval, from …\" — because it rewrites a contract already in force.",
+   "status": "pass",
+   "observed": "\"Amendment requested — value ₹94,400 → ₹1,50,000. It needs one approval, from Branch Manager or Branch Application Manager; until then the contract keeps its current figures. | In force. Within its term and quantity. quantity 0 of 10 used\""
+  },
+  {
+   "n": 12,
+   "do": "Dashboard of each signer.",
+   "expect": "\"contracts to endorse\" / \"contracts to approve\" count exactly the contracts where that person has a main button — no more, no fewer.",
+   "status": "pass",
+   "observed": "Under the standard rule, with several contracts pending, each signer's dashboard \"contracts to endorse / to approve\" equals their main buttons on Contract openings: OPERATION_MANAGER 2/0 (buttons 2/0); BRANCH_MANAGER 0/1 (buttons 0/1); BRANCH_MANAGER2 0/2 (buttons 0/2); BRANCH_APP_MANAGER 0/2 (buttons 0/2); BUSINESS_DIRECTOR 2/0 (buttons 2/0); SBU_HEAD 2/0 (buttons 2/0).",
+   "note": "Checked after putting the two-signature rule back (with one person not allowed to give both), so both kinds of task exist."
+  },
+  {
+   "n": 13,
+   "do": "Put the rule back to the standard one.",
+   "expect": "As SAL-100.",
+   "status": "pass",
+   "observed": "Standard rule back (\"Today: two signatures — first Operation Manager, Business Unit Head, Admin (legacy), Business Director or anyone who man…\"); registering a contract again reads as in SAL-100: \"Contract AHM/C/2026-27/00008 registered — it is waiting for approval. Waiting for the first signature — Test BAM, Test BranchMgr, Test Direc…\"."
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-179-end.jpg",
+ "seconds": 65,
+ "ranAt": "2026-11-15T15:48:39.398Z"
+}

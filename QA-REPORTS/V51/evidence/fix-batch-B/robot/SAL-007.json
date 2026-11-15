@@ -1,0 +1,75 @@
+{
+ "id": "SAL-007",
+ "title": "Approval rules of 21 Oct: no levels = no approval; costing-based quotes approved once; levels at the same time",
+ "area": "Sales",
+ "module": "Before you start",
+ "persona": "several",
+ "kind": "scenario",
+ "status": "FAILED",
+ "steps": [
+  {
+   "n": 1,
+   "do": "Set up Sales → note your levels, then Remove every level. As Test BDM make a ₹1,00,000 quotation and press Submit for approval.",
+   "expect": "\"No approval is needed for this quote — your company has no approval levels. It is ready to send.\" Status Approved. Put your levels back afterwards (SAL-003).",
+   "status": "fail",
+   "observed": "All 3 levels removed. The ₹1,00,000 quotation Q-00001 offers no \"Submit for approval\" button: it stays DRAFT; its Actions bar reads \"Actions — move this quote: ✉ Send to client No approval needed — your company has no approval levels. Mark lost 🧮 Project costing: ＋ Create costing for this quotation Pre-order review 5/5 done Enquir\" (a \"Send to client\" button straight from the draft). The message \"No approval is needed for this quote — your company has no approval levels. It is ready to send.\" and the Approved status never appear.",
+   "shot": "SAL-007-1-fail.jpg"
+  },
+  {
+   "n": 2,
+   "do": "With the levels back: make a project costing from an enquiry (SAL-050), get it approved (SAL-051), \"Make a quotation\" from it, change nothing, Submit for approval.",
+   "expect": "\"No approval is needed … it is at the prices of its approved project costing, which the approval levels already signed.\" Status Approved — no second round.",
+   "status": "fail",
+   "observed": "Costing approved by Test BranchMgr and Test MktMgr; \"Create quotation\" made Q-00002. It offers no \"Submit for approval\": it stays DRAFT; its Actions bar reads \"Actions — move this quote: ✉ Send to client No approval needed — it is at the prices of its approved project costing, which the approval levels already signed. Mark lost 🧮 Project costing: AHM/PC/2026-27/11/0001 Rev 00 \" (a \"Send to client\" button straight from the draft). The expected message and the Approved status never appear.",
+   "shot": "SAL-007-2-fail.jpg"
+  },
+  {
+   "n": 3,
+   "do": "Make another quotation from the same costing; as its creator change one rate, with the note the screen asks for; Submit.",
+   "expect": "It is approved (step 2), so it is changed through Edit → \"Create revision\" (owner, 15 Nov 2026, F19). The new revision has its own costing revision, which is approved first; then it goes to the approval levels like any quotation (the price is no longer the costing's).",
+   "status": "needs",
+   "observed": "On the first quotation (the costing no longer offers \"Create quotation\" once one is made from it): changing a rate first asked \"This quote was priced from costing AHM/PC/2026-27/11/0001 Rev 00. Say why its prices now differ, in \"Why the prices diff…\"; with the note it saved, and Submit sent it to the levels: \"Submitted for approval — 2 step(s). Now with Test BranchMgr (Branch Manager); then, last, level 2: Test MktMgr (Marketing Manager).\" (levels 1, 2).",
+   "shot": "SAL-007-3-needs.jpg",
+   "reason": "The costing page stops offering \"Create quotation\" once one quotation has been made from it, so \"another quotation from the same costing\" cannot be made; the rate change was tested on the first one.",
+   "proposed": "One approved costing prices one quotation. A price change is made on that quotation by its creator, with the note asked for, and it then goes to the approval levels like any quotation — as observed.",
+   "rule": true
+  },
+  {
+   "n": 4,
+   "do": "Set up Sales → \"When a quote needs more than one level, how do the levels approve?\" → \"At the same time — every level but the top one at once; the top one last\" → Save these answers.",
+   "expect": "Saved. The escalation question now notes it is used only one after another.",
+   "status": "pass",
+   "observed": "\"Saved. 1 answer changed — it applies from now on.\"; the escalation question notes \"(One after another only — at the same time, the levels are all asked already.)\""
+  },
+  {
+   "n": 5,
+   "do": "As Test BDM submit a ₹6,00,000 quotation with three levels, the top one a Business Director. Sign in as Test MktMgr (level 2) → Approvals.",
+   "expect": "It is listed straight away — level 2 does not wait for level 1 (unless one reports to the other). The quotation reads \"Now with level 1: …; level 2: … (at the same time); then, last, level 3: <Business Director>\". (From 14 Nov 2026 top management always signs last — SAL-192.)",
+   "status": "outdated",
+   "observed": "With the SAL-003 levels a ₹6,00,000 quotation has only two levels — ₹6,00,000 (Q-00003): 2 levels (BRANCH_MANAGER, MARKETING_MANAGER); \"Submitted for approval — 2 step(s). Now with Test BranchMgr (Branch Manager); then, last, level 2: Test MktMgr (Marketing Manager).\"; on Test MktMgr's Approvals straight away: no (its top level, the Marketing Manager, now signs last, owner 14 Nov 2026). With three levels (₹30,00,000, Q-00004) it reads \"Submitted for approval — 3 step(s). Now with level 1: Test BranchMgr (Branch Manager); level 2: Test MktMgr (Marketing Manager) (at the same time); then, last, ",
+   "shot": "SAL-007-5-old.jpg",
+   "suggest": "As Test BDM submit a ₹30,00,000 quotation (three levels, the top one a Business Director). Sign in as Test MktMgr (level 2) → Approvals. Expect: listed straight away; the quotation reads \"Now with level 1: …; level 2: … (at the same time); then, last, level 3: Test Director\"."
+  },
+  {
+   "n": 6,
+   "do": "Test MktMgr and Test BranchMgr approve, then the Business Director.",
+   "expect": "After the second signature: \"All approvals complete — quote approved and ready to send.\"",
+   "status": "pass",
+   "observed": "MktMgr: \"Your approval is recorded. Now with Test BranchMgr (Branch Manager); then, last, level 3: Test Director (Business Director).\"; BranchMgr: \"Your approval is recorded. Now with Test Director (Business Director).\"; Director (last): \"All approvals complete — quote approved and ready to send.\" — Approved.",
+   "shot": "SAL-007-6.jpg",
+   "note": "With three levels the \"All approvals complete\" message comes after the third signature (the Director's), not the second."
+  },
+  {
+   "n": 7,
+   "do": "Switch the answer back to \"One after another\" and Save.",
+   "expect": "Level 2 is again asked only after level 1 has signed.",
+   "status": "pass",
+   "observed": "Saved (\"Saved. 1 answer changed — it applies from now on.\"). Q-00005 (₹10,00,000): not on Test MktMgr's Approvals until Test BranchMgr signed level 1, then listed."
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-007-end.jpg",
+ "seconds": 31,
+ "ranAt": "2026-11-15T15:38:17.716Z"
+}

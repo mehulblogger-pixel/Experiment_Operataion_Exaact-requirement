@@ -1,0 +1,61 @@
+{
+ "id": "SAL-019",
+ "title": "Lead documents: attach, list, remove",
+ "area": "Sales",
+ "module": "Leads",
+ "persona": "MARKETING_EXECUTIVE",
+ "kind": "scenario",
+ "status": "PASSED",
+ "steps": [
+  {
+   "n": 1,
+   "do": "Documents tab → File(s): pick an RFQ PDF, What is it? \"Requirement / RFQ\", Note \"Rev B\" → \"Attach\".",
+   "expect": "The file is listed with kind, note and date.",
+   "status": "pass",
+   "observed": "\"1 file(s) attached.\" Listed: 📄 RFQ-TB-Cement.pdf Requirement / RFQ from the customer Rev B 15 Nov 2026 Test MktExec ✕",
+   "shot": "SAL-019-1.jpg"
+  },
+  {
+   "n": 2,
+   "do": "Attach several files at once.",
+   "expect": "All are listed.",
+   "status": "pass",
+   "observed": "\"3 file(s) attached.\" All three listed."
+  },
+  {
+   "n": 3,
+   "do": "Attach a 10 MB file (the limit is 8 MB per file).",
+   "expect": "Refused with a message naming the 8 MB limit; nothing half-saved.",
+   "status": "pass",
+   "observed": "Refused: \"3 file(s) attached. | Nothing has been saved — File(s) still needs filling in. | That file is too large (10.0 MB) — the limit is 8 MB. Choose a smaller file or compress it.\"; nothing saved.",
+   "shot": "SAL-019-3.jpg"
+  },
+  {
+   "n": 4,
+   "do": "Attach a .exe file.",
+   "expect": "It should be refused as a file type not allowed — record what happens.",
+   "status": "pass",
+   "observed": "Refused: \"\"setup.exe\" is a program file. Attach a document or a picture instead. Nothing else on the form was saved either — please attach a different file and submit again.\""
+  },
+  {
+   "n": 5,
+   "do": "Make a quotation from this lead (\"+ Make a quotation\") and save it.",
+   "expect": "The quotation's History says \"N file(s) carried over from the lead\" and the files are on the quotation.",
+   "status": "pass",
+   "observed": "Q-00001 History: \"4 file(s) carried over from the lead\"; 4 files are on the quotation.",
+   "shot": "SAL-019-5.jpg"
+  },
+  {
+   "n": 6,
+   "do": "Back on the lead, press ✕ on a file.",
+   "expect": "The file is removed after confirmation.",
+   "status": "pass",
+   "observed": "Asked \"Remove this file?\", then \"Attachment removed.\"; BOQ.csv is gone."
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-019-end.jpg",
+ "seconds": 11,
+ "ranAt": "2026-11-15T15:47:33.903Z"
+}

@@ -1,0 +1,61 @@
+{
+ "id": "SAL-120",
+ "title": "Every dashboard figure matches the register it comes from",
+ "area": "Sales",
+ "module": "Sales dashboard",
+ "persona": "MARKETING_MANAGER",
+ "kind": "scenario",
+ "status": "FAILED",
+ "steps": [
+  {
+   "n": 1,
+   "do": "Left menu → Insights → Sales dashboard → period 90 days.",
+   "expect": "Sections: The funnel · From first contact to won · Deals that have stopped moving · Why we lose · Who is selling · Effort behind it.",
+   "status": "pass",
+   "observed": "Sales dashboard, 90 days: The funnel · From first contact to won · Deals that have stopped moving · Why we lose · Who is selling · Effort behind it.",
+   "shot": "SAL-120-1.jpg"
+  },
+  {
+   "n": 2,
+   "do": "Count of open deals in \"Who is selling\" vs Sales → Opportunities (List, same period).",
+   "expect": "Equal.",
+   "status": "pass",
+   "observed": "\"Who is selling\" open deals: Test BDM 2, Test KAM 1, Test MktExec 1 = 4; Opportunities → List shows 4 open deals."
+  },
+  {
+   "n": 3,
+   "do": "\"Why we lose\" reasons vs lost deals in Opportunities → \"Why deals were lost — last 12 months\" (choose 12 months).",
+   "expect": "Equal counts and values.",
+   "status": "fail",
+   "observed": "dashboard (12 months): Price too high 2 0 ₹1,80,000 | Awarded to a competitor 1 0 ₹80,000 vs Opportunities: Price too high 2 ₹1,80,000 | Awarded to a competitor 1 ₹80,000",
+   "shot": "SAL-120-3-fail.jpg"
+  },
+  {
+   "n": 4,
+   "do": "\"Deals that have stopped moving\" vs the board (days beyond the stage's Days allowed).",
+   "expect": "Same deals.",
+   "status": "pass",
+   "observed": "Same deals: D-R3B, D-R3D — both past their stage's days, and the board marks both with their days."
+  },
+  {
+   "n": 5,
+   "do": "\"⬇ Funnel CSV\".",
+   "expect": "The file matches the screen.",
+   "status": "pass",
+   "observed": "The CSV (/crm-dashboard?days=90&export=csv) has one row per stage and its \"deals here now\" equal the screen: Enquiry received 1, Scope agreed 1, Quotation sent 1, Rate negotiation 1, PO / work order 0, Won 0, Lost 0."
+  },
+  {
+   "n": 6,
+   "do": "Switch 30 days / 12 months / 2 years.",
+   "expect": "Figures change consistently; nothing negative.",
+   "status": "pass",
+   "observed": "30 days: entered 1, conversions 0/0/0% | 12 months: entered 9, conversions 22/56/80/75/67/100/33% | 2 years: entered 9, conversions 22/56/80/75/67/100/33%",
+   "shot": "SAL-120-6.jpg"
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-120-end.jpg",
+ "seconds": 6,
+ "ranAt": "2026-11-15T15:48:50.683Z"
+}

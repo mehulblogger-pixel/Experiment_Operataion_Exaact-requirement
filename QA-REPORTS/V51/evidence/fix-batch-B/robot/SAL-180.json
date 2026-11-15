@@ -1,0 +1,203 @@
+{
+ "id": "SAL-180",
+ "title": "Journey 1 — Lead → quotation → accepted → contract number (no deal)",
+ "area": "Sales",
+ "module": "Sales flow",
+ "persona": "several",
+ "kind": "flow",
+ "status": "FAILED",
+ "steps": [
+  {
+   "n": 1,
+   "do": "[Marketing Executive] Left menu → Sales → Leads → \"+ New lead\": Company \"Flow One Fabricators\", Contact, Phone, What they want, Value 6,00,000 → \"Create it\".",
+   "expect": "Lead page. \"Lead L-… created.\" Three steps across the top: 1 Talk to them · 2 Send a quote · 3 Their answer. One main button: \"📞 Log your first contact\".",
+   "status": "pass",
+   "observed": "\"Lead L-2026-0001 created.\"; steps 1 Talk to them · 2 Send a quote · 3 Their answer; main button \"📞 Log your first contact\".",
+   "shot": "SAL-180-1.jpg"
+  },
+  {
+   "n": 2,
+   "do": "[Marketing Executive] \"📞 Log your first contact\" → fill \"With whom\" and a note → \"Save this contact\".",
+   "expect": "Step 1 is ticked. The main button is now \"Make the quote →\".",
+   "status": "pass",
+   "observed": "Step 1 ticked (✓ Talk to them); the main button is now \"Make the quote →\"."
+  },
+  {
+   "n": 3,
+   "do": "[Marketing Executive] \"Make the quote →\".",
+   "expect": "New quote form with the customer, contact and subject already filled from the lead. Six parts: Client & header · Offices · Sites · Commercials · Line items · Terms.",
+   "status": "pass",
+   "observed": "New quote form: customer \"Flow One Fabricators\", contact \"Ravi Shah\", subject \"Inspection of pressure vessels\"; parts: Client & header · Offices · Sites · Commercials · Line items · Terms."
+  },
+  {
+   "n": 4,
+   "do": "[Marketing Executive] Line items: \"Inspection of pressure vessels\", 60 Man-day × ₹10,000 → save.",
+   "expect": "\"Q-… created. It is saved on the lead too — Back takes you to the lead.\" Trail: Home › Sales › Leads › L-… · Flow One Fabricators › Quote. Totals ₹6,00,000 + GST ₹1,08,000 = ₹7,08,000.",
+   "status": "pass",
+   "observed": "\"Q-00001 created. It is saved on the lead too — Back takes you to the lead.\"; trail Home › Sales › Leads › L-2026-0001 · Flow One Fabricators › Quote; ₹6,00,000 + GST ₹1,08,000 = ₹7,08,000.",
+   "shot": "SAL-180-4.jpg"
+  },
+  {
+   "n": 5,
+   "do": "[Marketing Executive] \"Submit for approval\".",
+   "expect": "\"Submitted for approval — 1 step(s). Now with <Marketing Manager's name> (Marketing Manager).\" The top line reads \"Waiting for approval — with …\".",
+   "status": "pass",
+   "observed": "\"Submitted for approval — 1 step(s). Now with Test MktMgr (Marketing Manager).\"; top line \"Waiting for approval — with Test MktMgr (Marketing Manager).\""
+  },
+  {
+   "n": 6,
+   "do": "[Marketing Manager] Dashboard → \"quotes to approve\" → Quote register \"Awaiting your approval\" → open Q-… → \"Approve\".",
+   "expect": "\"All approvals complete — quote approved and ready to send.\"",
+   "status": "pass",
+   "observed": "Dashboard → quotes to approve → straight to the quotation (only one is waiting, so the register is skipped) → Q-00001 → (checklist ticked) Approve → \"All approvals complete — quote approved and ready to send.\""
+  },
+  {
+   "n": 7,
+   "do": "[Marketing Executive] Open the lead.",
+   "expect": "\"Your quote Q-… is approved — ready to send to them.\" with \"Open quote Q-… →\".",
+   "status": "pass",
+   "observed": "\"Your quote Q-00001 is approved — ready to send to them.\" with \"Open quote Q-00001 →\"."
+  },
+  {
+   "n": 8,
+   "do": "[Marketing Executive] Open the quotation.",
+   "expect": "The top line says she sends it: \"Approved and ready to go out. Next: send it to the client. Test MktExec (prepared it) sends it. The people they report to may send it if it is still unsent 24 hours after its approval — from <date, time>.\" The \"✉ Send to client\" button is there (owner, 15 Nov 2026, F1: the preparer sends). The strip at the top shows LEAD L-… and QUOTATION Q-….",
+   "status": "fail",
+   "observed": "top line: \"Approved and ready to go out. Test BDM, Test KAM or Test MktMgr sends it to the client — sending is not yours to do. Tell them it is ready. Actions — move this quote: Mark lost Revise (new rev) 🧮 Project costing: ＋ Create costing for this quotation Pre-order \"",
+   "shot": "SAL-180-8-fail.jpg"
+  },
+  {
+   "n": 9,
+   "do": "[Branch Manager, whom she reports to] Open the quotation. Then [Marketing Executive] \"✉ Send to client\".",
+   "expect": "Test BranchMgr, straight after approval: no Send button — \"Test MktExec sends it first. If it is still unsent 24 hours after its approval (from …), you may send it.\" Test MktExec sends it: \"Marked sent and follow-ups scheduled…\". Top line: \"Sent to the client on <date>. Waiting for their answer — mark it accepted, or lost.\" The page shows \"🔒 Locked … raise a revision\".",
+   "status": "fail",
+   "observed": "Test BranchMgr (whom the executive reports to), straight after approval: \"\"",
+   "shot": "SAL-180-9-fail.jpg",
+   "note": "Step 9 failed, so the robot then sent Q-00001 as the administrator (sent) to check steps 10–17 independently."
+  },
+  {
+   "n": 10,
+   "do": "[Marketing Executive — the person the quotation is assigned to] \"Mark accepted (won)\".",
+   "expect": "\"quote marked accepted. Flow One Fabricators is now linked to the client master…\". Top line: \"Accepted 🎉 — they said yes. With Accounts (<names>) to register the contract number. Nothing more for you to do here.\" (Fixed 13 Nov 2026 — it used to tell Sales \"Next: register the contract number\".)",
+   "status": "pass",
+   "observed": "\"quote marked accepted. Flow One Fabricators has been created in the client master. Its lin…\"; top line \"Accepted 🎉 — they said yes. With Accounts (Test Finance) to register the contract number. Nothing more for you to do here.\"",
+   "note": "The message says \"Flow One Fabricators has been created in the client master…\" (it was not on the master before) rather than \"is now linked to\"."
+  },
+  {
+   "n": 11,
+   "do": "[Marketing Executive] Open the lead.",
+   "expect": "\"🎉 Won — Flow One Fabricators is now a customer.\" It closed by itself — nothing was pressed on the lead.",
+   "status": "pass",
+   "observed": "\"🎉 Won — Flow One Fabricators is now a customer.\" — the lead closed by itself (CONVERTED)."
+  },
+  {
+   "n": 12,
+   "do": "[Finance] Dashboard → \"contracts to register\" → open Q-….",
+   "expect": "An amber box: \"⚠ Contract number is yet to be created — This is yours to do\" with ONE button: \"✓ Register the contract — next number\". The playbook lower down no longer repeats a \"Register contract\" button.",
+   "status": "pass",
+   "observed": "Amber box \"⚠ Contract number is yet to be created — This is yours to do\" with one \"✓ Register the contract — next number\"; the playbook has no Register button.",
+   "shot": "SAL-180-12.jpg"
+  },
+  {
+   "n": 13,
+   "do": "[Finance] \"✓ Register the contract — next number\".",
+   "expect": "One press. The number is generated (e.g. AHM/C/2026-27/00001). \"Contract … registered — it is waiting for approval. Waiting for the first signature — <names>. Then the final approval — <names>. The order goes to operations once it is open.\" Top line: \"Accepted 🎉 — contract … is waiting for approval.\"",
+   "status": "pass",
+   "observed": "Number AHM/C/2026-27/00001 generated in one press: \"Contract AHM/C/2026-27/00001 registered — it is waiting for approval. Waiting for the first signature — Test BAM, Test BranchMgr, Test Director and 3 more. Then the final approval — Test BAM, Test BranchMgr, Test BranchMgr2. The order goes to operations once it is open.\""
+  },
+  {
+   "n": 14,
+   "do": "[Operation Manager] Dashboard → \"contracts to endorse\" → Contract openings → on that row \"Give the first signature\".",
+   "expect": "Stays on Contract openings. \"First signature given. Waiting for the final approval — <Branch Managers by name>.\"",
+   "status": "pass",
+   "observed": "Stayed on Contract openings: \"First signature given. Waiting for the final approval — Test BAM, Test BranchMgr, Test BranchMgr2.\""
+  },
+  {
+   "n": 15,
+   "do": "[Branch Manager] Dashboard → \"contracts to approve\" → on that row \"Approve & open the contract\".",
+   "expect": "Stays on Contract openings. \"Contract … opened and floated to operations.\"",
+   "status": "pass",
+   "observed": "Stayed on Contract openings: \"Contract AHM/C/2026-27/00001 opened and floated to operations.\""
+  },
+  {
+   "n": 16,
+   "do": "[Coordinator] Dashboard.",
+   "expect": "A task \"contract opened — raise the work order\" — one contract: it opens the work-order form filled in from it. \"Raise a work order\" lists it under \"Newly opened — no work order raised yet\" until its first work order is raised. (New 13 Nov 2026.)",
+   "status": "pass",
+   "observed": "Task \"1 contract opened — raise the inspection call\" opens the order form filled in from AHM/C/2026-27/00001 (Flow One Fabricators); /raise-call lists it under \"Newly opened — no inspection call raised yet\".",
+   "note": "Wording: in the Inspection profile a work order is called an \"inspection call\", so the task reads \"contract opened — raise the inspection call\"."
+  },
+  {
+   "n": 17,
+   "do": "[Marketing Executive] Open the quotation.",
+   "expect": "Top line: \"Accepted 🎉 — they said yes. Contract open — raise … from it whenever the work comes in.\" Contract panel: the number, \"Open / in force\", who asked, first signature, final approval.",
+   "status": "pass",
+   "observed": "Top line \"Accepted 🎉 — they said yes. Contract open — raise … from it whenever the work comes in.\"; contract panel: AHM/C/2026-27/00001, Open / in force, asked by Test Finance, first signature Test OpsMgr, final approval Test BranchMgr.",
+   "note": "Wording slip: the top line reads \"raise inspection inspection calls\" (the word is doubled)."
+  },
+  {
+   "n": 18,
+   "do": "EDGE · [Marketing Manager] Reject instead of approving, with a comment.",
+   "expect": "The quotation is \"Sent back by …\"; the preparer corrects it and presses \"↻ Submit for approval again\". Rejecting without a comment is refused.",
+   "status": "pass",
+   "observed": "No comment → refused (\"Enter a comment saying why you are rejecting it.\"); with \"Rate below floor\" → \"Rejected. The quote now shows as rejected by you, with your \"; the preparer sees \"Sent back by Test MktMgr.\" and \"↻ Submit for approval again\"."
+  },
+  {
+   "n": 19,
+   "do": "EDGE · [Finance] Open the quotation BEFORE it is accepted.",
+   "expect": "No registration is offered anywhere: the step reads \"Register the contract number — Comes after it is accepted.\" and has no button. (Before 13 Nov 2026 a draft showed a \"Register contract\" button that led nowhere.)",
+   "status": "pass",
+   "observed": "\"Register the contract number — Comes after it is accepted.\" and no Register button."
+  },
+  {
+   "n": 20,
+   "do": "EDGE · [Finance] The client already has another contract.",
+   "expect": "The amber box shows \"See the registration panel\" instead of the one-press button — the panel lists the client's contracts so a second one is not added by mistake.",
+   "status": "pass",
+   "observed": "No one-press button; the amber box links \"Register it now\" to the registration panel, which lists the client's contract AHM/C/2026-27/00001.",
+   "note": "For Finance the amber box's link reads \"Register it now\" (it is \"See the registration panel\" for people who may not register) — it opens the panel, which lists AHM/C/2026-27/00001.",
+   "suggest": "The amber box shows \"Register it now\" (to the registration panel) instead of the one-press button; the panel lists the client's contracts."
+  },
+  {
+   "n": 21,
+   "do": "EDGE · [Operation Manager] Try to open the quotation itself.",
+   "expect": "\"Sales & CRM — restricted\" — an Operation Manager signs from Contract openings and does not need the quotation.",
+   "status": "pass",
+   "observed": "\"Sales & CRM — restricted You don’t have permission to open CRM — Quotations. Ask your work\""
+  },
+  {
+   "n": 22,
+   "do": "EDGE · [Branch Manager] Open Contract openings BEFORE the first signature.",
+   "expect": "No main button on that row: \"Waiting for the first signature — …\" and \"You give the final approval, after the first signature.\" (SAL-179).",
+   "status": "pass",
+   "observed": "Row AHM/C/2026-27/00002: no main button; \"Waiting for the first signature — forward to (optional) — · coordinator · asst manager · branch app manager · branch manager · business director · operation man…\""
+  },
+  {
+   "n": 23,
+   "do": "EDGE · The customer says no.",
+   "expect": "\"Mark lost\" on the quotation, with a reason → the quotation closes as lost.",
+   "status": "pass",
+   "observed": "\"Mark lost\" with a reason → LOST (PRICE_HIGH): \"Quotation moved to Lost / regretted.\""
+  },
+  {
+   "n": 24,
+   "do": "EDGE · The company's contract rule is \"One approval\" or \"None\".",
+   "expect": "One: only the final approval is asked. None: the contract is open the moment Accounts registers it (SAL-178, SAL-179).",
+   "status": "pass",
+   "observed": "One approval: the Operation Manager is asked nothing ((not listed)), the Branch Manager's single Approve opens it; None: the contract is OPEN the moment it is registered."
+  },
+  {
+   "n": 25,
+   "do": "EDGE · The price must change after it was sent.",
+   "expect": "\"Raise a revision\" — same quote number, next revision, approved and sent again; its costing stays linked (SAL-177).",
+   "status": "pass",
+   "observed": "Revision Q-00009 Rev 01 (same number) raised from the sent quotation, approved by Test MktMgr and sent again.",
+   "note": "The costing part (\"its costing stays linked\", SAL-177) was not exercised here — this man-day quotation has no costing."
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-180-end.jpg",
+ "seconds": 87,
+ "ranAt": "2026-11-15T15:36:01.290Z"
+}

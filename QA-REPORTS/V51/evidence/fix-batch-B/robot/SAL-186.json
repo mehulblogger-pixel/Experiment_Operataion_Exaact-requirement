@@ -1,0 +1,101 @@
+{
+ "id": "SAL-186",
+ "title": "A costing is locked from the moment its quotation goes for approval; a revision gets its own editable copy when the figures must change",
+ "area": "Sales",
+ "module": "Project costing",
+ "persona": "BUSINESS_DEV_MANAGER",
+ "kind": "scenario",
+ "status": "OUT_OF_DATE",
+ "steps": [
+  {
+   "n": 1,
+   "do": "Open the costing while its quotation is still a Draft.",
+   "expect": "\"Reopen as draft\" is offered — nobody has priced from it yet.",
+   "status": "outdated",
+   "observed": "While Q-00001 is still a draft, \"Reopen as draft\" is offered — but only to Test MktMgr, who gave the highest approval. Test BDM, who prepared it, is not offered it: \"🔒 Only Test MktMgr, who gave the highest approval, may reopen an approved costing — or, when they are away, the person they delegated their approvals to, or someone above them.\" (SAL-188, 14 Nov 2026).",
+   "suggest": "[The last approver] Open the costing while its quotation is still a Draft → \"Reopen as draft\" is offered — nobody has priced from it yet. (The preparer is not offered it — SAL-188.)",
+   "shot": "SAL-186-1-old.jpg"
+  },
+  {
+   "n": 2,
+   "do": "Submit the quotation for approval → open the costing.",
+   "expect": "No \"Reopen as draft\". The band reads \"🔒 This costing is Approved and read-only. Q-… has gone for approval. The costing is the record of how that price was worked out, so it is locked. To change the figures, raise a revision of the quote — the revision gets its own copy of this costing, to edit and approve.\"",
+   "status": "pass",
+   "observed": "Quotation submitted (\"Submitted for approval — 2 step(s). Now with Test BranchMgr (Branch Manager); then, last, level 2: Test MktMgr (Marketing Manager).\"). On the costing: no \"Reopen as draft\"; the band reads \"🔒 This costing is Approved and read-only. Approved by Test MktMgr. Q-00001 has gone for approval. The costing is the record of how that price was worked out, so it is locked. To change the figures, raise a revision of the quote — the revision gets its own copy of this costing, to edit and approve.\"",
+   "note": "A quotation at exactly its approved costing's prices needs no approval (it reads \"No approval needed — your approval rules do not cover this value\" and offers \"✉ Send to client\" directly), so to send it for approval a lump-sum \"Travel and lodging\" line was added with the price note.",
+   "suggest": "Add: \"(A quotation at exactly its costing's prices needs no approval and goes straight to Send — the lock then starts at Send.)\"",
+   "shot": "SAL-186-2.jpg"
+  },
+  {
+   "n": 3,
+   "do": "[Marketing Manager] approve the quotation → [BDM] open the costing. (The owner's case.)",
+   "expect": "Still no \"Reopen as draft\": \"… has been approved. …\". The same after \"Send\", \"won\" and a contract.",
+   "status": "pass",
+   "observed": "Still no \"Reopen as draft\", even for the last approver — approved: \"… has been approved. …\"; sent: \"… has gone to the client (sent …)\"; won: \"… has been won — the client accepted it.\"; contract: \"Q-00002 has a contract (AHM/C/2026-27/00001).\"."
+  },
+  {
+   "n": 4,
+   "do": "On the quotation press \"Revise (new rev)\" → type why (\"Client asked for two more engineers\") → \"Create revision\". (From 14 Nov 2026 the copy is made by itself — SAL-190.)",
+   "expect": "\"Created revision 01 … Its costing <number> Rev 01 was made from <number> Rev 00 as a draft — change the figures there and submit it for approval.\"",
+   "status": "pass",
+   "observed": "Message: \"Created revision 01 with 2 line(s) and 0 site(s) carried over. Edit it below. Its costing AHM/PC/2026-27/11/0001 Rev 01 was made from AHM/PC/2026-27/11/0001 Rev 00 as a draft — change it in the Costing tab here, then submit it for approval.\"",
+   "note": "The message ends \"— change it in the Costing tab here, then submit it for approval.\" (SAL-195: the revision's costing is changed in its Costing tab) instead of \"— change the figures there and submit it for approval.\"",
+   "suggest": "\"… Its costing <number> Rev 01 was made from <number> Rev 00 as a draft — change it in the Costing tab here, then submit it for approval.\""
+  },
+  {
+   "n": 5,
+   "do": "Open the revision's costing (from its Costing card).",
+   "expect": "A Draft with every role and setting copied, the same number ending \"Rev 01\", and \"Revisions: Rev 00 (approved) · Rev 01 (this one, draft)\". Add a role or change a head — it saves.",
+   "status": "pass",
+   "observed": "Opened AHM/PC/2026-27/11/0001 Rev 01 (Draft) from the Costing card: every role and setting copied; \"Revisions: Rev 00 (approved) · Rev 01 (this one, draft)\"; a new role \"Additional Engineer\" saved.",
+   "shot": "SAL-186-5.jpg"
+  },
+  {
+   "n": 6,
+   "do": "Open the original costing (Rev 00).",
+   "expect": "Unchanged and still locked — it is the record of the price that went out. Its history: \"Copied to … Rev 01 for Q-… revision 1 by <you>\". The new one's history: \"Costing … Rev 01 copied from … Rev 00 by <you> …\".",
+   "status": "pass",
+   "observed": "Rev 00 unchanged (1 role) and read-only; its history: \"Copied to … Rev 01 for Q-00001 revision 1 by Test BDM\"; Rev 01's: \"Costing AHM/PC/2026-27/11/0001 Rev 01 copied from AHM/PC/2026-27/11/0001 Rev 00 by Test BDM …\"."
+  },
+  {
+   "n": 7,
+   "do": "Submit the new costing for approval; once approved, submit the revision.",
+   "expect": "A man-month revision goes forward once its own copy is approved — before that it is refused: \"… Costing … Rev 01 is linked, but it is still a draft …\". When the revision goes for approval, its copy locks in turn.",
+   "status": "pass",
+   "observed": "Before Rev 01 was approved the revision could not go forward (no Submit button; in its place \"⚠ Not ready to submit: A man-month quote goes forward only once its project costing is approved. Costing AHM/PC/2026-27/11/0001 Rev 01 is linked, but it is stil\") — forced: \"A man-month quote goes forward only once its project costing is approved. Costing AHM/PC/2026-27/11/0001 Rev 01 is linked, but it is still a draft — open it, fill in the cost heads and press \"Submit f\". Once Rev 01 was approved it went for approval (\"Submitted for approval — 2 step(s). Now with Test BranchMgr (Branch Manager); the"
+  },
+  {
+   "n": 8,
+   "do": "NEGATIVE · Press \"Change the costing for this revision\" (if an old page still shows it).",
+   "expect": "Refused: its costing is already editable — open it. No second copy.",
+   "status": "pass",
+   "observed": "Pressing \"Change the costing for this revision\" on a revision that already has its own draft copy is refused: \"Its costing AHM/PC/2026-27/11/0003 Rev 01 is already editable — open it.\" — no second copy."
+  },
+  {
+   "n": 9,
+   "do": "NEGATIVE · Open an older revision of the quotation.",
+   "expect": "No \"Change the costing\" button; a forced press is refused: \"This is an older revision — open the current one.\"",
+   "status": "pass",
+   "observed": "Rev 00 reads \"This is an earlier revision.\" with no \"Change the costing\" button; a forced press: \"This is an older revision — open the current one.\"."
+  },
+  {
+   "n": 10,
+   "do": "EDGE · A quotation that never went for approval, with an approved costing.",
+   "expect": "No copy button — the costing is not held by the quotation; \"Reopen as draft\" on the costing is the way.",
+   "status": "pass",
+   "observed": "Costing card: \"🧮 Project costing: AHM/PC/2026-27/11/0004 Rev 00 — Never sent for approval revenue ₹7.73 L · margin 23.8% Unlink\" — no copy button. A forced copy is refused: \"Its costing AHM/PC/2026-27/11/0004 Rev 00 is not held by a quote that went for approval — open it and use \"Reopen as draft\".\""
+  },
+  {
+   "n": 11,
+   "do": "EDGE · A draft costing whose quotation has gone for approval.",
+   "expect": "Locked too — its roles cannot be changed until a revision gets its own copy.",
+   "status": "pass",
+   "observed": "The Draft costing whose quotation is waiting for approval shows \"🔒 This costing is Draft and read-only — locked by its quote. Q-00004 has gone for approval. The costing is the record of how that price was worked out, so it is locked. To change the figures, raise a revision of the quote — the revision gets its own copy of this costing, to edit and approve.\"; no role box or settings form; a forced role delete changes nothing."
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-186-end.jpg",
+ "seconds": 50,
+ "ranAt": "2026-11-15T15:39:42.121Z"
+}

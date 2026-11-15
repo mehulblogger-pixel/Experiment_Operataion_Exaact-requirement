@@ -1,0 +1,47 @@
+{
+ "id": "SAL-135",
+ "title": "Business Director — what they may and may not do in Sales",
+ "area": "Sales",
+ "module": "Who may do what",
+ "persona": "BUSINESS_DIRECTOR",
+ "kind": "access",
+ "status": "FAILED",
+ "steps": [
+  {
+   "n": 1,
+   "do": "Open Left menu → Sales and each tile in turn: Leads, Opportunities, Inquiries, Quotes, Quote templates, Pre-order checklist, Project costing, Approvals, Pipelines & funnels, Set up Sales.",
+   "expect": "Opens exactly what the matrix allows; anything else is refused with a sentence (never a blank page or an error).",
+   "status": "pass",
+   "observed": "Leads: opens; Opportunities: opens; Inquiries: opens; Quotes: opens; Quote templates: refused (\"You cannot manage CRM templates.\") [no tile — address typed]; Pre-order checklist: refused (\"You cannot configure the pre-order checklist.\") [no tile — address typed]; Project costing: opens; Approvals: opens; Pipelines & funnels: opens; Set up Sales: refused (\"Only someone who may change the Sales settings can answer these questi\") [no tile — address typed]"
+  },
+  {
+   "n": 2,
+   "do": "Try what the permission matrix says they may do: See every branch, approve, Insights.",
+   "expect": "Each works.",
+   "status": "pass",
+   "observed": "Register lists both the Ahmedabad and the Mumbai quotation; the Director signed level 3 last (\"All approvals complete — quote approved and ready to send.\"); Insights and the Sales dashboard open.",
+   "shot": "SAL-135-2.jpg"
+  },
+  {
+   "n": 3,
+   "do": "Try what the matrix says they may NOT do: Delete records unless administrator.",
+   "expect": "Each is refused (button absent, or a refusal sentence when the address is typed).",
+   "status": "fail",
+   "observed": "The Director (not an administrator) is offered a \"Delete\" button on the deal and a Delete on the enquiry register — and pressing it DELETED the deal (\"Opportunity OPP-2026-0001 deleted.\")",
+   "shot": "SAL-135-3-fail.jpg"
+  },
+  {
+   "n": 4,
+   "do": "Type the address of a refused screen directly.",
+   "expect": "Refused the same way — hiding the button is not enough.",
+   "status": "fail",
+   "observed": "a re-sent \"inquiry-delete\" form deleted the enquiry for the Director",
+   "shot": "SAL-135-4-fail.jpg"
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-135-end.jpg",
+ "seconds": 29,
+ "ranAt": "2026-11-15T16:09:55.100Z"
+}

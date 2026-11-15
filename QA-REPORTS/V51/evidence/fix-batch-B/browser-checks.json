@@ -1,0 +1,37 @@
+[
+ {
+  "id": "B2 future date",
+  "ok": true,
+  "saw": "Nothing has been saved — Received date cannot be after 15 Nov 2026."
+ },
+ {
+  "id": "B2 negative qty",
+  "ok": true,
+  "saw": "Nothing has been saved — Qty cannot be below 0."
+ },
+ {
+  "id": "B3 refused in the browser",
+  "ok": true,
+  "saw": "That file is too large (9.0 MB) — the limit is 8 MB. Choose a smaller file or compress it."
+ },
+ {
+  "id": "B3 refused by the server",
+  "ok": true,
+  "saw": "status 302 → /crm-templates · That file is too large — the limit is 8 MB. Nothing was saved. Choose a smaller file (or compress it) and try again."
+ },
+ {
+  "id": "B15 phone jump links",
+  "ok": true,
+  "saw": "#actions top 219px vs bar 159px; #costing top 219px vs bar 159px"
+ },
+ {
+  "id": "B21 reason on the sign-in page",
+  "ok": true,
+  "saw": "session edited true · http://127.0.0.1:9003/login · You were away for more than 60 minutes, so you were signed out. Sign in again to carry on where you were. What you typed has been kept."
+ },
+ {
+  "id": "B21 back to the form with the typing",
+  "ok": true,
+  "saw": "http://127.0.0.1:9003/lead-new · company box = \"B21 Timeout Co\""
+ }
+]

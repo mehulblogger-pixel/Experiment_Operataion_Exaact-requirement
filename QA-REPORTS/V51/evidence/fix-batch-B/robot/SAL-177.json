@@ -1,0 +1,92 @@
+{
+ "id": "SAL-177",
+ "title": "A costing cannot be unlinked once its quotation has gone for approval, been approved, sent, won or given a contract",
+ "area": "Sales",
+ "module": "Project costing",
+ "persona": "BUSINESS_DEV_MANAGER",
+ "kind": "scenario",
+ "status": "OUT_OF_DATE",
+ "steps": [
+  {
+   "n": 1,
+   "do": "Open the Draft quotation → its \"Project costing\" card.",
+   "expect": "An \"Unlink\" button is offered — the quotation has not gone out yet.",
+   "status": "pass",
+   "observed": "The Draft quotation's card: \"🧮 Project costing: AHM/PC/2026-27/11/0001 Rev 00 — Turbine overhaul crew revenue ₹7.73 L · margin 23.8% Unlink\" — with \"Unlink\"."
+  },
+  {
+   "n": 2,
+   "do": "Press \"Unlink\", then link the costing again (\"attach existing…\").",
+   "expect": "Both work. The quotation's History shows a line for the unlink and one for the link.",
+   "status": "pass",
+   "observed": "Unlink: \"Costing AHM/PC/2026-27/11/0001 Rev 00 unlinked — it is not deleted. Find it under Sales → Project costing (\"Not on a quotation\"), or attach it again with \"attach existing…\".\". Attach: \"Costing AHM/PC/2026-27/11/0001 Rev 00 linked.\". The quotation's History has \"Costing … was unlinked by Test BDM …\" and \"Costing … was linked by Test BDM.\""
+  },
+  {
+   "n": 3,
+   "do": "Submit the quotation for approval.",
+   "expect": "From 14 Nov 2026 the lock starts here: the card reads \"🔒 Locked — this quotation has gone for approval\". There is no Unlink button. Hovering over it explains: the costing is the record of how the price was worked out; to change the figures, raise a revision. (Before 14 Nov the lock started at \"Send\".)",
+   "status": "pass",
+   "observed": "Card: \"🧮 Project costing: AHM/PC/2026-27/11/0001 Rev 00 — Turbine overhaul crew revenue ₹7.73 L · margin 23.8% 🔒 Locked — this quote has gone for approval\"; no Unlink; hovering: \"Q-00001 has gone for approval. The costing is the record of how that price was worked out, so it is locked. To change the figures, raise a revision of the quote — the revision gets its own copy of this costing, to edit and approve.\"",
+   "note": "A quotation at exactly its approved costing's prices needs no approval and goes straight to \"✉ Send to client\"; to send it for approval a lump-sum travel line was added with the price note.",
+   "shot": "SAL-177-3.jpg"
+  },
+  {
+   "n": 4,
+   "do": "Approve it, then press \"Send\".",
+   "expect": "\"🔒 Locked — this quotation has been approved\", then \"… has gone to the client\".",
+   "status": "pass",
+   "observed": "Approved: \"🔒 Locked — this quote has been approved\"; sent: \"🔒 Locked — this quote has gone to the client\"."
+  },
+  {
+   "n": 5,
+   "do": "Mark it Accepted (won).",
+   "expect": "\"🔒 Locked — this quotation has been won\".",
+   "status": "pass",
+   "observed": "Card: \"🔒 Locked — this quote has been won\"."
+  },
+  {
+   "n": 6,
+   "do": "Register the contract.",
+   "expect": "\"🔒 Locked — this quotation has a contract\".",
+   "status": "pass",
+   "observed": "Accounts registered the contract (\"Contract AHM/C/2026-27/00001 registered — it is waiting for approval. Waiting fo\"); card: \"🔒 Locked — this quote has a contract\"."
+  },
+  {
+   "n": 7,
+   "do": "On a deal with a costing, mark the deal Won (or send it to Accounts).",
+   "expect": "The deal's costing card shows \"🔒 Stays linked — …\" in place of Unlink.",
+   "status": "pass",
+   "observed": "Deal with a costing: before \"🧮 Project costing: GEN/PC/2026-27/11/0001 Rev 00 — Refinery turnaround 2027 revenue ₹3.86 L Unlink\"; marked Won (\"Won — TB Refinery Ltd said yes. Next: on the Actions tab, send it to Accounts to\"); card now \"🧮 Project costing: GEN/PC/2026-27/11/0001 Rev 00 — Refinery turnaround 2027 revenue ₹3.86 L 🔒 Stays linked — this deal has been won\" (hover: \"OPP-2026-0001 has been won. The costing is the record of how it was priced, so it stays linked.\")."
+  },
+  {
+   "n": 8,
+   "do": "(Careful testers) Re-send an old Unlink from a page left open before the quotation was sent.",
+   "expect": "Red message \"Not unlinked — Q-… has gone to the client (sent …). The costing is the record of how that price was worked out, so it stays linked…\". The costing is still linked.",
+   "status": "pass",
+   "observed": "Red message: \"Not unlinked — Q-00002 has gone to the client (sent 15 Nov 2026). The costing is the record of how that price was worked out, so it is locked. To change the figures, raise a revision of the quote — the revision gets its own copy of this costing, to edit and approve.\". The costing is still linked.",
+   "note": "The message continues \"… so it is locked. To change the figures, raise a revision …\" rather than \"… so it stays linked…\".",
+   "suggest": "Red message \"Not unlinked — Q-… has gone to the client (sent …). The costing is the record of how that price was worked out, so it is locked. To change the figures, raise a revision of the quote …\"."
+  },
+  {
+   "n": 9,
+   "do": "Raise a revision of a sent quotation and open the new Draft revision.",
+   "expect": "\"🔒 Locked — an earlier revision has gone to the client\", with \"✎ Change the costing for this revision\" beside it (SAL-186).",
+   "status": "outdated",
+   "observed": "The new Draft revision's card reads \"🧮 Project costing: AHM/PC/2026-27/11/0002 Rev 01 — Turbine overhaul — phase 2 revenue ₹7.73 L · margin 23.8% Unlink\": since 14 Nov 2026 (SAL-190) the revision gets its own costing AHM/PC/2026-27/11/0002 Rev 01 (draft) made by itself, so there is no \"🔒 Locked — an earlier revision has gone to the client\" and no \"✎ Change the costing for this revision\" to press.",
+   "suggest": "Open the new Draft revision: its Costing card shows its own costing <number> Rev 01 (draft) — made by itself; the Rev 00 costing stays locked.",
+   "shot": "SAL-177-9-old.jpg"
+  },
+  {
+   "n": 10,
+   "do": "Revise a quotation that never went for approval, and open the revision.",
+   "expect": "\"Unlink\" is still offered — nothing has gone for approval yet.",
+   "status": "pass",
+   "observed": "A quotation that never went for approval (marked lost, then revised): the revision's card \"🧮 Project costing: AHM/PC/2026-27/11/0003 Rev 00 — Never went for approval revenue ₹7.73 L · margin 23.8% Unlink\" still offers Unlink."
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-177-end.jpg",
+ "seconds": 35,
+ "ranAt": "2026-11-15T15:38:52.356Z"
+}

@@ -1,0 +1,59 @@
+{
+ "id": "SAL-041",
+ "title": "Enquiry form refuses an incomplete enquiry and keeps your typing",
+ "area": "Sales",
+ "module": "Inquiries",
+ "persona": "MARKETING_EXECUTIVE",
+ "kind": "edge",
+ "status": "NEEDS_YOU",
+ "steps": [
+  {
+   "n": 1,
+   "do": "Press \"Create inquiry\" with nothing filled.",
+   "expect": "The form returns with \"Please add a client (pick one, or type a name); the contact person; a contact e-mail or mobile; the Business Unit (business unit); a subject.\" No enquiry created.",
+   "status": "pass",
+   "observed": "Refused: \"Please add a client (pick one, or type a name); the contact person; a contact e-mail or mobile; the business unit (business unit); a subject.\" No enquiry created.",
+   "note": "The message reads \"Please add a client (pick one, or type a name); the contact person; a contact e-mail or mobile; the business unit (business unit); a subject.\" (lower-case \"business unit\", which then repeats itself in brackets).",
+   "shot": "SAL-041-1.jpg"
+  },
+  {
+   "n": 2,
+   "do": "Fill everything except e-mail and mobile.",
+   "expect": "Refused: needs \"a contact e-mail or mobile\". Everything else you typed is still there.",
+   "status": "pass",
+   "observed": "Refused: \"Please add a contact e-mail or mobile.\"; client, contact, subject and details still there."
+  },
+  {
+   "n": 3,
+   "do": "Give a mobile but no e-mail.",
+   "expect": "Accepted — e-mail OR mobile is enough.",
+   "status": "pass",
+   "observed": "Accepted with a mobile and no e-mail: \"INQ-00001 created. You can now raise a quotation against it.\"",
+   "note": "After the refusal the form's button reads \"Save inquiry\" instead of \"Create inquiry\"."
+  },
+  {
+   "n": 4,
+   "do": "Received date in the future (next month).",
+   "expect": "Record what happens — ideally a warning; the enquiry must not count as overdue.",
+   "status": "needs",
+   "observed": "Refused: \"Nothing has been saved — Received date cannot be after 15 Nov 2026. | ⚠ This date is in the future. An inquiry can only be recorded as received today or earlier — it will not be saved.\"",
+   "reason": "The test asks to record what happens; the owner decides whether a future received date is refused or only warned.",
+   "proposed": "Refuse a received date in the future (\"an enquiry cannot have arrived after today\"), as the app now does (commit \"enquiry date not in the future\"); if it is ever allowed, it must never count as overdue.",
+   "rule": true,
+   "shot": "SAL-041-4-needs.jpg"
+  },
+  {
+   "n": 5,
+   "do": "Received date 90 days ago with Status Open.",
+   "expect": "The register shows a red \"⏳ 90d\" overdue pill.",
+   "status": "pass",
+   "observed": "The register shows a red \"⏳ 90d\" pill on the row.",
+   "shot": "SAL-041-5.jpg"
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-041-end.jpg",
+ "seconds": 9,
+ "ranAt": "2026-11-15T15:37:47.143Z"
+}

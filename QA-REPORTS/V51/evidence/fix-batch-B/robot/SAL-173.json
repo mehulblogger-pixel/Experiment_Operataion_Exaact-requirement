@@ -1,0 +1,62 @@
+{
+ "id": "SAL-173",
+ "title": "Applying an industry template only adds pipelines; wording and accreditation are an administrator's",
+ "area": "Sales",
+ "module": "Industry",
+ "persona": "several",
+ "kind": "scenario",
+ "status": "FAILED",
+ "steps": [
+  {
+   "n": 1,
+   "do": "As Test Director: Left menu → Admin → Settings → Your industry → pick \"Manufacturing & engineering\".",
+   "expect": "Only \"Add these pipelines\" is offered; no \"Make this our company's industry\" panel.",
+   "status": "fail",
+   "observed": "The panel is right (only \"Add these pipelines\"), but the Director cannot get there by Left menu → Admin → Settings → Your industry: Admin has no Settings tile for the Director, and /settings says \"Only admins can change settings.\" — only by typing /industry.",
+   "shot": "SAL-173-1-fail.jpg"
+  },
+  {
+   "n": 2,
+   "do": "\"Add these pipelines\".",
+   "expect": "Message \"… pipelines added. 3 pipelines created … Your wording and accreditation rules are unchanged.\" The inspection words and ISO/IEC 17020 rules are still in place.",
+   "status": "pass",
+   "observed": "\"Manufacturing & engineering pipelines added. 3 pipelines created — a main funnel (now the default), an alternate funnel and a lead pipeline, with 17 list values…\" Pipelines 5 → 8; wording pack still \"inspection\", accreditation rules still \"inspection\" (ISO/IEC 17020).",
+   "note": "Side effect: \"Add these pipelines\" also switched the company's default unit for a new quotation line from Man-day to \"NOS\" (setting default_charge_unit) — an inspection company now starts every new line in Nos although its wording is \"unchanged\"."
+  },
+  {
+   "n": 3,
+   "do": "As Master Admin pick \"Manufacturing & engineering\".",
+   "expect": "A separate panel \"Make this our company's industry\" lists each change, e.g. \"The inspection (ISO/IEC 17020) accreditation rules will be turned OFF.\" and a tick-box \"I understand the changes listed above.\"",
+   "status": "pass",
+   "observed": "Separate panel: \"Make this our company's industry This sets the words everyone in the company sees and which accreditation rules run. It creates no pipeline. The wording everyone sees changes to \"Manufacturing & fabrication\" (now \"Inspection & certification\"). The inspection (ISO/IEC 17020) accreditation rules will be turned OFF. I understand th\"",
+   "shot": "SAL-173-3.jpg"
+  },
+  {
+   "n": 4,
+   "do": "Press \"Make … our industry\" without ticking.",
+   "expect": "Refused: \"Tick the confirmation first — it lists what will change.\"",
+   "status": "fail",
+   "observed": "Refused, but with \"Nothing has been saved — I understand the changes listed above. needs ticking.\" — not \"Tick the confirmation first — it lists what will change.\"",
+   "shot": "SAL-173-4-fail.jpg"
+  },
+  {
+   "n": 5,
+   "do": "Tick and confirm.",
+   "expect": "Wording changes; accreditation off; no pipeline created by this step.",
+   "status": "pass",
+   "observed": "\"Your company's industry is now Manufacturing & engineering. No accreditation rules are on.\" — wording pack now \"manufacturing\" (e.g. Production Order / Production Orders), accreditation rules off, pipelines still 8."
+  },
+  {
+   "n": 6,
+   "do": "Pick \"Inspection, testing & certification\" and confirm.",
+   "expect": "ISO/IEC 17020 rules back on.",
+   "status": "pass",
+   "observed": "\"Your company's industry is now Inspection, testing & certification. The inspection (ISO/IEC 17020) accreditation rules are ON.\" — wording \"inspection\", accreditation rules \"inspection\" (ISO/IEC 17020) back on."
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-173-end.jpg",
+ "seconds": 6,
+ "ranAt": "2026-11-15T15:37:37.800Z"
+}

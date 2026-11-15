@@ -1,0 +1,72 @@
+{
+ "id": "SAL-153",
+ "title": "Manufacturer selling products: can Sales quote goods?",
+ "area": "Sales",
+ "module": "Company types",
+ "persona": "BUSINESS_DEV_MANAGER",
+ "kind": "scenario",
+ "status": "OUT_OF_DATE",
+ "steps": [
+  {
+   "n": 1,
+   "do": "New quote → Line items: Description \"SS316 fire hose reel cabinet\", Qty 50.",
+   "expect": "Accepted.",
+   "status": "pass",
+   "observed": "The line takes \"SS316 fire hose reel cabinet\", Qty 50."
+  },
+  {
+   "n": 2,
+   "do": "Unit.",
+   "expect": "No \"Nos / pieces / kg\" in the built-in list (Man-day, Man-month, Per visit, Audit day, Per lot / lump sum, Per document, Per km, Other). Use Other. Record as a GAP unless your administrator adds \"Nos\" under Admin → Masters (charge unit list) — if added, check it appears here.",
+   "status": "outdated",
+   "observed": "With Profile D (Manufacturing & engineering) the unit list offers Man-day, Man-month, Per visit, Audit day, Per lot / lump sum, Per document, Per km, Other, Nos, Set, Kg, Tonne, Metre, Litre, Box, Pair and a new line starts in \"Nos\" — goods units are built in since 12 Nov 2026 (SAL-004 step 4), so there is no gap and no need for \"Other\".",
+   "suggest": "Unit → \"Nos\" is offered and is the starting unit of a new line (also Set, Kg, Tonne, Metre, Litre, Box, Pair); the service units (Man-day …) are still there for service lines.",
+   "shot": "SAL-153-2-old.jpg"
+  },
+  {
+   "n": 3,
+   "do": "HSN code.",
+   "expect": "There is no HSN / SAC field on a quotation line. Record as a GAP.",
+   "status": "pass",
+   "observed": "No HSN / SAC field on the quotation line (nor anywhere on the form) — GAP confirmed, as the test expects."
+  },
+  {
+   "n": 4,
+   "do": "Service box.",
+   "expect": "Offers inspection types only. Record as a GAP for product companies.",
+   "status": "pass",
+   "observed": "The Service box draws from the \"Types of inspection requested\" list (37 inspection/audit types, e.g. Inspection (third-party / TPI), Expediting, Resident / site posting, Vendor assessment) — nothing for a product. GAP confirmed."
+  },
+  {
+   "n": 5,
+   "do": "Rate ₹18,500, GST 18% → totals.",
+   "expect": "Subtotal ₹9,25,000; GST ₹1,66,500; total ₹10,91,500.",
+   "status": "pass",
+   "observed": "Subtotal ₹9,25,000; GST ₹1,66,500; total ₹10,91,500 (stored and on the page).",
+   "shot": "SAL-153-5.jpg"
+  },
+  {
+   "n": 6,
+   "do": "Delivery period, freight, packing, warranty.",
+   "expect": "No dedicated fields — only Terms text. Record as a GAP.",
+   "status": "pass",
+   "observed": "No delivery period, freight, packing or warranty field — only the Terms text box. GAP confirmed."
+  },
+  {
+   "n": 7,
+   "do": "PDF.",
+   "expect": "Record how the document reads to a buyer of goods.",
+   "status": "needs",
+   "observed": "PDF line: \"Subject: 50 fire hose reel cabinets\"; title \"QUOTATION\", letterhead \"TB Inspection Services Pvt Ltd (TEST)\"; terms still read as a service firm's (Person-day; man-day; Inspection is carried out; Reports are issued); no HSN, delivery, freight or warranty lines.",
+   "reason": "The test asks how the document reads to a buyer of goods — a judgement.",
+   "proposed": "For Profile D the default terms should be a goods seller's (delivery period, freight, packing, warranty, HSN with GST rate per item); today it reads like an inspection body's quotation with a goods line in it — record as a GAP for product companies.",
+   "rule": true,
+   "shot": "SAL-153-7-needs.jpg"
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-153-end.jpg",
+ "seconds": 8,
+ "ranAt": "2026-11-15T15:33:46.828Z"
+}

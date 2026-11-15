@@ -1,0 +1,91 @@
+{
+ "id": "SAL-011",
+ "title": "Lead form — every field, empty and extreme values",
+ "area": "Sales",
+ "module": "Leads",
+ "persona": "MARKETING_EXECUTIVE",
+ "kind": "edge",
+ "status": "FAILED",
+ "steps": [
+  {
+   "n": 1,
+   "do": "Press \"Create it\" with everything empty.",
+   "expect": "Refused with a sentence naming what is missing (at least the company). No lead is created.",
+   "status": "pass",
+   "observed": "Refused, no lead created, still on the form: \"Nothing has been saved — Company or person still needs filling in.\"",
+   "shot": "SAL-011-1.jpg"
+  },
+  {
+   "n": 2,
+   "do": "Company name of 250 characters.",
+   "expect": "Saved (cut to the allowed length) or refused with a clear message — never a blank or error page.",
+   "status": "pass",
+   "observed": "Saved; the company name is kept at 200 characters (cut)."
+  },
+  {
+   "n": 3,
+   "do": "Company name with special characters: \"Shri Ram & Sons (P) Ltd. — युनिट २\".",
+   "expect": "Saved and shown exactly as typed everywhere (list, detail, quote).",
+   "status": "pass",
+   "observed": "Shown exactly as typed on the lead, in the lead list and on the quotation made from it.",
+   "shot": "SAL-011-3.jpg"
+  },
+  {
+   "n": 4,
+   "do": "Company name \"<b>Bold</b> <script>alert(1)</script>\".",
+   "expect": "Shown as plain text; no bold, no pop-up. On the hosted site the server's own firewall may refuse the save with a plain \"403 Forbidden\" page before it reaches the app — that is the host protecting you, and also a pass (owner, 12 Nov 2026).",
+   "status": "pass",
+   "observed": "Saved and shown as plain text \"<b>Bold</b> <script>alert(1)</script>\" on the lead, the list and the board — no bold, no pop-up."
+  },
+  {
+   "n": 5,
+   "do": "E-mail \"ravi@\" (invalid).",
+   "expect": "The browser or the page refuses it with a message.",
+   "status": "pass",
+   "observed": "Refused: the browser says \"Please enter a part following '@'. 'ravi@' is incomplete.\"."
+  },
+  {
+   "n": 6,
+   "do": "Value they are worth = -5000.",
+   "expect": "Refused, or saved as 0 with a message — record what happens.",
+   "status": "pass",
+   "observed": "Refused: the browser says \"Value must be greater than or equal to 0.\"."
+  },
+  {
+   "n": 7,
+   "do": "Value = 99999999999 (99,999 crore).",
+   "expect": "Saved and shown with Indian grouping, not in scientific form.",
+   "status": "pass",
+   "observed": "Saved; shown as ₹99,99,99,99,999 (Indian grouping)."
+  },
+  {
+   "n": 8,
+   "do": "Expected to close = a date in 2019.",
+   "expect": "Accepted, but the lead shows as overdue on the board.",
+   "status": "pass",
+   "observed": "Accepted; on the board the card reads \"TB Old Close Co L-2026-0005 0 ⏰ close date passed\".",
+   "shot": "SAL-011-8.jpg"
+  },
+  {
+   "n": 9,
+   "do": "Type of deputation = \"Man-month (site deputation)\", How many people = 0.",
+   "expect": "Refused or warned; never a lead for zero people without a message.",
+   "status": "fail",
+   "observed": "nothing to press called \"Leads\"",
+   "shot": "SAL-011-9-fail.jpg"
+  },
+  {
+   "n": 10,
+   "do": "Double-click \"Create it\" quickly.",
+   "expect": "Only ONE lead is created.",
+   "status": "fail",
+   "observed": "nothing to press called \"Leads\"",
+   "shot": "SAL-011-10-fail.jpg"
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-011-end.jpg",
+ "seconds": 23,
+ "ranAt": "2026-11-15T15:33:13.545Z"
+}

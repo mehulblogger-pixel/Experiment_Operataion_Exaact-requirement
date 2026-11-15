@@ -1,0 +1,70 @@
+{
+ "id": "SAL-013",
+ "title": "Only the responsible person marks a lead lost — with a reason AND remarks",
+ "area": "Sales",
+ "module": "Leads",
+ "persona": "MARKETING_EXECUTIVE",
+ "kind": "scenario",
+ "status": "FAILED",
+ "steps": [
+  {
+   "n": 1,
+   "do": "Sign in as Test BDM (not responsible for it) and open the lead → Actions tab.",
+   "expect": "Under \"It did not happen\": \"Only the person responsible for this lead — Test MktExec — marks it lost.\" No Lost button.",
+   "status": "pass",
+   "observed": "Under \"It did not happen\": \"Only the person responsible for this lead — Test MktExec — marks it lost.\" No Lost button."
+  },
+  {
+   "n": 2,
+   "do": "Sign in as Test MktExec → Actions tab → \"It did not happen\". Leave \"Why it was lost\" on \"choose a reason…\", type remarks → press \"Lost\".",
+   "expect": "The browser asks you to choose a reason; nothing changes.",
+   "status": "pass",
+   "observed": "Pressed \"Not pursued\": the browser asks \"Please select an item in the list.\" on \"Why it was lost\"; nothing changed.",
+   "note": "The button is labelled \"Not pursued\" (the pipeline's lost stage), not \"Lost\".",
+   "suggest": "press \"Not pursued\""
+  },
+  {
+   "n": 3,
+   "do": "Choose \"Price too high / lost on price\", leave \"Remarks — what happened\" empty → \"Lost\".",
+   "expect": "The browser asks for the remarks; nothing changes.",
+   "status": "pass",
+   "observed": "The browser asks \"Please fill out this field.\" on the remarks; nothing changed."
+  },
+  {
+   "n": 4,
+   "do": "Remarks \"Competitor 20% cheaper\" → \"Lost\".",
+   "expect": "The lead shows \"Closed — this one did not happen.\" with your reason and remarks.",
+   "status": "pass",
+   "observed": "The lead shows \"Closed — this one did not happen.\" with \"Price too high / lost on price\" and \"Competitor 20% cheaper\".",
+   "shot": "SAL-013-4.jpg"
+  },
+  {
+   "n": 5,
+   "do": "Lead register → List → tick two open leads of Test MktExec → \"Mark lost\" → choose a reason, leave \"Remarks — required\" empty → apply.",
+   "expect": "Refused: \"Add your remarks — what happened, in a sentence. Both the reason and the remarks are required.\" Nothing is marked lost.",
+   "status": "pass",
+   "observed": "Refused: \"Add your remarks — what happened, in a sentence. Both the reason and the remarks are required.\" Nothing marked lost."
+  },
+  {
+   "n": 6,
+   "do": "Same, with remarks \"No budget this year\".",
+   "expect": "Both are marked lost. A lead belonging to someone else in the same tick-list is left alone \"(…not yours to mark lost)\".",
+   "status": "pass",
+   "observed": "\"2 leads updated. 1 left alone (already closed, or not yours to mark lost).\"",
+   "shot": "SAL-013-6.jpg"
+  },
+  {
+   "n": 7,
+   "do": "Left menu → Insights → Sales dashboard → \"Why we lose\".",
+   "expect": "The reasons are counted.",
+   "status": "fail",
+   "observed": "\"Why we lose\" reads: Why we lose Loss reasons REASON DEALS LEADS VALUE Client budget withdrawn / on hold 0 2 ₹2,00,000 Price too high / lost on price 0 1 ₹1,00,000 Won 0 (₹0) against lost 0 in this window. Effort behind it All of it → Calls, meetings and visits somebody typed in, last 30 days. A funnel with no effort be",
+   "shot": "SAL-013-7-fail.jpg"
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-013-end.jpg",
+ "seconds": 9,
+ "ranAt": "2026-11-15T15:50:25.442Z"
+}

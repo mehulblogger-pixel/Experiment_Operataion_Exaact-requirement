@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'cd5c7c3 · 2026-11-15 15:34 UTC · 719 files';
+$RELEASE = '573fc43 · 2026-11-15 16:13 UTC · 719 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -118,8 +118,8 @@ $EXPECT  = [
     'lib/costing_heads.php' => ['s'=>40151,'h'=>'347d406f1639a3e0'],
     'lib/costrecon.php' => ['s'=>11258,'h'=>'a6af5a16164f3458'],
     'lib/cpanel.php' => ['s'=>8181,'h'=>'9322634c72aed841'],
-    'lib/crm.php' => ['s'=>352286,'h'=>'c030a0b84889f7de'],
-    'lib/crmdash.php' => ['s'=>16949,'h'=>'09817a93fe517cd1'],
+    'lib/crm.php' => ['s'=>353646,'h'=>'914c26967c1b83c4'],
+    'lib/crmdash.php' => ['s'=>16482,'h'=>'82aa17a5a8d3ea34'],
     'lib/customer360.php' => ['s'=>24402,'h'=>'f1d98328a475561b'],
     'lib/customforms.php' => ['s'=>12896,'h'=>'a60a82554280a959'],
     'lib/cvp.php' => ['s'=>64043,'h'=>'834aeaa8ba261a28'],
@@ -186,7 +186,7 @@ $EXPECT  = [
     'lib/packs.php' => ['s'=>14404,'h'=>'2c631d79aea60e49'],
     'lib/partnerimport.php' => ['s'=>23742,'h'=>'bc507ebf2a770c8f'],
     'lib/party.php' => ['s'=>11622,'h'=>'55ad01fbf381e780'],
-    'lib/pdf.php' => ['s'=>27209,'h'=>'0f264076f92071ea'],
+    'lib/pdf.php' => ['s'=>27213,'h'=>'d11c50106498d27f'],
     'lib/pdso.php' => ['s'=>62942,'h'=>'b8624fad908da790'],
     'lib/pipelines.php' => ['s'=>15893,'h'=>'a7e86258ac189169'],
     'lib/platform_mail.php' => ['s'=>22419,'h'=>'95ffd0e9fea3845d'],
@@ -445,15 +445,15 @@ $EXPECT  = [
     'views/ops/crm/approval_rule_form.php' => ['s'=>3668,'h'=>'0dc628db27deb0a7'],
     'views/ops/crm/approval_rule_list.php' => ['s'=>3282,'h'=>'531cb94b6c0d3205'],
     'views/ops/crm/inquiry_form.php' => ['s'=>11107,'h'=>'afc56ace2f550cda'],
-    'views/ops/crm/inquiry_list.php' => ['s'=>9348,'h'=>'09ae58f7cb0f67d4'],
-    'views/ops/crm/quote_detail.php' => ['s'=>83969,'h'=>'f2e3defe3daaf362'],
+    'views/ops/crm/inquiry_list.php' => ['s'=>9719,'h'=>'a2c022184c51567e'],
+    'views/ops/crm/quote_detail.php' => ['s'=>83981,'h'=>'ec47a3a4dc9c25c9'],
     'views/ops/crm/quote_external.php' => ['s'=>8907,'h'=>'7aa7bd1259a0c79d'],
-    'views/ops/crm/quote_form.php' => ['s'=>49873,'h'=>'141e92a1098e9279'],
+    'views/ops/crm/quote_form.php' => ['s'=>49833,'h'=>'43abc4285c3b67e9'],
     'views/ops/crm/quote_list.php' => ['s'=>8027,'h'=>'82e4be9525ad6c07'],
     'views/ops/crm/reports.php' => ['s'=>3252,'h'=>'f30c7776ec26baf9'],
     'views/ops/crm/template_form.php' => ['s'=>3958,'h'=>'3671a20d6c01c474'],
     'views/ops/crm/template_list.php' => ['s'=>8793,'h'=>'9923952768e69153'],
-    'views/ops/crm_dashboard.php' => ['s'=>13343,'h'=>'47e48f68a0dfd6f1'],
+    'views/ops/crm_dashboard.php' => ['s'=>14055,'h'=>'713d33ad34875cb6'],
     'views/ops/custom_fields.php' => ['s'=>4958,'h'=>'f2f969e3c56dfed4'],
     'views/ops/customer360.php' => ['s'=>29931,'h'=>'2197023e362e8e81'],
     'views/ops/data_control.php' => ['s'=>19266,'h'=>'8f0ae88fcb869398'],
@@ -516,7 +516,7 @@ $EXPECT  = [
     'views/ops/incident_detail.php' => ['s'=>4503,'h'=>'2c7ba200a5fc2960'],
     'views/ops/incident_form.php' => ['s'=>5464,'h'=>'e475b7f16801c901'],
     'views/ops/incidents.php' => ['s'=>2842,'h'=>'b7d86d97e273a923'],
-    'views/ops/industry.php' => ['s'=>6049,'h'=>'002cdab35134fae6'],
+    'views/ops/industry.php' => ['s'=>6119,'h'=>'b11c2e581aac37ea'],
     'views/ops/inspector_form.php' => ['s'=>28824,'h'=>'facaee3c14d0ec6a'],
     'views/ops/inspector_list.php' => ['s'=>3906,'h'=>'bce93ef5a50d93c3'],
     'views/ops/inspector_profile.php' => ['s'=>7251,'h'=>'50ffb7d7db054da2'],

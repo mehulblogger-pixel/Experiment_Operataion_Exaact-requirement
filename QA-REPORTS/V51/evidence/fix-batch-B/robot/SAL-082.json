@@ -1,0 +1,54 @@
+{
+ "id": "SAL-082",
+ "title": "Waiving the checklist — who, with a reason, shown on the quotation",
+ "area": "Sales",
+ "module": "Pre-order checklist",
+ "persona": "several",
+ "kind": "scenario",
+ "status": "PASSED",
+ "steps": [
+  {
+   "n": 1,
+   "do": "As Test BDM (the preparer, not an approver): look for \"A point cannot be confirmed? Waive the checklist\".",
+   "expect": "Not offered (or refused: \"Only someone who may approve this quote can waive its checklist.\").",
+   "status": "pass",
+   "observed": "Not offered to Test BDM (panel shows 5/7 done, no waiver link); sending a waiver anyway: \"Only someone who may approve this quote can waive its checklist.\""
+  },
+  {
+   "n": 2,
+   "do": "As Test BranchMgr (approver): open \"Waive the checklist\", leave the reason empty.",
+   "expect": "Refused: \"Say why the checklist is being waived — the reason is shown on the quote.\"",
+   "status": "pass",
+   "observed": "Refused, nothing waived — Nothing has been saved — Why — shown on the quote with your name still needs filling in.",
+   "note": "The empty reason is stopped in the browser before the server's sentence can be shown: \"Nothing has been saved — Why — shown on the quote with your name still needs filling in.\".",
+   "suggest": "Refused — the reason box must be filled in (the server's own sentence \"Say why the checklist is being waived…\" is a backstop)."
+  },
+  {
+   "n": 3,
+   "do": "Reason \"Bank guarantee terms come with the PO\" → Waive.",
+   "expect": "Message \"Checklist waived. The reason and your name are shown on the quote.\" Panel: \"⚠ Waived by Test BranchMgr on <date> — Bank guarantee terms come with the PO\". History has the waiver.",
+   "status": "pass",
+   "observed": "\"Checklist waived. The reason and your name are shown on the quote.\" Panel: \"⚠ Waived by Test BranchMgr on 15 Nov 2026 — Bank guarantee terms come with the PO\"; History has the waiver.",
+   "shot": "SAL-082-3.jpg"
+  },
+  {
+   "n": 4,
+   "do": "Raise a revision.",
+   "expect": "The revision starts unticked and NOT waived.",
+   "status": "pass",
+   "observed": "Rev 01 shows \"0/7 done\" and no waiver line."
+  },
+  {
+   "n": 5,
+   "do": "Accept or lose the quotation, then try to change its ticks.",
+   "expect": "Refused: its checklist can no longer change.",
+   "status": "pass",
+   "observed": "Marked lost; the ticks are greyed out and a forced save is refused: \"This quote is lost — its checklist can no longer change.\""
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-082-end.jpg",
+ "seconds": 6,
+ "ranAt": "2026-11-15T15:37:32.253Z"
+}

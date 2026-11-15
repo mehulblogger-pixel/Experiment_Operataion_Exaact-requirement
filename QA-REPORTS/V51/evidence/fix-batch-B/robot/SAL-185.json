@@ -1,0 +1,114 @@
+{
+ "id": "SAL-185",
+ "title": "An enquiry shows what became of it — Open, Quoted, Won, Lost (by itself) or Dropped (by hand, with a reason)",
+ "area": "Sales",
+ "module": "Enquiries",
+ "persona": "MARKETING_EXECUTIVE",
+ "kind": "scenario",
+ "status": "FAILED",
+ "steps": [
+  {
+   "n": 1,
+   "do": "Open enquiry A (\"Edit\").",
+   "expect": "There is no Status dropdown any more: \"Status: Open — Follows its quote, set by itself.\" Below the form, \"Where it stands: Open — no quote yet.\" with \"Drop this enquiry\" folded, and \"History of this enquiry\".",
+   "status": "pass",
+   "observed": "No Status dropdown: \"Status Open — Follows its quote — set by itself.\" Below the form \"Where it stands: Open — no quote yet.\" with \"Drop this inquiry\" folded, and \"History of this inquiry\" (the test copy says \"inquiry\" where the test says \"enquiry\").",
+   "shot": "SAL-185-1.jpg"
+  },
+  {
+   "n": 2,
+   "do": "Back on the register → on A press \"Quote\" → add a line → save.",
+   "expect": "A reads \"Quoted\" in the register.",
+   "status": "pass",
+   "observed": "Pressed \"Quote\" on INQ-00001, added one line, saved (Q-00001). The register shows INQ-00001 \"Quoted\"."
+  },
+  {
+   "n": 3,
+   "do": "[Marketing Manager] approve it; [Marketing Executive, who prepared it] \"✉ Send to client\" → later \"Mark accepted (won)\".",
+   "expect": "A reads \"Won\" — nobody touched the enquiry. Its page: \"Won — its quote was accepted.\" and the quote number with \"(accepted / closed-won)\". History: \"… is now won — it follows its quote\".",
+   "status": "fail",
+   "observed": "Test MktMgr approved, but Test MktExec, who prepared it, could not send it — only MASTER_ADMIN could. After sending and \"Mark accepted (won)\" the enquiry follows by itself: register \"Won\"; its page \"Won — its quote was accepted. Quote: Q-00001 (accepted / closed-won)\"; history \"INQ-00001 is now won — it follows its quote\".",
+   "shot": "SAL-185-3-fail.jpg"
+  },
+  {
+   "n": 4,
+   "do": "Raise a quotation for B, send it, then \"Mark lost\" with a reason.",
+   "expect": "B reads \"Lost\". (Expired — no answer within its validity — also reads \"Lost\".)",
+   "status": "pass",
+   "observed": "Quotation Q-00002 sent (by MASTER_ADMIN) then \"Mark lost\" with a reason: B reads \"Lost\". A third enquiry whose sent quotation passed its 30-day validity (daily sweep) also reads \"Lost\"."
+  },
+  {
+   "n": 5,
+   "do": "Raise a second quotation for B and send it.",
+   "expect": "B reads \"Quoted\" again: one lost quotation does not end it while another is out. If that one is accepted, B reads \"Won\".",
+   "status": "fail",
+   "observed": "locator.click: Timeout 12000ms exceeded.",
+   "shot": "SAL-185-5-fail.jpg"
+  },
+  {
+   "n": 6,
+   "do": "New enquiry C \"Lab test — outside scope\" → open it → \"Drop this enquiry\" → Why: \"We declined to quote\", Note \"Not our scope\" → \"Drop it\".",
+   "expect": "\"… dropped — we declined to quote.\" Where it stands: \"Dropped — closed without a quote. We declined to quote — Not our scope · by <you>, <date>\", with \"Reopen it\". In the register, hovering \"Dropped\" shows the reason; there is no \"Quote\" button on it.",
+   "status": "pass",
+   "observed": "Message \"INQ-00004 dropped — we declined to quote.\". Where it stands: \"Dropped Dropped — closed without a quote. We declined to quote — Not our scope · by Test MktExec, 15 Nov 2026 Reopen it …\" with \"Reopen it\". In the register \"Dropped\" shows \"We declined to quote\" on hover, and there is no Quote button.",
+   "shot": "SAL-185-6.jpg"
+  },
+  {
+   "n": 7,
+   "do": "\"Reopen it\" on C.",
+   "expect": "\"… is open again.\" Status Open, the reason cleared. The history keeps both steps.",
+   "status": "pass",
+   "observed": "Message \"INQ-00004 is open again.\"; status Open, reason and note cleared; history keeps \"dropped by Test MktExec — We declined to quote\" and \"reopened by Test MktExec\"."
+  },
+  {
+   "n": 8,
+   "do": "NEGATIVE · Drop without picking a reason.",
+   "expect": "The form will not send; a forced send is refused: \"Say why it is dropped — pick a reason.\"",
+   "status": "pass",
+   "observed": "The \"Why\" box is required — the browser keeps the form (\"Please select an item in the list.\"); a forced send is refused: \"Say why it is dropped — pick a reason.\". Still Open."
+  },
+  {
+   "n": 9,
+   "do": "NEGATIVE · Open A (it has a quotation) and look for \"Drop this enquiry\".",
+   "expect": "Not offered: \"With a quote raised, this follows the quote. If the work is not coming, mark the quote lost.\" A forced drop is refused the same way.",
+   "status": "pass",
+   "observed": "Not offered on A: \"With a quote raised, this follows the quote. If the work is not coming, mark the quote lost.\" A forced drop is refused: \"A quote has been raised for INQ-00001, so it follows that quote — mark the quote lost instead.\"."
+  },
+  {
+   "n": 10,
+   "do": "Look at the four cards at the top of the register (this year).",
+   "expect": "Enquiries (with how many are still open) · Quoted (% of enquiries, how many awaiting an answer) · Won (% of enquiries that became orders) · Lost · Dropped (with the hit rate = won ÷ (won + lost)). Each card opens the list filtered to that status. Change the year or search — the cards follow.",
+   "status": "pass",
+   "observed": "Cards: 📨 ENQUIRIES 4 1 open, not quoted yet || 📝 QUOTED 3 75% of enquiries · 0 awaiting an answer || 🏆 WON 1 25% of enquiries became orders || 📉 LOST · DROPPED 2 · 0 Hit rate 33% of decided quotes. Opening each: ENQUIRIES 4 → /inquiries lists 4 (Open/Lost/Won); QUOTED 3 → /inquiries?st=QUOTED_ANY&fy=2026-27 lists 3 (Lost/Won); WON 1 → /inquiries?st=WON&fy=2026-27 lists 1 (Won); LOST · → /inquiries?st=LOST_DROPPED&fy=2026-27 lists 2 (Lost). FY 2027-28 → no cards (nothing that year); search \"Valve\" → \"📨 ENQUIRIES 1 0 open, not quoted yet\".",
+   "note": "The \"Lost · Dropped\" card opens the Lost list only (?st=LOST); the dropped enquiries are reached through the status filter."
+  },
+  {
+   "n": 11,
+   "do": "EDGE · An enquiry recorded before this update, still reading \"Quoted\" although its quotation was accepted.",
+   "expect": "Opening the register (or the enquiry) corrects it to \"Won\" by itself.",
+   "status": "pass",
+   "observed": "A was set back to the old \"Quoted\" (its quotation accepted); opening the register corrected it to \"Won\" by itself."
+  },
+  {
+   "n": 12,
+   "do": "NEGATIVE · New enquiry with \"Received date\" set to tomorrow (owner, 13 Nov 2026).",
+   "expect": "The calendar does not go past today. Typed in anyway, a red \"⚠ This date is in the future … it will not be saved\" appears under the field at once; pressing \"Create inquiry\" keeps you on the form: \"⚠ The received date … is in the future. An enquiry can only be recorded as received today or earlier — it was not saved.\" Nothing is recorded. Today or an earlier date saves normally.",
+   "status": "pass",
+   "observed": "The calendar stops at today (max 2026-11-15). Tomorrow typed: \"Received date ⚠ This date is in the future. An inquiry can only be recorded as received today or earlier — it will not b\" at once; \"Create inquiry\" kept the form with the refusal \"⚠ The received date … is in the future … it was not saved.\" and nothing was recorded. Today saved normally.",
+   "note": "After the refusal the form's button reads \"Save inquiry\" instead of \"Create inquiry\" (the heading still says \"New client inquiry\") — a small wording slip."
+  },
+  {
+   "n": 13,
+   "do": "EDGE · The status filter on the register.",
+   "expect": "Lists Open, Quoted, Won, Lost, Dropped. If your company renamed statuses under Admin → lists, your names are kept and Won / Lost still appear.",
+   "status": "fail",
+   "observed": "the filter offers: All statuses, Open, Quoted, Won, Lost, Dropped, Quoted — any outcome, Lost or dropped",
+   "shot": "SAL-185-13-fail.jpg"
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-185-end.jpg",
+ "seconds": 43,
+ "ranAt": "2026-11-15T15:50:16.138Z"
+}

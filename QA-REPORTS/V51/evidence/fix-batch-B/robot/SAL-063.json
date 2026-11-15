@@ -1,0 +1,35 @@
+{
+ "id": "SAL-063",
+ "title": "Double-click and two people editing the same quotation",
+ "area": "Sales",
+ "module": "Quotes",
+ "persona": "several",
+ "kind": "edge",
+ "status": "PASSED",
+ "steps": [
+  {
+   "n": 1,
+   "do": "\"+ New quote\", fill a valid quotation, double-click \"Create quote\".",
+   "expect": "One quotation is created. If the form is sent twice you see \"That quote was already saved — here it is.\"",
+   "status": "pass",
+   "observed": "One quotation after the double-click; sending the same form again created nothing and said \"That was already saved — the form was sent twice, so the second copy was ignored.\".",
+   "shot": "SAL-063-1.jpg",
+   "note": "Sending the same form again is caught by the app-wide double-send guard first, which says \"That was already saved — the form was sent twice, so the second copy was ignored.\" (landing on /quote?id=1), not the quotation's own \"That quote was already saved — here it is.\"",
+   "suggest": "If the form is sent twice you are told it was already saved, and no second quotation is made."
+  },
+  {
+   "n": 2,
+   "do": "Two people open \"Edit\" on the same draft. A changes Contact person and saves. B then changes Subject and saves.",
+   "expect": "B is refused: \"Someone else saved changes to this record while you had it open. Reopen it to see the latest version, then re-apply your change — your edit was not saved, so nothing of theirs was overwritten.\" A's change is kept.",
+   "status": "pass",
+   "observed": "A (Test BDM) saved (\"Quote saved.\"); B (admin) was refused: \"Someone else saved changes to this record while you had it open. Reopen it to se…\"; A's contact person is kept and the subject is unchanged.",
+   "shot": "SAL-063-2.jpg",
+   "note": "B is the Master Admin here: since 14 Nov 2026 a quotation assigned to Test BDM is edited only by Test BDM and the people above them, so a second sales colleague cannot open its Edit screen."
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-063-end.jpg",
+ "seconds": 8,
+ "ranAt": "2026-11-15T16:08:56.322Z"
+}

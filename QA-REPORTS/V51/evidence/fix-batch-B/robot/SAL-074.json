@@ -1,0 +1,42 @@
+{
+ "id": "SAL-074",
+ "title": "Preparer approving their own quotation — both answers of Set up Sales",
+ "area": "Sales",
+ "module": "Approvals",
+ "persona": "BRANCH_MANAGER",
+ "kind": "scenario",
+ "status": "FAILED",
+ "steps": [
+  {
+   "n": 1,
+   "do": "Set up Sales \"Yes — when it is within their own authority\". As Test BranchMgr submit their own ₹3,00,000 quotation.",
+   "expect": "Approved on submit — Test BranchMgr does not sign their own level (owner, 15 Nov 2026, F13). History: \"Approved on submit — a self-approval: it is within Test BranchMgr's own approval authority …\".",
+   "status": "fail",
+   "observed": "status PENDING_APPROVAL — Submitted for approval — 1 step(s). Now with Test BranchMgr (Branch Manager).",
+   "shot": "SAL-074-1-fail.jpg",
+   "note": "Test BranchMgr cannot create a quotation (no \"Create / edit quotations\" right; /quote-new says: \"You cannot create or edit quotations.\"), so \"prepares\" was set up as a quotation assigned to Test BranchMgr.",
+   "suggest": "A ₹3,00,000 quotation assigned to Test BranchMgr (made by a sales colleague)."
+  },
+  {
+   "n": 2,
+   "do": "Test MktExec prepares a ₹3,00,000 quotation and tries to approve it.",
+   "expect": "No Approve button: the Level 1 step is not theirs.",
+   "status": "pass",
+   "observed": "Test MktExec made and submitted it; the Level 1 row reads \"Test BranchMgr (Branch Manager) — Pending\" with no Approve button for them.",
+   "shot": "SAL-074-2.jpg"
+  },
+  {
+   "n": 3,
+   "do": "Set up Sales \"No — someone else must always approve it\". Repeat the first step; then try Approve as Test BranchMgr.",
+   "expect": "It goes to the next level up (Level 2, Test MktMgr) — level 1 is not needed. History: \"Levels 1 not needed — prepared by Test BranchMgr …\" and \"It goes to level 2 … — someone other than the preparer must approve it.\" Test BranchMgr cannot approve it.",
+   "status": "fail",
+   "observed": "not passed up a level: Submitted (\"Submitted for approval — 1 step(s). Now with Test BranchMgr (Branch Manager).\"): levels [1]; status PENDING_APPROVAL; pressing Approve anyway: \"You are not an approver for this step.\"; History: \"\".",
+   "shot": "SAL-074-3-fail.jpg"
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-074-end.jpg",
+ "seconds": 12,
+ "ranAt": "2026-11-15T16:09:08.407Z"
+}

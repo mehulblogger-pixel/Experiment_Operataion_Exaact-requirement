@@ -1,0 +1,66 @@
+{
+ "id": "SAL-002",
+ "title": "Answer \"Set up Sales\" — record your company's answers before testing",
+ "area": "Sales",
+ "module": "Before you start",
+ "persona": "MARKETING_MANAGER",
+ "kind": "scenario",
+ "status": "OUT_OF_DATE",
+ "steps": [
+  {
+   "n": 1,
+   "do": "Left menu → Sales → \"Set up Sales\" (tile on the Sales home).",
+   "expect": "Page headed \"Sales — set up in a few questions\" with sections: Approving a quote (it starts with \"Who approves, and up to what value\" — the levels, editable right here); Approving a deal as it moves stage; Other approvals in Sales; Reviewing the request before it is approved (contract review); Already set by your company's rules.",
+   "status": "outdated",
+   "observed": "Headed \"Sales — set up in a few questions\"; \"Approving a quote\" starts with the level summary and \"Who approves, and up to what value\". There is no \"Other approvals in Sales\" section any more: since 13 Nov 2026 (commit \"Sales approvals in one place\") each approval has its own section — Approving a quote · Who approves, and up to what value · Approving a project costing · Opening a contract · Approving a deal as it moves stage · Leads — marking lost, giving to someone else, reopening · Reviewing the request before it is approved (contract review) · Already set by your company's rules.",
+   "shot": "SAL-002-1-old.jpg",
+   "suggest": "Page headed \"Sales — set up in a few questions\" with sections: Approving a quote (starting with the levels and \"Who approves, and up to what value\"); Approving a project costing; Opening a contract; Approving a deal as it moves stage; Leads — marking lost, giving to someone else, reopening; Reviewing the request before it is approved (contract review); Already set by your company's rules."
+  },
+  {
+   "n": 2,
+   "do": "Read \"Other approvals in Sales\".",
+   "expect": "One line each for Leads (no approval), Deals, Project costing, Quotes and Opening a contract — each saying who approves.",
+   "status": "outdated",
+   "observed": "Every subject still says who approves, but in its own section rather than a single \"Other approvals in Sales\": Leads (\"only the person responsible marks a lead lost… a manager may reopen\"), Deals (\"only the stage rules above\"), Project costing (\"approved through the same levels as a quote of that value — never by the person who prepared it\"), Quotes (under \"Already set\": \"the levels above, in order…\") and Opening a contract (\"Today: two signatures…\"). Leads need no approval to create.",
+   "shot": "SAL-002-2-old.jpg",
+   "suggest": "Read the sections \"Approving a project costing\", \"Opening a contract\", \"Approving a deal as it moves stage\" and \"Leads — …\". Expect: each says who approves (leads need no approval; deals only by stage rules; costing by the quote levels; contract by its signatures)."
+  },
+  {
+   "n": 3,
+   "do": "Read \"Already set by your company's rules\".",
+   "expect": "Your approval levels are written out in sentences, including any value no level covers.",
+   "status": "outdated",
+   "observed": "The level sentences now open the \"Approving a quote\" section (Level 1 — from ₹0 to ₹5,00,000 before tax: Branch Manager. Level 2 — above ₹5,00,000 to ₹25,00,000 before tax: Marketing Manager. Level 3 — above ₹25,00,000 before tax: Business Director. — and, when there is a gap, \"Nothing above … is covered by a level\"). \"Already set by your company's rules\" now lists the general rules: values before tax; a change to commercial terms cancels an approval; \"Quotes: the levels above, in order — level 1 first… top management last\"; who records the customer's answer; held customers get nothing new.",
+   "shot": "SAL-002-3-old.jpg",
+   "suggest": "Read the top of \"Approving a quote\": your levels are written out in sentences, including any value no level covers. \"Already set by your company's rules\" lists the fixed rules (before tax; changes cancel approval; top management last)."
+  },
+  {
+   "n": 4,
+   "do": "Question \"When a quote's value is not covered by any of your approval levels…\" — choose \"It goes to the approvers of your highest level\". Question \"May the person who prepared a quote approve it themselves…\" — choose \"Yes — when it is within their own authority\". Question \"When a quote needs more than one level, how do the levels approve?\" — choose \"One after another — level 1 first\". Question \"If a quote waits too long at one approval level…\" — choose \"After 1 day\". Question \"Must a man-month quote come from an approved project costing…\" — choose \"Yes — an approved costing first\". Checklist: \"Yes — show the checklist on every quote\" and \"Yes — every point must be ticked (or waived)\". Press \"Save these answers\".",
+   "expect": "A message confirms the answers were saved. Reopen the page: every answer is still selected.",
+   "status": "pass",
+   "observed": "Message: \"Saved. 7 answers changed — it applies from now on.\". Reopened: all seven answers still selected.",
+   "shot": "SAL-002-4.jpg"
+  },
+  {
+   "n": 5,
+   "do": "Left menu → Directory → Activity (or the activity log).",
+   "expect": "One entry \"Sales answered: …\" per changed answer, in the words of the question.",
+   "status": "pass",
+   "observed": "7 \"Sales answered\" entries.",
+   "shot": "SAL-002-5.jpg"
+  },
+  {
+   "n": 6,
+   "do": "Sign in as Test MktExec and open the same page.",
+   "expect": "Refused — only someone who may change the quotation approval rules may answer.",
+   "status": "pass",
+   "observed": "Refused: \"Only someone who may change the Sales settings can answer these questions.\""
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-002-end.jpg",
+ "seconds": 5,
+ "ranAt": "2026-11-15T15:48:44.335Z"
+}

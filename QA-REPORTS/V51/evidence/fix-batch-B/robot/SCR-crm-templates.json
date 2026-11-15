@@ -1,0 +1,170 @@
+{
+ "id": "SCR-crm-templates",
+ "title": "Screen check — Document templates",
+ "area": "Sales",
+ "module": "Quote templates",
+ "persona": "MASTER_ADMIN",
+ "kind": "screen",
+ "status": "FAILED",
+ "steps": [
+  {
+   "n": 1,
+   "do": "Open the screen: Go to Sales → CRM — Sales reports → Document templates (or type /crm-templates after the site address).",
+   "expect": "The page heading reads \"Document templates\"; the breadcrumb reads Home › Sales › CRM — Sales reports; the page loads in under 3 seconds with no error.",
+   "status": "pass",
+   "observed": "Opened without error in 67 ms; heading \"Document templates\"; breadcrumb Home › Sales › CRM — Sales reports › Crm templates.",
+   "shot": "SCR-crm-templates-1.jpg"
+  },
+  {
+   "n": 2,
+   "do": "Read the line under the heading.",
+   "expect": "It says: \"Upload your Word quote format (for editing) and the signature that appears on the client PDF. The generated quote stamps the document / format number from the format.\" — and it is true for what you see.",
+   "status": "pass",
+   "observed": "The line reads as the test says. (Whether it is true for what you see is checked by the other steps.)"
+  },
+  {
+   "n": 3,
+   "do": "Form “Save letterhead”: fill every field with valid values and press “Save letterhead”.",
+   "expect": "Saved with a confirmation message; the saved values show exactly as typed when reopened.",
+   "status": "pass",
+   "observed": "Saved — \"Letterhead saved — see \"Saved — this is what prints\" below; it heads every quote PDF.\" (new: settings); the values show as typed when reopened."
+  },
+  {
+   "n": 4,
+   "do": "Same form: press “Save letterhead” with everything empty.",
+   "expect": "Refused with one clear sentence naming what is missing; no half-saved record.",
+   "status": "pass",
+   "observed": "Refused: \"Please add the company name and the address — they head every quote PDF. Nothing was saved.\". Nothing was saved."
+  },
+  {
+   "n": 5,
+   "do": "Field \"Company logo (PNG / JPG)\" (file) — try one allowed file; then several at once; then a file that is too large; then a file type that should not be allowed (.exe).",
+   "expect": "Allowed files attach and are listed. Too-large and wrong-type files are refused with a message naming the limit.",
+   "status": "fail",
+   "observed": "too large (30 MB) was accepted. Tried — one allowed file: accepted (\"Letterhead saved — see \"Saved — this is what prints\" below; it heads every quote\"); several at once: the box takes one file at a time; too large (30 MB): accepted (\"Letterhead saved — see \"Saved — this is what prints\" below; it heads every quote\"); an .exe: refused — \"\"robot-sample.exe\" is a program file. Attach a document or a picture instead. Nothing else on the form was saved either \"",
+   "shot": "SCR-crm-templates-5-fail.jpg"
+  },
+  {
+   "n": 6,
+   "do": "Field \"Company name\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Letterhead saved — see \"Saved — this is what prints\" below; it heads every quote\"); empty: refused — \"Please add the company name — they head every quote PDF. Nothing was saved.\"; 300 characters: accepted (\"Letterhead saved — see \"Saved — this is what prints\" below; it heads every quote\"); special characters: accepted (\"Letterhead saved — see \"Saved — this is what prints\" below; it heads every quote\"); Hindi/Gujarati: accepted (\"Letterhead saved — see \"Saved — this is what prints\" below; it heads every quote\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 7,
+   "do": "Field \"Contact line (phone · email · web · GSTIN)\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Letterhead saved — see \"Saved — this is what prints\" below; it heads every quote\"); empty: accepted (\"Letterhead saved — see \"Saved — this is what prints\" below; it heads every quote\"); 300 characters: accepted (\"Letterhead saved — see \"Saved — this is what prints\" below; it heads every quote\"); special characters: accepted (\"Letterhead saved — see \"Saved — this is what prints\" below; it heads every quote\"); Hindi/Gujarati: accepted (\"Letterhead saved — see \"Saved — this is what prints\" below; it heads every quote\"). Nothing broke; what was accepted shows as "
+  },
+  {
+   "n": 8,
+   "do": "Field \"Address (one line each)\" (textarea) — try several lines with line breaks; then 3,000 characters; then leave it empty.",
+   "expect": "Line breaks are kept when the record is reopened and printed. Very long text is kept or refused with a message — never a blank page.",
+   "status": "pass",
+   "observed": "Tried — several lines: accepted (\"Letterhead saved — see \"Saved — this is what prints\" below; it heads every quote\"); 3,000 characters: accepted (\"Letterhead saved — see \"Saved — this is what prints\" below; it heads every quote\"); empty: refused — \"Please add the address — they head every quote PDF. Nothing was saved.\". Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 9,
+   "do": "Field \"Footer note (optional)\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Letterhead saved — see \"Saved — this is what prints\" below; it heads every quote\"); empty: accepted (\"Letterhead saved — see \"Saved — this is what prints\" below; it heads every quote\"); 300 characters: accepted (\"Letterhead saved — see \"Saved — this is what prints\" below; it heads every quote\"); special characters: accepted (\"Letterhead saved — see \"Saved — this is what prints\" below; it heads every quote\"); Hindi/Gujarati: accepted (\"Letterhead saved — see \"Saved — this is what prints\" below; it heads every quote\"). Nothing broke; what was accepted shows as "
+  },
+  {
+   "n": 10,
+   "do": "Same form: press “Save letterhead” twice quickly (double-click).",
+   "expect": "Saved once — never two records.",
+   "status": "pass",
+   "observed": "Pressed twice quickly: nothing new was stored twice."
+  },
+  {
+   "n": 11,
+   "do": "Form “Save signature”: fill every field with valid values and press “Save signature”.",
+   "expect": "Saved with a confirmation message; the saved values show exactly as typed when reopened.",
+   "status": "needs",
+   "observed": "Refused: \"Signature: Unreadable / unsupported image format (e.g. HEIC). Upload a JPG or PNG, or install Imagick.\"",
+   "reason": "The robot's ordinary values were refused — a person must choose values that suit this form.",
+   "rule": false,
+   "shot": "SCR-crm-templates-11-needs.jpg"
+  },
+  {
+   "n": 12,
+   "do": "Same form: press “Save signature” with everything empty.",
+   "expect": "Refused with one clear sentence naming what is missing; no half-saved record.",
+   "status": "pass",
+   "observed": "Refused before sending — the browser points at the first missing box: \"Please select a file. — sig\". Nothing was saved."
+  },
+  {
+   "n": 13,
+   "do": "Field \"Signature image (PNG / JPG)\" (file) — try one allowed file; then several at once; then a file that is too large; then a file type that should not be allowed (.exe).",
+   "expect": "Allowed files attach and are listed. Too-large and wrong-type files are refused with a message naming the limit.",
+   "status": "fail",
+   "observed": "too large (30 MB) was accepted. Tried — one allowed file: accepted (\"Signature saved — see \"Saved — this is what prints\" below; it appears on every q\"); several at once: the box takes one file at a time; too large (30 MB): accepted (\"Signature saved — see \"Saved — this is what prints\" below; it appears on every q\"); an .exe: refused — \"\"robot-sample.exe\" is a program file. Attach a document or a picture instead. Nothing else on the form was saved either \"",
+   "shot": "SCR-crm-templates-13-fail.jpg"
+  },
+  {
+   "n": 14,
+   "do": "Field \"Signatory name\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Signature saved — see \"Saved — this is what prints\" below; it appears on every q\"); empty: refused by the form (\"Please fill out this field.\"); 300 characters: accepted (\"Signature saved — see \"Saved — this is what prints\" below; it appears on every q\"); special characters: accepted (\"Signature saved — see \"Saved — this is what prints\" below; it appears on every q\"); Hindi/Gujarati: accepted (\"Signature saved — see \"Saved — this is what prints\" below; it appears on every q\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 15,
+   "do": "Field \"Designation\" (text) — try a normal value; then leave it empty; then 300 characters; then special characters  & < > \" ' ₹ ; then Hindi/Gujarati text (नमस्ते / નમસ્તે).",
+   "expect": "Normal value saves and shows exactly as typed. A 300-character value is cut or refused with a message. Special characters and Indian scripts show exactly as typed, never as code. A refusal keeps everything else you typed.",
+   "status": "pass",
+   "observed": "Tried — a normal value: accepted (\"Signature saved — see \"Saved — this is what prints\" below; it appears on every q\"); empty: refused by the form (\"Please fill out this field.\"); 300 characters: accepted (\"Signature saved — see \"Saved — this is what prints\" below; it appears on every q\"); special characters: accepted (\"Signature saved — see \"Saved — this is what prints\" below; it appears on every q\"); Hindi/Gujarati: accepted (\"Signature saved — see \"Saved — this is what prints\" below; it appears on every q\"). Nothing broke; what was accepted shows as typed."
+  },
+  {
+   "n": 16,
+   "do": "Same form: press “Save signature” twice quickly (double-click).",
+   "expect": "Saved once — never two records.",
+   "status": "pass",
+   "observed": "Pressed twice quickly: nothing new was stored twice."
+  },
+  {
+   "n": 17,
+   "do": "Button / link \"+ Add template\" — press it.",
+   "expect": "It opens the screen at /crm-template-new; Back returns here.",
+   "status": "pass",
+   "observed": "Opened /crm-template-new; Back returns here."
+  },
+  {
+   "n": 18,
+   "do": "Button / link \"Edit\" — press it.",
+   "expect": "It opens the screen at /crm-template-edit?id=…; Back returns here.",
+   "status": "pass",
+   "observed": "Opened /crm-template-edit?id=1; Back returns here."
+  },
+  {
+   "n": 19,
+   "do": "Table with columns: Name, Kind, Document no., Format no., Rev, Issued, File, Status.",
+   "expect": "Every column has a value or a dash; numbers line up; long text wraps; an empty list says so in words; on a phone the table scrolls inside itself.",
+   "status": "pass",
+   "observed": "Columns: Name, Kind, Document no., Format no., Rev, Issued, File, Status."
+  },
+  {
+   "n": 20,
+   "do": "Narrow the window to phone width (about 390 pixels) or open on a phone.",
+   "expect": "Readable and usable without the whole page scrolling sideways; buttons big enough to tap.",
+   "status": "pass",
+   "observed": "On a phone (390 px) the page does not scroll sideways; buttons are big enough to tap.",
+   "shot": "SCR-crm-templates-20.jpg"
+  },
+  {
+   "n": 21,
+   "do": "Who may open it: sign in as each role (or ask your administrator) and open this screen.",
+   "expect": "Measured on a test copy today — opened for: Marketing Manager. Refused for: Asst. Manager, Branch Application Manager, Branch Manager, Business Development Manager, Business Director, Coordinator, Finance, Inspector, Key Accounts Manager, Marketing Executive, Operation Manager, Quality Head, Business Unit Head, Senior Inspector, Technical Head. Check this against what your business wants (docs/02-permission-matrix.md). Record any surprise.",
+   "status": "pass",
+   "observed": "Opened for: Marketing Manager. Refused for the others — as the test says."
+  }
+ ],
+ "note": "The list was empty on the copy, so the robot first made one record through /crm-template-new to have a row to act on.",
+ "crash": "",
+ "finalShot": "SCR-crm-templates-end.jpg",
+ "seconds": 75,
+ "ranAt": "2026-11-15T15:44:21.439Z"
+}

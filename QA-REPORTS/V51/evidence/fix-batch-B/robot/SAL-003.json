@@ -1,0 +1,98 @@
+{
+ "id": "SAL-003",
+ "title": "Set approval levels that match a real company — on Set up Sales itself",
+ "area": "Sales",
+ "module": "Before you start",
+ "persona": "MARKETING_MANAGER",
+ "kind": "scenario",
+ "status": "PASSED",
+ "steps": [
+  {
+   "n": 1,
+   "do": "Sales home → \"Set up Sales\" → section \"Approving a quote\" → \"Who approves, and up to what value\".",
+   "expect": "One card per level (Level · From value · Up to value (0 = no limit) · Approved by (role) · …or one named person · For · In use · Save · Remove), and a dashed card at the end with \"Add this level\".",
+   "status": "pass",
+   "observed": "No levels yet (\"No levels yet. Add the first one:\"); the dashed card (dashed) offers Level · From value · Up to value (0 = no limit) · Approved by (role) · …or one named person · For · In use and \"Add this level\". (A saved level's card adds Save and Remove — seen from step 2.)",
+   "shot": "SAL-003-1.jpg"
+  },
+  {
+   "n": 2,
+   "do": "In the dashed card: Level 1, From 0, Up to 500000, Approved by \"Branch Manager\", For \"Every business unit\". Press \"Add this level\".",
+   "expect": "You stay on Set up Sales. A card \"Level 1\" appears, and the summary above reads \"Level 1 — from ₹0 to ₹5,00,000 before tax: Branch Manager.\"",
+   "status": "pass",
+   "observed": "Stayed on Set up Sales; card \"Level 1\" with Save and Remove; summary \"Level 1 — from ₹0 to ₹5,00,000 before tax: Branch Manager.\"",
+   "shot": "SAL-003-2.jpg"
+  },
+  {
+   "n": 3,
+   "do": "Look at the new dashed card.",
+   "expect": "It is already filled in: Level 2, From 500000 — where level 1 stops.",
+   "status": "pass",
+   "observed": "The dashed card already holds Level 2, From 500000."
+  },
+  {
+   "n": 4,
+   "do": "Level 2: Up to 2500000, Approved by \"Marketing Manager\". Add this level.",
+   "expect": "Card \"Level 2\"; summary line \"Level 2 — above ₹5,00,000 to ₹25,00,000 before tax: Marketing Manager.\"",
+   "status": "pass",
+   "observed": "Card \"Level 2\"; summary \"Level 2 — above ₹5,00,000 to ₹25,00,000 before tax: Marketing Manager.\""
+  },
+  {
+   "n": 5,
+   "do": "Level 3: From 2500000, Up to 0, Approved by \"Business Director\". Add this level.",
+   "expect": "Card \"Level 3\"; summary says \"above ₹25,00,000\". The line \"Nothing above … is covered\" disappears, and a line reads \"A quote goes up the levels: it is signed by the level its value falls in and by every level below it, in order.\"",
+   "status": "pass",
+   "observed": "Card \"Level 3\"; \"above ₹25,00,000\"; the \"Nothing above\" line disappeared; \"A quote goes up the levels…\" is shown."
+  },
+  {
+   "n": 6,
+   "do": "Edge: in the dashed card type From 900000 and Up to 800000. Add this level.",
+   "expect": "Refused: \"The \"up to\" value must be above the \"from\" value (or 0 for no upper limit).\" No card is added.",
+   "status": "pass",
+   "observed": "Refused: \"The \"up to\" value must be above the \"from\" value (or 0 for no upper limit).\"; still three cards.",
+   "shot": "SAL-003-6.jpg"
+  },
+  {
+   "n": 7,
+   "do": "Change Level 1's \"Approved by\" to \"Business Unit Head\" and press that card's Save. Then change it back to Branch Manager and Save.",
+   "expect": "Each save stays on Set up Sales; the summary follows the change.",
+   "status": "pass",
+   "observed": "Each save stayed on Set up Sales; the summary followed: Level 1 — from ₹0 to ₹5,00,000 before tax: Business Unit Head. → Level 1 — from ₹0 to ₹5,00,000 before tax: Branch Manager."
+  },
+  {
+   "n": 8,
+   "do": "Sales → Quotes → \"Approval rules\" (the full screen).",
+   "expect": "The same three levels, named \"Level 1 — Branch Manager\", \"Level 2 — Marketing Manager\", \"Level 3 — Business Director\".",
+   "status": "pass",
+   "observed": "Approval rules lists Level 1 — Branch Manager, Level 2 — Marketing Manager, Level 3 — Business Director.",
+   "shot": "SAL-003-8.jpg"
+  },
+  {
+   "n": 9,
+   "do": "Edge: in the dashed card type Level 4, From 30000, Up to 100000 (inside Level 1). Add this level.",
+   "expect": "Refused: \"Level 1 already covers ₹0 to ₹5,00,000. Levels may not overlap — a quotation moves up through them in order…\". No card is added.",
+   "status": "pass",
+   "observed": "Refused: \"Level 1 already covers ₹0 to ₹5,00,000. Levels may not overlap — a quotation moves up through them in order. Start this level at ₹5,00,000, or change level 1 first.\""
+  },
+  {
+   "n": 10,
+   "do": "Edge: type Level 1, From 3000000, Up to 0 (a higher range with a lower level number). Add this level.",
+   "expect": "Refused: \"A higher value needs a higher level number…\". No card is added.",
+   "status": "pass",
+   "observed": "Refused: \"A higher value needs a higher level number: level 1 covers ₹0 to ₹5,00,000, so this range must be level 2 or above.\""
+  },
+  {
+   "n": 11,
+   "do": "As Test BDM make three quotations — ₹2,00,000, ₹10,00,000 and ₹30,00,000 before tax — and submit each for approval. Open each one's approval steps.",
+   "expect": "₹2,00,000: Level 1 only. ₹10,00,000: Level 1, then Level 2. ₹30,00,000: Level 1 → Level 2 → Level 3 (one after another, or all at once if Set up Sales says so).",
+   "status": "pass",
+   "observed": "₹2,00,000: Level 1 (now with level 1; \"Submitted for approval — 1 step(s). Now with Test BranchMgr (Branch Manager).\") | ₹10,00,000: Level 1 → Level 2 (now with level 1; \"Submitted for approval — 2 step(s). Now with Test BranchMgr (Branch Manager); th\") | ₹30,00,000: Level 1 → Level 2 → Level 3 (now with level 1; \"Submitted for approval — 3 step(s). Now with Test BranchMgr (Branch Manager); th\")",
+   "shot": "SAL-003-11.jpg"
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-003-end.jpg",
+ "seconds": 18,
+ "ranAt": "2026-11-15T15:32:50.727Z"
+}

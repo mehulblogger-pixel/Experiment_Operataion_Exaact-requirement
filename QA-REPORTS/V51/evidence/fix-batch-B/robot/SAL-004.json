@@ -1,0 +1,77 @@
+{
+ "id": "SAL-004",
+ "title": "Company types to test — run the Sales tests once for each",
+ "area": "Sales",
+ "module": "Before you start",
+ "persona": "MASTER_ADMIN",
+ "kind": "scenario",
+ "status": "PASSED",
+ "steps": [
+  {
+   "n": 1,
+   "do": "Profile A — Third-party inspection agency (services by man-day). Left menu → Admin → Settings → Your industry → \"Inspection, testing & certification\" → Make it the company's industry (tick \"I understand the changes listed above.\").",
+   "expect": "Wording and ISO/IEC 17020 rules match an inspection body.",
+   "status": "pass",
+   "observed": "Already the company's industry (\"✓ Your company already uses this industry's wording and accreditation rules\"); wording pack \"inspection\", accreditation rules \"inspection\" (ISO/IEC 17020)."
+  },
+  {
+   "n": 2,
+   "do": "Profile B — Testing laboratory: \"Testing & calibration laboratory\".",
+   "expect": "The ISO/IEC 17025 laboratory rules are switched on, inspection rules off; the panel listed both changes before you confirmed.",
+   "status": "pass",
+   "observed": "The panel listed \"17020 … turned OFF\" and \"17025 … turned ON\" before confirming; after: \"Your company's industry is now Testing & calibration laboratory. Quotation and order lines now also offer Per sample, Pe\" — rules now \"labs\".",
+   "shot": "SAL-004-2.jpg"
+  },
+  {
+   "n": 3,
+   "do": "Profile C — Manpower supply / deputation: \"Recruitment & staffing\". Quote by Man-month.",
+   "expect": "Man-month quotations need an approved project costing (if your Set up Sales answer says so).",
+   "status": "pass",
+   "observed": "Applied (\"Your company's industry is now Recruitment & staffing. Quotation and order lines\"). A man-month quotation (Q-00001) without a costing: \"Not ready to submit: A man-month quote goes forward only from an approved project costing — make one for it (Project costing), have it approved, and link it to this quote.\"",
+   "shot": "SAL-004-3.jpg"
+  },
+  {
+   "n": 4,
+   "do": "Profile D — Manufacturer selling products: \"Manufacturing & engineering\". Try to quote 50 cabinets.",
+   "expect": "Making it the company's industry says the quotation lines now also offer Nos, Set, Kg, Tonne and more. A new quotation line starts in Nos; the service units (Man-day …) are still there for service lines. There is still no HSN code field — record that as a GAP.",
+   "status": "pass",
+   "observed": "Applied: \"Your company's industry is now Manufacturing & engineering. Quotation and order lines now also offer Nos, Set, Kg, Tonne and more. No accreditation rules are on\". New line starts in Nos; units Man-day, Man-month, Per visit, Audit day, Per lot / lump sum, Per document, Per km, Other, Per sample, Per test, Per parameter, Per hour, Per month, Nos, Set, Kg, Tonne, Metre, Litre, Box, Pair. HSN code field: none (GAP, as the test expects).",
+   "shot": "SAL-004-4.jpg",
+   "note": "GAP recorded as the test asks: the quotation line has no HSN code field."
+  },
+  {
+   "n": 5,
+   "do": "Profile E — Trader (products + services): \"Trading & distribution\".",
+   "expect": "Lines offer Nos, Set, Box, Carton, Dozen, Kg, Tonne, Metre, Litre, Roll, Pair as well as the service units; a new line starts in Nos (owner, 12 Nov 2026).",
+   "status": "pass",
+   "observed": "A new line starts in Nos; offers Man-day, Man-month, Per visit, Audit day, Per lot / lump sum, Per document, Per km, Other, Per sample, Per test, Per parameter, Per hour, Per month, Nos, Set, Kg, Tonne, Metre, Litre, Box, Pair, Carton, Dozen, Roll."
+  },
+  {
+   "n": 6,
+   "do": "Profile F — Construction / EPC: \"Construction, projects & infrastructure\". Quote lump-sum stages.",
+   "expect": "Lines also offer \"Per stage / milestone\", square / cubic / running metre. The quotation page has \"Billing by milestones\" → \"Set up milestones\" (see SAL-158).",
+   "status": "pass",
+   "observed": "Lines offer Per parameter, Metre, Per stage / milestone, Square metre, Cubic metre, Running metre; the quotation page has \"Billing by milestones\" with \"Set up milestones\"."
+  },
+  {
+   "n": 7,
+   "do": "Profile G — One-person consultancy: no approval levels at all; Set up Sales \"No approval is needed\".",
+   "expect": "Quotes can be sent straight from Draft.",
+   "status": "pass",
+   "observed": "Applied \"Professional & consulting services\"; levels removed — Set up Sales: \"You have no approval levels yet…\"; quotation Q-00003 is Draft and offers \"Send to client\" straight away (\"No approval needed\").",
+   "note": "There is no industry called \"One-person consultancy\"; the robot used \"Professional & consulting services\" and removed the approval levels."
+  },
+  {
+   "n": 8,
+   "do": "After each profile, go back to Profile A on the test workspace.",
+   "expect": "Wording returns to inspection words.",
+   "status": "pass",
+   "observed": "Back on Inspection: \"Your company's industry is now Inspection, testing & certification. The inspection (ISO/IEC 17020) accreditation rules a\"; wording pack \"inspection\" (Operations speaks of inspection calls), rules \"inspection\"."
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-004-end.jpg",
+ "seconds": 18,
+ "ranAt": "2026-11-15T16:08:20.344Z"
+}

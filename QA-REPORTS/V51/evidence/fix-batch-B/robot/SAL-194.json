@@ -1,0 +1,38 @@
+{
+ "id": "SAL-194",
+ "title": "One Documents button; a jump from \"On this quote\" lands on its section",
+ "area": "Sales",
+ "module": "Quotations",
+ "persona": "BUSINESS_DEV_MANAGER",
+ "kind": "scenario",
+ "status": "PASSED",
+ "steps": [
+  {
+   "n": 1,
+   "do": "Look at the title row.",
+   "expect": "PDF (for client), Word (editable), Edit (if allowed) — the second \"📎 Documents\" and the second \"← back\" button are gone. \"📎 Documents\" stays in \"On this quote\"; back stays at the top of the page.",
+   "status": "pass",
+   "observed": "Title row: ⬇ PDF (for client) · Word (editable) · Edit — no second \"📎 Documents\" or \"← back\". \"On this quote\": Actions · Approval chain · Pre-order checklist · Costing · 📎 Documents. Back at the top of the page: \"← CRM — Quotations\"."
+  },
+  {
+   "n": 2,
+   "do": "Press \"Costing\" in \"On this quote\".",
+   "expect": "The page scrolls so the Project costing box sits just under the top bar, fully visible — on a phone too.",
+   "status": "pass",
+   "observed": "Laptop: the Project costing box sits at 97px, just under the 53px top bar, fully visible; phone: at 219px under a 159px bar, fully visible.",
+   "shot": "SAL-194-2.jpg"
+  },
+  {
+   "n": 3,
+   "do": "Press \"📎 Documents\", \"Approval chain\", \"Actions\".",
+   "expect": "Each lands with its box in view.",
+   "status": "pass",
+   "observed": "Each lands with its box just under the top bar: 📎 Documents top 574px / bar 53px; 📎 Documents (phone) top 219px / bar 159px; Approval chain top 97px / bar 53px; Approval chain (phone) top 219px / bar 159px; Actions top 97px / bar 53px; Actions (phone) top 219px / bar 159px."
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-194-end.jpg",
+ "seconds": 20,
+ "ranAt": "2026-11-15T15:50:51.107Z"
+}

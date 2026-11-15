@@ -1,0 +1,46 @@
+{
+ "id": "SAL-136",
+ "title": "Finance — what they may and may not do in Sales",
+ "area": "Sales",
+ "module": "Who may do what",
+ "persona": "FINANCE",
+ "kind": "access",
+ "status": "PASSED",
+ "steps": [
+  {
+   "n": 1,
+   "do": "Open Left menu → Sales and each tile in turn: Leads, Opportunities, Inquiries, Quotes, Quote templates, Pre-order checklist, Project costing, Approvals, Pipelines & funnels, Set up Sales.",
+   "expect": "Opens exactly what the matrix allows; anything else is refused with a sentence (never a blank page or an error).",
+   "status": "pass",
+   "observed": "Leads: refused (\"Sales & CRM — restricted You don’t have permission to open Leads & pip\") [no tile — address typed]; Opportunities: refused (\"Sales & CRM — restricted You don’t have permission to open Leads & pip\"); Inquiries: refused (\"Sales & CRM — restricted You don’t have permission to open CRM — Inqui\") [no tile — address typed]; Quotes: opens; Quote templates: refused (\"You cannot manage CRM templates.\") [no tile — address typed]; Pre-order checklist: refused (\"You cannot configure the pre-order checklist.\") [no tile — address typed]; Project costing: opens; Approvals: opens [no tile — a",
+   "note": "The Sales page shows Finance tiles that then refuse: Opportunities, Pipelines & funnels (drawn on opp_can_view()/pipe_can_view(), which accept Quotes view, while the screens need Leads view)."
+  },
+  {
+   "n": 2,
+   "do": "Try what the permission matrix says they may do: Read quotations, register contracts, edit contract figures (as amendment), read client register.",
+   "expect": "Each works.",
+   "status": "pass",
+   "observed": "Read the quotation; registered AHM/C/2026-27/00001 (\"Contract AHM/C/2026-27/00001 registered — it is waiting for …\"); the new value went in as an amendment waiting for signatures (\"Amendment requested — value ₹94,400 → ₹1,14,400. It needs two signatures — first…\", value still 94400); the client register opens.",
+   "shot": "SAL-136-2.jpg"
+  },
+  {
+   "n": 3,
+   "do": "Try what the matrix says they may NOT do: Create quotations, mark accepted/lost, work leads.",
+   "expect": "Each is refused (button absent, or a refusal sentence when the address is typed).",
+   "status": "pass",
+   "observed": "no \"+ New quote\"; /quote-new → \"You cannot create or edit quotations.\"; no Mark accepted / Mark lost; a re-sent accept form → \"Only the person assigned to this quote (Test BDM) can record the client's answer.\"; Leads → \"Sales & CRM — restricted You don’t have permission to open L\""
+  },
+  {
+   "n": 4,
+   "do": "Type the address of a refused screen directly.",
+   "expect": "Refused the same way — hiding the button is not enough.",
+   "status": "pass",
+   "observed": "/lead-new → \"Sales & CRM — restricted You don’t have permission to o\"; /opportunities → \"Sales & CRM — restricted You don’t have permission to o\"; /inquiry-new → \"Sales & CRM — restricted You don’t have permission to o\"; /quote-edit?id=2 → \"You cannot create or edit quotations.\"; /sales-setup → \"Only someone who may change the Sales settings can answ\"; /pipelines → \"Sales & CRM — restricted You don’t have permission to o\""
+  }
+ ],
+ "note": "",
+ "crash": "",
+ "finalShot": "SAL-136-end.jpg",
+ "seconds": 24,
+ "ranAt": "2026-11-15T16:10:19.500Z"
+}
