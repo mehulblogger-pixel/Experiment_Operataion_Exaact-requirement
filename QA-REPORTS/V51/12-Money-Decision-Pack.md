@@ -2,7 +2,7 @@
 
 15 Nov 2026 · All 152 Money tests were run on a private copy of V51.1 with made-up data. Nothing has been changed yet.
 
-**How to answer:** reply with the item numbers, for example *"A1 yes, A2 yes, A3 yes, A4 no, B ok, C1 agree, C9 accrual"*. Anything you don't mention stays untouched.
+**How to answer:** reply with the item numbers, for example *"A1 yes, A2 yes, A3 yes, A4 no, B ok, C1 agree, C3 accrual, D1 yes, D3 every expense names a job, E1 yes"*. Anything you don't mention stays untouched.
 
 ## Where Money stands
 
@@ -58,6 +58,39 @@ Plus the wording of the 10 out-of-date tests.
 | C12 | MON-091 | An empty month shows no "Calculate and store" button | **Fine — update the test** |
 | C13 | MON-100 | A sub-contractor cost listed before the month-end run makes reconciliation amber every month | **Ignore months not yet run** |
 | C14 | Billing MD/MM | Man-day: a stage completion or an ordinary report as the billing point; extra man-days without approval; termination / notice charges; part completion. Man-month: a replacement inspector raised as a new job; extensions; extra days capped at a month; billing cycles that are not calendar months | **These need your billing rules written down before I test them — I will not guess** |
+
+## D — Older Money problems confirmed again on V51.1 (from the earlier audit list)
+
+These came from the earlier findings list and were checked again on V51.1: they still exist. I left them out of the first version of this pack. That was a gap, now corrected.
+
+| # | Item | What happens today | Proposal | Your yes needed? |
+| --- | --- | --- | --- | --- |
+| D1 | HF-005 | **The same expense is counted twice in profit by default.** A ₹2,500 hotel recorded on the job closure *and* on the inspector's voucher shows as ₹2,500 expenses + ₹2,500 voucher. A "duplicates" worklist exists, but someone has to clear it by hand | Count it once automatically (match on job, date, amount), keep the worklist for doubtful cases | **Yes — money** |
+| D2 | HF-194 | **Changing the invoice-number format mid-year restarts the series in the same year.** After AHM/2627/0002 the next invoice became AHM-2026-27-0001 | Continue the count within the financial year whatever the format; or forbid changing the format mid-year. **Ask your accountant — GST expects one unbroken series per year** | **Yes — GST** |
+| D3 | HF-108 | Expenses on a job closure always name the job, but voucher lines may have no job — so some costs never reach any job's profit | **Your rule:** must every inspector expense name a job? | **Decision** |
+| D4 | HF-171 | Recording receipts and starting invoices is allowed to anyone with "see inter-office credit" — a Coordinator recorded a receipt. There is no separate Finance permission for writing to the books | Give book-keeping its own permission (Finance and those you name) | **Yes — permission** |
+| D5 | HF-036 | Tally is one-way: EXAACT exports to Tally but never reads back what Tally changed | Record as a known limit, or plan a read-back later | Decision |
+| D6 | HF-103 | When a credit between offices is proposed or countered, the other office gets **no e-mail**, and the voucher download + submit step does not exist | Send the e-mail; add the step | Within P2 — I can fix |
+| D7 | HF-104 | The Invoice tracker has no filters (year, month, office, business unit, client, status) — only a CSV download | Add the filter bar | Within P2 — I can fix |
+| D8 | HF-197 | No screen shows documents waiting / sent / failed to MGH Books (Books is not connected on the copy, so a failure could not be produced) | Add a "Sent to Books" status list | Within P3 — I can fix |
+| D9 | HF-086 | Money logic still sits in the general program file (technical tidy-up, nothing you can see) | Leave for later | No |
+
+Also: **DEF-DB-001** (part-month invoice quantities cut to 3 decimals on MySQL — ₹6,41,637 instead of ₹6,41,580) is a Money problem too; it is in the Sales pack as **A8**, with **C18** (check invoices already issued on the live site).
+
+## E — Not built (the documents describe them, the app has no button)
+
+| # | Test | Gap | Proposal |
+| --- | --- | --- | --- |
+| E1 | MON-007 | The billable-events board has no **Cancel** button, although the rules allow Pending / Approved / Disputed → Cancelled (the server route exists) | Add the button (with a reason) — needs your yes: it changes what can be billed |
+| E2 | MON-057 | Two people editing the same draft invoice get **no warning**; the later save silently wins | Warn and refuse the second save, as other screens already do |
+
+## F — What is NOT tested yet in Money (so you know what the numbers above do not cover)
+
+- **Billing scenarios:** 22 of the 27 man-day / man-month scenarios are not started (5 partly). Man-month is not touched at all. These need the rules in C14 first, so that I test against your rules and not my guesses.
+- **Outside systems:** Tally import, MGH Books, a real Razorpay payment page and real printing cannot be done from the private copy.
+- **Live data:** invoices already issued on the live site are not checked (see Sales C18). Nothing on the live site is touched without your separate permission.
+
+So the Money picture is: **10 defects + 8 older problems still present + 2 features not built + 14 questions + most billing scenarios still untested.**
 
 ## After you answer
 
