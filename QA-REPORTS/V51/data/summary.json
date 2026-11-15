@@ -1,16 +1,16 @@
 {
- "generated": "2026-11-15T16:33:49.581Z",
+ "generated": "2026-11-15T16:57:52.696Z",
  "tests": 1472,
- "executed": 431,
- "passed": 318,
- "failed": 113,
- "blocked": 56,
- "notStarted": 906,
- "cannot": 24,
+ "executed": 465,
+ "passed": 347,
+ "failed": 118,
+ "blocked": 91,
+ "notStarted": 810,
+ "cannot": 43,
  "owner": 0,
- "completionPct": 29.3,
- "passRatePct": 73.8,
- "defects": 105,
+ "completionPct": 31.7,
+ "passRatePct": 74.6,
+ "defects": 106,
  "screens": 480,
- "events": 3779
+ "events": 4048
 }
