@@ -112,8 +112,11 @@ $drive($BDM, 'quote-status', 'POST', ['id' => $day], ['to' => 'SENT']);
 t_eq($st($day), 'SENT', 'control: a man-day quotation needs no costing');
 
 // ---- D-11 A: the creator may change its prices, with a note ------------------------------------
-// A second, fresh quotation from the same approved costing, still a draft.
-$drive($MM, 'project-costing-to-quote', 'POST', [], ['id' => $cid]);
+// A second, fresh quotation from the same approved costing, still a draft. Since v51.1 (owner, 15 Nov 2026)
+// a costing linked to a quotation makes no second one, and with live quotations for the client the person
+// chooses revise or new — so the arrangement unlinks it and chooses "a separate new quotation".
+$pdo->prepare("UPDATE project_costings SET quote_id=NULL WHERE id=?")->execute([$cid]);
+$drive($MM, 'project-costing-to-quote', 'POST', [], ['id' => $cid, 'make' => 'new']);
 $q2 = (int) $pc($cid)['quote_id'];
 $line = ops_one("SELECT * FROM quote_lines WHERE quote_id=?", [$q2]);
 $ver = fn() => (string) ops_val("SELECT updated_at FROM quotations WHERE id=?", [$q2]);   // what the open form carries
