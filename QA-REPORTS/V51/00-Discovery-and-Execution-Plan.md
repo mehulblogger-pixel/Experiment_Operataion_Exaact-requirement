@@ -4,6 +4,15 @@ Report date: 15 Nov 2026 · Prepared by: A00 Master QA Orchestrator · Status: *
 
 Everything below was measured, not assumed, unless it says "estimate".
 
+**Where to find everything.** The files are sent to you in this chat after every update. The same files are kept on GitHub in the repository branch `claude/testing-branch-setup-0gqe8n`, folder `QA-REPORTS/V51/`:
+
+| File | What it is |
+| --- | --- |
+| `00-Discovery-and-Execution-Plan.md` | This report |
+| `EXAACT_LIVE_TESTING_TRACKER.xlsx` | The live tracker, 14 sheets. Regenerated after every batch of results. |
+| `evidence/` | Screenshots, database read-backs and logs |
+| `data/events.jsonl` | The tracker's raw, append-only record |
+
 ## 1. What is being tested
 
 | Item | Finding |
@@ -94,6 +103,51 @@ Result: **COMPLETED – FAIL**, defect **DEF-0001 (P2)** raised.
 - An earlier run of the demo stopped at step 4 because my test script used a wrong table name. That is recorded in the activity log as a script error, not an app defect.
 - Evidence: `evidence/DEMO-01-*.png`, `evidence/DEMO-01-db-row.json`, `evidence/DEMO-01-result.json`.
 
+## 5a. Automated suite baseline
+
+The app's own **722 test files ran on v51.1: 20,182 checks passed, 0 failed** (10 min 46 s). These are the developers' checks of the code. They do not replace testing the screens as a user, which the robot and the agents do.
+
+## 5b. Historical Findings Register (Part 3)
+
+- All QA and outstanding-work notes were read in full, including PENDING.md (4,175 lines), UAT-TRACKER, UAT-MATRIX, DEPLOY-CHECKLIST and DEPLOY-SOP.
+- **211 items** are still recorded as open or unclear; **477** are recorded as closed.
+- Every open item is in tracker sheet 13 as NOT STARTED. Each will be retested by the agent of its module. None is carried forward as pass or fail.
+- Open items by module: Admin & Security 66, CRM & Sales 17, Licensing & SaaS 17, Money 16, Setup & Masters 16, Insights 15, Operations 15, People 14, Quality 13, Reporting 11, Directory 5, Marketplace 3, Client Portal 3.
+
+Your 8 named items. Only item 1 is confirmed by a live test. The others are **provisional, from reading the code**, and will be confirmed on the test copy:
+
+| # | Item | V51 classification | Basis |
+| --- | --- | --- | --- |
+| 1 | Previously recorded automated test failures (3 "release-dependency" checks) | **Fixed in V51** | Confirmed: the full suite now has 0 failures |
+| 2 | Contract registration lifecycle, including adding a contract from the client screen (PENDING → endorsement → approval) | Fixed in V51 (provisional) | Both the client-screen and quotation routes now create the contract as PENDING and use the same opening rule. PENDING.md still calls it open, but a later document records it closed; the two disagree. |
+| 3 | Duplicate cost: job-closure expenses vs inspector vouchers | **Reproduced in V51** (provisional) | Both are written separately and the job profit adds both. A warning and a duplicate list exist, but the two are not merged. |
+| 4 | Metrics on legacy status fields (ops-desk "report pending") | Partly fixed (provisional) | "Report pending" now reads a live field. But work orders are never set to CLOSED by the app, so an "open calls" count could be wrong. |
+| 5 | Masters and Admin access by role | Reproduced in V51 (provisional) | Coordinators see the Admin area through a read-only Masters tile; the Director's edit rights on Masters need checking |
+| 6 | Inspector login with no linked team-member record | Reproduced in V51 (provisional) | The dashboard shows zeros with no explanation. "My Jobs" does explain it. |
+| 7 | Own permission sets after role changes | Reproduced, by design (provisional) | A person with their own set does not follow later role edits, except for new modules and four named grants |
+| 8 | Differences between source and deployed files | Requires further investigation | `/deploy-check.php` compares every PHP file by size and fingerprint. It must be opened on each site (see L-01). |
+
+**Also found while reading, to be confirmed live (tracker sheet 6):**
+- **I-09 — possible cross-branch approval.** The contract-opening queue may let one branch's manager approve another branch's contract. This will be the first security test.
+- **I-10 — "Open calls" may never go down,** because the app never sets a work order to CLOSED.
+- **I-11 — packaging.** The app's own `tools/release.sh` and the "Download ZIP" route in DEPLOY-CHECKLIST.md include the `tests/` folder, which your rule forbids. The zips I build for you leave it out; the script and checklist do not.
+- **I-12 — deploy-check limits.** It checks all 719 PHP files, and all match v51.1. It does not check JS/CSS files, extra leftover files or `config.php`.
+
+## 5c. Sales robot run on v51.1 (provisional, triage in progress)
+
+Run on v51.1 so far (168 of 170 cases): **70 passed, 46 failed, 26 need your decision or the real world, 26 have wording out of date** because a later decision of yours changed the screen.
+
+The 46 failures, grouped automatically by comparing with the earlier run on the held v52/v53 code:
+
+| Group | Count | Meaning |
+| --- | --- | --- |
+| Robot script | 4 | The scripts predate v51.1's "revise or new" choice. Marked BLOCKED, not failed; the scripts will be updated. |
+| Fixed in the held updates | 13 | Real V51 problems (Indian money grouping, plain messages, Reject after the first contract signature, "signed for" on a delegate's approval, …) whose fixes are already built in v52/v53 |
+| Open on both versions | 22 | Real open defects, to be confirmed and given defect IDs |
+| To look at closely | 7 | Previously "wording out of date" or "needs you" |
+
+No defect is raised from these until each is confirmed on screen (tracker item I-08).
+
 ## 6. Execution plan
 
 **Stage 2 — parallel, by module** (each agent on its own private copies):
@@ -153,3 +207,4 @@ What could stretch it:
 4. **Fixes:** may I fix approved defects in batches, each batch tested before you get a zip? And do you want to approve each defect, or approve by severity (for example "fix all P2/P3, ask me for P0/P1 and anything touching money or approvals")?
 5. **Scope:** include **Marketplace** (136 test cases), which is in the app but not in your 12-module list?
 6. **Held work:** V51 is tested as it is; v52 and v53 stay on hold until you decide. Confirm.
+7. **Packaging (I-11):** may I correct `tools/release.sh` and DEPLOY-CHECKLIST.md so they never include the `tests/` folder?
