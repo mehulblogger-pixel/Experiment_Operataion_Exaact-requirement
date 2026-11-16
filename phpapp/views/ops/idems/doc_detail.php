@@ -82,7 +82,7 @@
         <?php if (in_array($doc['status'], ['APPROVED','ISSUED'], true) && $doc['type_code'] !== 'RN' && (can('mod.idems.edit') || is_master_of('idems'))): ?>
           <form method="post" action="/document-release-note"><input type="hidden" name="id" value="<?= (int)$doc['id'] ?>"><button type="submit">📋 Draft Release Note</button></form>
         <?php endif; ?>
-        <?php if (!empty($doc['finalized']) && empty($doc['revised_by_id']) && (can('mod.idems.edit') || is_master_of('idems'))): ?>
+        <?php if (!empty($doc['finalized']) && empty($doc['revised_by_id']) && function_exists('idems_reopen_actor') && idems_reopen_actor($doc, true) !== ''): ?>
           <hr>
           <form method="post" action="/document-revise" onsubmit="return confirm('Create Rev <?= (int)($doc['rev'] ?? 0) + 1 ?> of this report? The original stays on file, unchanged.')"><input type="hidden" name="id" value="<?= (int)$doc['id'] ?>"><button type="submit">♻️ Reissue as new revision</button></form>
         <?php endif; ?>
@@ -596,7 +596,11 @@
       $target = $nm ?: ($a['approver_role'] ? (ORG_ROLES[$a['approver_role']] ?? $a['approver_role']) : 'Any approver');
       $sp = ['PENDING'=>'p-warn','APPROVED'=>'p-ok','REJECTED'=>'p-bad','SENTBACK'=>'p-bad','DELEGATED'=>'p-info'][$a['status']] ?? 'p-mut'; ?>
       <div class="appr-step">
+        <?php if (($a['approver_kind'] ?? '') === 'REOPEN'): ?>
+        <span class="pill p-bad">Sent back to the inspector by the executing office</span>
+        <?php else: ?>
         <span class="pill <?= $sp ?>">L<?= (int)$a['level'] ?> · <?= e(IDEMS_APPR_STATUS[$a['status']] ?? $a['status']) ?></span>
+        <?php endif; ?>
         <strong><?= e($target) ?></strong>
         <?php if ($a['acted_by']): ?><span class="muted">— <?= e($a['acted_by']) ?><?= $a['acted_at']?' · '.e(date('d M H:i', strtotime($a['acted_at']))):'' ?></span><?php endif; ?>
         <?php if ($a['remarks']): ?><div class="muted" style="font-size:12px">“<?= e($a['remarks']) ?>”</div><?php endif; ?>
@@ -631,6 +635,22 @@
       </div>
     </form>
   <?php endif; ?>
+</div>
+<?php endif; ?>
+
+<?php // 0.3 / C2 (owner, 16 Nov 2026) — a Coordinator (or above) of the executing
+      // office, or the person acting for them, sends a submitted / approved report
+      // back to its inspector, with a reason. Issued reports get a new revision instead.
+  $reopenActor = function_exists('idems_reopen_actor') ? idems_reopen_actor($doc) : '';
+  if ($reopenActor !== ''): ?>
+<div class="panel" data-tab="Approvals" id="send-back">
+  <div class="ctitle" style="margin-top:0"><h3>Send back to the inspector</h3></div>
+  <p class="muted" style="margin:0 0 8px;font-size:12.5px">The inspector can change this <?= e(Tl('report')) ?> again only after you send it back. It returns to Draft<?= strtoupper((string)$doc['status']) === 'APPROVED' ? ', the approvals given so far are cleared, and it goes through approval again from the start when they resubmit it' : ' and goes through review again when they resubmit it' ?>. Your name and reason are kept in the History.</p>
+  <form method="post" action="/document-reopen" onsubmit="return this.reason.value.trim() !== '' || (alert('Please give the reason.'), false)">
+    <input type="hidden" name="id" value="<?= (int)$doc['id'] ?>">
+    <textarea class="form-control" name="reason" rows="2" required placeholder="What should the inspector correct? (required)" style="margin-bottom:8px"></textarea>
+    <button class="btn secondary" type="submit">↩ Send back to the inspector</button>
+  </form>
 </div>
 <?php endif; ?>
 

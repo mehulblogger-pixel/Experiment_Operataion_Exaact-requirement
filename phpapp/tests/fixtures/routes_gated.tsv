@@ -129,7 +129,9 @@ document-new	idems	map
 document-pdf	idems	map
 document-polish-text	idems	map
 document-release-note	idems	map
+document-reopen	idems	map
 document-review	idems	map
+document-revise	idems	map
 document-rn-flag	idems	map
 document-scope-from-qap	idems	map
 document-smart	idems	map
