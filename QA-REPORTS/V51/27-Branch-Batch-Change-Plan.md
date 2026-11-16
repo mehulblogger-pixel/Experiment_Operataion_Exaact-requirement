@@ -8,6 +8,50 @@ The examples use two offices, **Ahmedabad** and **Mumbai**, and people with name
 
 ---
 
+## Part 0 — Update after your second reply (16 Nov 2026)
+
+You added five points. Here is how each changes the plan. Where a point goes beyond today's rules, it is marked **NEEDS YOUR YES**.
+
+**0.1 Finance and Marketing Manager are central teams: office chosen per person.**
+- **Today:** both roles automatically see every office.
+- **After:** they see **the offices ticked on their record**. Tick all offices for someone who needs the company-wide picture. They still see only finance data (Finance) or sales data (Marketing Manager), as today.
+- *Example:* Finance person Meera has Ahmedabad and Mumbai ticked. She sees invoices, receipts and vouchers of those two offices only. Finance head Rakesh has all offices ticked and sees everything.
+- **NEEDS YOUR YES (C1):** if a Finance or Marketing Manager has **no** office ticked, they see nothing. Quotation approvals waiting for the Marketing Manager (your level 2, ₹5–25 lakh) would then have nobody to approve them. **My recommendation:** when the update is installed, **everyone who holds these roles today is given "all offices"**, so nothing changes for current people. Only new people need offices ticked. Your admin can narrow anyone at any time.
+
+**0.2 Reports: the inspector who did the inspection opens, edits and submits it.**
+- **Yes, that stays exactly so:** the inspector who conducted it (or created it) works on their own report, and no other inspector can (R2).
+
+**0.3 Reports: after submission, approval or issue, the inspector can edit again only if a Coordinator of the executing office opens it.**
+
+| Report stage | Today | After |
+| --- | --- | --- |
+| Draft, Sent back | Inspector edits | Unchanged |
+| Submitted / under review | Only the approver can send it back | **Also** a Coordinator (or above) **of the executing office** can send it back to the inspector, with a reason |
+| Approved, not yet issued | **Nobody can send it back** | A Coordinator (or above) of the executing office can send it back to Draft, with a reason. The approval chain then runs again |
+| Issued to the client | Locked; "Reissue as new revision" (broken today, Reporting A3) | The executing-office Coordinator starts a new revision (R1, R2 …). The inspector edits the revision, and it goes through approval and issue again. The issued original never changes |
+
+- **NEEDS YOUR YES (C2):** "Approved → back to Draft" is a **new step in the report lifecycle** (today an approved report can only be issued). I will write it into `docs/03`. Each send-back records who, when and why in the History tab.
+- Reporting A3 (repairing "Reissue") is needed for the last row, so it is now part of this batch.
+
+**0.4 Vouchers: Finance approves last, after the reporting chain, with all attachments.**
+- *Example:* Amit's ₹8,000 voucher → Neha (N+1) approves → Sunil (N+2) approves → **Finance** checks the attachments and approves → **Approved**.
+- **Which Finance person:** any Finance person whose ticked offices include the voucher's office (0.1). If there is none, the admin sees a warning.
+- Finance can also send it back with a reason, like any approver (Q3).
+- This gives Finance an approval right on vouchers; your permission list says "View" today. I will update the list.
+- **Question C3:** who marks a voucher **Paid**? Today a Coordinator-level person does. **My recommendation: Finance**, since they approve last and make the payment.
+
+**0.5 Candidate pool: central, not owned by a branch, with a master switch.**
+- **The candidate pool and "Best matches":** every office sees all candidates who are **not yet hired**, from any branch.
+- **A badge:** once a candidate is in process, every office sees "**Recruitment in process — Ahmedabad (Interview stage)**" on the candidate. "Onboarding in process" shows once joining has started.
+- **One switch for the Master Admin:** "Offices can see each other's candidate pool", **on** by default as you described. Off = each office sees only its own pool.
+- **Stays branch-limited:** the Recruitment home "Today" and "Risks" panels, because they are each office's own to-do list (interviews today, offers expiring), and the candidate register's own records.
+- **Question C4:** can another office **also** start a process with a candidate who already carries the "in process" badge? **My recommendation: yes, but with a warning** naming the office already working with them, so two offices never make offers to the same person unknowingly.
+
+**So the questions now are C1–C4 (above) plus Q1–Q6 (Part 4).** The one-line answer, if you agree with my recommendations:
+> **"Plan OK. C1–C4 and Q1–Q6 as recommended, A3 yes."**
+
+---
+
 ## Part 1 — Your question about the Director (B1)
 
 **Question:** with "no office → sees nothing", which office do we set for the Director, Managing Director or head of the company?
@@ -19,7 +63,7 @@ The examples use two offices, **Ahmedabad** and **Mumbai**, and people with name
 | Master Admin, Admin | Every office, every business unit | No |
 | **Business Director** (use this for a Managing Director or company head) | **Every office, every business unit** | **No** |
 | Business Unit Head | Every office, but only their own business unit | No |
-| Finance, Marketing Manager | Every office | No |
+| Finance, Marketing Manager | **The offices ticked on their record**; tick all for the company-wide picture (see 0.1) | **Yes: tick their offices** |
 | Branch Manager, Operation Manager, Asst. Manager, Coordinator, sales and marketing executives, inspectors | **Their own office only** | **Yes: their home office** |
 
 - **Someone who covers 2 or 3 branches** (a regional manager, for example): an admin ticks those offices in the person's record ("Offices covered"). That already exists.
@@ -116,8 +160,8 @@ You chose **"R1 allowed to change"**. So **no code changes here.** Instead I cor
    - an approver on leave can be covered through the existing **Approval delegation**.
 5. **Who no longer approves:** today any Coordinator-level person in the branch can approve any voucher. After the change, **only the people in that inspector's own chain** can.
 6. **Unchanged:**
-   - **Finance** can **view** vouchers (your decision D-07). It is refused today, which is part of the defect.
-   - **Paid** and **reopening** stay as today.
+   - **Finance** can **view** vouchers (your decision D-07; refused today), and now also **approves last** (see 0.4).
+   - **Reopening** stays as today. Who marks **Paid** is question C3.
    - A **frozen month** still locks editing.
 7. **Documents updated in the same change:** the permission list (`docs/02`) and the voucher lifecycle (`docs/03`).
 
@@ -130,7 +174,7 @@ You chose **"R1 allowed to change"**. So **no code changes here.** Instead I cor
 | B2 | Changing a work order's status, priority or criticality checks the branch **before** saving | A Mumbai Coordinator who changes Ahmedabad work order WO-0045 to "On hold" is refused, and **nothing is saved**. Today the change is saved, and only then does the message say "outside your scope" |
 | B3 | The Operations home and scheduling board show only your branch's work orders, also when the executing office is blank. The deputations list is limited by branch. The **contracting office can open** a work order it passed to another office | Mumbai sold WO-0050 and passed it to Ahmedabad to carry out. Mumbai can now open it (today it is refused). Pune cannot |
 | B5 | "New inspection report → Start from an inspection call" offers only your branch's work orders | An Ahmedabad Coordinator no longer sees, or loads, Mumbai's client, vendor and PO |
-| B6 | Recruitment home panels, "Best matches" and the candidate pool apply the same branch limit as the candidate register | A Mumbai recruiter no longer sees Ahmedabad's candidates in "Today" or "Risks" |
+| B6 | **Changed by you (see 0.5):** the "Today" and "Risks" panels stay each office's own. The candidate pool and "Best matches" are central, with the in-process badge and the Master Admin switch | A Mumbai recruiter no longer sees Ahmedabad's interviews in "Today", but does see every not-yet-hired candidate in the pool |
 | R2 | An Inspector edits only their **own** reports (where they are the inspector or the creator) | Inspector Amit can no longer open Inspector Rahul's draft and change it |
 | R3 | A nonconformity's containment, disposition ("accept as it stands") and reopening go to whoever may **close** it: the Quality / Technical Head and admins. Branch and Operation Managers keep View and **Record** | A Branch Manager can still raise a nonconformity, but can no longer accept it as it stands |
 | R4 | The Business Development Manager no longer opens the Operations home. The Branch Application Manager no longer allocates jobs | Both as your permission list already says |
@@ -156,7 +200,7 @@ You chose **"R1 allowed to change"**. So **no code changes here.** Instead I cor
 | Q3 | When a voucher is **rejected**: send it back to Draft with the reason (the inspector corrects and resubmits), or add a new final status "Rejected"? | **Send back to Draft with the reason.** No new status is needed; the History keeps the rejection and its reason |
 | Q4 | Should the same amount bands also apply to **coordinators' and other staff's own vouchers**, or only to inspectors'? | **Everyone's vouchers, the same way: N+1 is whoever the claimant reports to** |
 | Q5 | Your badge idea: once an office engages a professional, internal staff see on that professional's profile "Working with us — Ahmedabad office (since 12 Nov)". Outsiders see nothing. Add it now (new work) or later? | **Later, as its own small piece of work**, so this batch stays fixes only |
-| Q6 | B4: when the **contracting** office edits a report that has already been **issued** to the client, is that allowed, or only before issue? | **Only before issue.** After issue, a correction should go through "Reissue as new revision" (R1, R2), so the client always gets a properly numbered revision. That button is broken today (Reporting **A3**, "Not found"). **I recommend adding Reporting A3 to this batch: answer "Q6 agree, A3 yes"** |
+| Q6 | B4: when the **contracting** office edits a report that has already been **issued** to the client, is that allowed, or only before issue? | **Only before issue.** After issue, a correction should go through "Reissue as new revision" (R1, R2), so the client always gets a properly numbered revision. That button is broken today (Reporting **A3**, "Not found"). **Reporting A3 is now part of this batch (see 0.3)** |
 
 **After your "Plan OK" and Q1–Q6:**
 1. I build the batch.
