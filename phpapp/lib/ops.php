@@ -683,13 +683,52 @@ function call_exec_office($call) {
 // office is unset, or when their office scope includes the executing office.
 function call_alloc_allowed($execOffice, $scopeOffices, $isCoord) {
     if (!$isCoord) return false;
-    if ($scopeOffices === 'ALL' || !is_array($scopeOffices) || !$scopeOffices) return true;
+    if ($scopeOffices === 'ALL' || !is_array($scopeOffices)) return true;
+    //  An empty office list is a person nobody placed in a branch — they see no
+    //  work order, so they allocate none (DEF-ADM-002: it used to read as "all").
+    if (!$scopeOffices) return false;
     $exec = (int)$execOffice;
     if ($exec <= 0) return true;
     return in_array($exec, array_map('intval', $scopeOffices), true);
 }
 function call_can_allocate($call) {
-    return call_alloc_allowed(call_exec_office($call), scope_offices(), is_coordinator_level());
+    return call_alloc_allowed(call_exec_office($call), scope_offices(), job_allocate_role_can());
+}
+// R4 / DEF-OPS-020 — who may ALLOCATE (raise or edit) a job, by role. The
+// permission matrix gives the Branch Application Manager "View" on Jobs: it is
+// the branch's configuration custodian, not its dispatcher. It sits in
+// MGMT_ROLES for its admin screens, which is how is_coordinator_level() let it
+// allocate. Everyone else coordinator level and above keeps allocating exactly
+// as before; a company that wants its Branch Application Manager to allocate
+// ticks "Allocate / edit jobs" (ops.job.allocate) for the role or the person.
+function job_allocate_role_can() {
+    if (function_exists('is_master') && is_master()) return true;
+    if (!is_coordinator_level()) return false;
+    if (user_role() === 'BRANCH_APP_MANAGER') return function_exists('can') && can('ops.job.allocate');
+    return true;
+}
+// THE TWO SCOPE QUESTIONS ON ONE WORK ORDER (DEF-OPS-011, DEF-OPS-046).
+//
+// RUN it — change its status, priority, criticality, clarifications, validation
+// override: the office that carries it out (call_exec_office(): the executing
+// office, else the contracting office), read through scope_allows() so an order
+// with neither set belongs to the managing office, as every register reads it.
+function call_exec_scope_allows($call) {
+    if (!$call) return false;
+    $exec = call_exec_office($call);
+    return scope_allows($exec > 0 ? $exec : null, $call['sbu'] ?? null);
+}
+// OPEN it — the executing office (as above, and as the record has always been
+// guarded) OR the contracting office, which sold it, invoices it and must be
+// able to chase it (owner, 16 Nov 2026, change plan B3). The register already
+// lists it to both offices (call_office_clause()); the record now agrees.
+// Anyone else is still refused.
+function call_view_scope_allows($call) {
+    if (!$call) return false;
+    if (scope_allows($call['executing_office_id'] ?? null, $call['sbu'] ?? null)) return true;
+    if (call_exec_scope_allows($call)) return true;
+    $ibo = (int)($call['ibo_office_id'] ?? 0);
+    return $ibo > 0 && scope_allows($ibo, $call['sbu'] ?? null);
 }
 function can_see_salary() { return can('data.salary'); } // salary/cost visibility
 // What the branch keeps out of an invoice. Deliberately a separate permission
@@ -3529,8 +3568,14 @@ function ops_route_module_map() {
         'confidentiality'=>'confidentiality','conf-undertaking-add'=>'confidentiality','conf-nda-add'=>'confidentiality',
         'conf-breach'=>'confidentiality','conf-breach-add'=>'confidentiality','conf-breach-close'=>'confidentiality',
         'site-docs'=>'identity','site-docs-add'=>'identity','site-docs-delete'=>'identity',
-        'hold-points'=>'hold-points','hw-point-new'=>'hold-points','hw-point-clear'=>'hold-points',
-        'hw-point-waive'=>'hold-points','hw-point-cancel'=>'hold-points','hw-point-reopen'=>'hold-points','hw-point-derive'=>'hold-points',
+        //  X1 / DEF-QUA-002 — these named a module "hold-points" that does not
+        //  exist, so the register and every action were refused to everybody,
+        //  the Master Admin included. A hold / witness point is an inspection
+        //  finding raised off a report's activity table, worked by whoever writes
+        //  or reviews reports — the Reporting module (idems), the first right
+        //  hwp_can_view() / hwp_can_edit() ask. The handler's own checks still run.
+        'hold-points'=>'idems','hw-point-new'=>'idems','hw-point-clear'=>'idems',
+        'hw-point-waive'=>'idems','hw-point-cancel'=>'idems','hw-point-reopen'=>'idems','hw-point-derive'=>'idems',
         'ncr'=>'ncr','ncr-item'=>'ncr','ncr-new'=>'ncr','ncr-contain'=>'ncr','ncr-disposition'=>'ncr',
         'ncr-capa'=>'ncr','ncr-assign'=>'ncr','ncr-close'=>'ncr','ncr-reopen'=>'ncr',
         'capa'=>'capa','capa-item'=>'capa','capa-new'=>'capa','capa-cause'=>'capa','capa-plan'=>'capa',
@@ -5608,6 +5653,9 @@ function ops_calls($route, $method) {
         if ($route === 'call-edit') {
             $call = ops_one("SELECT * FROM calls WHERE id=?", [(int)($_GET['id'] ?? 0)]);
             if (!$call) { http_response_code(404); view('notfound'); return; }
+            //  B2 — branch scope before the form is shown or saved: the two
+            //  offices of the work order (executing, contracting), nobody else.
+            ops_require(call_view_scope_allows($call), 'This ' . Tl('call') . ' is outside your office / branch scope.');
         }
         // Raised straight off a won quotation: the client, the contract number,
         // the commercials and the business unit come across so nobody has to
@@ -5963,6 +6011,7 @@ function ops_calls($route, $method) {
         $call = ops_one("SELECT * FROM calls WHERE id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$call) { http_response_code(404); view('notfound'); return; }
         ops_require(can('mod.calls.edit') || is_coordinator_level(), 'You cannot set the required credit.');
+        ops_require(call_view_scope_allows($call), 'This ' . Tl('call') . ' is outside your office / branch scope.');   // B2 — before saving
         if ($method === 'POST') {
             $req = ($_POST['credit_required'] ?? '') === '' ? 0 : (float)$_POST['credit_required'];
             $st  = $_POST['credit_status'] ?? 'COUNTERED';
@@ -5984,7 +6033,8 @@ function ops_calls($route, $method) {
         // coordinator who typed another branch's call id was served the record
         // the list had correctly hidden from them. Proven with two branches
         // before it was fixed.
-        ops_require(scope_allows($call['executing_office_id'] ?? null, $call['sbu'] ?? null),
+        //  B3 / DEF-OPS-011 — the contracting office may open it too.
+        ops_require(call_view_scope_allows($call),
             'This ' . Tl('call') . ' is outside your office / branch scope.');
         $jobs = ops_all("SELECT j.*, i.name inspector_name, i.staff_kind, s.agency subcon_agency FROM jobs j LEFT JOIN inspectors i ON i.id=j.inspector_id LEFT JOIN subcons s ON s.id=j.subcon_id WHERE j.call_id=? ORDER BY j.id DESC", [$call['id']]);
         // lead-time metrics
@@ -8176,7 +8226,7 @@ function ops_jobs($route, $method) {
         //  B10-CL-1 — the button is now gated where it is drawn, but a bookmark or
         //  a stale page can still land here. Explain, the way B9-4 does, instead of
         //  bouncing to the dashboard. The predicate is untouched.
-        if (!is_coordinator_level()) {
+        if (!job_allocate_role_can()) {
             if (function_exists('ops_access_notice')) {
                 return ops_access_notice('Allocate a ' . Tl('job'),
                     'Allocating a ' . Tl('job') . ' isn’t available to your role.');
@@ -8781,7 +8831,7 @@ function ops_jobs($route, $method) {
         redirect('/job?id=' . $job['id'] . '#visits');
     }
     if ($route === 'job-reassign' && $method === 'POST') {
-        ops_require(is_coordinator_level(), 'You cannot reassign ' . Tlp('job') . '.');
+        ops_require(job_allocate_role_can(), 'You cannot reassign ' . Tlp('job') . '.');
         $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$job) { http_response_code(404); view('notfound'); return; }
         if (($why = job_lock_block($job)) !== '') { flash($why, 'error'); redirect('/job?id=' . $job['id']); }

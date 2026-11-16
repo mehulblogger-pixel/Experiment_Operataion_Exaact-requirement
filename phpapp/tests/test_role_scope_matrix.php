@@ -16,9 +16,10 @@
 t_section('Role office scope matches the matrix');
 
 $scope = fn($r) => role_defaults($r)['offices'] ?? '';
-//  Finance reconciles for the whole company, so company-wide scope is the
-//  decision, not an oversight — recorded here so it is never "fixed" by mistake.
-t_eq($scope('FINANCE'),        'ALL', '*** FINANCE is company-wide by design (matrix: reconciles across offices)');
+//  Finance and the Marketing Manager are office-based since 16 Nov 2026 (owner,
+//  change plan 0.1 / C1): their reach is the offices ticked on their record.
+t_eq($scope('FINANCE'),           'OWN', '*** FINANCE is office-based (matrix: the offices ticked on the person)');
+t_eq($scope('MARKETING_MANAGER'), 'OWN', '*** MARKETING_MANAGER is office-based (matrix: the offices ticked on the person)');
 t_eq($scope('COORDINATOR'),    'OWN', '*** COORDINATOR is confined to their own office');
 t_eq($scope('INSPECTOR'),      'OWN', '*** INSPECTOR is confined to their own office');
 t_eq($scope('BRANCH_MANAGER'), 'OWN', '*** BRANCH_MANAGER is confined to their own office');

@@ -186,6 +186,13 @@ function ncr_can_record() { return can('mod.ncr.add') || ncr_can_raise(); }
 // Closing is a separate act from raising, for the same reason approving is
 // separate from creating everywhere else in this application.
 function ncr_can_close() { return can('ncr.close') || can('capa.close') || is_master(); }
+// R3 / DEF-QUA-006 (owner rule Q-B1, 19 Oct 2026; change plan R3, 16 Nov 2026) —
+// CONTAINMENT, the DISPOSITION (including "Accept as it stands") and REOPENING a
+// closed one go to whoever may CLOSE it: the Quality / Technical Head and the
+// administrators. A Branch or Operation Manager holds Corrective actions Edit,
+// and ncr_can_raise() reads that as a right over nonconformities too, so they
+// could accept a nonconformity as it stands; the matrix gives them View · Record.
+function ncr_can_decide() { return ncr_can_raise() && ncr_can_close(); }
 
 // ---- Numbering -------------------------------------------------------------
 function ncr_ref_next() {
@@ -516,7 +523,7 @@ function ops_ncr($route, $method) {
         view('ops/ncr_detail', [
             'n' => $n, 'events' => ncr_events((int)$n['id']),
             'missing' => ncr_close_missing($n),
-            'canEdit' => ncr_can_raise(), 'canClose' => ncr_can_close(),
+            'canEdit' => ncr_can_raise(), 'canClose' => ncr_can_close(), 'canDecide' => ncr_can_decide(),
             'capa' => (!empty($n['capa_id']) && function_exists('capa_row')) ? capa_row((int)$n['capa_id']) : null,
             'issue'         => $issueOn ? ncdca_issue_panel((int)$n['id']) : null,
             'issueTypes'    => $issueOn ? ncdca_issue_types() : [],
@@ -557,6 +564,7 @@ function ops_ncr($route, $method) {
     if ($method !== 'POST') redirect($back);
 
     if ($route === 'ncr-contain') {
+        ops_require(ncr_can_decide(), 'You cannot change a nonconformity. Recording one is open to coordinators and above; working it is for quality.');
         $t = trim((string)($_POST['containment'] ?? ''));
         if ($t === '') { flash('Say what was actually done to contain it.', 'error'); redirect($back); }
         db()->prepare("UPDATE nonconformities SET containment=?, contained_on=?, contained_by=?,
@@ -568,6 +576,7 @@ function ops_ncr($route, $method) {
     }
 
     if ($route === 'ncr-disposition') {
+        ops_require(ncr_can_decide(), 'You cannot change a nonconformity. Recording one is open to coordinators and above; working it is for quality.');
         $d = (string)($_POST['disposition'] ?? '');
         if (!isset(NCR_DISPOSITIONS[$d]) || $d === '') { flash('Choose what happened to the work.', 'error'); redirect($back); }
         $note = trim((string)($_POST['disposition_note'] ?? ''));
@@ -618,6 +627,8 @@ function ops_ncr($route, $method) {
     }
 
     if ($route === 'ncr-reopen') {
+        //  Reopening undoes a closure, so it needs the authority that closes.
+        ops_require(ncr_can_close(), 'You cannot reopen a nonconformity. Reopening is for whoever may close it — the Quality or Technical Head.');
         db()->prepare("UPDATE nonconformities SET status='DISPOSITIONED', closed_on='', closed_by='' WHERE id=?")
             ->execute([(int)$n['id']]);
         ncr_log((int)$n['id'], 'REOPENED', trim((string)($_POST['why'] ?? '')));

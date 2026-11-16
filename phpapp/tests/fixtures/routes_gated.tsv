@@ -159,7 +159,7 @@ hierarchy	users	map
 hiring-request	hiring	map
 hiring-request-leaver	hiring	family
 hiring-requests	hiring	map
-hold-points	hold-points	map
+hold-points	idems	map
 idems-approval-rule-edit	idems	map
 idems-approval-rules	idems	map
 identity	identity	map

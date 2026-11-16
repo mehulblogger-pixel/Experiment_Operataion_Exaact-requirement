@@ -62,7 +62,12 @@ function sched_unallocated_calls($offices, $limit = 40) {
     if (is_array($offices)) {
         if (!$offices) return [];
         $in = implode(',', array_map('intval', $offices));
-        $w[] = "(c.executing_office_id IN ($in) OR c.executing_office_id IS NULL)";
+        //  DEF-OPS-002 — a blank executing office was offered to EVERY branch.
+        //  It belongs to the office that carries the order out: the contracting
+        //  office, else the managing office (call_exec_office_sql()).
+        $w[] = function_exists('call_exec_office_sql')
+            ? call_exec_office_sql('c.executing_office_id', 'c.ibo_office_id') . " IN ($in)"
+            : "c.executing_office_id IN ($in)";
     }
     // M15 — inlined int, never bound: MySQL rejects LIMIT '?'-as-string.
     try {
@@ -181,7 +186,7 @@ function ops_schedule_board($method) {
         'from' => $from, 'to' => $to, 'board' => $board, 'capacity' => $capacity,
         'unalloc' => $unalloc, 'suggest' => $suggest, 'suggestSpan' => $suggestSpan,
         's_from' => $sFrom, 's_to' => $sTo, 's_sbu' => $sSbu, 's_call' => $sCall, 'sbus' => $sbus,
-        'canAllocate' => function_exists('can') ? (can('ops.job.allocate') || is_coordinator_level()) : true,
+        'canAllocate' => function_exists('can') ? (can('ops.job.allocate') || (function_exists('job_allocate_role_can') ? job_allocate_role_can() : is_coordinator_level())) : true,
     ]);
     return true;
 }
