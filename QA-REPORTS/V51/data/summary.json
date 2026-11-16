@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-16T17:20:04.068Z",
+ "generated": "2026-11-16T17:41:12.978Z",
  "tests": 1501,
  "executed": 1051,
  "passed": 756,
@@ -12,5 +12,5 @@
  "passRatePct": 71.9,
  "defects": 249,
  "screens": 480,
- "events": 6197
+ "events": 6198
 }

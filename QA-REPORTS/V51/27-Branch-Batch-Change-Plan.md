@@ -65,6 +65,13 @@ You added five points. Here is how each changes the plan. Where a point goes bey
 
 ---
 
+**Owner, 16 Nov 2026 (later):** "There is nothing like team passport. It's for market place wherein professional have this so they can create credibility in client or hiring customer mind."
+- **What I do:** the change to the staff "Team passports" screen (DEF-MKT-008) is **withdrawn**, and that screen stays exactly as it is today. Only the posting part of B7 stays: inside the company, a posting records which office posted it.
+- **The professional's own passport** ("My passport") is not touched.
+- **Open question for later:** the app has a staff screen "Team passports" under Marketplace, for the company's own inspectors. Keep it, or remove it from the menu?
+
+---
+
 ## Part 1 — Your question about the Director (B1)
 
 **Question:** with "no office → sees nothing", which office do we set for the Director, Managing Director or head of the company?
