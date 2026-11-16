@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '573fc43 · 2026-11-15 16:13 UTC · 719 files';
+$RELEASE = '815edb8 · 2026-11-16 01:45 UTC · 719 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -419,7 +419,7 @@ $EXPECT  = [
     'views/ops/connect_identity.php' => ['s'=>5849,'h'=>'14b648589596fcad'],
     'views/ops/connect_join.php' => ['s'=>9329,'h'=>'88bb7cc9b1e7a868'],
     'views/ops/connect_match_weights.php' => ['s'=>3856,'h'=>'14f2f37f5872848b'],
-    'views/ops/connect_messages.php' => ['s'=>5959,'h'=>'3d2f79a081ab9566'],
+    'views/ops/connect_messages.php' => ['s'=>5961,'h'=>'30e18b49e07ffa4e'],
     'views/ops/connect_orgs.php' => ['s'=>4763,'h'=>'52cc8cfafc0fd31c'],
     'views/ops/connect_passport_public.php' => ['s'=>6646,'h'=>'d3a171906f276469'],
     'views/ops/connect_passport_share.php' => ['s'=>3238,'h'=>'001e14194e7c30e0'],
@@ -909,8 +909,21 @@ foreach (array_merge($stale, $missing) as $r) {
 }
 arsort($byDir);
 
+// The clock the application stamps its records with. The app sets no time zone
+// of its own, so it uses whatever the server's PHP is set to. Shown next to
+// India time so anyone can see at a glance whether the two differ (QA audit
+// V51.1, Reporting C18: the CERT-In six-hour clock and "when it was noticed"
+// depend on it). Reads only.
+$__tz    = date_default_timezone_get();
+$__srv   = new DateTime('now');
+$__ist   = new DateTime('now', new DateTimeZone('Asia/Kolkata'));
+$__gap   = $__ist->getOffset() - $__srv->getOffset();
+$CLOCK   = 'server clock ' . $__srv->format('j M Y, H:i') . ' (' . $__tz . ') · India time ' . $__ist->format('j M Y, H:i')
+         . ($__gap === 0 ? ' · same as India time' : ' · differs from India time by ' . floor(abs($__gap) / 3600) . ' h ' . ((abs($__gap) % 3600) / 60) . ' min');
+
 if ($IS_CLI) {
     echo "EXAACT deployment check — release {$RELEASE}\n";
+    echo "Time zone: {$CLOCK}\n";
     echo str_repeat('=', 70) . "\n";
     printf("%d of %d files match. %d stale, %d missing.\n", count($ok), $total, count($stale), count($missing));
     foreach ($byDir as $dir => $n) echo "  {$dir}  {$n} file(s) out of date\n";
@@ -955,6 +968,7 @@ header('Content-Type: text/html; charset=utf-8');
 <div class="wrap">
   <h1>Deployment check</h1>
   <p class="rel">Release <code><?= $h($RELEASE) ?></code> · signed in as <?= $h($AUTH['username'] ?? '') ?></p>
+  <p class="rel">Time zone: <?= $h($CLOCK) ?></p>
 
   <?php if (!$bad): ?>
     <div class="verdict v-ok"><span style="font-size:22px">&#10003;</span>
