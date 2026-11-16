@@ -40,3 +40,5 @@ t_eq((string) bbr_doc($mine)['title'], 'BBR created by Amit, edited', 'the creat
 // A Coordinator of the branch keeps editing any report of the branch.
 $r = bbr_drive($fx['coA'], 'document-edit', 'POST', ['id' => $rahuls], bbr_edit_post($rahuls, ['title' => 'BBR Rahul draft, coordinator']));
 t_eq((string) bbr_doc($rahuls)['title'], 'BBR Rahul draft, coordinator', 'the branch Coordinator still edits an inspector\'s draft');
+
+bbr_cleanup();   // leave nothing behind for later test files

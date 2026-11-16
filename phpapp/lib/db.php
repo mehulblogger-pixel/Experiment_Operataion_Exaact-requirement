@@ -816,6 +816,7 @@ function run_schema($withSeeds = true) {
     if (function_exists('reqf_migrate')) reqf_migrate();               // M3 — multi-vacancy fulfilment columns
     if (function_exists('hreq_migrate')) hreq_migrate();               // M4 — the hiring request layer
     if (function_exists('appr_migrate')) appr_migrate();               // Phase 6 — configurable approval rules/levels/requests/steps
+    if (function_exists('vappr_migrate')) vappr_migrate();             // Branch batch R5 — voucher_approval_log + voucher chain columns
     if (function_exists('rasg_migrate')) rasg_migrate();               // M5 — the recruiter accountability ledger
     if (function_exists('rful_migrate')) rful_migrate();               // Phase 4 — multi-source fulfilment allocations
     if (function_exists('careers_migrate')) careers_migrate();         // Phase 7 — requisitions.careers_published/careers_summary

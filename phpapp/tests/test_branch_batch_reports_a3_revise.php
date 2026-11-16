@@ -46,3 +46,5 @@ t_eq((string) ($rev2['irn'] ?? ''), $irn . '/R2', 'the next revision is numbered
 // Pressing it again on the original returns the existing revision.
 $r = bbr_drive($fx['coA'], 'document-revise', 'POST', [], ['id' => $orig]);
 t_eq((int) ops_val("SELECT COUNT(*) FROM report_docs WHERE revises_id=?", [$orig]), 1, 'a second press makes no duplicate: ' . bbr_said($r));
+
+bbr_cleanup();   // leave nothing behind for later test files

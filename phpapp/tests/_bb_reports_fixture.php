@@ -34,7 +34,7 @@ function bbr_said($r) { return implode(' | ', array_map(fn($f) => (string) ($f['
 function bbr_scope_refused($r) { return stripos(bbr_said($r), 'outside your office / branch scope') !== false; }
 
 function bbr_fixture() {
-    static $fx = null;
+    $fx = $GLOBALS['__bbr_fx'] ?? null;   // global, not static, so bbr_cleanup() can reset it
     if ($fx !== null) return $fx;
     $pdo = db();
     $off = function ($code, $name) use ($pdo) {
@@ -80,7 +80,7 @@ function bbr_fixture() {
     $fx['callMM'] = (int) $pdo->lastInsertId();
     $t = ops_one("SELECT id, code FROM report_types WHERE active=1 ORDER BY id LIMIT 1");
     $fx['typeId'] = (int) $t['id']; $fx['typeCode'] = (string) $t['code'];
-    return $fx;
+    return $GLOBALS['__bbr_fx'] = $fx;
 }
 
 // A report filed under the Ahmedabad office against the Mumbai-sold work order.
@@ -100,6 +100,33 @@ function bbr_report(array $over = []) {
         ->execute(array_values($row));
     return (int) db()->lastInsertId();
 }
+// Remove every row this fixture and the report tests made (all named BBR / bbr_), so a later
+// test file never counts them — e.g. job_glance(['id'=>0]) counting reports filed with no job.
+// Each test_branch_batch_reports_*.php calls this at its end; the next one builds afresh.
+function bbr_cleanup() {
+    $pdo = db();
+    $q = function ($sql, $a = []) use ($pdo) { try { $pdo->prepare($sql)->execute($a); } catch (Throwable $e) {} };
+    $ids = function ($sql, $a = []) { try { return array_map('intval', array_column(ops_all($sql, $a) ?: [], 'id')); } catch (Throwable $e) { return []; } };
+    $in = fn($xs) => $xs ? implode(',', array_map('intval', $xs)) : '0';
+    $offs  = $ids("SELECT id FROM offices WHERE name LIKE 'BBR %'");
+    $calls = $ids("SELECT id FROM calls WHERE call_code LIKE 'BBR-%'");
+    $users = $ids("SELECT id FROM users WHERE username LIKE 'bbr!_%' ESCAPE '!'");
+    $docs  = $ids("SELECT id FROM report_docs WHERE office_id IN (" . $in($offs) . ") OR call_id IN (" . $in($calls) . ")
+                   OR irn LIKE 'BBR/%' OR title LIKE 'BBR%'");
+    foreach (['report_approvals', 'report_files'] as $t) $q("DELETE FROM $t WHERE report_doc_id IN (" . $in($docs) . ")");
+    $q("DELETE FROM idems_audit WHERE entity='report_doc' AND entity_id IN (" . $in($docs) . ")");
+    $q("DELETE FROM report_docs WHERE id IN (" . $in($docs) . ")");
+    $q("DELETE FROM approval_delegations WHERE delegator_user_id IN (" . $in($users) . ") OR delegate_user_id IN (" . $in($users) . ")");
+    $q("DELETE FROM jobs WHERE call_id IN (" . $in($calls) . ") OR job_code LIKE 'BBR-%'");
+    $q("DELETE FROM calls WHERE id IN (" . $in($calls) . ")");
+    $q("DELETE FROM business_partners WHERE legal_name LIKE 'BBR %'");
+    $q("DELETE FROM inspectors WHERE name LIKE 'BBR %'");
+    $q("DELETE FROM users WHERE id IN (" . $in($users) . ")");
+    $q("DELETE FROM offices WHERE id IN (" . $in($offs) . ")");
+    unset($GLOBALS['__bbr_fx']);
+    unset($_SESSION['uid']); if (function_exists('current_user')) current_user(true); if (function_exists('ua')) ua(true);
+}
+
 function bbr_doc($id) { return ops_one("SELECT * FROM report_docs WHERE id=?", [(int) $id]); }
 // The edit form exactly as the browser posts it for this report (every field it renders).
 function bbr_edit_post($id, array $over = []) {

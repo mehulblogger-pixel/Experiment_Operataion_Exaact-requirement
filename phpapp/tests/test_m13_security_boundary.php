@@ -114,7 +114,9 @@ $ops = preg_replace('#^\s*//.*$#m', '', file_get_contents(__DIR__ . '/../lib/ops
 $callRoute = strpos($ops, "if (\$route === 'call') {");
 t_ok($callRoute !== false, 'V4 · the call detail route exists');
 $body = substr($ops, $callRoute, 2000);
-t_ok(strpos($body, 'scope_allows($call[') !== false,
+// Branch batch B3 (16 Nov 2026): the detail asks call_view_scope_allows(), the same
+// office rule as the list plus the contracting office (DEF-OPS-011).
+t_ok(strpos($body, 'scope_allows($call[') !== false || strpos($body, 'call_view_scope_allows($call)') !== false,
      'V4 · ATTACK BLOCKED — the DETAIL now applies the same scope as the list');
 // The job detail, which always had it, is untouched.
 $jobRoute = strpos($ops, "if (\$route === 'job') {");

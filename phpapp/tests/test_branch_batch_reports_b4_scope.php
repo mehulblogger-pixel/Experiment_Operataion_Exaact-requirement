@@ -92,3 +92,5 @@ $r = bbr_drive($fx['coM'], 'document-edit', 'POST', ['id' => $id], bbr_edit_post
 t_eq((string) bbr_doc($id)['title'], 'BBR edited by Mumbai', 'after issue the contracting office can no longer edit it: ' . bbr_said($r));
 $r = bbr_drive($fx['coM'], 'document', 'GET', ['id' => $id], [], [$irn]);
 t_ok(!empty($r['has'][$irn]), 'it can still open the issued report');
+
+bbr_cleanup();   // leave nothing behind for later test files

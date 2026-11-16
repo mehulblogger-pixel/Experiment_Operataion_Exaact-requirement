@@ -320,7 +320,7 @@ t_eq($cE['remaining'], 0, 'remaining stays sane');
 t_ok(function_exists('cand_scope_gate'), 'the candidate register has a branch-scope gate');
 $opsSrc2 = preg_replace('#^\s*//.*$#m', '', file_get_contents(__DIR__ . '/../lib/ops.php'));
 $cp = strpos($opsSrc2, 'function ops_candidates($route, $method) {');
-t_ok($cp !== false && strpos(substr($opsSrc2, $cp, 160), 'cand_scope_gate()') !== false,
+t_ok($cp !== false && strpos(substr($opsSrc2, $cp, 160), 'cand_scope_gate(') !== false,   // B6: now cand_scope_gate($route, $method)
      'and it runs on entry to the module, before any route reads an id');
 
 $origSess2 = $_SESSION;
@@ -356,7 +356,7 @@ current_user(true); ua(true);
 t_ok(scope_allows(871, null), 'the branch-A user may act on their own branch');
 t_ok(!scope_allows(872, null), '…and may NOT act on branch B');
 // The gate asks exactly that question of both ends of a move.
-$gateSrc = substr($opsSrc2, strpos($opsSrc2, 'function cand_scope_gate()'), 1800);
+$gateSrc = substr($opsSrc2, strpos($opsSrc2, 'function cand_scope_gate('), 2600);   // B6: takes ($route, $method)
 t_ok(substr_count($gateSrc, 'scope_allows(') === 2,
      'the gate checks BOTH the candidate’s own requisition and the one it is moved to');
 t_ok(strpos($gateSrc, "\$_POST['requisition_id']") !== false,

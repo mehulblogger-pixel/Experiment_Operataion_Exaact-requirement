@@ -51,3 +51,5 @@ $r = bbr_drive($fx['amit'], 'document-new', 'GET', ['job' => $mumJob, 'call' => 
 t_ok(!empty($r['has']['Prefilled from']), 'the inspector allocated to a Mumbai job still loads it to write its report: ' . bbr_said($r));
 $r = bbr_drive($fx['rahul'], 'document-new', 'GET', ['job' => $mumJob, 'call' => $fx['callMM']], [], ['Prefilled from']);
 t_ok(empty($r['has']['Prefilled from']), 'another Ahmedabad inspector, not on that job, does not: ' . bbr_said($r));
+
+bbr_cleanup();   // leave nothing behind for later test files

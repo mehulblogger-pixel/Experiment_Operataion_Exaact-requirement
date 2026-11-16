@@ -161,3 +161,32 @@ $portalHtml = (function ($row) use ($root) {   // drawn exactly as views/portal/
     ob_start(); include $root . '/views/ops/_cx_closing.php'; return ob_get_clean();
 })(cx_requirement_get($RA2));
 t_ok(strpos($portalHtml, 'value="req_extend"') !== false, 'the client portal\'s closing-date panel still offers its extend buttons');
+
+// ---- clean up: this file's committed rows must not change later tests' counts ----------------------
+// (the route drives run in a separate process, so nothing here can live inside a rolled-back
+// transaction). Everything this file made is named BB7 / bb7_; nothing else is touched.
+(function () {
+    $pdo = db();
+    $q = function ($sql, $a = []) use ($pdo) { try { $pdo->prepare($sql)->execute($a); } catch (Throwable $e) {} };
+    $ids = function ($sql, $a = []) { try { return array_map('intval', array_column(ops_all($sql, $a) ?: [], 'id')); } catch (Throwable $e) { return []; } };
+    $in = fn($xs) => $xs ? implode(',', array_map('intval', $xs)) : '0';
+    $reqs = $ids("SELECT id FROM cx_requirements WHERE title LIKE 'BB7%' OR ref_code LIKE 'BB7-%'");
+    $offs = $ids("SELECT id FROM offices WHERE name LIKE 'BB7 %'");
+    $apps = $ids("SELECT id FROM cx_applications WHERE requirement_id IN (" . $in($reqs) . ")");
+    $engs = $ids("SELECT id FROM cx_engagements WHERE requirement_id IN (" . $in($reqs) . ") OR application_id IN (" . $in($apps) . ")");
+    $vchs = $ids("SELECT id FROM cx_engagement_vouchers WHERE engagement_id IN (" . $in($engs) . ")");
+    foreach (['cx_engagement_voucher_lines', 'cx_engagement_voucher_files'] as $t) $q("DELETE FROM $t WHERE voucher_id IN (" . $in($vchs) . ")");
+    $q("DELETE FROM cx_engagement_vouchers WHERE id IN (" . $in($vchs) . ")");
+    $q("DELETE FROM cx_engagements WHERE id IN (" . $in($engs) . ")");
+    foreach (['cx_positions', 'cx_terms', 'cx_readiness', 'cx_messages', 'cx_bench_alloc', 'cx_disputes'] as $t)
+        $q("DELETE FROM $t WHERE requirement_id IN (" . $in($reqs) . ")");
+    $q("DELETE FROM cx_disputes WHERE application_id IN (" . $in($apps) . ")");
+    $q("DELETE FROM cx_applications WHERE id IN (" . $in($apps) . ")");
+    $q("DELETE FROM billable_events WHERE office_id IN (" . $in($offs) . ")");
+    $q("DELETE FROM cx_requirements WHERE id IN (" . $in($reqs) . ")");
+    $q("DELETE FROM requisitions WHERE req_code LIKE 'BB7-RQ%'");
+    $q("DELETE FROM cx_professionals WHERE name LIKE 'BB7%'");
+    $q("DELETE FROM users WHERE username LIKE 'bb7!_%' ESCAPE '!'");
+    $q("DELETE FROM offices WHERE id IN (" . $in($offs) . ")");
+    unset($_SESSION['uid']); current_user(true); if (function_exists('ua')) ua(true);
+})();

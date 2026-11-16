@@ -19,8 +19,18 @@ $pdo->prepare("INSERT INTO report_docs (irn, type_code, status, finalized, job_i
 $doc = ops_one("SELECT * FROM report_docs WHERE irn='RNB-1'");
 
 // Nothing open but the Release Note tick → only the revision is offered.
+// Branch batch A3 / C2 (owner, 16 Nov 2026): starting a revision is for the executing
+// office's Coordinator-or-above (or their delegate), so the link is asked as someone
+// who may start one — here the master — and is NOT offered to someone signed out.
+$__rnbPrev = $_SESSION['uid'] ?? null;
+$_SESSION['uid'] = (int) ops_val("SELECT id FROM users WHERE is_superuser=1 ORDER BY id LIMIT 1");
+current_user(true); if (function_exists('ua')) ua(true);
 $links = idems_rn_blocker_links($doc);
 t_ok(count($links) === 1 && ($links[0]['post'] ?? '') === '/document-revise', 'unticked Release Note: the way out is a new revision');
+unset($_SESSION['uid']); current_user(true); if (function_exists('ua')) ua(true);
+t_ok(!array_filter(idems_rn_blocker_links($doc), fn($l) => ($l['post'] ?? '') === '/document-revise'),
+     '…and the revision is not offered to someone who may not start one');
+if ($__rnbPrev !== null) $_SESSION['uid'] = $__rnbPrev; current_user(true); if (function_exists('ua')) ua(true);
 
 // An open hold point and an open deviation on the job.
 $pdo->prepare("INSERT INTO hw_points (job_id, report_doc_id, point_type, description, status, dedupe_key, created_at) VALUES (?,?,'HOLD','Hydro test','OPEN','rnb-h1',?)")

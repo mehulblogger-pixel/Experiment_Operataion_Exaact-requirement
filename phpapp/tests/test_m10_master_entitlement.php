@@ -185,6 +185,13 @@ $BASELINE = [
     // one question. Same answer for a master as before (is_master_of(['identity',
     // 'clients']), clients being core), and the tile still needs Operations licensed.
     'sitedocs_can_view',
+    // Branch batch (owner, 16 Nov 2026) — both Category B. job_allocate_role_can()
+    // is the allocation role band (coordinator level minus the Branch Application
+    // Manager, R4) asked inside the jobs routes, which the M5 gate refuses without
+    // the Jobs module. vappr_config_can() (Master Admin) guards /voucher-approvals,
+    // whose route maps to the Vouchers module ('voucher' prefix) and is refused
+    // without it.
+    'job_allocate_role_can', 'vappr_config_can',
 ];
 $unclassified = array_values(array_diff($open, $BASELINE));
 t_ok(!$unclassified,

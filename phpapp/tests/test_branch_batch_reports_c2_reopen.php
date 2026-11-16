@@ -101,3 +101,5 @@ $r = bbr_drive($sr, 'document-reopen', 'POST', [], ['id' => $dg, 'reason' => 'Ne
 t_eq((string) bbr_doc($dg)['status'], 'DRAFT', 'acting for the executing office\'s Coordinator, he sends it back: ' . bbr_said($r));
 $h = bbr_history($dg, 'REOPEN');
 t_ok($h && strpos((string) $h[0]['new_value'], 'acting for Neha Probe') !== false, 'the History says he acted for Neha through the delegation');
+
+bbr_cleanup();   // leave nothing behind for later test files
