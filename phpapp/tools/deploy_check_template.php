@@ -189,8 +189,21 @@ foreach (array_merge($stale, $missing) as $r) {
 }
 arsort($byDir);
 
+// The clock the application stamps its records with. The app sets no time zone
+// of its own, so it uses whatever the server's PHP is set to. Shown next to
+// India time so anyone can see at a glance whether the two differ (QA audit
+// V51.1, Reporting C18: the CERT-In six-hour clock and "when it was noticed"
+// depend on it). Reads only.
+$__tz    = date_default_timezone_get();
+$__srv   = new DateTime('now');
+$__ist   = new DateTime('now', new DateTimeZone('Asia/Kolkata'));
+$__gap   = $__ist->getOffset() - $__srv->getOffset();
+$CLOCK   = 'server clock ' . $__srv->format('j M Y, H:i') . ' (' . $__tz . ') · India time ' . $__ist->format('j M Y, H:i')
+         . ($__gap === 0 ? ' · same as India time' : ' · differs from India time by ' . floor(abs($__gap) / 3600) . ' h ' . ((abs($__gap) % 3600) / 60) . ' min');
+
 if ($IS_CLI) {
     echo "EXAACT deployment check — release {$RELEASE}\n";
+    echo "Time zone: {$CLOCK}\n";
     echo str_repeat('=', 70) . "\n";
     printf("%d of %d files match. %d stale, %d missing.\n", count($ok), $total, count($stale), count($missing));
     foreach ($byDir as $dir => $n) echo "  {$dir}  {$n} file(s) out of date\n";
@@ -235,6 +248,7 @@ header('Content-Type: text/html; charset=utf-8');
 <div class="wrap">
   <h1>Deployment check</h1>
   <p class="rel">Release <code><?= $h($RELEASE) ?></code> · signed in as <?= $h($AUTH['username'] ?? '') ?></p>
+  <p class="rel">Time zone: <?= $h($CLOCK) ?></p>
 
   <?php if (!$bad): ?>
     <div class="verdict v-ok"><span style="font-size:22px">&#10003;</span>

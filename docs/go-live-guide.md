@@ -143,6 +143,9 @@ The zip is the same for both sites and never contains `config.local.php`, `tenan
 4. **Leave alone:** `config.local.php`, `tenants.php`, and the `exaact_data` and
    `exaact_backups` folders next to the app folder.
 5. **Check the upload landed.** Sign in as admin → open `/deploy-check.php` → every file matches.
+   The page also shows a **Time zone** line: the server's clock beside India time. If it says
+   the two differ, every time the app records (for example the six-hour CERT-In clock) is off
+   by that amount, so tell Claude before going further.
 6. **Check it is live:** no red TEST COPY bar; Platform setup → send a test e-mail; Payment
    (Razorpay) → **live** keys (`rzp_live_…`) → Check payment keys; one small real payment,
    then refund it in Razorpay.

@@ -48,7 +48,7 @@
         <?php if ($s['unread'] > 0): ?><span class="mx-unread"><?= (int)$s['unread'] ?></span><?php endif; ?>
         <div class="who"><?= e($who) ?></div>
         <div class="req"><?= e($s['ref_code']) ?> · <?= e($s['req_title']) ?></div>
-        <?php if ($s['last']): ?><div class="snip"><?= e(($s['last']['sender_kind'] === 'staff') ? 'You: ' : '') . mb_substr((string)$s['last']['body'], 0, 60) ?></div><?php endif; ?>
+        <?php if ($s['last']): ?><div class="snip"><?= e((($s['last']['sender_kind'] === 'staff') ? 'You: ' : '') . mb_substr((string)$s['last']['body'], 0, 60)) ?></div><?php endif; ?>
       </a>
     <?php endforeach; endif; ?>
   </div>
