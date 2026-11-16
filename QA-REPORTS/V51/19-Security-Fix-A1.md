@@ -38,7 +38,7 @@ On a server already set to India time it says "same as India time". It only read
 | --- | --- |
 | New automatic test `tests/test_connect_messages_escaping.php` | **On the old code: 1 passed, 5 failed** (it catches the hole). **On the fixed code: 6 passed, 0 failed** |
 | The original attack, repeated in a browser on a private copy with made-up data | **Old V51.1 code:** a pop-up appeared in the Coordinator's inbox ("127.0.0.1") and a live `<img onerror>` element was in the page. **Fixed code:** no pop-up, no live element; the message shows as plain text |
-| Robot: the 12 Marketplace tests that use Messages (MKT-006, 073–079, 081, 083, 114, SCR-connect-messages) | ROBOT_RESULTS |
+| Robot: the 12 Marketplace tests that use Messages (MKT-006, 073–079, 081, 083, 114, SCR-connect-messages) | **No test got worse.** 11 of the 12 give exactly their V51.1 result, step by step: 9 pass, 2 "needs you" (real WhatsApp provider; contact masking is your question, Marketplace C14), and MKT-114 still has the known DEF-MKT-019 step. **MKT-076, which caught the hole, failed on V51.1 and passes now** |
 | Full automatic suite, SQLite | SUITE_SQLITE |
 | Full automatic suite, MariaDB | SUITE_MARIADB |
 
