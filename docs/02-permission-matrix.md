@@ -453,11 +453,11 @@ administrator. Raise it with the owner before widening.
 > `tests/test_marketplace_region_filter.php` fails if anyone wraps the pool
 > search in `scope_clause()`.
 
-**Branch batch B7 — owner, 16 Nov 2026 (DEF-MKT-006, DEF-MKT-008). Applies the
+**Branch batch B7 — owner, 16 Nov 2026 (DEF-MKT-006). Applies the
 "action keeps its own scope" row above to the Marketplace's own records. No new
 permission, no new status.** Everything here is *inside the posting company*:
-no outside-facing screen (`/pro/*`, the public job board and `/p/<token>`
-passport page, careers, the client and agency portals, search, matching,
+no outside-facing screen (`/pro/*`, the public job board, careers, the client
+and agency portals, search, matching,
 notifications, e-mail) shows or depends on a posting's office, and how
 professionals and outside clients find, apply to or post work is unchanged.
 
@@ -482,13 +482,7 @@ professionals and outside clients find, apply to or post work is unchanged.
   application, booking or voucher of a different posting.
 - **A posting with no office** stays actionable by every office that may use
   the Marketplace desk, exactly as before — no existing data is locked away.
-- **Team passports** (`/passport-share`, the staff screen for our *own* team
-  members): the list, opening a member's link, creating it and regenerating
-  (revoking) it follow the member's home office (`scope_allows`); company-wide
-  roles see all. A share link is created only when someone presses "Create
-  share link" (a POST, checked like every other form), never by opening the
-  page. The public passport page and a professional's own passport are
-  unchanged. (`tests/test_branch_batch_marketplace.php`)
+  (`tests/test_branch_batch_marketplace.php`)
 
 The manpower-marketplace staff desk (K2a) reuses coordinator/master and adds **no**
 permission. The **professional-identity console** (`/connect-identity`, linking an

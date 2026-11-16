@@ -257,7 +257,7 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <?php if ($isPro): ?>
             <?php if (!empty($m['passport_token'])): ?><a class="btn secondary" href="/p/<?= e($m['passport_token']) ?>" target="_blank" rel="noopener" style="font-size:13px">Passport ↗</a><?php endif; ?>
-          <?php elseif (!function_exists('connect_passport_scope_ok') || connect_passport_scope_ok(ops_one("SELECT home_office_id FROM inspectors WHERE id=?", [(int)$m['id']]))): /* DEF-MKT-008 — own office's team only */ ?>
+          <?php else: ?>
             <a class="btn secondary" href="/passport-share?id=<?= (int)$m['id'] ?>" style="font-size:13px">Passport</a>
           <?php endif; ?>
           <?php if ($can_act && $m['eligibility'] !== 'BLOCKED'): ?>

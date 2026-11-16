@@ -9,12 +9,7 @@
 //  still SEES it and its applicants, only that office (and company-wide roles)
 //  may ACT on it. A posting with no office stays everyone's on the desk.
 //
-//  DEF-MKT-008 (P3): Team passports listed every branch's people and let anyone
-//  regenerate (revoke) anyone's link; opening the page minted a token. Now the
-//  list and the link actions follow the user's office scope, and a link is made
-//  only by pressing the button (POST).
-//
-//  Outsiders see nothing of this: the public passport page, the professionals'
+//  Outsiders see nothing of this: the professionals'
 //  job board and the client portal's closing-date panel are checked unchanged.
 //
 //  Drives the real routes through tests/_sales_route_worker.php (a separate
@@ -42,7 +37,6 @@ $nobody = function () { unset($_SESSION['uid']); current_user(true); if (functio
 
 $pdo = db();
 connect_market_migrate();
-if (function_exists('connect_passport_migrate')) connect_passport_migrate();
 $office = function ($name) use ($pdo) { $pdo->prepare("INSERT INTO offices (name, is_active) VALUES (?,1)")->execute([$name]); return (int) $pdo->lastInsertId(); };
 $A = $office('BB7 Ahmedabad'); $B = $office('BB7 Mumbai');
 $mk = function ($un, $first, $role, $off) use ($pdo) {
@@ -167,39 +161,3 @@ $portalHtml = (function ($row) use ($root) {   // drawn exactly as views/portal/
     ob_start(); include $root . '/views/ops/_cx_closing.php'; return ob_get_clean();
 })(cx_requirement_get($RA2));
 t_ok(strpos($portalHtml, 'value="req_extend"') !== false, 'the client portal\'s closing-date panel still offers its extend buttons');
-
-// ============================================================================
-t_section('Team passports follow the office; a link is made only on a button press (DEF-MKT-008)');
-
-$insp = function ($name, $off) use ($pdo) {
-    $pdo->prepare("INSERT INTO inspectors (name, status, home_office_id) VALUES (?, 'ACTIVE', ?)")->execute([$name, $off]);
-    return (int) $pdo->lastInsertId();
-};
-$IA = $insp('BB7 Inspector Ahmedabad', $A); $IB = $insp('BB7 Inspector Mumbai', $B);
-$tok = fn($id) => (string) ops_val("SELECT passport_token FROM inspectors WHERE id=?", [(int) $id]);
-
-$pg = $drive($CA, 'passport-share', 'GET', [], [], ['BB7 Inspector Ahmedabad', 'BB7 Inspector Mumbai']);
-t_ok(!empty($pg['has']['BB7 Inspector Ahmedabad']) && empty($pg['has']['BB7 Inspector Mumbai']), 'the Ahmedabad coordinator\'s list shows Ahmedabad\'s team only');
-$pg = $drive($BD, 'passport-share', 'GET', [], [], ['BB7 Inspector Ahmedabad', 'BB7 Inspector Mumbai']);
-t_ok(!empty($pg['has']['BB7 Inspector Ahmedabad']) && !empty($pg['has']['BB7 Inspector Mumbai']), 'a company-wide role sees every office\'s team');
-
-$pdo->prepare("UPDATE inspectors SET passport_token='bb7aaaabbbbccccdddd0000111122223' WHERE id=?")->execute([$IB]);
-$r = $drive($CA, 'passport-share', 'POST', [], ['id' => $IB, 'action' => 'regenerate']);
-t_eq($tok($IB), 'bb7aaaabbbbccccdddd0000111122223', 'Ahmedabad cannot regenerate (revoke) a Mumbai team member\'s link (' . $said($r) . ')');
-$pg = $drive($CA, 'passport-share', 'GET', ['id' => $IB], [], ['bb7aaaabbbbccccdddd0000111122223']);
-t_ok(empty($pg['has']['bb7aaaabbbbccccdddd0000111122223']), '…nor open it to copy the link');
-$drive($CB, 'passport-share', 'POST', [], ['id' => $IB, 'action' => 'regenerate']);
-t_ok($tok($IB) !== '' && $tok($IB) !== 'bb7aaaabbbbccccdddd0000111122223', 'control: Mumbai regenerates its own team member\'s link');
-
-$pg = $drive($CA, 'passport-share', 'GET', ['id' => $IA], [], ['Create share link', 'Regenerate link']);
-t_eq($tok($IA), '', 'opening a passport page does not create a share link');
-t_ok(!empty($pg['has']['Create share link']) && empty($pg['has']['Regenerate link']), '…it offers a "Create share link" button instead');
-$drive($CA, 'passport-share', 'POST', [], ['id' => $IA, 'action' => 'create']);
-$tA = $tok($IA);
-t_ok(strlen($tA) === 32, 'pressing the button (POST) creates the link');
-$pg = $drive($CA, 'passport-share', 'GET', ['id' => $IA], [], [$tA, 'Regenerate link']);
-t_ok(!empty($pg['has'][$tA]) && !empty($pg['has']['Regenerate link']), 'the page then shows that link and the regenerate button');
-
-// ---- the public passport page is unchanged -------------------------------------------------------------
-$pub = connect_passport_lookup($tA);
-t_ok($pub && (int) $pub['id'] === $IA, 'the public passport link still opens the team member\'s page, with no sign-in or office involved');

@@ -1,8 +1,6 @@
 <?php
 // Connect K1 — staff screen to get/copy a professional's public passport link,
 // see its QR, preview the public page, and regenerate (revoke) the link.
-// DEF-MKT-008 — the list is the person's own office(s); a link is made only by
-// pressing "Create share link" (a POST), never by opening the page.
 $inspector = $inspector ?? null; $token = $token ?? ''; $url = $url ?? '';
 $data = $data ?? null; $inspectors = $inspectors ?? [];
 $qr = ($url !== '' && function_exists('qr_svg')) ? qr_svg($url, 160, 'M', 3) : '';
@@ -15,12 +13,12 @@ $qr = ($url !== '' && function_exists('qr_svg')) ? qr_svg($url, 160, 'M', 3) : '
 
 <?php if (!$inspector): ?>
   <div class="panel" style="margin-top:12px">
-    <p class="muted" style="margin:0 0 10px">Choose one of your office's team to get their passport link:</p>
+    <p class="muted" style="margin:0 0 10px">Choose a professional to get their passport link:</p>
     <div style="display:flex;flex-wrap:wrap;gap:8px">
       <?php foreach ($inspectors as $i): ?>
         <a class="btn secondary" href="/passport-share?id=<?= (int)$i['id'] ?>"><?= e($i['name']) ?></a>
       <?php endforeach; ?>
-      <?php if (!$inspectors): ?><span class="muted">No active team members in your office.</span><?php endif; ?>
+      <?php if (!$inspectors): ?><span class="muted">No active professionals on record.</span><?php endif; ?>
     </div>
   </div>
 <?php else: ?>
@@ -30,17 +28,6 @@ $qr = ($url !== '' && function_exists('qr_svg')) ? qr_svg($url, 160, 'M', 3) : '
     <div class="kpi"><span class="kic">✅</span><div class="k">Live now</div><div class="v"><?= (int)($data['live_count'] ?? 0) ?></div></div>
   </div>
 
-  <?php if ($token === ''): ?>
-  <div class="panel" style="margin-top:12px">
-    <h3 style="margin:0 0 8px">Share link</h3>
-    <p class="muted" style="margin:0 0 10px">No share link yet. Create one to give <?= e($inspector['name']) ?> a public, verifiable passport page and QR code.</p>
-    <form method="post" action="/passport-share" style="margin:0">
-      <input type="hidden" name="id" value="<?= (int)$inspector['id'] ?>">
-      <input type="hidden" name="action" value="create">
-      <button type="submit" class="btn">🔗 Create share link</button>
-    </form>
-  </div>
-  <?php else: ?>
   <div class="panel" style="margin-top:12px">
     <h3 style="margin:0 0 8px">Share link</h3>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
@@ -63,5 +50,4 @@ $qr = ($url !== '' && function_exists('qr_svg')) ? qr_svg($url, 160, 'M', 3) : '
     <input type="hidden" name="action" value="regenerate">
     <button type="submit" class="btn secondary">↻ Regenerate link (revoke current)</button>
   </form>
-  <?php endif; ?>
 <?php endif; ?>

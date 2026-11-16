@@ -202,61 +202,23 @@ function connect_passport_can() {
     return false;
 }
 
-// ============================================================================
-//  DEF-MKT-008 — owner, 16 Nov 2026 (branch batch B7). Team passports are the
-//  shareable page of one of OUR OWN team members, so they follow the person's
-//  office like the rest of the team register (R-30): a coordinator lists, opens,
-//  creates and regenerates links for the people of the offices their scope
-//  covers; company-wide roles cover every office. The 13 Oct 2026 "discovery is
-//  not office-scoped" rule is about searching the shared freelancer pool — it is
-//  not touched here. The public /p/<token> page is unchanged.
-//
-//  And a link is made only when someone presses the button (a POST, checked
-//  against the form key like every other form) — never by opening the page.
-// ============================================================================
-
-/** May the person signed in manage this team member's passport link? */
-function connect_passport_scope_ok($insp) {
-    if (!is_array($insp)) return false;
-    return !function_exists('scope_allows') || scope_allows($insp['home_office_id'] ?? null);
-}
-
-/** The active team members whose passports this person may share. */
-function connect_passport_team() {
-    $rows = ops_all("SELECT id, name, home_office_id FROM inspectors WHERE COALESCE(status,'ACTIVE')='ACTIVE' ORDER BY name") ?: [];
-    return array_values(array_filter($rows, 'connect_passport_scope_ok'));
-}
-
 /** Staff screen: get/copy an inspector's public passport link + QR + preview. */
 function ops_connect_passport_share($method) {
     ops_require(connect_passport_can(), 'You cannot manage passport links.');
-    connect_passport_migrate();
     $id = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
-    $insp = $id > 0 ? ops_one("SELECT * FROM inspectors WHERE id=?", [$id]) : null;
-    if ($insp && !connect_passport_scope_ok($insp)) {
-        flash('That team member belongs to another office. You can share passports for your own office\'s team only.', 'error');
-        redirect('/passport-share');
-    }
-    if ($method === 'POST') {
-        if (!$insp) { flash('That team member was not found.', 'error'); redirect('/passport-share'); }
-        $act = (string)($_POST['action'] ?? '');
-        if ($act === 'regenerate') {
-            connect_passport_regenerate($id);
-            flash('A new passport link was generated — any previously shared link no longer works.');
-        } elseif ($act === 'create') {
-            connect_passport_token($id, true);
-            flash('Share link created — copy it or show the QR.');
-        }
+    if ($method === 'POST' && $id > 0 && ($_POST['action'] ?? '') === 'regenerate') {
+        connect_passport_regenerate($id);
+        flash('A new passport link was generated — any previously shared link no longer works.');
         redirect('/passport-share?id=' . $id);
     }
-    //  Opening the page only READS the link; it never makes one.
-    $token = $insp ? connect_passport_token($id, false) : '';
+    $insp = $id > 0 ? ops_one("SELECT * FROM inspectors WHERE id=?", [$id]) : null;
+    $token = $insp ? connect_passport_token($id) : '';
     view('ops/connect_passport_share', [
         'inspector' => $insp,
         'token'     => $token,
         'url'       => $token !== '' ? connect_passport_url($token) : '',
         'data'      => $insp ? connect_passport_public_data(array_merge($insp, ['passport_token' => $token])) : null,
-        'inspectors'=> connect_passport_team(),
+        'inspectors'=> ops_all("SELECT id, name FROM inspectors WHERE COALESCE(status,'ACTIVE')='ACTIVE' ORDER BY name") ?: [],
     ]);
     return true;
 }
