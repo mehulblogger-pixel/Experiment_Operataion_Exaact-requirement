@@ -75,6 +75,19 @@ function approvals_hub_sections() {
             'items' => $items,
         ];
     }
+    //  Expense vouchers at the level waiting on this person — their reporting
+    //  line, then Finance (branch batch R5, 16 Nov 2026). An administrator is
+    //  listed only where nobody else can act, with the reason why.
+    if (function_exists('voucher_waiting_on_me')) {
+        $items = voucher_waiting_on_me();
+        if ($items) $out[] = [
+            'key'   => 'vouchers',
+            'title' => 'Expense vouchers',
+            'sub'   => 'Vouchers waiting at your approval level. Approve them, or send them back with a reason.',
+            'act'   => '/vouchers',
+            'items' => $items,
+        ];
+    }
     //  Lead reassignments waiting for a manager (owner, 20 Oct 2026).
     if (function_exists('lead_reassign_waiting_on_me')) {
         $items = lead_reassign_waiting_on_me();
@@ -116,6 +129,7 @@ function approvals_hub_can_view() {
     //  it too — a Branch Manager approving quotations holds no stage-gate right.
     if (function_exists('crm_quote_ids_awaiting_me') && crm_quote_ids_awaiting_me()) return true;
     if (function_exists('pc_waiting_on_me') && pc_waiting_on_me()) return true;
+    if (function_exists('voucher_waiting_on_me') && voucher_waiting_on_me()) return true;
     return function_exists('lead_reassign_waiting_on_me') && (bool) lead_reassign_waiting_on_me();
 }
 
@@ -151,6 +165,16 @@ function approvals_hub_row($sectionKey, array $r) {
             'when'  => (string)substr((string)($r['updated_at'] ?? ''), 0, 10),
             'rule'  => '',
             'url'   => '/project-costing?id=' . (int)$r['id'],
+        ];
+    }
+    if ($sectionKey === 'vouchers') {
+        return [
+            'what'  => ((string)($r['inspector_name'] ?? '') ?: 'Voucher') . ' — ' . (string)($r['month'] ?? ''),
+            'kind'  => (function_exists('fmoney') ? fmoney((float)($r['total'] ?? 0)) : '') . ' · ' . (string)($r['_level'] ?? ''),
+            'who'   => (string)($r['inspector_name'] ?? ''),
+            'when'  => (string)substr((string)($r['submitted_at'] ?? ''), 0, 10),
+            'rule'  => (string)($r['_warning'] ?? ''),
+            'url'   => '/voucher?id=' . (int)$r['id'],
         ];
     }
     if ($sectionKey === 'lead_reassign') {

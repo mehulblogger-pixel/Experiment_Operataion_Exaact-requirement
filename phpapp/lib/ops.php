@@ -505,6 +505,8 @@ function ops_migrate() {
     ensure_column('expenses', 'extra', 'TEXT');
     // voucher supporting-file mime (voucher table itself is created in ensure_schema)
     ensure_column('vouchers', 'supporting_mime', "VARCHAR(100) DEFAULT ''");
+    // Branch batch R5 — the approval chain's log and round (lib/voucher_approval.php).
+    if (function_exists('vappr_migrate')) vappr_migrate();
     // per-office finance params (overhead % + contingency %) for accurate profitability
     ensure_column('offices', 'overhead_pct', 'DECIMAL(6,2) NULL');
     ensure_column('offices', 'contingency_pct', 'DECIMAL(6,2) NULL');
@@ -3629,6 +3631,12 @@ function ops_module_gate($route, $peek = false) {
         $jid = (int)($_GET['id'] ?? $_GET['job'] ?? $_POST['id'] ?? $_POST['job_id'] ?? $_POST['job'] ?? 0);
         if ($jid && job_owned_by_me($jid)) return;   // owner may proceed
     }
+    // Branch batch R5 — the same for a voucher: its claimant and the people in
+    // its approval chain hold no Vouchers module, and the handler decides on the
+    // record (can_view_voucher / can_edit_voucher). Not when the licence is off.
+    if ($mod === 'vouchers' && !can('mod.vouchers.view') && current_user()
+        && !(function_exists('licence_blocks') && licence_blocks('mod.vouchers.view'))
+        && voucher_route_owner_safe($base)) return;
     if ($mod && !can("mod.$mod.view")) {
         // MILESTONE 12. Two different "no"s still need two different sentences —
         // telling somebody to ask their administrator for a module the company
@@ -3902,6 +3910,10 @@ function ops_dispatch($route, $method) {
         //  are set, the other is what is waiting on you.
         case $route === 'approvals-setup':
             return ops_approvals_setup($route, $method);
+        case $route === 'voucher-approvals':                         // branch batch R5 — Admin → Approvals → Expense vouchers
+            return ops_voucher_approvals($method);
+        case $route === 'voucher-delegations':                       // branch batch R5 — who covers for a voucher approver
+            return ops_voucher_delegations($method);
         case $route === 'approval-delegations':                      // Phase 3 · M2 — who may act for whom, and when
             return ops_approval_delegations($route, $method);
         case $route === 'recruit-approvals':                         // Phase 6 — configurable recruitment approval matrix + SLA
@@ -7670,7 +7682,60 @@ function inspector_link_msg() {
          . Tl('engineer') . ' instead — then use the full ' . THP('job') . ' and ' . THP('voucher') . ' registers under Operations.';
 }
 function voucher_owner_is_me($v) { return my_inspector_id() && (int)$v['inspector_id'] === (int)my_inspector_id(); }
-function can_view_voucher($v) { return is_coordinator_level() || voucher_owner_is_me($v); }
+// ---- Who may do what with a voucher (docs/02 Vouchers row, footnote 3) -------
+//  Branch batch R5 / DEF-OPS-031, 003, 033, 034 (16 Nov 2026). Before, every
+//  voucher screen asked is_coordinator_level(): an inspector could not open
+//  their own voucher (the module gate refused it), Finance could not read the
+//  vouchers it pays, and the Business Director — View on the matrix — was
+//  offered Approve and Reopen on every voucher in the company.
+//
+//  Now:
+//   * the claimant opens, edits (while DRAFT) and submits their OWN voucher;
+//   * staff holding the Vouchers module read the vouchers of the offices their
+//     scope covers (Finance and the Business Director included: View);
+//   * staff holding Vouchers EDIT edit and submit drafts in their offices;
+//   * anybody in the voucher's approval chain opens it — that is how an
+//     Asst. Manager, or any N+1 without the module, reaches what they approve;
+//   * APPROVING is the chain alone (lib/voucher_approval.php), never a role.
+function voucher_in_scope($v) {
+    if (is_master()) return true;
+    return !function_exists('scope_allows') || scope_allows(voucher_office_id($v) ?: null, voucher_sbu($v) ?: null);
+}
+function voucher_staff_reads($v) { return can('mod.vouchers.view') && voucher_in_scope($v); }
+function voucher_staff_edits($v) { return (is_master() || can('mod.vouchers.edit')) && voucher_in_scope($v); }
+function can_view_voucher($v) {
+    return voucher_owner_is_me($v) || voucher_staff_reads($v)
+        || (function_exists('vappr_is_participant') && vappr_is_participant($v));
+}
+function can_submit_voucher($v) {
+    return ($v['status'] ?? '') === 'DRAFT' && (voucher_owner_is_me($v) || voucher_staff_edits($v));
+}
+// C3 (owner, 16 Nov 2026) — Finance approves last and makes the payment, so
+// Finance marks an APPROVED voucher Paid; the Master Admin and an Admin may too.
+// Never the claimant, and only in the offices the person covers.
+function can_mark_voucher_paid($v) {
+    if (($v['status'] ?? '') !== 'APPROVED' || voucher_owner_is_me($v)) return false;
+    $role = user_role();
+    return (is_master() || in_array($role, ['ADMIN', 'FINANCE'], true)) && voucher_in_scope($v);
+}
+// Reopen is as it was — a SUBMITTED or APPROVED voucher by coordinator level, a
+// PAID one by a manager — except the Business Director, who is View only
+// (DEF-OPS-034), and only within the offices the person covers.
+function can_reopen_voucher($v) {
+    // Reopening is a register right (Vouchers module, in scope) — being somebody's
+    // approver in the chain does not add it; an approver sends back instead.
+    if (user_role() === 'BUSINESS_DIRECTOR' || !voucher_staff_reads($v)) return false;
+    if (($v['status'] ?? '') === 'PAID') return is_admin_level();
+    return is_coordinator_level() && in_array($v['status'] ?? '', ['SUBMITTED', 'APPROVED'], true);
+}
+// The module gate lets a voucher route through for somebody without the
+// Vouchers module, so the handler's own checks above can decide: the claimant
+// and the chain's approvers hold no module right. Every voucher handler asks
+// can_view_voucher() / can_edit_voucher() on the record itself.
+function voucher_route_owner_safe($route) {
+    return in_array((string)$route, ['vouchers','voucher','voucher-generate','voucher-entry','voucher-save','voucher-header',
+        'voucher-status','voucher-print','voucher-file','voucher-csv','voucher-quick-add','voucher-line-receipt'], true);
+}
 // A voucher is the timesheet the whole cost run is built on. Once the month has
 // been calculated and closed, changing a day behind it would make the stored
 // allocation describe a month that no longer exists — the figures would still
@@ -7693,7 +7758,7 @@ function voucher_lock_reason($v) {
 }
 function can_edit_voucher($v) {
     if (voucher_month_frozen($v)) return false;
-    return ($v['status'] === 'DRAFT') && (is_coordinator_level() || voucher_owner_is_me($v));
+    return ($v['status'] === 'DRAFT') && (voucher_owner_is_me($v) || voucher_staff_edits($v));
 }
 
 // Build the month's day rows from the inspector's jobs (idempotent — skips days
@@ -7822,18 +7887,46 @@ function ops_vouchers($route, $method) {
             view('ops/voucher_list', ['rows' => $rows, 'mine' => true, 'inspectors' => []]);
             return;
         }
-        ops_require(is_coordinator_level(), 'You cannot view vouchers.');
-        $rows = ops_all("SELECT v.*, i.name inspector_name FROM vouchers v LEFT JOIN inspectors i ON i.id=v.inspector_id ORDER BY v.month DESC, i.name");
-        view('ops/voucher_list', ['rows' => $rows, 'mine' => false, 'inspectors' => inspectors_list(false)]);
+        // Branch batch R5 — staff with the Vouchers module see the offices their
+        // scope covers (not the whole company); anybody also sees their own
+        // vouchers and the ones waiting for, or already signed by, them.
+        $byId = [];
+        if (can('mod.vouchers.view')) {
+            [$sw, $sa] = function_exists('scope_clause') && !is_master() ? scope_clause('COALESCE(v.office_id, i.home_office_id)', 'i.sbu') : ['1=1', []];
+            foreach (ops_all("SELECT v.*, i.name inspector_name FROM vouchers v LEFT JOIN inspectors i ON i.id=v.inspector_id WHERE $sw", $sa) as $r) $byId[(int)$r['id']] = $r;
+        }
+        $extra = [];
+        if (my_inspector_id()) $extra = array_merge($extra, array_map('intval', array_column(ops_all("SELECT id FROM vouchers WHERE inspector_id=?", [(int)my_inspector_id()]), 'id')));
+        if (function_exists('vappr_migrate')) {
+            vappr_migrate();
+            $extra = array_merge($extra, array_map('intval', array_column(ops_all("SELECT DISTINCT voucher_id FROM voucher_approval_log WHERE user_id=?", [(int)(current_user()['id'] ?? 0)]), 'voucher_id')));
+            foreach (voucher_waiting_on_me() as $w) $extra[] = (int)$w['id'];
+        }
+        foreach (array_unique($extra) as $xid) {
+            if (isset($byId[$xid])) continue;
+            $r = ops_one("SELECT v.*, i.name inspector_name FROM vouchers v LEFT JOIN inspectors i ON i.id=v.inspector_id WHERE v.id=?", [$xid]);
+            if ($r && can_view_voucher($r)) $byId[$xid] = $r;
+        }
+        ops_require(can('mod.vouchers.view') || $byId || my_inspector_id(), 'You cannot view vouchers.');
+        $rows = array_values($byId);
+        usort($rows, fn($a, $b) => [$b['month'], (string)$a['inspector_name']] <=> [$a['month'], (string)$b['inspector_name']]);
+        $waitIds = function_exists('voucher_waiting_on_me') ? array_map(fn($w) => (int)$w['id'], voucher_waiting_on_me()) : [];
+        $canCreate = is_master() || can('mod.vouchers.edit');
+        view('ops/voucher_list', ['rows' => $rows, 'mine' => false, 'waitIds' => $waitIds, 'canCreate' => $canCreate,
+            'inspectors' => $canCreate ? inspectors_list(false) : []]);
         return;
     }
 
     if ($route === 'voucher') {
         $id = (int)($_GET['id'] ?? 0);
         if (!$id) { // find-or-create for inspector + month
-            $insId = is_coordinator_level() ? (int)($_GET['ins'] ?? 0) : (int)my_inspector_id();
+            // Your own month always; somebody else's only with Vouchers EDIT in
+            // their office (a Business Director or Finance — View — cannot create one).
+            $insId = (int)($_GET['ins'] ?? 0) ?: (int)my_inspector_id();
             $month = preg_match('/^\d{4}-\d{2}$/', $_GET['month'] ?? '') ? $_GET['month'] : date('Y-m');
             if (!$insId) { flash('Pick a ' . Tl('engineer') . ' first.', 'error'); redirect('/vouchers'); }
+            if ($insId !== (int)my_inspector_id())
+                ops_require(voucher_staff_edits(['inspector_id' => $insId, 'office_id' => null]), 'You can open only your own voucher.');
             $v = ops_one("SELECT * FROM vouchers WHERE inspector_id=? AND month=?", [$insId, $month]);
             if (!$v) {
                 $pdo->prepare("INSERT INTO vouchers (inspector_id,office_id,month,status,created_by,created_at) VALUES (?,?,?, 'DRAFT', ?,?)")
@@ -7855,12 +7948,11 @@ function ops_vouchers($route, $method) {
         if (!$v) { http_response_code(404); view('notfound'); return; }
         ops_require(can_view_voucher($v), 'You cannot view this voucher.');
         $entries = ops_all("SELECT * FROM voucher_entries WHERE voucher_id=? ORDER BY entry_date, id", [$id]);
-        // R5 — the Approve button hides from the claimant and from whoever submitted
-        // it (maker != checker), matching the server-side guard so no one is offered a
-        // button that will only error. Mark-paid / reopen stay on the general control.
-        $meUid = (int)(current_user()['id'] ?? 0);
-        $canApproveThis = is_coordinator_level() && !voucher_owner_is_me($v)
-            && ((int)($v['submitted_by'] ?? 0) === 0 || (int)$v['submitted_by'] !== $meUid);
+        // Branch batch R5 — the chain decides who approves (lib/voucher_approval.php);
+        // the buttons ask exactly the questions the server asks.
+        $progress = vappr_progress($v);
+        $act = vappr_can_act($v, $progress);
+        $canApproveThis = $act['ok'];
         // Module 30 — the inspector's recent jobs, for the quick-add "against a job" picker.
         $qaJobs = ops_all("SELECT j.id, j.job_code, bp.display_name client_name, bp.legal_name legal
                            FROM jobs j LEFT JOIN calls c ON c.id=j.call_id LEFT JOIN business_partners bp ON bp.id=c.client_id
@@ -7869,7 +7961,9 @@ function ops_vouchers($route, $method) {
             'leaveOpts' => lk_options_or('leave_type', LEAVE_TYPES), 'dayOpts' => lk_options_or('day_code', DAY_CODES),
             'heads' => voucher_heads_for($v['inspector_id']), 'modes' => voucher_modes_for($v['inspector_id']),
             'rates' => voucher_mode_rates($v['inspector_id']), 'sum' => voucher_summary($v['id']),
-            'headLabels' => expense_head_label_map(), 'canApprove' => is_coordinator_level(), 'canApproveThis' => $canApproveThis,
+            'headLabels' => expense_head_label_map(), 'canApproveThis' => $canApproveThis, 'act' => $act,
+            'progress' => $progress, 'history' => vappr_history($v['id']),
+            'canSubmit' => can_submit_voucher($v), 'canPaid' => can_mark_voucher_paid($v), 'canReopen' => can_reopen_voucher($v),
             'qaJobs' => $qaJobs, 'addJob' => (int)($_GET['addjob'] ?? 0),
             'natureOpts' => ['REVENUE'=>'Revenue','NONREV'=>'Non-Revenue','SUPPORT'=>'Support function','MD'=>'MD']]);
         return;
@@ -7897,7 +7991,9 @@ function ops_vouchers($route, $method) {
     // Routes through can_edit_voucher, so every R5 lock (DRAFT-only, owner, month-frozen)
     // still applies — a submitted/paid month is refused, never silently written past.
     if ($route === 'voucher-quick-add' && $method === 'POST') {
-        $insId = is_coordinator_level() ? (int)($_POST['inspector_id'] ?? 0) : (int)my_inspector_id();
+        $insId = (int)($_POST['inspector_id'] ?? 0) ?: (int)my_inspector_id();
+        if ($insId !== (int)my_inspector_id())
+            ops_require(voucher_staff_edits(['inspector_id' => $insId, 'office_id' => null]), 'You can add expenses only to your own voucher.');
         if (!$insId) { flash('No inspector to log the expense against.', 'error'); redirect('/vouchers'); }
         $month = preg_match('/^\d{4}-\d{2}$/', (string)($_POST['month'] ?? '')) ? $_POST['month'] : date('Y-m');
         $v = ops_one("SELECT * FROM vouchers WHERE inspector_id=? AND month=?", [$insId, $month]);
@@ -8003,43 +8099,44 @@ function ops_vouchers($route, $method) {
     if ($route === 'voucher-status' && $method === 'POST') {
         $v = ops_one("SELECT * FROM vouchers WHERE id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$v) { http_response_code(404); view('notfound'); return; }
-        // R5 — record WHO submitted, so approval can enforce maker != checker.
-        if (function_exists('ensure_column')) ensure_column('vouchers', 'submitted_by', "VARCHAR(20) DEFAULT ''");
-        $act   = $_POST['action'] ?? '';
-        $meUid = (int)(current_user()['id'] ?? 0);
+        vappr_migrate();
+        $v = ops_one("SELECT * FROM vouchers WHERE id=?", [(int)$v['id']]);
+        ops_require(can_view_voucher($v), 'You cannot view this voucher.');
+        $act = $_POST['action'] ?? '';
         if ($act === 'submit') {
-            ops_require(($v['status'] === 'DRAFT') && (is_coordinator_level() || voucher_owner_is_me($v)), 'Cannot submit this voucher.');
-            $pdo->prepare("UPDATE vouchers SET status='SUBMITTED', submitted_at=?, submitted_by=? WHERE id=?")->execute([date('c'), (string)$meUid, $v['id']]);
-            flash('Voucher submitted for approval.');
+            ops_require(can_submit_voucher($v), 'Cannot submit this voucher.');
+            // R5 — the submitter is recorded so approval can enforce maker != checker,
+            // and a new round starts: every level approves again.
+            $v = vappr_submit($v);
+            $p = vappr_progress($v);
+            flash('Voucher submitted. It now waits for ' . vappr_waiting_text($p) . '.');
         } elseif ($act === 'approve') {
-            ops_require(is_coordinator_level() && $v['status'] === 'SUBMITTED', 'Only a manager can approve a submitted voucher.');
-            // R5 — segregation of duties: the approver may not be the claimant whose
-            // expenses these are, nor the person who submitted the voucher. One person
-            // cannot both raise and approve an expense claim. (Legacy vouchers with no
-            // recorded submitter fall back to allowing approval.)
-            ops_require(!voucher_owner_is_me($v), 'You cannot approve your own expense voucher — it must be checked by someone else.');
-            $submittedBy = (int)($v['submitted_by'] ?? 0);
-            ops_require($submittedBy === 0 || $submittedBy !== $meUid,
-                'This voucher must be approved by someone other than the person who submitted it (maker ≠ checker).');
-            $pdo->prepare("UPDATE vouchers SET status='APPROVED', checked_by=?, approved_by=?, authorized_by=?, approved_at=? WHERE id=?")
-                ->execute([$_POST['checked_by'] ?? '', ($_POST['approved_by'] ?? '') ?: user_name(current_user()), $_POST['authorized_by'] ?? '', date('c'), $v['id']]);
-            flash('Voucher approved.');
+            ops_require($v['status'] === 'SUBMITTED', 'Only a submitted voucher can be approved.');
+            // Maker != checker, the chain's order and delegation: vappr_can_act().
+            [$ok, $msg] = vappr_approve($v, (string)($_POST['note'] ?? ''));
+            flash($msg, $ok ? 'success' : 'error');
+        } elseif ($act === 'sendback') {
+            ops_require($v['status'] === 'SUBMITTED', 'Only a submitted voucher can be sent back.');
+            [$ok, $msg] = vappr_send_back($v, (string)($_POST['reason'] ?? ''));
+            flash($msg, $ok ? 'success' : 'error');
         } elseif ($act === 'paid') {
-            ops_require(is_coordinator_level() && $v['status'] === 'APPROVED', 'Only an approved voucher can be marked paid.');
-            $pdo->prepare("UPDATE vouchers SET status='PAID' WHERE id=?")->execute([$v['id']]);
+            ops_require(can_mark_voucher_paid($v), 'Only Finance (or an administrator) marks an approved voucher paid.');
+            $pdo->prepare("UPDATE vouchers SET status='PAID' WHERE id=? AND status='APPROVED'")->execute([$v['id']]);
+            vappr_log($v, 'PAID');
             flash('Voucher marked as paid.');
         } elseif ($act === 'reopen') {
             // R5 — a PAID voucher is settled money; reopening it (which would let the
             // figures be altered) is restricted to a real manager, not any coordinator.
             // A SUBMITTED / APPROVED voucher may still be reopened by coordinator-level.
+            // The Business Director reopens nothing (View only, DEF-OPS-034).
             if ($v['status'] === 'PAID') {
-                ops_require(is_admin_level(), 'A paid voucher can only be reopened by a manager.');
+                ops_require(can_reopen_voucher($v), 'A paid voucher can only be reopened by a manager.');
             } else {
-                ops_require(is_coordinator_level() && in_array($v['status'], ['SUBMITTED', 'APPROVED'], true),
-                    'Only a submitted or approved voucher can be reopened.');
+                ops_require(can_reopen_voucher($v), 'Only a submitted or approved voucher can be reopened.');
             }
             // Clear the recorded submitter so the next submit re-establishes maker ≠ checker.
             $pdo->prepare("UPDATE vouchers SET status='DRAFT', submitted_by='' WHERE id=?")->execute([$v['id']]);
+            vappr_log($v, 'REOPENED', '', '', trim((string)($_POST['reason'] ?? '')));
             flash('Voucher reopened for editing.');
         }
         redirect('/voucher?id=' . $v['id']);
@@ -9575,6 +9672,7 @@ function ops_pending_tasks() {
             'recruit'       => ['🧑‍💼', 'recruitment approvals', 'hiring requests, requisitions, offers or salaries waiting on you', '/my-approvals'],
             'gates'         => ['🛂', 'deals to approve', 'deals held at a stage until you agree', '/approvals'],
             'lead_reassign' => ['🔁', 'lead reassignments', 'leads waiting for you to approve a new owner', '/approvals'],
+            'vouchers'      => ['🧾', 'vouchers to approve', 'expense vouchers waiting at your approval level', '/vouchers'],
         ];
         try {
             foreach (approvals_hub_sections() as $sec) {
@@ -9586,6 +9684,7 @@ function ops_pending_tasks() {
                     $it = $sec['items'][0];
                     if ($sec['key'] === 'quotes' && !empty($it['id'])) $href = '/quote?id=' . (int)$it['id'];
                     elseif ($sec['key'] === 'costings' && !empty($it['id'])) $href = '/project-costing?id=' . (int)$it['id'];
+                    elseif ($sec['key'] === 'vouchers' && !empty($it['id'])) $href = '/voucher?id=' . (int)$it['id'];
                 }
                 $add($n, $lk[0], $lk[1], $lk[2], $href, 'info');
             }
@@ -9629,12 +9728,16 @@ function ops_pending_tasks() {
         $add($first, '✍', 'contracts to endorse', 'contract openings waiting for your first signature', '/contract-openings', 'warn');
         $add($final, '📝', 'contracts to approve', 'contract openings waiting for your approval', '/contract-openings', 'info');
     }
-    // Vouchers submitted for approval — shown to whoever can actually act on a
-    // voucher (edit rights or finance), not to every management-level role. A
-    // sales manager does not approve travel vouchers.
-    if (can('mod.vouchers.edit') || can('finance.reconcile') || is_master()) {
-        $n = $cnt("SELECT COUNT(*) FROM vouchers WHERE status='SUBMITTED'");
-        $add($n, '🧾', 'vouchers to approve', 'expense vouchers submitted for approval', '/vouchers', 'warn');
+    // Vouchers to approve now come from the approval chain, through the hub
+    // above (branch batch R5): each approver is counted the vouchers at THEIR
+    // level, not every submitted voucher in the company. What is left here is
+    // the payment: an approved voucher, for Finance (C3) in the offices it covers.
+    if (function_exists('can_mark_voucher_paid') && (is_master() || in_array(user_role(), ['ADMIN', 'FINANCE'], true))
+        && !(function_exists('licence_blocks') && licence_blocks('mod.vouchers.view'))) {
+        $toPay = 0;
+        try { foreach (ops_all("SELECT * FROM vouchers WHERE status='APPROVED'") ?: [] as $pv) if (can_mark_voucher_paid($pv)) $toPay++; }
+        catch (Throwable $e) {}
+        $add($toPay, '💳', 'vouchers to pay', 'approved expense vouchers waiting to be marked paid', '/vouchers', 'warn');
     }
 
     // ---- Reports (IDEMS) waiting on ME -------------------------------------
@@ -9701,6 +9804,10 @@ function ops_pending_tasks() {
                         OR EXISTS(SELECT 1 FROM report_docs d WHERE d.job_id=j.id AND COALESCE(d.deleted,0)=0 AND COALESCE(d.finalized,0)=1))", [$insId]),
             '✅', 'jobs to close', 'work done — close the job &amp; record its expenses', '/my-jobs?f=toclose', 'info', 'jobs');
         // My vouchers still in draft (not yet submitted for approval).
+        // Sent back by an approver (branch batch R5, Q3): the reason is on the voucher.
+        $sentBack = 0; try { if (function_exists('vappr_migrate')) { vappr_migrate(); $sentBack = (int)ops_val("SELECT COUNT(*) FROM vouchers WHERE inspector_id=? AND status='DRAFT' AND COALESCE(sent_back_reason,'')<>''", [$insId]); } } catch (Throwable $e) {}
+        $add($sentBack, '↩', $sentBack === 1 ? 'voucher sent back — correct it' : 'vouchers sent back — correct them',
+            'an approver sent it back with a reason; correct and submit again', '/vouchers', 'bad', 'money');
         $add($cnt("SELECT COUNT(*) FROM vouchers WHERE inspector_id=? AND status='DRAFT'", [$insId]),
             '🧾', 'vouchers to submit', 'expense vouchers you have not submitted', '/vouchers', 'info', 'money');
     }

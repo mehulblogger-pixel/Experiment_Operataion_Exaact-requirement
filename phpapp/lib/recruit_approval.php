@@ -1271,7 +1271,13 @@ function appr_delegation_save($id, array $post) {
     // or without recruitment. They can only ever cover quotations.
     $quoteOnly = strtoupper((string)($post['entity'] ?? ($existing['entity'] ?? ''))) === 'QUOTE'
               && (!$existing || strtoupper((string)$existing['entity']) === 'QUOTE');
-    if (!appr_config_can() && !($quoteOnly && function_exists('crm_quote_delegation_can') && crm_quote_delegation_can()))
+    // Expense-voucher delegations (branch batch R5, 16 Nov 2026) the same way:
+    // managed by whoever sets the voucher chain (the Master Admin), with or
+    // without recruitment, and they only ever cover vouchers.
+    $voucherOnly = strtoupper((string)($post['entity'] ?? ($existing['entity'] ?? ''))) === 'VOUCHER'
+              && (!$existing || strtoupper((string)$existing['entity']) === 'VOUCHER');
+    if (!appr_config_can() && !($quoteOnly && function_exists('crm_quote_delegation_can') && crm_quote_delegation_can())
+        && !($voucherOnly && function_exists('vappr_config_can') && vappr_config_can()))
         return [false, 'Only an administrator on a workspace with recruitment can configure approval delegation.', 0];
     if ($id > 0 && !$existing) return [false, 'That delegation no longer exists.', 0];
 
@@ -1290,7 +1296,7 @@ function appr_delegation_save($id, array $post) {
         if ((int) ($row['is_active'] ?? 0) !== 1) return [false, 'That user is switched off, so they cannot be ' . $u[1] . '.', 0];
     }
     $entity = strtoupper($val('entity'));
-    if ($entity !== '' && !isset(APPR_ENTITIES[$entity]) && $entity !== 'QUOTE') return [false, 'That is not something this workspace approves.', 0];
+    if ($entity !== '' && !isset(APPR_ENTITIES[$entity]) && $entity !== 'QUOTE' && $entity !== 'VOUCHER') return [false, 'That is not something this workspace approves.', 0];
     $office = (int) $val('office_id', '0') ?: null;
     if ($office !== null && function_exists('scope_allows') && !scope_allows($office, null))
         return [false, 'That branch is outside your office / branch scope.', 0];
@@ -1334,7 +1340,8 @@ function appr_delegation_revoke($id) {
     // M3 CORRECTION · F2 — the same gate as create/edit and as the approval matrix
     // (a quotation-only delegation by the people who manage quotation approvals).
     $quoteOnly = strtoupper((string)$d['entity']) === 'QUOTE' && function_exists('crm_quote_delegation_can') && crm_quote_delegation_can();
-    if (!appr_config_can() && !$quoteOnly)
+    $voucherOnly = strtoupper((string)$d['entity']) === 'VOUCHER' && function_exists('vappr_config_can') && vappr_config_can();
+    if (!appr_config_can() && !$quoteOnly && !$voucherOnly)
         return [false, 'Only an administrator on a workspace with recruitment can revoke an approval delegation.'];
     db()->prepare("UPDATE approval_delegations SET active=0, revoked_by=?, revoked_at=? WHERE id=?")
         ->execute([_appr_actor(), _appr_now(), (int) $id]);

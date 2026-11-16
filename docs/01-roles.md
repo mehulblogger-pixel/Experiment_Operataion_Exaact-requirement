@@ -142,6 +142,7 @@ whichever is offered first (owner, test book ONB-041, 25 Oct 2026).
 - **Who:** accounts/finance — registers contracts off won quotes, raises and issues invoices, records receipts, reconciles credit and attendance.
 - **Context:** desk, laptop; money-first dashboard (`dashboard.php:65`).
 - **Sees:** Sales (quotes view), Operations (calls/jobs/vouchers **view-only**), Reporting, Money (invoicing/profitability/billing), Insights. **No Directory, no Admin, no Recruitment, no Quality.**
+- **Expense vouchers (branch batch R5, 16 Nov 2026):** reads the vouchers of the offices it covers, **signs the Finance level of a voucher's approval chain — always the last level** — and **marks an approved voucher Paid** (C3). It edits no voucher. See `02-permission-matrix.md` footnote 3.
 - **Accountable for:** billing, collections, and the numbering integrity of invoices.
 - **Must never:** allocate/close jobs or edit operations records; manage users/settings.
 

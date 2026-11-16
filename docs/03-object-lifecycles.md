@@ -97,23 +97,47 @@ stateDiagram-v2
 `vouchers.status` (`ops.php:217-225`) — **DRAFT → SUBMITTED → APPROVED → PAID**, with a
 `reopen` back to DRAFT. A separate **month-freeze** overlay (`voucher_month_frozen()`
 → `cost_month_frozen()`, `costing.php:282`) locks *editing* regardless of status.
+**No status was added** by the approval chain (branch batch R5, 16 Nov 2026): the chain
+runs *inside* SUBMITTED, and a send-back returns to DRAFT.
 
 ```mermaid
 stateDiagram-v2
-  [*] --> DRAFT : voucher find-or-create (ops.php:4904)
-  DRAFT --> SUBMITTED : submit · coordinator-level OR owner, status==DRAFT (ops.php:4988-4990)
-  SUBMITTED --> APPROVED : approve · is_coordinator_level, status==SUBMITTED, approver != claimant & != submitter (R5)
-  APPROVED --> PAID : paid · is_coordinator_level, status==APPROVED
-  PAID --> DRAFT : reopen · is_admin_level ONLY (R5)
-  APPROVED --> DRAFT : reopen · is_coordinator_level
-  SUBMITTED --> DRAFT : reopen · is_coordinator_level
+  [*] --> DRAFT : voucher find-or-create — own month, or Vouchers Edit in the office
+  DRAFT --> SUBMITTED : submit · the claimant OR Vouchers Edit in the office; starts a new approval round
+  SUBMITTED --> SUBMITTED : approve one level · the person (or delegate) at the current level of the chain
+  SUBMITTED --> APPROVED : approve the LAST level · Finance (always last)
+  SUBMITTED --> DRAFT : send back · whoever may sign the current level, reason REQUIRED
+  APPROVED --> PAID : paid · Finance (offices it covers), Master Admin, Admin — never the claimant
+  PAID --> DRAFT : reopen · is_admin_level ONLY, not the Business Director
+  APPROVED --> DRAFT : reopen · is_coordinator_level, not the Business Director
+  SUBMITTED --> DRAFT : reopen · is_coordinator_level, not the Business Director
 ```
 
-- **R5 fixed:** `reopen` now checks the source status — a **PAID** voucher reopens only for a
-  real manager (`is_admin_level`), not any coordinator; SUBMITTED/APPROVED reopen by
-  coordinator-level. **Approve now enforces segregation of duties** — the approver must be
-  neither the claimant nor the person who submitted it (`vouchers.submitted_by`), matching the
-  maker≠checker control used for contracts and reports.
+- **The chain (SUBMITTED → APPROVED)** — `lib/voucher_approval.php`. The levels come from
+  Admin → Approvals → Expense vouchers (Master Admin): reporting line **N+1 … N+4** (the
+  claimant's "Reports to", then that person's, …), **Office Finance**, **Central Finance**,
+  each needed above an amount the Master Admin sets (blank = always). Nothing is set when
+  shipped; the default is **N+1, then Finance** (office Finance, else central Finance). The
+  reporting levels sign in order up to the highest level the total needs; Finance signs
+  last (office, then central). A shorter line stops at its highest person; no "Reports to"
+  (or a level nobody can sign) is signed by an administrator, who is warned. Each level
+  signed is a row in `voucher_approval_log` for the current round (`vouchers.appr_round`);
+  the voucher becomes APPROVED when the last required level signs. Who may sign each level
+  is in `docs/02` footnote 3.
+- **Send back (SUBMITTED → DRAFT)** — the owner's Q3: no "Rejected" status. The reason is
+  mandatory, kept on the voucher (`sent_back_reason/_by/_at`, shown to the claimant until
+  they resubmit) and in History. Resubmitting opens a new round, so **every level signs
+  again** from N+1.
+- **Vouchers already SUBMITTED before the chain** — round 0, no log rows: they start at the
+  first level of the chain on their next action, with no conversion. A voucher with no
+  recorded submitter (legacy) can be signed by anyone at the level except the claimant.
+- **R5 fixed (earlier):** `reopen` checks the source status — a **PAID** voucher reopens only
+  for a real manager (`is_admin_level`); SUBMITTED/APPROVED reopen by coordinator level.
+  **Segregation of duties** — the claimant and the submitter (`vouchers.submitted_by`) never
+  sign a level, and one person signs one level of a voucher. Reopening clears the submitter
+  and is recorded in History.
+- **Paid (C3)** — Finance approves last and pays, so Finance marks Paid; coordinators no
+  longer do.
 
 ---
 
