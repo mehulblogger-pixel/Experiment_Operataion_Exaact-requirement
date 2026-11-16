@@ -694,10 +694,40 @@ stateDiagram-v2
   UNDER_REVIEW --> APPROVED : approve, last level · idems_can_act_step (idems.php:5743)
   UNDER_REVIEW --> REJECTED : reject (remark required) · idems_can_act_step (idems.php:5750)
   UNDER_REVIEW --> DRAFT : sendback (remark required) · idems_can_act_step (idems.php:5757)
+  VETTING --> DRAFT : document-reopen, reason required · idems_reopen_actor (executing-office Coordinator+ or delegate)
+  UNDER_REVIEW --> DRAFT : document-reopen, reason required · idems_reopen_actor (executing-office Coordinator+ or delegate)
+  APPROVED --> DRAFT : document-reopen, reason required · idems_reopen_actor — NEW (owner C2, 16 Nov 2026); approvals cleared, chain runs again on resubmit
   APPROVED --> ISSUED : document-finalize · idems.finalize/master, approver≠issuer (idems.php:4518, seg 4460)
-  ISSUED --> [*] : locked (finalized=1); revise spawns a NEW DRAFT row (idems.php:4578)
+  ISSUED --> [*] : locked (finalized=1); document-revise spawns a NEW DRAFT revision R1, R2 … · idems_reopen_actor forRevision
   REJECTED --> DRAFT : editable again (idems_status_allows_edit idems.php:3463)
 ```
+
+**Reopening a report — the owner's 0.3 / C2 (16 Nov 2026, `QA-REPORTS/V51/27`).**
+The inspector edits only in Draft / Sent back (unchanged). After submission,
+approval or issue they edit again only when a **Coordinator-or-above of the
+EXECUTING office** opens it — or the person acting for them through the existing
+**Approval delegation** (a delegation for *everything*, for that office or for every
+office; a quotation-only delegation does not reach reports; recruitment behaviour is
+unchanged). "Executing office" = the job's executing office, else the work order's
+(`calls.executing_office_id`, legacy `ibo_office_id`), else the report's own office.
+The actor must also hold the report right (`mod.idems.edit` or `idems.finalize`),
+so a Business Director (View) or a Branch Application Manager (config only) does not
+gain it. Route `document-reopen` (`idems_reopen_actor()`, `IDEMS_REOPEN_STATES`):
+- **SUBMITTED / VETTING / UNDER_REVIEW → DRAFT** — existing move, this actor added.
+- **APPROVED → DRAFT** — **the one new move** (owner approved C2). The approvals given
+  so far are cleared (`report_approvals` deleted, `approved_by/approved_at` blanked) and
+  one "sent back" marker step is left, so the report reads "Returned for correction";
+  on resubmit `idems_build_approval_chain()` runs the whole chain again from level 1.
+- **ISSUED** → never reopened. A correction is a **new revision** (`document-revise`,
+  Reporting A3 — the route was missing from the router and is now wired): R1, R2 … of
+  the original number, a new DRAFT that goes through approval and issue again; the
+  issued original never changes. Started by the same actor.
+- A reason is mandatory; each send-back writes who, from which office (and for whom,
+  under a delegation), when, from which stage and why to the report's History
+  (`idems_audit` action `REOPEN`; a revision start is `REVISION_STARTED`).
+- No status is added: DRAFT is the existing status. The existing approver send-back
+  and the vetting return are unchanged.
+
 
 - **Segregation (new, this codebase):** at finalize, if the current user approved this
   report, issue is refused — approver ≠ issuer (`idems_issue_blocked_for_approver()`), master excepted.
@@ -710,6 +740,16 @@ stateDiagram-v2
   Finalize also needs full chain approval, a completeness gate, an AI-QA critical gate
   (`4473-4487`) and a calibration/authorisation gate (`4497-4503`).
 - Editable only in '', DRAFT, REJECTED (`idems_status_allows_edit`, `idems.php:3463-3466`).
+- **Who may open and edit (B4 / R2, owner 16 Nov 2026 — no status changed).** A report
+  is opened (page, register, PDF, Word, files) and edited (details, body, submit) by its
+  **issuing** office (`report_docs.office_id`) or the **executing** office of its work
+  order / job; the **contracting** office (`contracting_office_id`, legacy `ibo_office_id`)
+  may also open and edit it, but only before issue (Q6: editing stops at submission, as
+  above), and each contracting-office edit is written to the History as
+  *"Edited by <name> (<office> — contracting office): <fields> changed"*
+  (`CONTRACTING_EDIT`). Anyone else is refused (`idems_doc_access()`). An Inspector edits
+  only their own reports — the inspector on it, or its creator (`idems_is_own_report()`,
+  `report_docs.created_by_user_id`). Issue and approve rules are unchanged.
 
 ---
 

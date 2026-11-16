@@ -75,6 +75,19 @@ on. Reports and photographs can still be uploaded. A coordinator cannot reopen i
 (the deadline is on you); the branch manager can. That is deliberate, not a
 fault.
 
+**Inspection reports of a shared work order (owner, 16 Nov 2026 — B4, B5, C2):**
+the office that issues a report and the office that carries out its work order
+open and edit it; the office that sold the work order (contracting office) may
+also open it and edit it before it is submitted — each such edit is written to the
+report's History. *New report → Start from an inspection call* offers only your
+office's work orders. When a report you carry out has been submitted, is at
+vetting, under review or approved, **Approvals → Send back to the inspector**
+(with a reason) returns it to Draft so the inspector can correct it; an approved
+report then goes through approval again from the start. An issued report is
+never reopened: **More ▾ → Reissue as new revision** makes R1, R2 … for the
+inspector to correct, and it is approved and issued again. Someone acting for you
+through Approval delegation can do the same while you are away.
+
 **If Reassign says "choose a different resource":** it is asking you to pick
 somebody. The box opens on nobody and no longer offers whoever currently holds
 the job — who that is, is written beside it. There is no limit on how many times

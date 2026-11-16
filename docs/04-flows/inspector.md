@@ -65,6 +65,9 @@ coordinator, manager or anyone holding the money permissions still sees the full
 - **Report path forks on the vetting gate:** Submit → `VETTING` (to a vetter first) if the gate is on, else straight to the approval chain (`idems.php:4428-4436`). The gate is a single admin switch — **Settings → Vetting checklist** (`/vetting-checklist`), "Require technical vetting before approval" (`vetting_gate_required`, off by default; Release Notes are always exempt). See `docs/edge-cases/07-vetting-review-approval.md §13`.
 - **Read the draft before you submit:** the report detail's primary **"📄 Download draft"** button (and *More ▾ → PDF (draft)*) gives the inspector the report as a PDF **watermarked DRAFT** at any point before it is issued — no submit or approval needed. Read it over, then submit for review (`ops_idems_pdf`, `idems.php:7648`).
 
+- **Your own reports only (R2, owner 16 Nov 2026):** you edit and submit the reports where you are the inspector, or which you created. Another inspector's report opens read-only — no "Edit details" / "Fill report".
+- **After you submit, it is out of your hands:** to change a submitted, approved or issued report, ask a Coordinator (or above) of the executing office. They send it back to you with a reason (it shows in *Returned for correction*), or — once issued — start a new revision (R1, R2 …) for you to correct; it then goes through approval and issue again (C2 / 0.3).
+
 **Handoff points (named):**
 - **Inspector → Vetter/Approver:** on submit the report leaves the inspector and shows on the approver's dashboard "Reports awaiting your approval" and their pending tasks (`dashboard.php:253`, `ops.php:6336`). A rejected report returns as "to fix & resubmit" (`ops.php:6370`).
 - **Inspector → Report issuer:** once approved, an `idems.finalize` holder sees "to issue" (`ops.php:6342`) and produces the locked PDF.
