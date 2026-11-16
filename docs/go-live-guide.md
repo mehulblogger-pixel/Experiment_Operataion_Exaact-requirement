@@ -126,6 +126,23 @@ other two choices: only you add companies, or companies apply and you approve ea
 trial length and limits are under Companies → **🚀 Self sign-up & free trial**. Then try it
 yourself in a private window at **/start** with an e-mail you can read.
 
+## Before the first update: database password still in config.php?
+
+If `/deploy-check.php` says the real database details are only in `config.php`, any update
+would take the site down (every update replaces `config.php`). Move them once, with no editing:
+
+1. Back up (mPanel → Backups, and Admin → Backup & restore).
+2. Upload the one-file zip `EXAACT-move-settings-helper.zip` into the app folder → Extract.
+3. Open `https://<site>/move-settings.php`, sign in with the administrator login, press
+   **Move my settings**.
+4. It copies the settings unchanged into `config.local.php`, checks the site still opens the
+   same database with the same admin login, undoes itself if any check fails, and deletes itself.
+5. Open `/deploy-check.php`: `config.local.php` → has real details: yes, read by the app: yes.
+
+The helper (source: `deploy-helpers/move-settings.php`) never shows a password, never changes
+`config.php`, the database or the admin password, and refuses to run if `config.local.php`
+already exists. It is not part of the application or of any update zip.
+
 ## Updating the live site after testing
 
 Test every change on the test copy (opstest.mghaiapps.com) first. When testing is complete,
