@@ -52,6 +52,19 @@ You added five points. Here is how each changes the plan. Where a point goes bey
 
 ---
 
+## Part 0b — Your final answers (16 Nov 2026): "Ok now please fix the things as per your recommendation"
+
+- **Approved as recommended:** C1, C2, C3, Q1–Q6 and Reporting A3.
+- **0.1, in your words:** the existing quotation and costing approval chains (Admin → Approvals: N+1, then N+2 … up to the SBU Head and the Director) must keep working after Finance and the Marketing Manager become office-based. **Vouchers get the same kind of chain**, and **can have an office-level Finance approval and then a central Finance team approval**, in addition to the reporting-line levels.
+- **0.3:** if the executing office's Coordinator is not available, **their delegate** (existing Approval delegation) can reopen or send back the report.
+- **0.5, C4 replaced by your rule:**
+  - The candidate pool is the **company's own internal pool** (CVs received directly, from consultants, HR and so on), **not the Marketplace**, which is a separate paid module.
+  - It is shared by all offices; no branch owns a candidate.
+  - **No other office can start anything with a candidate whose recruitment or onboarding is already in process with another office.** The candidate shows the in-process badge. Other offices are refused, not just warned.
+  - The Master Admin switch (offices see each other's pool) stays, on by default.
+
+---
+
 ## Part 1 — Your question about the Director (B1)
 
 **Question:** with "no office → sees nothing", which office do we set for the Director, Managing Director or head of the company?
