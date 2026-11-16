@@ -666,6 +666,50 @@ Routes deliberately open to any signed-in portal user: `portal` (each tile tests
 `cvp_client_is_admin()` and answers **404** to everyone else, and `portal/bench`
 requires the signed-in party to resolve to an active agency organisation.
 
+**The site limit and the alerts (branch batch P2/P3, owner, 16 Nov 2026 — Client
+portal pack A1/A2).** No permission is added; two existing limits now reach the
+places they missed:
+
+- **Site limit on deputations (DEF-CP-003).** A client person limited to some
+  sites ("Which sites" on Directory → Client portal → Change) sees and acts on
+  the deputations of **those sites only**: `portal/deputations` (the deputation
+  list and the attendance periods), `portal/dep-approve` (a period at another
+  site is "not found", so its billable quantity cannot be approved),
+  `portal/dep-gate`, and the "attendance to approve" count on the overview. The
+  site is the work order's, as for work orders and reports; a deputation whose
+  work order has no site recorded stays visible. No site limit = every site, as
+  before. (`pdso_portal_deputations/approvals/approval($…, $siteIds)`.)
+- **Alerts (DEF-CP-002).** `portal/alerts` and the Alerts count show each person
+  only the alerts for what they may open: report alerts need `reports` **and**
+  the report to be within their site limit; nonconformity alerts need `issues`;
+  marketplace requirement alerts need `market.post`. "Mark read" / "Mark all
+  read" act only on the alerts that person is shown, so one colleague cannot
+  clear another's. The vendor portal's alerts follow the same rule with its own
+  rights (`reports`, `issues`, `qualification`). (`CVP_EVENT_NEEDS`,
+  `cvp_notify_viewer()` in `lib/cvp.php`.)
+
+**Staff side of the client portal (branch batch P4/P1, owner, 16 Nov 2026 —
+Client portal pack A4, Directory pack A1).** Still `mod.portal.edit` (unchanged
+roles); the reach is narrowed to match the invite list:
+
+- **Whose portal people (CP-021).** The register's "Who can sign in" list and its
+  actions — Change (`/portal-user-perms`), Withdraw / Restore
+  (`/portal-user-toggle`) and New link (`/portal-user-reinvite`) — cover **the
+  same clients as the invite list**: the clients of the staff member's own
+  office(s) (`partner_office_sql()` on the client's home branch). Company-wide
+  roles (Master Admin, Admin) see every client; a client
+  with no home branch is visible to all, as on the client register. Another
+  office's client person is "not found" / refused, and nothing changes.
+- **New link (CP-021).** The fresh sign-in link is **e-mailed to the client
+  person's own address** through the app's mail (`ops_mail`, kind
+  `portal_reset`, so the e-mail log keeps no copy of the link). Staff see only
+  whether it was sent — never the link. (A brand-new invitation is unchanged:
+  the link is shown once so staff can pass it on.)
+- **Change permissions saves THAT person (DEF-DIR-005).** The form names the
+  client it was drawn for; a save is refused whole unless the portal user
+  belongs to that client and the client is within the staff member's reach, and
+  a site limit can only name that client's own sites.
+
 The **professional portal** (`/pro/*`, `cx_professionals`) has no per-user
 permission layer by design: an account there is **one individual**, with no
 colleagues to restrict. Its routes are bounded by the signed-in professional's

@@ -631,6 +631,12 @@ function portal_request_to_call($r) {
     if (!$r) return [0, 'That request no longer exists.'];
     if (!empty($r['call_id'])) return [(int)$r['call_id'], '']; // already raised — reuse it
     if (!function_exists('ops_next_code')) return [0, 'The call register is not available on this install.'];
+    // DEF-FLOW-007 — the hold rule (D-12) on this door too. Every other door
+    // that raises new work for a client asks partner_trade_block(); this one did
+    // not, so a client on hold still got a work order through the portal. Asked
+    // HERE, in the write, so no caller can skip it; the request stays open.
+    if (function_exists('partner_trade_block') && ($tb = partner_trade_block((int)($r['partner_id'] ?? 0))) !== '')
+        return [0, $tb];
 
     // Fold everything the client told us into a readable brief on the call.
     $lines = [];
@@ -661,6 +667,23 @@ function portal_users_for($partnerId) {
     return portal_try(fn() => ops_all(
         "SELECT * FROM client_users WHERE partner_id=? ORDER BY name, id", [(int)$partnerId]));
 }
+// CP-021 — whose portal people a staff member may see and manage: the clients
+// of the same offices the invite list offers (clients_list() limits by the
+// client's home branch through partner_office_sql()). Company-wide roles see
+// every client; a client with no home branch belongs to nobody and stays
+// visible to all, exactly as on the invite list and the client register.
+function portal_staff_partner_sql($alias = 'p') {
+    if (function_exists('is_master') && is_master()) return '1=1';
+    return function_exists('partner_office_sql') ? partner_office_sql($alias . '.home_branch_id') : '1=1';
+}
+// One portal user, but only if they belong to a client this staff member may
+// manage; null otherwise (so a typed id of another office's client is "not found").
+function portal_staff_user($id) {
+    return portal_try(fn() => ops_one(
+        "SELECT cu.*, p.display_name partner_name, p.legal_name
+         FROM client_users cu JOIN business_partners p ON p.id = cu.partner_id
+         WHERE cu.id = ? AND " . portal_staff_partner_sql('p'), [(int)$id]), null) ?: null;
+}
 function portal_users_all() {
     return portal_try(fn() => ops_all(
         "SELECT cu.*, COALESCE(p.display_name, p.legal_name) partner_name,
@@ -668,6 +691,7 @@ function portal_users_all() {
          FROM client_users cu
          LEFT JOIN business_partners p ON p.id = cu.partner_id
          LEFT JOIN partner_contacts pc ON pc.id = cu.contact_id
+         WHERE " . portal_staff_partner_sql('p') . "
          ORDER BY partner_name, cu.name"));
 }
 
@@ -731,6 +755,23 @@ function portal_invite($partnerId, $email, $name, $contactId = 0) {
     }
     return ['id' => (int)db()->lastInsertId(), 'token' => $token,
             'link' => portal_base_url() . '/portal/accept?t=' . $token];
+}
+
+// CP-021 — e-mail a fresh sign-in link to the portal person's OWN address,
+// through the app's mail function. Sent as a 'portal_reset' message, so the
+// e-mail log keeps no copy of the link (lib/ops.php ops_mail(): sign-in links
+// are never kept) and it goes out through the accounts sender. Returns whether
+// it was sent; the caller tells staff "sent" or "not sent", never the link.
+function portal_send_new_link(array $u, $link) {
+    if (!function_exists('ops_mail')) return false;
+    $who = function_exists('user_name') && function_exists('current_user') && current_user() ? user_name(current_user()) : app_name();
+    return (bool)ops_mail((string)$u['email'], app_name() . ' — your new sign-in link for the client portal',
+        "Hello " . ((string)($u['name'] ?? '') ?: 'there') . ",\n\n"
+        . $who . " at " . app_name() . " has made you a new sign-in link for the client portal.\n"
+        . "Your old password no longer works. Open this link within seven days and choose your own password:\n\n"
+        . $link . "\n\n"
+        . "Nobody at " . app_name() . " knows or chooses your password. If you did not expect this e-mail, reply to let us know.\n",
+        '', 'portal_reset');
 }
 
 function portal_base_url() {
@@ -1098,8 +1139,9 @@ function portal_route($route, $method) {
             portal_need('deputation', 'deputations');
             if (!function_exists('pdso_portal_deputations')) { portal_view('message', ['title' => 'Deputations', 'body' => 'Deputation is not enabled.']); exit; }
             portal_view('deputations', [
-                'rows'      => pdso_portal_deputations(portal_partner_id()),
-                'approvals' => pdso_portal_approvals(portal_partner_id()),
+                // DEF-CP-003 — the person's site limit, as on work orders and reports.
+                'rows'      => pdso_portal_deputations(portal_partner_id(), portal_site_ids()),
+                'approvals' => pdso_portal_approvals(portal_partner_id(), false, portal_site_ids()),
                 'canApprove'=> pcan('deputation.approve'),
                 'statuses'  => function_exists('pdso_statuses') ? pdso_statuses() : [],
             ]);
@@ -1108,7 +1150,9 @@ function portal_route($route, $method) {
         case 'portal/dep-gate':
             portal_need('deputation', 'gate passes');
             $jid = (int)($_POST['job_id'] ?? 0); $party = portal_partner_id();
-            $owns = $jid > 0 && (int)ops_val("SELECT COUNT(*) FROM jobs j JOIN calls c ON c.id=j.call_id WHERE j.id=? AND c.client_id=?", [$jid, $party]) > 0;
+            // Ownership AND the person's site limit (DEF-CP-003): a gate pass is an
+            // action on a deployment, so it follows the same rule as the list.
+            $owns = $jid > 0 && (int)ops_val("SELECT COUNT(*) FROM jobs j JOIN calls c ON c.id=j.call_id WHERE j.id=? AND c.client_id=? AND " . portal_site_sql('c'), [$jid, $party]) > 0;
             if ($method === 'POST' && $owns && function_exists('mobilization_gate_issue')) {
                 if ((string)($_POST['action'] ?? '') === 'revoke') [, $gmsg] = mobilization_gate_revoke($jid, (string)(portal_user()['name'] ?? 'Client'));
                 else [, $gmsg] = mobilization_gate_issue($jid, (string)(portal_user()['name'] ?? 'Client'), (string)($_POST['note'] ?? ''));
@@ -1118,7 +1162,10 @@ function portal_route($route, $method) {
 
         case 'portal/dep-approve':
             portal_need('deputation.approve', 'approving attendance');
-            $ap = pdso_portal_approval((int)($_POST['id'] ?? $_GET['id'] ?? 0), portal_partner_id());
+            // DEF-CP-003 — an attendance period at a site outside the person's limit
+            // does not exist for them: approving it would set the billable quantity
+            // of a site they were never given.
+            $ap = pdso_portal_approval((int)($_POST['id'] ?? $_GET['id'] ?? 0), portal_partner_id(), portal_site_ids());
             if (!$ap) { http_response_code(404); portal_view('notfound'); exit; }
             if ($method === 'POST' && in_array($ap['status'], ['SUBMITTED','CLIENT_REVIEW'], true)) {
                 $decision = ($_POST['decision'] ?? '') === 'APPROVED' ? 'APPROVED' : 'RETURNED';
@@ -1697,13 +1744,20 @@ function ops_portal_admin($route, $method) {
 
     if ($route === 'portal-user-perms') {
         $id = (int)($_POST['id'] ?? $_GET['id'] ?? 0);
-        $u = portal_try(fn() => ops_one(
-            "SELECT cu.*, p.display_name partner_name, p.legal_name
-             FROM client_users cu JOIN business_partners p ON p.id = cu.partner_id
-             WHERE cu.id = ?", [$id]), null);
+        // DEF-DIR-005 / CP-021 — only a portal user of a client this staff member
+        // may manage; anyone else's id is "not found".
+        $u = portal_staff_user($id);
         if (!$u) { http_response_code(404); view('notfound'); return true; }
         if ($method === 'POST') {
-            portal_perms_save($id, $_POST);
+            // The form names the client it was drawn for. A save whose person is
+            // not of that client is refused whole: that mismatch is exactly what
+            // DEF-DIR-005 produced (the staff member's id, another client's user).
+            if ((int)($_POST['partner_id'] ?? 0) !== (int)$u['partner_id']) {
+                flash('Nothing was saved — that form was not for ' . ($u['name'] ?: $u['email'])
+                    . '. Open “Change” on their row again.', 'error');
+                redirect('/portal-users');
+            }
+            portal_perms_save($id, $_POST, (int)$u['partner_id']);
             flash('Access saved for ' . ($u['name'] ?: $u['email']) . '.');
             redirect('/portal-users');
         }
@@ -1713,7 +1767,8 @@ function ops_portal_admin($route, $method) {
 
     if ($route === 'portal-user-toggle' && $method === 'POST') {
         $id = (int)($_POST['id'] ?? 0);
-        $u = portal_try(fn() => ops_one("SELECT * FROM client_users WHERE id=?", [$id]), null);
+        $u = portal_staff_user($id);   // CP-021 — own office's clients only
+        if (!$u) flash('That person is not one of your clients’ portal users.', 'error');
         if ($u) {
             db()->prepare("UPDATE client_users SET is_active=? WHERE id=?")
                 ->execute([empty($u['is_active']) ? 1 : 0, $id]);
@@ -1726,14 +1781,21 @@ function ops_portal_admin($route, $method) {
 
     if ($route === 'portal-user-reinvite' && $method === 'POST') {
         $id = (int)($_POST['id'] ?? 0);
-        $u = portal_try(fn() => ops_one("SELECT * FROM client_users WHERE id=?", [$id]), null);
+        $u = portal_staff_user($id);   // CP-021 — own office's clients only
+        if (!$u) flash('That person is not one of your clients’ portal users.', 'error');
         if ($u) {
+            // CP-021 — the link that sets this person's password goes to THEIR
+            // OWN e-mail, never onto a staff screen: whoever opens it chooses the
+            // password, so showing it to staff let staff become the client.
             $token = bin2hex(random_bytes(24));
             db()->prepare("UPDATE client_users SET invite_token=?, invite_expires=?, password_hash='', must_change=1 WHERE id=?")
                 ->execute([$token, date('c', time() + 7 * 86400), $id]);
-            $_SESSION['portal_invite_link'] = portal_base_url() . '/portal/accept?t=' . $token;
-            flash('A new invitation link has been made for ' . $u['email']
+            $sent = portal_send_new_link($u, portal_base_url() . '/portal/accept?t=' . $token);
+            if ($sent) flash('A new sign-in link has been sent to ' . $u['email']
                 . '. Their old password no longer works.');
+            else flash('A new sign-in link was made for ' . $u['email'] . ', but the e-mail could not be sent'
+                . ' (check Settings → E-mail). Their old password no longer works. Once e-mail works, press'
+                . ' “New link” again, or they can use “Forgot your password?” on the portal sign-in page.', 'error');
         }
         redirect('/portal-users');
     }
@@ -1771,7 +1833,9 @@ function ops_portal_admin($route, $method) {
                     redirect('/portal-users');
                 }
                 [$callId, $err] = portal_request_to_call($r);
-                if ($err) { flash($err, 'error'); redirect('/portal-users'); }
+                // Refused (a client on hold, DEF-FLOW-007) or failed: nothing is
+                // recorded, so the request stays open to be answered again.
+                if ($err) { flash($err . ' The request is still open.', 'error'); redirect('/portal-users'); }
                 db()->prepare("UPDATE portal_requests SET status='CONVERTED', call_id=?, reply=?, handled_by=?, handled_at=? WHERE id=?")
                     ->execute([$callId, substr($reply, 0, 1000), user_name(current_user()), date('c'), (int)$r['id']]);
                 flash('Request accepted and ' . Tl('call') . ' raised — complete the scheduling below.');
@@ -1950,10 +2014,13 @@ function portal_sites_for($partnerId) {
          WHERE partner_id = ? ORDER BY is_primary DESC, id", [(int)$partnerId]));
 }
 
-function portal_perms_save($clientUserId, array $b) {
+function portal_perms_save($clientUserId, array $b, $partnerId = 0) {
     $keys = [];
     foreach (array_keys(PORTAL_PERMS) as $k) if (!empty($b['p_' . str_replace('.', '_', $k)])) $keys[] = $k;
     $sites = array_values(array_filter(array_map('intval', (array)($b['site_ids'] ?? []))));
+    // DEF-DIR-005 — a site limit can only name this client's own sites.
+    if ((int)$partnerId > 0)
+        $sites = array_values(array_intersect($sites, array_map('intval', array_column(portal_sites_for((int)$partnerId), 'id'))));
     // Phase 10 (CVP) Slice 5 — org-admin flag + access-expiry (columns added by
     // cvp_migrate; guarded so the save still works before that migrate runs).
     $orgAdmin = !empty($b['is_org_admin']) ? 1 : 0;
