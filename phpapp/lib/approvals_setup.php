@@ -88,6 +88,18 @@ function apsetup_areas() {
             'can'   => (bool) ($lic('sales') && ($master() || $can('settings.manage'))),
         ],
         [
+            //  Branch batch R5 (owner, 16 Nov 2026): "the Master Admin sets the
+            //  amounts and the levels". The screen's own gate is the same question.
+            'key'   => 'vouchers',
+            'label' => 'Expense vouchers',
+            'url'   => '/voucher-approvals',
+            'icon'  => '🧾',
+            'what'  => 'Who approves an expense voucher: the claimant\'s reporting line (N+1 to N+4) '
+                     . 'by amount, then office and central Finance — and who covers for an approver who is away.',
+            'can'   => (bool) ($fx('vappr_config_can') && vappr_config_can()
+                         && (!$fx('licence_blocks') || !licence_blocks('mod.vouchers.view'))),
+        ],
+        [
             'key'   => 'quotes',
             'label' => 'Quotes & reports',
             'url'   => '/approval-rules',

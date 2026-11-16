@@ -69,7 +69,7 @@ coordinator, manager or anyone holding the money permissions still sees the full
 - **Inspector → Vetter/Approver:** on submit the report leaves the inspector and shows on the approver's dashboard "Reports awaiting your approval" and their pending tasks (`dashboard.php:253`, `ops.php:6336`). A rejected report returns as "to fix & resubmit" (`ops.php:6370`).
 - **Inspector → Report issuer:** once approved, an `idems.finalize` holder sees "to issue" (`ops.php:6342`) and produces the locked PDF.
 - **Inspector/Coordinator → Finance:** closing the job (`closed_flag=1`) makes it appear in Finance's **/to-bill** (`booksui.php:123`).
-- **Inspector → Voucher approver:** submitting the voucher surfaces "vouchers to approve" (`ops.php:6323`).
+- **Inspector → Voucher approver:** submitting the voucher starts its approval chain (branch batch R5): it shows as "vouchers to approve" for the person the inspector reports to (N+1), then — if the amount needs it — N+2 and above, then Finance (`lib/voucher_approval.php`, `docs/02` footnote 3). An approver may send it back with a reason; the inspector sees the reason on the voucher and as "voucher sent back — correct it", corrects it and submits again.
 
 **Click-count — fill & submit a report:** open job (1) → New report → Save (2) →
 Fill report (1) → write body + Save (1) → Submit for review (1) = **~6 clicks** (form

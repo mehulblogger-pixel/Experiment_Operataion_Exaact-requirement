@@ -17,10 +17,11 @@
     if (($r['month'] ?? '') === $curMonth) $tThisMonth += $t;
   }
   $awaiting = $cDraft + $cSubmitted;
+  $waitIds = $waitIds ?? []; $canCreate = $canCreate ?? false;
 ?>
 <div class="master-head">
   <div><h1><?= $mine ? 'My travelling-expense vouchers' : 'Inspector vouchers' ?></h1>
-    <p class="sub" style="margin:2px 0 0">Monthly "Statement of Travelling Expenses"<?= $mine ? ' — only your own claims are shown.' : ' — across the ' . Tlp('engineer') . ' you supervise.' ?></p></div>
+    <p class="sub" style="margin:2px 0 0">Monthly "Statement of Travelling Expenses"<?= $mine ? ' — only your own claims are shown.' : ' — the offices you cover, your own, and those waiting for your approval.' ?></p></div>
 </div>
 
 <div class="kpi-row">
@@ -38,13 +39,19 @@
     <div class="k-sub"><?= $cPaid ?> paid · <?= $cApproved ?> approved</div></div>
 </div>
 
+<?php if ($waitIds): ?>
+  <div class="panel" style="border-left:3px solid var(--accent,#2b6cff);padding:10px 14px">
+    <strong><?= count($waitIds) ?> <?= e(count($waitIds) == 1 ? Tl('voucher') : Tlp('voucher')) ?> waiting for your approval</strong>
+    <span class="muted"> — marked "Your turn" below. Open one to approve it or send it back with a reason.</span>
+  </div>
+<?php endif; ?>
 <?php if ($mine): ?>
   <form method="get" action="/voucher" class="filter-bar">
     <label class="muted" style="align-self:center">Open a month:</label>
     <input class="form-control" type="month" name="month" value="<?= e($curMonth) ?>" required>
     <button class="btn" type="submit">Open / create</button>
   </form>
-<?php else: ?>
+<?php elseif ($canCreate): ?>
   <form method="get" action="/voucher" class="filter-bar">
     <label class="muted" style="align-self:center">Open a voucher:</label>
     <select class="form-control searchable" name="ins" required style="min-width:220px"><option value="">— inspector —</option>
@@ -64,7 +71,7 @@
     <tr>
       <td><strong><?= e($r['month']) ?></strong></td>
       <?php if (!$mine): ?><td><?= e($r['inspector_name'] ?? '—') ?></td><?php endif; ?>
-      <td><span class="pill <?= $statusPill[$r['status']] ?? 'p-mut' ?>"><?= e($r['status']) ?></span></td>
+      <td><span class="pill <?= $statusPill[$r['status']] ?? 'p-mut' ?>"><?= e($r['status']) ?></span><?php if (in_array((int)$r['id'], $waitIds, true)): ?> <span class="pill p-warn">Your turn</span><?php endif; ?></td>
       <td class="num"><?= (float)($r['total'] ?? 0)>0 ? cur_sym().nf((float)$r['total'],0) : '—' ?></td>
       <td class="num"><a class="btn small" href="/voucher?id=<?= (int)$r['id'] ?>">Open</a></td>
     </tr>

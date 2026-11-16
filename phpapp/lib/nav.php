@@ -117,6 +117,8 @@ function nav_screen_label($route) {
         'idems-approval-rules'  => 'Report approval rules',
         'quote-approval-rules'  => 'Quotation approval rules',
         'approval-delegations'  => 'Approval delegations',
+        'voucher-approvals'     => 'Expense voucher approvals',
+        'voucher-delegations'   => 'Who covers for a voucher approver',
         'my-approvals'          => 'My approvals',
         'recruit-approvals'     => 'Recruitment approvals',
         //  R-33 — the cockpit's nested routes title-case into nonsense

@@ -28,7 +28,7 @@
   <div class="kpi"><span class="kic">📌</span><div class="k">Status</div><div class="v" style="font-size:17px;margin-top:8px"><span class="pill <?= $vpill[0] ?>"><?= e($vpill[1]) ?></span></div><div class="d"><?= $v['approved_by'] ? 'by '.e($v['approved_by']) : 'not yet approved' ?></div></div>
 </div>
 
-<div data-tabs data-tabs-key="voucher" data-tabs-order="Entries,Summary">
+<div data-tabs data-tabs-key="voucher" data-tabs-order="Entries,Summary,History">
 <?php if ($canEdit): ?>
 <?php // ---- Module 30: quick add one expense (amount + type + optional job + receipt) ---- ?>
 <div class="panel" data-tab="Entries" id="quick-add" style="border-left:3px solid var(--accent,#2b6cff)">
@@ -279,32 +279,95 @@
 
     <hr style="margin:12px 0;border:none;border-top:1px solid #eee">
     <p><strong>Status:</strong> <span class="badge <?= $statusBadge[$v['status']] ?? 'AMBER' ?>"><?= e($v['status']) ?></span>
-      <?php if ($v['approved_by']): ?><span class="muted"> · approved by <?= e($v['approved_by']) ?></span><?php endif; ?></p>
+      <?php if ($v['approved_by'] && in_array($v['status'], ['APPROVED','PAID'], true)): ?><span class="muted"> · approved by <?= e($v['approved_by']) ?></span><?php endif; ?></p>
+    <?php
+      //  Branch batch R5 — the approval chain, in words: where it is and who is next.
+      $lv = $progress['levels'] ?? []; $curIdx = $progress['current'] ?? null;
+    ?>
+    <?php if ($v['status'] === 'DRAFT' && trim((string)($v['sent_back_reason'] ?? '')) !== ''): ?>
+      <div class="vchain-note bad" role="status">
+        <strong>Sent back<?= ($v['sent_back_by'] ?? '') !== '' ? ' by ' . e($v['sent_back_by']) : '' ?><?= ($v['sent_back_at'] ?? '') !== '' ? ' on ' . e(fdate(substr((string)$v['sent_back_at'], 0, 10))) : '' ?>:</strong>
+        <?= e($v['sent_back_reason']) ?><br><span class="muted">Correct it and submit again — it goes back to the first approver.</span>
+      </div>
+    <?php endif; ?>
+    <?php if ($v['status'] === 'SUBMITTED' && $curIdx !== null): ?>
+      <p class="vchain-wait"><strong>Waiting for:</strong> <?= e(vappr_waiting_text($progress)) ?></p>
+      <?php if (($lv[$curIdx]['problem'] ?? '') !== ''): ?><div class="vchain-note warn" role="status">⚠ <?= e($lv[$curIdx]['problem']) ?></div><?php endif; ?>
+    <?php elseif ($v['status'] === 'DRAFT' && $lv): ?>
+      <p class="vchain-wait muted">When submitted, it goes to: <?= e(implode(' → ', array_map(fn($l) => $l['short'], $lv))) ?></p>
+    <?php endif; ?>
+    <?php if ($lv && $v['status'] !== 'DRAFT'): ?>
+      <ol class="vchain" aria-label="Approval chain">
+        <?php foreach ($lv as $i => $l): $d = $l['done'] ?? null; ?>
+          <li class="<?= $d ? 'done' : ($i === $curIdx ? 'now' : '') ?>">
+            <span class="vchain-dot" aria-hidden="true"><?= $d ? '✓' : ($i === $curIdx ? '●' : '○') ?></span>
+            <span><strong><?= e($l['label']) ?></strong>
+              <?php if ($d): ?> — <?= e($d['user_name']) ?><?= ($d['on_behalf_name'] ?? '') !== '' ? ' for ' . e($d['on_behalf_name']) : '' ?>, <?= e(fdate(substr((string)$d['created_at'], 0, 10))) ?>
+              <?php elseif ($l['approvers']): ?> — <?= e(implode(', ', array_slice(array_map('vappr_name', $l['approvers']), 0, 4))) ?><?= count($l['approvers']) > 4 ? ' …' : '' ?>
+              <?php else: ?> — <span class="muted">an administrator</span><?php endif; ?></span>
+          </li>
+        <?php endforeach; ?>
+      </ol>
+    <?php endif; ?>
     <div class="row-actions" style="flex-wrap:wrap;gap:6px">
-      <?php if ($v['status']==='DRAFT' && ($canApprove || voucher_owner_is_me($v))): ?>
+      <?php if (!empty($canSubmit)): ?>
         <form method="post" action="/voucher-status?id=<?= (int)$v['id'] ?>"><input type="hidden" name="action" value="submit"><button class="btn" type="submit">Submit for approval</button></form>
       <?php endif; ?>
-      <?php if ($v['status']==='SUBMITTED' && ($canApproveThis ?? $canApprove)): ?>
+      <?php if ($v['status']==='SUBMITTED' && !empty($canApproveThis)): ?>
         <form method="post" action="/voucher-status?id=<?= (int)$v['id'] ?>" class="inline-add" style="align-items:flex-end">
           <input type="hidden" name="action" value="approve">
-          <div class="ff"><label>Checked by</label><input class="form-control" name="checked_by"></div>
-          <div class="ff"><label>Approved by</label><input class="form-control" name="approved_by" value="<?= e(user_name(current_user())) ?>"></div>
-          <div class="ff"><label>Authorized by</label><input class="form-control" name="authorized_by"></div>
-          <button class="btn" type="submit">Approve</button>
+          <div class="ff"><label>Note <span class="muted">— optional</span></label><input class="form-control" name="note"></div>
+          <button class="btn" type="submit">Approve<?= !empty($act['on_behalf']) ? ' for ' . e(vappr_name(vappr_user($act['on_behalf']))) : '' ?></button>
         </form>
-      <?php elseif ($v['status']==='SUBMITTED' && $canApprove && !($canApproveThis ?? true)): ?>
-        <p class="muted" style="margin:0;font-size:12.5px">Awaiting approval — it must be approved by someone other than
-          <?= voucher_owner_is_me($v) ? 'you (the claimant)' : 'the person who submitted it' ?> (maker&nbsp;≠&nbsp;checker).</p>
+        <form method="post" action="/voucher-status?id=<?= (int)$v['id'] ?>" class="inline-add" style="align-items:flex-end">
+          <input type="hidden" name="action" value="sendback">
+          <div class="ff"><label>Reason for sending back *</label><input class="form-control" name="reason" required placeholder="e.g. hotel bill for 12 Nov missing"></div>
+          <button class="btn secondary" type="submit">Send back</button>
+        </form>
+      <?php elseif ($v['status']==='SUBMITTED' && !voucher_owner_is_me($v) && (int)($v['submitted_by'] ?? 0) === (int)(current_user()['id'] ?? 0)): ?>
+        <p class="muted" style="margin:0;font-size:12.5px">Awaiting approval — it must be approved by someone other than the person who submitted it (maker&nbsp;≠&nbsp;checker).</p>
       <?php endif; ?>
-      <?php if ($v['status']==='APPROVED' && $canApprove): ?>
+      <?php if (!empty($canPaid)): ?>
         <form method="post" action="/voucher-status?id=<?= (int)$v['id'] ?>"><input type="hidden" name="action" value="paid"><button class="btn" type="submit">Mark paid</button></form>
       <?php endif; ?>
-      <?php if ($v['status']!=='DRAFT' && $canApprove): ?>
+      <?php if (!empty($canReopen)): ?>
         <form method="post" action="/voucher-status?id=<?= (int)$v['id'] ?>" onsubmit="return confirm('Reopen for editing?')"><input type="hidden" name="action" value="reopen"><button class="btn secondary" type="submit">Reopen</button></form>
       <?php endif; ?>
     </div>
   </div>
 </div>
+
+<div class="panel" data-tab="History" style="margin-top:16px">
+  <h3 class="tab-sub">History</h3>
+  <?php if (empty($history)): ?>
+    <p class="muted" style="margin:0">Nothing yet. Each submission, approval, send-back and payment is recorded here — who, at which level, when and why.</p>
+  <?php else: ?>
+    <?php $verb = ['SUBMITTED' => 'Submitted', 'APPROVED' => 'Approved', 'SENT_BACK' => 'Sent back', 'REOPENED' => 'Reopened', 'PAID' => 'Marked paid']; ?>
+    <ul class="vhist">
+      <?php foreach (array_reverse($history) as $h): ?>
+        <li><span class="muted"><?= e(fdate(substr((string)$h['created_at'], 0, 10))) ?> <?= e(substr((string)$h['created_at'], 11, 5)) ?></span>
+          <strong><?= e($verb[$h['action']] ?? $h['action']) ?></strong>
+          <?= ($h['level_label'] ?? '') !== '' ? '· ' . e($h['level_label']) : '' ?>
+          · <?= e($h['user_name']) ?><?= ($h['on_behalf_name'] ?? '') !== '' ? ' for ' . e($h['on_behalf_name']) : '' ?>
+          <?php if (trim((string)($h['reason'] ?? '')) !== ''): ?><div class="vhist-why">“<?= e($h['reason']) ?>”</div><?php endif; ?>
+        </li>
+      <?php endforeach; ?>
+    </ul>
+  <?php endif; ?>
+</div>
+<style>
+  .vchain{list-style:none;margin:8px 0 10px;padding:0;display:grid;gap:6px;font-size:13px}
+  .vchain li{display:flex;gap:8px;align-items:flex-start}
+  .vchain-dot{width:18px;flex:none;text-align:center;color:var(--muted,#6b7280)}
+  .vchain li.done .vchain-dot{color:var(--ok,#15803d)} .vchain li.now{font-weight:600} .vchain li.now .vchain-dot{color:var(--accent,#2b6cff)}
+  .vchain-wait{margin:6px 0;font-size:13.5px}
+  .vchain-note{border-radius:8px;padding:8px 10px;margin:8px 0;font-size:13px;line-height:1.5}
+  .vchain-note.bad{background:var(--bad-soft,#fdecec);border-left:3px solid var(--bad,#c62828)}
+  .vchain-note.warn{background:var(--warn-soft,#fff7e6);border-left:3px solid var(--warn,#b45309)}
+  .vhist{list-style:none;margin:0;padding:0;display:grid;gap:8px;font-size:13px}
+  .vhist li{border-bottom:1px solid var(--line,#eee);padding-bottom:6px}
+  .vhist-why{margin:2px 0 0 0;color:var(--ink,#28313f)}
+</style>
 </div><!-- /data-tabs (voucher) -->
 
 <script>
