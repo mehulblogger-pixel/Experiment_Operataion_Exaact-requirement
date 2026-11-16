@@ -1281,11 +1281,18 @@ function role_defaults_base($role) {
         case 'BUSINESS_DEV_MANAGER': case 'KEY_ACCOUNTS_MANAGER':
             return ['perms' => ['dash.operations','dash.financial','data.credit','crm.quote.create','crm.quote.send','crm.followup.manage'], 'offices' => 'OWN', 'sbus' => 'ALL'];
         case 'MARKETING_MANAGER':
-            return ['perms' => ['dash.operations','dash.financial','data.credit','data.revenue','data.profitability','crm.quote.create','crm.quote.approve','crm.quote.send','crm.followup.manage','crm.template.manage'], 'offices' => 'ALL', 'sbus' => 'ALL'];
+            return ['perms' => ['dash.operations','dash.financial','data.credit','data.revenue','data.profitability','crm.quote.create','crm.quote.approve','crm.quote.send','crm.followup.manage','crm.template.manage'], 'offices' => 'OWN', 'sbus' => 'ALL'];
         case 'MARKETING_EXECUTIVE':
             return ['perms' => ['crm.quote.create','crm.followup.manage'], 'offices' => 'OWN', 'sbus' => 'OWN'];
         case 'FINANCE':
-            return ['perms' => ['dash.financial','data.credit','data.revenue','data.salary','data.profitability','finance.reconcile','crm.contract.register'], 'offices' => 'ALL', 'sbus' => 'ALL'];
+            //  Finance and the Marketing Manager are central teams whose reach is
+            //  chosen PER PERSON (owner, 16 Nov 2026, change plan 0.1): they see
+            //  the offices ticked on their record — "All offices" ticked for the
+            //  company-wide picture — or else their home office. Their rights
+            //  (finance data / sales data) are unchanged. Everyone who held these
+            //  roles when this shipped was given "All offices" once
+            //  (access_migrate_central_roles_scope()), so nobody lost anything.
+            return ['perms' => ['dash.financial','data.credit','data.revenue','data.salary','data.profitability','finance.reconcile','crm.contract.register'], 'offices' => 'OWN', 'sbus' => 'ALL'];
         case 'QUALITY_HEAD': case 'TECHNICAL_HEAD':
             //  ncr.close and capa.close are the two rights the owner named on
             //  2026-10-18. idems.audit.view is what makes a closure defensible to
@@ -1354,10 +1361,44 @@ function access_apply_owner_grants($force = false) {
     } catch (Throwable $e) { return []; }   // never block a sign-in over this; it retries next request
 }
 
+// ---- C1 (owner, 16 Nov 2026): central roles become office-based ---------------
+// Finance and the Marketing Manager used to see every office by role. They now
+// see the offices ticked on their record (role_defaults_base(), 'OWN'). So that
+// nobody who holds one of these roles TODAY loses anything — and quotation
+// approvals waiting for the Marketing Manager keep reaching somebody — every
+// active person in either role (a custom role built on one of them included)
+// whose "Offices covered" is empty is given "All offices", ONCE per database.
+// The flag makes it idempotent and means a later deliberate narrowing by an
+// administrator is never undone; people added after this ran must be given
+// their offices (the User register flags anyone left without a branch).
+const ACCESS_CENTRAL_SCOPE_ROLES = ['FINANCE', 'MARKETING_MANAGER'];
+const ACCESS_CENTRAL_SCOPE_FLAG  = 'scope_central_roles_c1_applied';
+function access_migrate_central_roles_scope($force = false) {
+    static $ran = false;
+    if (($ran && !$force) || !function_exists('setting_get') || !function_exists('setting_set')) return 0;
+    $ran = true;
+    try {
+        if ((string) setting_get(ACCESS_CENTRAL_SCOPE_FLAG, '') !== '') return 0;
+        $n = 0;
+        $rows = ops_all("SELECT id, role, scope_offices FROM users
+                         WHERE COALESCE(is_active,1)=1 AND COALESCE(is_superuser,0)=0") ?: [];
+        foreach ($rows as $u) {
+            $base = function_exists('role_effective_key') ? role_effective_key(strtoupper((string) $u['role'])) : strtoupper((string) $u['role']);
+            if (!in_array($base, ACCESS_CENTRAL_SCOPE_ROLES, true)) continue;
+            if (trim((string) ($u['scope_offices'] ?? '')) !== '') continue;   // already given offices — keep them
+            db()->prepare("UPDATE users SET scope_offices='ALL' WHERE id=?")->execute([(int) $u['id']]);
+            $n++;
+        }
+        setting_set(ACCESS_CENTRAL_SCOPE_FLAG, date('c') . ' (' . $n . ')');
+        return $n;
+    } catch (Throwable $e) { return 0; }   // never block a sign-in over this; it retries next request
+}
+
 function ua($fresh = false) {
     static $a = null;
     if (!$fresh && $a !== null) return $a;
     if (function_exists('access_apply_owner_grants')) access_apply_owner_grants();
+    if (function_exists('access_migrate_central_roles_scope')) access_migrate_central_roles_scope();
     if ($fresh) $a = null;
     $u = current_user($fresh);
     if (!$u) return $a = ['role' => 'GUEST', 'perms' => [], 'offices' => [], 'sbus' => [], 'self' => true, 'home' => null, 'master' => false];
@@ -1620,7 +1661,10 @@ function partner_view_level($partner) {
     if (!$branch) return 'FULL';                       // unassigned — belongs to nobody
     if (!function_exists('scope_offices')) return 'FULL';
     $off = scope_offices();
-    if ($off === 'ALL' || !is_array($off) || !$off) return 'FULL';
+    if ($off === 'ALL' || !is_array($off)) return 'FULL';
+    //  An empty office list is "no branch", not "every branch" (DEF-ADM-002):
+    //  a person nobody placed in a branch may not change another office's party.
+    if (!$off) return (function_exists('scope_needs_home') && scope_needs_home()) ? 'BASIC' : 'FULL';
     return in_array($branch, array_map('intval', $off), true) ? 'FULL' : 'BASIC';
 }
 
@@ -1669,13 +1713,33 @@ function partner_write_denied_msg($partner) {
 // ============================================================================
 function call_office_clause($execCol, $contractCol) {
     $off = function_exists('scope_offices') ? scope_offices() : 'ALL';
-    if ($off === 'ALL' || !is_array($off) || !$off) return ['1=1', []];
+    if ($off === 'ALL' || !is_array($off)) return ['1=1', []];
+    //  DEF-ADM-002 / DEF-OPS-001 — an EMPTY office list was read as "every
+    //  office", so a branch person whose home office was left blank saw every
+    //  branch's work orders under the banner telling them their lists were empty.
+    //  The same answer as scope_clause() and scope_allows(): a person this
+    //  workspace cannot place in a branch sees no row; a run with nobody signed
+    //  in (export, CLI) stays unscoped, as it always has.
+    if (!$off) return [(function_exists('scope_needs_home') && scope_needs_home()) ? '1=0' : '1=1', []];
     static $ahm = null;
     if ($ahm === null) $ahm = (int)(ops_val("SELECT id FROM offices WHERE is_ahmedabad=1 LIMIT 1") ?: 0);
     // Inline integer ids for the same reason scope_clause() does: a bound '20'
     // does not match int 20 once COALESCE() has dropped integer affinity.
     $ids = implode(',', array_map('intval', $off));
     return ["(COALESCE($execCol, $ahm) IN ($ids) OR $contractCol IN ($ids))", []];
+}
+
+// THE OFFICE THAT RUNS A WORK ORDER, as one SQL expression — the SQL twin of
+// call_exec_office() in lib/ops.php: the executing office when one is set,
+// otherwise the contracting office (a work order nobody forwarded is carried out
+// by the office that took it), otherwise the managing (Ahmedabad) office, as
+// scope_clause() reads an unassigned row. The Operations home, its registers and
+// the scheduling board — the executing office's desk — scope on this
+// (DEF-OPS-002: a blank executing office used to be shown to EVERY branch).
+function call_exec_office_sql($execCol, $contractCol) {
+    static $ahm = null;
+    if ($ahm === null) $ahm = (int)(ops_val("SELECT id FROM offices WHERE is_ahmedabad=1 LIMIT 1") ?: 0);
+    return "COALESCE(NULLIF($execCol, 0), NULLIF($contractCol, 0), $ahm)";
 }
 
 // Phase 2 §51 — the SCALAR twin of scope_clause(), for guarding a single record
@@ -2184,6 +2248,8 @@ function access_migrate() {
     ensure_column('users', 'permissions', "VARCHAR(600) DEFAULT ''");
     ensure_column('users', 'reports_to_id', 'INT NULL');
     if (setting_get('fy_start_month') === null) setting_set('fy_start_month', '4');
+    // C1 — Finance / Marketing Manager keep every office they had (once).
+    access_migrate_central_roles_scope(true);
     // One-time: remove the Candles/Wax/Tier demo (the confusing "Product line" field).
     if (setting_get('demo_removed') === null) {
         try {

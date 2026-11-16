@@ -120,7 +120,7 @@
   $canAlloc = function_exists('call_can_allocate') ? call_can_allocate($call) : is_coordinator_level();
   // A contracting-office coordinator sees the call but cannot allocate it — the
   // executing office does that. Say so, rather than silently hiding the button.
-  $contractOnly = is_coordinator_level() && !$canAlloc;
+  $contractOnly = (function_exists('job_allocate_role_can') ? job_allocate_role_can() : is_coordinator_level()) && !$canAlloc;
   $execName = $contractOnly ? ops_val("SELECT name FROM offices WHERE id=?", [call_exec_office($call)]) : '';
 ?>
 <?php if ($contractOnly): ?>

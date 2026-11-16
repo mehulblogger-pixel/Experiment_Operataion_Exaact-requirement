@@ -12,7 +12,7 @@
   <div class="row-actions">
     <?php if (!$job['closed_flag'] && !$lock['locked']): ?><a class="btn" href="/job-close?id=<?= (int)$job['id'] ?>">Close job</a><?php endif; ?>
     <?php if (can('mod.idems.edit') || is_master_of('idems')): ?><a class="btn secondary" href="/document-new?job=<?= (int)$job['id'] ?><?= $job['call_id'] ? '&call='.(int)$job['call_id'] : '' ?>" title="Create an inspection report — all known details are filled in">📑 New report</a><?php endif; ?>
-    <?php if (is_coordinator_level() && !$job['closed_flag'] && !$lock['locked']): ?><a class="btn secondary" href="/job-edit?id=<?= (int)$job['id'] ?>">Edit</a><?php endif; ?>
+    <?php if ((function_exists('job_allocate_role_can') ? job_allocate_role_can() : is_coordinator_level()) && !$job['closed_flag'] && !$lock['locked']): ?><a class="btn secondary" href="/job-edit?id=<?= (int)$job['id'] ?>">Edit</a><?php endif; ?>
     <?php if (function_exists('connect_source_can') && connect_source_can() && !$job['closed_flag'] && !$lock['locked']): ?><a class="btn secondary" href="/connect-source?job=<?= (int)$job['id'] ?>" title="Rank and assign people across internal inspectors, the marketplace and this client’s bench">🔎 Source manpower</a><?php endif; ?>
     <?php if ($job['call_id']): ?><a class="btn secondary" href="/call?id=<?= (int)$job['call_id'] ?>">View call</a><?php endif; ?>
     <?php // Module 30 — the assigned inspector logs their own expense for this job straight
@@ -177,7 +177,7 @@
       // — the morning somebody calls in sick — without touching the rest of the
       // job. Only shown when there is genuinely more than one visit day.
       $vp = $visitPlan ?? [];
-      $canReshuffle = !$job['closed_flag'] && is_coordinator_level();
+      $canReshuffle = !$job['closed_flag'] && (function_exists('job_allocate_role_can') ? job_allocate_role_can() : is_coordinator_level());
       if (count($vp) > 1): ?>
 <div class="panel" id="visits" data-tab="Schedule &amp; site">
   <div class="ctitle" style="margin-top:0"><h3>Who goes on each day

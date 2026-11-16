@@ -738,6 +738,16 @@ function pdso_deputations($filter = []) {
     if (!empty($filter['status'])) { $w[] = "j.dep_status=?"; $a[] = $filter['status']; }
     if (!empty($filter['inspector_id'])) { $w[] = "j.inspector_id=?"; $a[] = (int)$filter['inspector_id']; }
     if (!empty($filter['open'])) { $w[] = "COALESCE(NULLIF(j.dep_status,''),'') NOT IN ('CLOSED','CANCELLED','DEMOBILIZED')"; }
+    //  DEF-OPS-037 (branch batch B3, owner 16 Nov 2026) — the deputation register
+    //  and its dashboard listed every branch's deputations. A deputation is a job,
+    //  so it follows the work-order rule (call_office_clause()): the office that
+    //  carries it out or the office that contracted it; a person with no branch
+    //  sees none; company-wide roles and runs with nobody signed in are unscoped.
+    if (function_exists('call_office_clause')) {
+        [$sw, $sa] = call_office_clause('COALESCE(j.executing_office_id, c.executing_office_id, c.ibo_office_id)',
+                                        'COALESCE(j.contracting_office_id, c.contracting_office_id, c.ibo_office_id)');
+        $w[] = $sw; $a = array_merge($a, $sa);
+    }
     $sql = "SELECT j.*, c.client_id, c.inspection_type, c.call_code,
                    i.name AS person_name,
                    COALESCE(NULLIF(bp.display_name,''), bp.legal_name) AS client_name

@@ -75,6 +75,19 @@ function hwp_missing_table(Throwable $e) {
 function hwp_can_view() { return function_exists('can') && (can('mod.idems.view') || can('mod.jobs.view') || is_master_of(['idems','jobs'])); }
 function hwp_can_edit() { return function_exists('can') && (can('mod.idems.edit') || can('mod.jobs.edit') || is_master_of(['idems','jobs'])); }
 
+// X1 — the point's branch, asked before any change: the job it sits on (the
+// same question the job record asks), else the office stored on the point.
+function hwp_job_in_scope($jobId) {
+    $job = (int)$jobId ? ops_one("SELECT id, executing_office_id, sbu FROM jobs WHERE id=?", [(int)$jobId]) : null;
+    if (!$job) return false;
+    return !function_exists('scope_allows') || scope_allows($job['executing_office_id'] ?? null, $job['sbu'] ?? null);
+}
+function hwp_in_scope($h) {
+    if (!$h) return false;
+    if ((int)($h['job_id'] ?? 0) > 0) return hwp_job_in_scope((int)$h['job_id']);
+    return !function_exists('scope_office_allows') || scope_office_allows($h['office_id'] ?? null);
+}
+
 function hwp_type_label($t)   { return HW_POINT_TYPES[$t] ?? $t; }
 function hwp_status_label($s) { return HW_POINT_STATUS[$s] ?? $s; }
 
@@ -247,7 +260,10 @@ function ops_hwpoints($route, $method) {
     // Manager-wide list of everything still holding.
     if ($route === 'hold-points') {
         $scope = function_exists('scope_offices') ? scope_offices() : 'ALL';
-        $rows = hwp_open_all(is_array($scope) ? $scope : null);
+        //  An empty office list is a person with no branch: nothing, not everything
+        //  (DEF-ADM-002 — hwp_open_all() reads an empty list as "no filter").
+        $noBranch = is_array($scope) && !$scope && function_exists('scope_needs_home') && scope_needs_home();
+        $rows = $noBranch ? [] : hwp_open_all(is_array($scope) ? $scope : null);
         view('ops/hwpoints', ['mode' => 'all', 'rows' => $rows, 'canEdit' => hwp_can_edit()]);
         return true;
     }
@@ -259,7 +275,11 @@ function ops_hwpoints($route, $method) {
         $jobId = (int)($_POST['job_id'] ?? $_GET['job'] ?? 0);
         $back  = $jobId ? '/job?id=' . $jobId . '#holdpoints' : '/hold-points';
         if ($method === 'POST') {
-            $job = $jobId ? ops_one("SELECT id, call_id, office_id FROM jobs WHERE id=?", [$jobId]) : null;
+            //  jobs has no office_id column — the job's office is its executing
+            //  office. Reading office_id threw, so no point could be raised by hand.
+            $job = $jobId ? ops_one("SELECT id, call_id, executing_office_id AS office_id FROM jobs WHERE id=?", [$jobId]) : null;
+            if (!$job) { flash('Pick the ' . (function_exists('Tl') ? Tl('job') : 'job') . ' the point belongs to.', 'error'); redirect($back); }
+            ops_require(hwp_job_in_scope($jobId), 'This ' . (function_exists('Tl') ? Tl('job') : 'job') . ' is outside your office / branch scope.');
             if (trim((string)($_POST['description'] ?? '')) === '' && trim((string)($_POST['qap_clause'] ?? '')) === '') {
                 flash('Give the point a QAP clause or a short description.', 'error'); redirect($back);
             }
@@ -277,6 +297,7 @@ function ops_hwpoints($route, $method) {
 
     if ($route === 'hw-point-derive') {
         $jobId = (int)($_POST['job_id'] ?? $_GET['job'] ?? 0);
+        ops_require(hwp_job_in_scope($jobId), 'This ' . (function_exists('Tl') ? Tl('job') : 'job') . ' is outside your office / branch scope.');
         $n = 0;
         foreach (ops_all("SELECT * FROM report_docs WHERE job_id=? AND finalized=1 AND deleted=0", [$jobId]) as $d) $n += hwp_derive_from_doc($d);
         flash($n > 0 ? "Scanned issued reports — $n new hold/witness point" . ($n === 1 ? '' : 's') . " raised." : 'Scanned issued reports — nothing new to raise.');
@@ -288,6 +309,7 @@ function ops_hwpoints($route, $method) {
     if (!$h) { http_response_code(404); view('notfound'); return true; }
     $back = $h['job_id'] ? '/job?id=' . (int)$h['job_id'] . '#holdpoints' : '/hold-points';
     if ($method !== 'POST') redirect($back);
+    ops_require(hwp_in_scope($h), 'This hold / witness point is outside your office / branch scope.');
 
     if ($route === 'hw-point-clear' || $route === 'hw-point-waive' || $route === 'hw-point-cancel') {
         $status = ['hw-point-clear' => 'CLEARED', 'hw-point-waive' => 'WAIVED', 'hw-point-cancel' => 'CANCELLED'][$route];

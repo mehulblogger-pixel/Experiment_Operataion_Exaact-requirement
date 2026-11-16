@@ -56,7 +56,7 @@ whichever is offered first (owner, test book ONB-041, 25 Oct 2026).
 - **Context:** desk, laptop; figures-first.
 - **Sees:** every area (view-only); Masters/Users tiles show, **System settings hidden** (no `settings.manage`, `areas.php:213`).
 - **Accountable for:** company-wide performance and margin.
-- **Must never:** edit operational records or see identity documents by default.
+- **Must never:** edit operational records or see identity documents by default. *(Recruitment is the exception: Hiring / Candidates = **Edit**, owner 16 Nov 2026, R1 — they add and edit candidates, schedule interviews, draft offers; approving an offer stays a manager decision.)*
 
 ## SBU_HEAD — "Business Unit Head"
 - **Key:** `SBU_HEAD` · all dashboards + all `data.*` + `workforce.report.approve` + `org.hierarchy.view` + `idems.finalize` + `idems.audit.view`; offices `ALL`, **sbus `OWN`** (`access.php:441-442`); views a broad module set (`:330-331`). **Records nonconformities** (`mod.ncr.add` + view; owner, 2026-10-19).
@@ -64,7 +64,7 @@ whichever is offered first (owner, test book ONB-041, 25 Oct 2026).
 - **Context:** desk, laptop.
 - **Sees:** Sales, Operations, Recruitment, Quality (pack-gated), Reporting, Money, Insights, Directory, Admin(Masters). No Users module.
 - **Accountable for:** their SBU's revenue, utilisation and report sign-off.
-- **Must never:** manage logins/settings; act outside their SBU's data.
+- **Must never:** manage logins/settings; act outside their SBU's data. *(Hiring / Candidates = **Edit** within their own business unit, owner 16 Nov 2026, R1; approving an offer stays a manager decision.)*
 
 ## BRANCH_MANAGER — "Branch Manager"
 - **Key:** `BRANCH_MANAGER` · all dashboards + all `data.*` + `ops.call.create` + `ops.job.allocate` + `ops.job.close` + `workforce.availability` + `workforce.report.approve` + `master.manage` + `users.manage.branch` + `org.hierarchy.view` + `idems.finalize` + `idems.audit.view`; **offices `OWN`**, sbus `ALL` (`access.php:443-444`); edits calls/jobs/idems/vouchers/hiring/reconcile/clients/vendors/masters/reports/users/complaints/capa/datacontrol/portal (`:332-334`). **Records nonconformities** (`mod.ncr.add` + view; owner, 2026-10-19).
@@ -80,7 +80,7 @@ whichever is offered first (owner, test book ONB-041, 25 Oct 2026).
 - **Context:** desk, laptop.
 - **Sees:** Operations (calls/jobs view), Money (overheads), Insights, Directory (client holds), Admin (Masters, Users, report-config tiles via `idems.type.manage`). **No Reporting rail item** despite IDEMS-config perms (see flag).
 - **Accountable for:** the branch's configuration correctness and login hygiene.
-- **Must never:** run inspections or approve/issue reports (has no `mod.idems.view` or `idems.finalize`).
+- **Must never:** run inspections or approve/issue reports (has no `mod.idems.view` or `idems.finalize`); **allocate jobs** — Jobs is View (R4, 16 Nov 2026: refused unless the company ticks *Allocate / edit jobs* for the role or person).
 - **⚠ Flag:** holds `idems.type.manage`/`idems.timestamp.edit` but not `mod.idems.view`, so the Reporting area doesn't appear — the config screens are reachable via Admin tiles only.
 
 ## OPERATION_MANAGER — "Operation Manager"
@@ -113,7 +113,7 @@ whichever is offered first (owner, test book ONB-041, 25 Oct 2026).
 - **Context:** desk/mobile; sales-flavoured dashboard (`dashboard.php:63`).
 - **Sees:** Sales, Insights, Directory (clients). Nothing operational, no money beyond credit.
 - **Accountable for:** pipeline and won quotations.
-- **Must never:** touch operations, approve quotes, register contracts, or manage users.
+- **Must never:** touch operations, approve quotes, register contracts, or manage users. The *Operations dashboard* tick drives its dashboard tiles only; it does not open the Operations home or its work lists (R4, 16 Nov 2026).
 
 ## KEY_ACCOUNTS_MANAGER — "Key Accounts Manager"
 - **Key:** `KEY_ACCOUNTS_MANAGER` · **identical defaults to BUSINESS_DEV_MANAGER** (`access.php:456-457`, `:348-350`).
@@ -122,8 +122,9 @@ whichever is offered first (owner, test book ONB-041, 25 Oct 2026).
 - **Sees / Accountable / Must never:** as BUSINESS_DEV_MANAGER.
 
 ## MARKETING_MANAGER — "Marketing Manager"
-- **Key:** `MARKETING_MANAGER` · `dash.operations, dash.financial, data.credit, data.revenue, data.profitability, crm.quote.create, crm.quote.approve, crm.quote.send, crm.followup.manage, crm.template.manage`; offices/sbus `ALL` (`access.php:458-459`); edits inquiries/quotes/crm_orders/crm_reports/clients, views reports/profitability (`:351-353`).
-- **Who:** senior sales/marketing — can approve quotations and manage templates across all offices.
+- **Key:** `MARKETING_MANAGER` · `dash.operations, dash.financial, data.credit, data.revenue, data.profitability, crm.quote.create, crm.quote.approve, crm.quote.send, crm.followup.manage, crm.template.manage`; **offices = the offices ticked on the person** (else their home office), sbus `ALL`; edits inquiries/quotes/crm_orders/crm_reports/clients, views reports/profitability (`:351-353`).
+- **Office reach (owner, 16 Nov 2026 — change plan 0.1 / C1):** a central role whose offices are chosen **per person**. Tick **All offices** for someone who covers the whole company; a Marketing Manager with offices ticked approves the quotations and costings of **those offices** (they are level 2 of the owner's quotation chain). Everyone holding the role when this shipped was given All offices once, so nobody lost anything; a new Marketing Manager sees only their home office until more offices are ticked, and none if neither is set (the User register flags them).
+- **Who:** senior sales/marketing — can approve quotations and manage templates for the offices they cover.
 - **Context:** desk, laptop.
 - **Sees:** Sales (incl. pre-order checklist via `crm.quote.approve`), Money (profitability), Insights, Directory, Admin (Document-templates tile via `crm.template.manage`, `areas.php:222`).
 - **Accountable for:** sales conversion, quote quality, templates.
@@ -138,7 +139,7 @@ whichever is offered first (owner, test book ONB-041, 25 Oct 2026).
 - **Must never:** approve/send quotes, touch operations or money.
 
 ## FINANCE — "Finance"
-- **Key:** `FINANCE` · `dash.financial, data.credit, data.revenue, data.salary, data.profitability, finance.reconcile, crm.contract.register`; offices/sbus `ALL` (`access.php:462-463`); edits invoicing/crm_orders, views quotes/crm_reports/profitability/reports/jobs/calls/vouchers/idems (`:357-359`), **and vendors and clients, read only (owner, 2026-10-19, Q-G and Q-K)**. **Not `is_admin_level`.**
+- **Key:** `FINANCE` · `dash.financial, data.credit, data.revenue, data.salary, data.profitability, finance.reconcile, crm.contract.register`; **offices = the offices ticked on the person** (else their home office), sbus `ALL` (owner, 16 Nov 2026 — change plan 0.1 / C1: tick **All offices** for the company-wide finance team; everyone holding the role when this shipped was given All offices once; a new Finance person sees only their home office until more offices are ticked, and none if neither is set); edits invoicing/crm_orders, views quotes/crm_reports/profitability/reports/jobs/calls/vouchers/idems (`:357-359`), **and vendors and clients, read only (owner, 2026-10-19, Q-G and Q-K)**. **Not `is_admin_level`.**
 - **Who:** accounts/finance — registers contracts off won quotes, raises and issues invoices, records receipts, reconciles credit and attendance.
 - **Context:** desk, laptop; money-first dashboard (`dashboard.php:65`).
 - **Sees:** Sales (quotes view), Operations (calls/jobs/vouchers **view-only**), Reporting, Money (invoicing/profitability/billing), Insights. **No Directory, no Admin, no Recruitment, no Quality.**

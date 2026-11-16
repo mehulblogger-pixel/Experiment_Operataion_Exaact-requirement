@@ -54,7 +54,7 @@
     <p style="white-space:pre-wrap"><?= e($n['containment']) ?></p>
     <p class="muted" style="font-size:12px">Recorded by <?= e($n['contained_by']) ?> on <?= e(fdate($n['contained_on'])) ?></p>
   <?php endif; ?>
-  <?php if ($canEdit && !$closed): ?>
+  <?php if (($canDecide ?? $canEdit) && !$closed): ?>
   <form method="post" action="/ncr-contain">
     <input type="hidden" name="id" value="<?= (int)$n['id'] ?>">
     <textarea class="form-control" name="containment" rows="2" placeholder="e.g. the report was recalled from the client the same day"><?= e($n['containment']) ?></textarea>
@@ -71,7 +71,7 @@
       <?php if (trim((string)$n['disposition_note']) !== ''): ?><br><span style="white-space:pre-wrap"><?= e($n['disposition_note']) ?></span><?php endif; ?></p>
     <p class="muted" style="font-size:12px">Decided by <?= e($n['disposition_by']) ?> on <?= e(fdate($n['disposition_on'])) ?></p>
   <?php endif; ?>
-  <?php if ($canEdit && !$closed): ?>
+  <?php if (($canDecide ?? $canEdit) && !$closed): ?>
   <form method="post" action="/ncr-disposition">
     <input type="hidden" name="id" value="<?= (int)$n['id'] ?>">
     <select class="form-control" name="disposition" style="max-width:360px">

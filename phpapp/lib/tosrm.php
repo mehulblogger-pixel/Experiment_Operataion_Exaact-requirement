@@ -283,6 +283,9 @@ function tosrm_clar_set_status($id, $status) {
     db()->prepare("UPDATE call_clarifications SET status=? WHERE id=?")->execute([$status, (int)$id]);
     return true;
 }
+function tosrm_clar_on_call($clarId, $callId) {
+    return (int)$clarId > 0 && (int)ops_val("SELECT COUNT(*) FROM call_clarifications WHERE id=? AND call_id=?", [(int)$clarId, (int)$callId]) > 0;
+}
 function tosrm_clar_list($callId) { return ops_all("SELECT * FROM call_clarifications WHERE call_id=? ORDER BY id DESC", [(int)$callId]) ?: []; }
 function tosrm_clar_open_count($callId) { $r = ops_one("SELECT COUNT(*) n FROM call_clarifications WHERE call_id=? AND status='OPEN'", [(int)$callId]); return (int)($r['n'] ?? 0); }
 
@@ -302,6 +305,27 @@ function tosrm_can_edit() {
     if (function_exists('is_coordinator_level') && is_coordinator_level()) return true;
     return false;
 }
+
+// B2 / DEF-OPS-046 — BRANCH SCOPE IS ASKED BEFORE ANYTHING IS SAVED.
+//
+// The actions below checked only the role (tosrm_can_edit()), wrote, and then
+// redirected to the record — whose own guard was the first thing to say "outside
+// your office / branch scope", by which time another branch's work order had
+// already been put On hold or marked Critical. Each action now asks first:
+//   a work order → the office that carries it out (call_exec_scope_allows(),
+//                  lib/ops.php — the contracting office may OPEN it, not run it);
+//   a job        → the same question the job record asks (its executing office
+//                  and business unit, scope_allows()).
+function tosrm_call_scope_ok($call) {
+    if (function_exists('call_exec_scope_allows')) return call_exec_scope_allows($call);
+    return function_exists('scope_allows') ? scope_allows($call['executing_office_id'] ?? null, $call['sbu'] ?? null) : true;
+}
+function tosrm_job_scope_ok($job) {
+    if (!$job) return false;
+    return function_exists('scope_allows') ? scope_allows($job['executing_office_id'] ?? null, $job['sbu'] ?? null) : true;
+}
+function tosrm_call_scope_msg() { return 'This ' . (function_exists('Tl') ? Tl('call') : 'call') . ' is outside your office / branch scope.'; }
+function tosrm_job_scope_msg()  { return 'This ' . (function_exists('Tl') ? Tl('job') : 'job') . ' is outside your office / branch scope.'; }
 
 // ---------------------------------------------------------------------------
 //  Panel — rendered on the call detail page. Self-contained (echoes HTML), so
@@ -438,7 +462,9 @@ function tosrm_render_call_panel($call) {
     $curLabel = $statuses[$cur] ?? $cur;
     $prio = (string)($call['priority'] ?? ''); $crit = (string)($call['criticality'] ?? ''); $src = (string)($call['source'] ?? '');
     $prioOpt = tosrm_priority_options(); $critOpt = tosrm_criticality_options(); $srcOpt = tosrm_source_options();
-    $canEdit = tosrm_can_edit();
+    //  The contracting office can open the record (B3) but the forms are the
+    //  executing office's — drawn only for those whose save would be accepted.
+    $canEdit = tosrm_can_edit() && tosrm_call_scope_ok($call);
     ob_start(); ?>
     <style>
       .tosrm-panel .sr-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-bottom:14px}
@@ -584,6 +610,7 @@ function ops_tosrm_action($route, $method) {
     if ($method !== 'POST') redirect($back);
     if (!csrf_ok($_POST['_csrf'] ?? '')) { flash('That form had expired — please try again.', 'error'); redirect($back); }
     ops_require(tosrm_can_edit(), 'You do not have permission to change this service request.');
+    ops_require(tosrm_call_scope_ok($call), tosrm_call_scope_msg());   // B2 — before any write
     tosrm_migrate();
     tosrm_migrate_b();
 
@@ -621,10 +648,14 @@ function ops_tosrm_action($route, $method) {
             } else flash('Give the clarification a subject.', 'error');
             break;
         case 'call-clar-respond':
+            //  The clarification must be one of THIS work order's — the scope
+            //  check above was asked of the call in the form, not of the id.
+            if (!tosrm_clar_on_call((int)($_POST['id'] ?? 0), $callId)) { flash('That clarification was not found on this ' . (function_exists('Tl') ? Tl('call') : 'call') . '.', 'error'); break; }
             if (tosrm_clar_respond((int)($_POST['id'] ?? 0), (string)($_POST['response'] ?? ''))) flash('Response recorded.');
             else flash('Write the response.', 'error');
             break;
         case 'call-clar-status':
+            if (!tosrm_clar_on_call((int)($_POST['id'] ?? 0), $callId)) { flash('That clarification was not found on this ' . (function_exists('Tl') ? Tl('call') : 'call') . '.', 'error'); break; }
             tosrm_clar_set_status((int)($_POST['id'] ?? 0), (string)($_POST['status'] ?? ''));
             flash('Clarification updated.');
             break;
@@ -1141,6 +1172,7 @@ function ops_tosrm_job_action($route, $method) {
     if ($method !== 'POST') redirect($back);
     if (!csrf_ok($_POST['_csrf'] ?? '')) { flash('That form had expired — please try again.', 'error'); redirect($back); }
     ops_require(tosrm_can_edit(), 'You do not have permission to change this assignment.');
+    ops_require(tosrm_job_scope_ok($job), tosrm_job_scope_msg());   // B2 — before any write
     tosrm_migrate_b();
 
     switch ($route) {
@@ -1463,6 +1495,7 @@ function ops_tosrm_ready_action($route, $method) {
     if ($method !== 'POST') redirect($back);
     if (!csrf_ok($_POST['_csrf'] ?? '')) { flash('That form had expired — please try again.', 'error'); redirect($back); }
     ops_require(tosrm_can_edit(), 'You do not have permission to change this job.');
+    ops_require(tosrm_job_scope_ok($job), tosrm_job_scope_msg());   // B2 — before any write
     tosrm_migrate_c();
 
     switch ($route) {
@@ -1754,7 +1787,7 @@ function tosrm_render_call_sla($call) {
     tosrm_migrate_d();
     $esc = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
     $cid = (int)($call['id'] ?? 0);
-    $canEdit = tosrm_can_edit();
+    $canEdit = tosrm_can_edit() && tosrm_call_scope_ok($call);
     $csrf = function_exists('csrf_token') ? csrf_token() : '';
     $tat = tosrm_tat($call); $sla = tosrm_sla_eval($call);
     $delays = tosrm_delay_list_for_call($cid);
@@ -1823,6 +1856,7 @@ function ops_tosrm_delay_action($route, $method) {
     if (!csrf_ok($_POST['_csrf'] ?? '')) { flash('That form had expired — please try again.', 'error'); redirect($back); }
     ops_require(tosrm_can_edit(), 'You do not have permission to record a delay.');
     if (!$job) { flash('Job not found.', 'error'); redirect('/calls'); }
+    ops_require(tosrm_job_scope_ok($job), tosrm_job_scope_msg());   // B2 — before any write
     tosrm_delay_add($jobId, ['reason'=>$_POST['reason'] ?? '', 'category'=>$_POST['category'] ?? '', 'responsibility'=>$_POST['responsibility'] ?? '', 'impact'=>$_POST['impact'] ?? '', 'action'=>$_POST['action'] ?? '']);
     flash('Delay recorded.');
     redirect($back);
@@ -1894,7 +1928,14 @@ function tosrm_call_office_sql($offices, $alias = 'c') {
     if (!is_array($offices)) return '1=1';
     if (!$offices) return '1=0';
     $in = implode(',', array_map('intval', $offices));
-    return "($alias.executing_office_id IN ($in) OR $alias.executing_office_id IS NULL)";
+    //  DEF-OPS-002 — "OR executing_office_id IS NULL" showed every order with a
+    //  blank executing office to EVERY branch: a Delhi coordinator saw
+    //  Ahmedabad's work in New requests, the Backlog and the registers while the
+    //  record itself refused them. Such an order is carried out by the office
+    //  that took it (call_exec_office()), else the managing office.
+    if (function_exists('call_exec_office_sql'))
+        return '(' . call_exec_office_sql("$alias.executing_office_id", "$alias.ibo_office_id") . " IN ($in))";
+    return "($alias.executing_office_id IN ($in))";
 }
 
 // ---- Ops desk metrics ------------------------------------------------------
@@ -2027,6 +2068,12 @@ function tosrm_render_comms($entityKind, $entityId, $backAnchor = 'comms') {
     $esc = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
     $rows = act_for_entity($entityKind, (int)$entityId, 50) ?: [];
     $canEdit = tosrm_can_edit();
+    //  Drawn only where comm-add would accept it (B2): a work order opened by
+    //  its contracting office is read here, not written.
+    if ($canEdit && strtoupper((string)$entityKind) === 'CALL') {
+        $cr = ops_one("SELECT * FROM calls WHERE id=?", [(int)$entityId]);
+        $canEdit = $cr && tosrm_call_scope_ok($cr);
+    }
     $csrf = function_exists('csrf_token') ? csrf_token() : '';
     //  Only the kinds a person may record by hand — the system's own events
     //  (joining, identity) are written by the workflow that causes them.
@@ -2064,8 +2111,15 @@ function tosrm_render_comms($entityKind, $entityId, $backAnchor = 'comms') {
 // ---------------------------------------------------------------------------
 //  Handlers.
 // ---------------------------------------------------------------------------
+// R4 / DEF-OPS-004 — the Operations home and its work lists (counters,
+// pending scheduling, backlog, schedule and assignment registers) are operations
+// WORK, so they need the work-order or job module. The "Operations dashboard"
+// tick (dash.operations) alone used to open them, which gave sales roles that
+// hold it for their dashboard tiles — Business Development / Key Accounts /
+// Marketing Manager — the work lists the permission matrix withholds from them.
+// dash.operations still drives the dashboard widgets it is for.
 function tosrm_ops_desk_can() {
-    return (function_exists('can') && (can('dash.operations') || can('mod.calls.view') || can('mod.jobs.view')))
+    return (function_exists('can') && (can('mod.calls.view') || can('mod.jobs.view')))
         || (function_exists('is_coordinator_level') && is_coordinator_level())
         || (function_exists('is_master') && is_master());
 }
@@ -2586,6 +2640,14 @@ function ops_tosrm_comm_action($route, $method) {
         if ($method !== 'POST') redirect($back);
         if (!csrf_ok($_POST['_csrf'] ?? '')) { flash('That form had expired — please try again.', 'error'); redirect($back); }
         ops_require(tosrm_can_edit(), 'You do not have permission to log a communication.');
+        //  B2 — the record the note is written against must be in scope.
+        if ($ek === 'JOB') {
+            $jr = $eid ? ops_one("SELECT * FROM jobs WHERE id=?", [$eid]) : null;
+            ops_require($jr && tosrm_job_scope_ok($jr), tosrm_job_scope_msg());
+        } elseif ($ek === 'CALL') {
+            $cr = $eid ? ops_one("SELECT * FROM calls WHERE id=?", [$eid]) : null;
+            ops_require($cr && tosrm_call_scope_ok($cr), tosrm_call_scope_msg());
+        }
         if (function_exists('act_log') && trim((string)($_POST['subject'] ?? '')) !== '') {
             act_log($ek, $eid, (string)($_POST['kind'] ?? 'NOTE'), (string)($_POST['subject'] ?? ''), ['body'=>(string)($_POST['body'] ?? '')]);
             flash('Communication logged.');
@@ -2618,6 +2680,7 @@ function ops_tosrm_comm_action($route, $method) {
         if ($method !== 'POST') redirect($back);
         if (!csrf_ok($_POST['_csrf'] ?? '')) { flash('That form had expired — please try again.', 'error'); redirect($back); }
         ops_require(tosrm_can_edit(), 'You do not have permission to raise an issue.');
+        ops_require($job && tosrm_job_scope_ok($job), tosrm_job_scope_msg());   // B2 — before any write
         $title = trim((string)($_POST['title'] ?? '')); if ($title === '') { flash('Describe the operational issue.', 'error'); redirect($back); }
         $id = tosrm_issue_from_event($jobId, $title, (string)($_POST['description'] ?? ''), (string)($_POST['severity'] ?? 'MINOR'));
         flash($id ? 'Operational issue raised in the Phase 8 register (linked to this job).' : 'Could not raise the issue.', $id ? 'success' : 'error');

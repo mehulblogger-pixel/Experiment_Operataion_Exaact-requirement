@@ -70,11 +70,15 @@ $wide = $mkUser('COORDINATOR', null, 'ALL');
 t_eq($scopeOf($wide), 'ALL', 'an explicit company-wide scope is still honoured');
 $two = $mkUser('COORDINATOR', 981, '981,982');
 t_eq($scopeOf($two), '981,982', 'an explicit two-branch scope is still honoured');
-//  Finance is company-wide BY DESIGN (docs/02-permission-matrix.md). Recorded
-//  here so a future tightening cannot quietly take it away.
-$fin = $mkUser('FINANCE', 981, '');
-t_eq($scopeOf($fin), 'ALL', '*** FINANCE stays company-wide — the matrix says it reconciles across offices');
+//  Finance is office-based since 16 Nov 2026 (owner, change plan 0.1 / C1):
+//  it sees the offices ticked on its record — "All offices" for the company-wide
+//  picture, which every Finance person holding the role on the day it shipped
+//  was given — or else its home office (docs/02-permission-matrix.md).
+$fin = $mkUser('FINANCE', 981, 'ALL');
+t_eq($scopeOf($fin), 'ALL', '*** FINANCE with "All offices" ticked is company-wide');
 t_ok(!scope_needs_home(), '…and is never flagged as misconfigured for having no branch');
+$finOwn = $mkUser('FINANCE', 981, '');
+t_eq($scopeOf($finOwn), '981', '*** FINANCE with nothing ticked sees its home office only (no longer every office by role)');
 
 // ---------------------------------------------------------------------------
 //  2. THE CLAUSE BUILDERS AGREE WITH THE SCOPE. A fix to ua() is cosmetic if
@@ -130,7 +134,8 @@ $visible = function ($uid) use ($as) {
 };
 t_eq($visible($north), ['PB-NORTH-1'], '*** a North coordinator sees North work and NOT South work');
 t_eq($visible($lost),  [],             '*** an unplaced coordinator sees no branch at all');
-t_eq($visible($fin),   ['PB-NORTH-1', 'PB-SOUTH-1'], 'Finance sees both branches, as the matrix intends');
+t_eq($visible($fin),   ['PB-NORTH-1', 'PB-SOUTH-1'], 'Finance with "All offices" sees both branches');
+t_eq($visible($finOwn), ['PB-NORTH-1'], 'Finance placed in North with nothing ticked sees North only');
 t_eq($visible($two),   ['PB-NORTH-1', 'PB-SOUTH-1'], 'a two-branch coordinator sees exactly their two');
 
 // ---------------------------------------------------------------------------
@@ -141,7 +146,7 @@ $_SESSION = $origSess; current_user(true); ua(true);
 $unplaced = array_column(scope_unplaced_users(), 'id');
 t_ok(in_array($lost, $unplaced, true), '*** the unplaced coordinator is listed for an administrator to fix');
 t_ok(!in_array($north, $unplaced, true), '…a properly placed one is not');
-t_ok(!in_array($fin, $unplaced, true),   '…and neither is Finance, which needs no branch');
+t_ok(!in_array($fin, $unplaced, true),   '…and neither is Finance with "All offices" ticked');
 
 // ---------------------------------------------------------------------------
 //  Clean up — this suite shares one database with every other.
