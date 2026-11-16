@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '815edb8 · 2026-11-16 01:45 UTC · 719 files';
+$RELEASE = '53f2093 · 2026-11-16 15:57 UTC · 720 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -125,7 +125,7 @@ $EXPECT  = [
     'lib/cvp.php' => ['s'=>64043,'h'=>'834aeaa8ba261a28'],
     'lib/datacontrol.php' => ['s'=>37664,'h'=>'1206a5a742cd1266'],
     'lib/datatable.php' => ['s'=>15699,'h'=>'dfea30bbc69ccef3'],
-    'lib/db.php' => ['s'=>59314,'h'=>'9d4ad69816ae0a34'],
+    'lib/db.php' => ['s'=>59447,'h'=>'cccba29ebd17a920'],
     'lib/decisionrules.php' => ['s'=>12116,'h'=>'7f7d5a9cd6e144ef'],
     'lib/dedupe.php' => ['s'=>12027,'h'=>'de5bdc1c0769610b'],
     'lib/deptorg.php' => ['s'=>36122,'h'=>'1407a36dc1683f07'],
@@ -260,6 +260,7 @@ $EXPECT  = [
     'lib/tenants.php' => ['s'=>23379,'h'=>'8bb1d9d0ef7cc82e'],
     'lib/terms.php' => ['s'=>29354,'h'=>'d6c676af2865de50'],
     'lib/timesheet.php' => ['s'=>9604,'h'=>'a6a8bd9555d2fd07'],
+    'lib/timezone.php' => ['s'=>1766,'h'=>'3f6dac267d9867fa'],
     'lib/tmplpreview.php' => ['s'=>3520,'h'=>'770170cf566d21da'],
     'lib/tosrm.php' => ['s'=>175958,'h'=>'97546ac06cc88324'],
     'lib/trace_audit.php' => ['s'=>17883,'h'=>'b7fce5750cd3b3df'],
@@ -909,17 +910,26 @@ foreach (array_merge($stale, $missing) as $r) {
 }
 arsort($byDir);
 
-// The clock the application stamps its records with. The app sets no time zone
-// of its own, so it uses whatever the server's PHP is set to. Shown next to
-// India time so anyone can see at a glance whether the two differ (QA audit
-// V51.1, Reporting C18: the CERT-In six-hour clock and "when it was noticed"
-// depend on it). Reads only.
-$__tz    = date_default_timezone_get();
+// The clock the application stamps its records with. Since 16 Nov 2026 (owner
+// decision T1) the app sets India time itself, in lib/timezone.php; an older
+// release set nothing and used whatever the server's PHP is set to. The line
+// shows the clock the app uses, the server's own clock beside it, and whether
+// the app's clock matches India time (QA audit V51.1, Reporting C18: the
+// CERT-In six-hour clock and "when it was noticed" depend on it). The app's zone
+// is READ from that file, not loaded, so this page never changes its own clock.
+$__tz    = date_default_timezone_get();                       // the server's own PHP zone
 $__srv   = new DateTime('now');
+$__appTz = '';
+$__tzSrc = is_file(__DIR__ . '/lib/timezone.php') ? (string) @file_get_contents(__DIR__ . '/lib/timezone.php') : '';
+if ($__tzSrc !== '' && preg_match("/define\\('APP_TIMEZONE',\\s*'([A-Za-z_\\/+-]+)'\\)/", $__tzSrc, $__m)
+    && in_array($__m[1], timezone_identifiers_list(), true)) $__appTz = $__m[1];
+$__app   = new DateTime('now', new DateTimeZone($__appTz !== '' ? $__appTz : $__tz));
 $__ist   = new DateTime('now', new DateTimeZone('Asia/Kolkata'));
-$__gap   = $__ist->getOffset() - $__srv->getOffset();
-$CLOCK   = 'server clock ' . $__srv->format('j M Y, H:i') . ' (' . $__tz . ') · India time ' . $__ist->format('j M Y, H:i')
-         . ($__gap === 0 ? ' · same as India time' : ' · differs from India time by ' . floor(abs($__gap) / 3600) . ' h ' . ((abs($__gap) % 3600) / 60) . ' min');
+$__gap   = $__ist->getOffset() - $__app->getOffset();
+$CLOCK   = 'the app uses ' . ($__appTz === 'Asia/Kolkata' ? 'India time (Asia/Kolkata)' : ($__appTz !== '' ? $__appTz : 'the server clock (' . $__tz . ')'))
+         . ': ' . $__app->format('j M Y, H:i') . ' · server clock ' . $__srv->format('j M Y, H:i') . ' (' . $__tz . ')'
+         . ($__gap === 0 ? ' · same as India time'
+                         : ' · India time ' . $__ist->format('j M Y, H:i') . ' · differs from India time by ' . floor(abs($__gap) / 3600) . ' h ' . ((abs($__gap) % 3600) / 60) . ' min');
 
 if ($IS_CLI) {
     echo "EXAACT deployment check — release {$RELEASE}\n";
