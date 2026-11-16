@@ -264,6 +264,7 @@ try {
     require __DIR__ . '/lib/hiringreq.php';       // M4 — the hiring request layer, before execution
     require __DIR__ . '/lib/recruit_cc.php';
     require __DIR__ . '/lib/recruit_assign.php';  // M5 — the one door for recruiter accountability
+    require __DIR__ . '/lib/recruit_pool.php';    // Branch batch B6 — the shared candidate pool, in-process badge, other-office block
     require __DIR__ . '/lib/recruit_exec.php';    // M6 — the integrated execution gate
     require __DIR__ . '/lib/recruit_fulfil.php';  // Phase 4 — multi-source fulfilment of ONE approved demand
     require __DIR__ . '/lib/recruit_kpi.php';     // Phase 5 — the ONE authoritative recruitment KPI, SLA & ageing engine

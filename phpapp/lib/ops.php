@@ -6546,13 +6546,24 @@ function ops_requisitions($route, $method) {
         if (function_exists('recruit_fit_score')) foreach ($cands as &$cd) { $cd['fit'] = recruit_fit_score($cd, $req); } unset($cd);
         $pool = [];
         if (function_exists('recruit_fit_score')) {
+            //  BRANCH BATCH B6 (owner, 16 Nov 2026) — this query had no scope at
+            //  all (DEF-REC-003). The pool is the company's own and no branch owns
+            //  a candidate, so with "Offices can see each other's candidate pool"
+            //  ON (the default) every office is offered every candidate who has not
+            //  joined; OFF, only its own office's (and unattached) candidates.
+            //  rpool_list_clause() is the one definition; it needs the class join.
+            [$poolW, $poolA] = function_exists('rpool_list_clause') ? rpool_list_clause('c') : ['1=1', []];
             $others = ops_all("SELECT c.*, t.label trade_label, s.label skill_label FROM candidates c
-                               LEFT JOIN lookup_values t ON t.id=c.trade_id LEFT JOIN lookup_values s ON s.id=c.skill_id
+                               LEFT JOIN lookup_values t ON t.id=c.trade_id LEFT JOIN lookup_values s ON s.id=c.skill_id"
+                               . (function_exists('reqf_class_join') ? reqf_class_join('c') : '') . "
                                WHERE (c.requisition_id IS NULL OR c.requisition_id<>?)
                                  AND c.stage NOT IN ('ACCEPTED','REJECTED','WITHDRAWN','OFFER_DECLINED')
-                               ORDER BY c.id DESC LIMIT 80", [$req['id']]) ?: [];
+                                 AND $poolW
+                               ORDER BY c.id DESC LIMIT 80", array_merge([$req['id']], $poolA)) ?: [];
             foreach ($others as $o) { $f = recruit_fit_score($o, $req); if ($f['score'] >= 55) { $o['fit'] = $f; $pool[] = $o; } }
             usort($pool, fn($a, $b) => $b['fit']['score'] <=> $a['fit']['score']); $pool = array_slice($pool, 0, 5);
+            //  B6 — every office sees who is already in process, and with whom.
+            if (function_exists('cand_process_badge')) { foreach ($pool as &$pc) { $pc['in_process'] = cand_process_badge($pc); } unset($pc); }
         }
         // P1b — the same ranked shortlist, but from the MARKETPLACE professional bench.
         $proPool = function_exists('recruit_pro_pool') ? recruit_pro_pool($req) : [];
@@ -6588,26 +6599,46 @@ function nzc_cand($f, $v) {
 //   · a requisition you are MOVING it to must also be in your scope — otherwise a
 //     branch-A user could push work onto branch B, and (since M3) write a status
 //     change to a requisition they cannot even see.
-function cand_scope_gate() {
+//
+// BRANCH BATCH B6 (owner, 16 Nov 2026) — the candidate pool is the company's own,
+// so the first direction now has two halves:
+//   · READING (the candidate page itself): another office's candidate who has
+//     not joined may be opened while "Offices can see each other's candidate
+//     pool" is ON — the page shows "Recruitment in process — <office>" and every
+//     action on it is refused (cand_pool_may_view()).
+//   · WORKING (every other candidate route): asked of the one guard,
+//     cand_other_office_block(). A candidate in process with an office you do
+//     not cover is refused, naming the office; a candidate whose process ended is
+//     back in the pool and is started by linking them to your own requisition.
+function cand_scope_gate($route = '', $method = '') {
     if (!function_exists('scope_allows')) return;
     $reqOffice = function ($reqId) {
         $reqId = (int) $reqId; if ($reqId <= 0) return null;
         try { return ops_one("SELECT office_id, sbu FROM requisitions WHERE id=?", [$reqId]) ?: null; }
         catch (Throwable $e) { return null; }
     };
+    $to = (int) ($_POST['requisition_id'] ?? $_GET['requisition_id'] ?? 0);
     // The candidate named on this request.
     $id = (int) ($_GET['id'] ?? $_POST['id'] ?? 0);
     if ($id > 0) {
-        try { $cand = ops_one("SELECT requisition_id FROM candidates WHERE id=?", [$id]); }
-        catch (Throwable $e) { $cand = null; }
-        if ($cand && !empty($cand['requisition_id'])) {
-            $r = $reqOffice($cand['requisition_id']);
-            if ($r) ops_require(scope_allows($r['office_id'] ?? null, $r['sbu'] ?? null),
-                                'This candidate belongs to a requisition outside your office / branch scope.');
+        $isPost = strtoupper((string) $method) === 'POST';
+        if (function_exists('cand_other_office_block')) {
+            if ($route === 'candidate' && !$isPost) {
+                ops_require(cand_pool_may_view($id), 'This candidate belongs to a requisition outside your office / branch scope.');
+            } else {
+                cand_other_office_require($id, ['to_requisition' => $to, 'form' => ($route === 'candidate-edit' && !$isPost)]);
+            }
+        } else {
+            try { $cand = ops_one("SELECT requisition_id FROM candidates WHERE id=?", [$id]); }
+            catch (Throwable $e) { $cand = null; }
+            if ($cand && !empty($cand['requisition_id'])) {
+                $r = $reqOffice($cand['requisition_id']);
+                if ($r) ops_require(scope_allows($r['office_id'] ?? null, $r['sbu'] ?? null),
+                                    'This candidate belongs to a requisition outside your office / branch scope.');
+            }
         }
     }
     // The requisition this request is attaching the candidate TO.
-    $to = (int) ($_POST['requisition_id'] ?? $_GET['requisition_id'] ?? 0);
     if ($to > 0) {
         $r = $reqOffice($to);
         if ($r) ops_require(scope_allows($r['office_id'] ?? null, $r['sbu'] ?? null),
@@ -6616,7 +6647,7 @@ function cand_scope_gate() {
 }
 
 function ops_candidates($route, $method) {
-    cand_scope_gate();   // M3 audit — branch scope, before anything reads an id
+    cand_scope_gate($route, $method);   // M3 audit — branch scope, before anything reads an id (B6: + the other-office block)
     $pdo = db();
 
     // stage transition (+ optional hire = create inspector)
@@ -7581,7 +7612,14 @@ function ops_candidates($route, $method) {
         $wfMatches = (function_exists('workforce_matches') && empty($cand['inspector_id'])) ? workforce_matches($cand) : [];
         $wfStrong  = $wfMatches ? workforce_strong_matches($wfMatches) : [];
         $wfAckTok  = $wfStrong ? workforce_ack_issue((int)$cand['id'], $wfMatches, $cand) : '';
+        //  B6 — the in-process badge every office sees, and, for an office that
+        //  may only LOOK (another office's process, or a candidate back in the
+        //  pool from another office), why it cannot act here.
+        $poolBadge = function_exists('cand_process_badge') ? cand_process_badge($cand) : '';
+        $poolBlock  = function_exists('cand_other_office_block') ? cand_other_office_block($cand) : '';
+        $poolLocked = function_exists('cand_other_office_block') && cand_other_office_block($cand, ['process_only' => true]) !== '';
         view('ops/candidate_detail', ['cand' => $cand, 'events' => $events, 'dupes' => $dupes, 'subDupes' => $subDupes,
+            'poolBadge' => $poolBadge, 'poolBlock' => $poolBlock, 'poolLocked' => $poolLocked,
             'wfMatches' => $wfMatches, 'wfStrong' => $wfStrong, 'wfAckTok' => $wfAckTok,
             'fit' => $fit, 'readiness' => $readiness, 'linkReq' => $linkReq, 'asgComm' => $asgComm, 'asgPacket' => $asgPacket,
             'personApps' => $personApps, 'proMatches' => $proMatches, 'proLink' => $proLink, 'person' => $person,

@@ -45,7 +45,9 @@
         <?php foreach ($rows as $r): ?>
           <tr>
             <td><a href="/candidate?id=<?= (int)$r['cand_id'] ?>"><?= e($r['cand_code']) ?></a>
-              <?php if ($r['cand_name']): ?><span class="muted">· <?= e($r['cand_name']) ?></span><?php endif; ?></td>
+              <?php if ($r['cand_name']): ?><span class="muted">· <?= e($r['cand_name']) ?></span><?php endif; ?>
+              <?php // B6 — whose process this person is in; only that office can work on them. ?>
+              <?php if (!empty($r['in_process'])): ?><br><span class="pill p-warn" style="font-size:11px;white-space:normal" title="Only that office can work on this <?= e(Tl('candidate')) ?> until their process ends.">🔒 <?= e($r['in_process']) ?></span><?php endif; ?></td>
             <td style="font-size:12px"><?= $r['req_code'] ? e($r['req_code']) : e($r['client_name'] ?: '—') ?></td>
             <td style="font-size:12px"><?= e($r['stage'] ?: '—') ?></td>
             <td><?= e($r['pro_name'] ?: ('#' . $r['pro_id'])) ?>

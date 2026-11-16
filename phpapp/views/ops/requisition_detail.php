@@ -355,7 +355,9 @@ if (!empty($pool)): ?>
     <?php foreach ($pool as $pc): [$fl, $ftone] = recruit_fit_band($pc['fit']['score']);
       $why = implode(' · ', array_map(fn($x) => $x['label'], array_filter($pc['fit']['factors'], fn($x) => $x['state'] === 'ok'))); ?>
     <tr>
-      <td><b><?= e(candidate_name($pc)) ?></b> <span class="muted"><?= e($pc['cand_code']) ?></span></td>
+      <td><b><?= e(candidate_name($pc)) ?></b> <span class="muted"><?= e($pc['cand_code']) ?></span>
+        <?php // B6 — already in process with an office: every office sees it, and with whom. ?>
+        <?php if (!empty($pc['in_process'])): ?><br><span class="pill p-warn" style="font-size:11px;white-space:normal" title="Only that office can work on this <?= e(Tl('candidate')) ?> until their process ends.">🔒 <?= e($pc['in_process']) ?></span><?php endif; ?></td>
       <td><?= e(lk_options_or('designation', DESIGNATIONS)[$pc['designation']] ?? ($pc['designation'] ?: '—')) ?></td>
       <td><span class="pill <?= e($ftone) ?>"><?= (int)$pc['fit']['score'] ?>% <?= e($fl) ?></span></td>
       <td class="muted" style="font-size:12px"><?= e($why ?: '—') ?></td>

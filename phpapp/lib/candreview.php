@@ -917,6 +917,8 @@ function ops_candidate_review($route, $method) {
     ops_require(crev_can_see($cand), 'You cannot open this candidate.');
 
     if ($method === 'POST') {
+        //  B6 — deciding a review is working on the candidate: their office only.
+        if (function_exists('cand_other_office_require')) cand_other_office_require($cand);
         $action = strtolower(trim((string) ($_POST['action'] ?? '')));
         $reason = (string) ($_POST['reason'] ?? '');
         if ($action === 'continue') {
