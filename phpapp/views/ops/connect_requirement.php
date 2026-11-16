@@ -6,6 +6,9 @@ $can_rate = $can_rate ?? false; $ratings = $ratings ?? []; $disputes = $disputes
 $terms = $terms ?? null; $terms_fields = $terms_fields ?? []; $readiness = $readiness ?? [];
 $readiness_items = $readiness_items ?? []; $readiness_score = $readiness_score ?? null; $advisor = $advisor ?? null;
 $billable = $billable ?? null; $positions = $positions ?? []; $crew = $crew ?? null; $disciplines = $disciplines ?? [];
+//  DEF-MKT-006 — every office sees this posting; only an office whose scope
+//  covers it (company-wide roles cover all) gets the buttons that act on it.
+$can_act = $can_act ?? true; $office_name = $office_name ?? '';
 $ratedDir = [];
 foreach ($ratings as $rr) $ratedDir[strtoupper((string)$rr['direction'])] = $rr;
 $pill = function ($s) {
@@ -37,6 +40,13 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
   </div>
 </div>
 
+<?php if (!$can_act): ?>
+<div class="panel" style="margin-top:12px;background:#f4f7f7;border-left:4px solid #5b6b6a">
+  <div style="font-weight:600">👀 You can see this requirement and its applicants</div>
+  <div class="cxmeta" style="margin-top:2px">It belongs to the <strong><?= e($office_name !== '' ? $office_name : 'posting') ?></strong> office. Only that office, or a company-wide role, can award, book, bill, deploy or close it. You can still duplicate it as a new draft of your own.</div>
+</div>
+<?php endif; ?>
+
 <?php if ($advisor && ($advisor['actions'] || strtoupper((string)$advisor['risk']) !== 'LOW')):
   $rk = strtoupper((string)$advisor['risk']);
   $bg = $rk==='HIGH' ? '#f6e6e6' : ($rk==='MEDIUM' ? '#fbf3d8' : '#e7f5ef');
@@ -56,6 +66,7 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
 <div class="panel" style="margin-top:12px">
   <div class="cxmeta" style="margin-bottom:8px">
     <?php if ((int)($req['requisition_id'] ?? 0) > 0): $fromRq = ops_one("SELECT id, req_code FROM requisitions WHERE id=?", [(int)$req['requisition_id']]); if ($fromRq): ?>From <?= e(Tl('requisition')) ?> <a href="/requisition?id=<?= (int)$fromRq['id'] ?>"><strong><?= e($fromRq['req_code'] ?: ('#' . $fromRq['id'])) ?></strong></a> · <?php endif; endif; ?>
+    <?php if ($office_name !== ''): ?><?= e($office_name) ?> office · <?php endif; ?>
     <?php if (!empty($req['poster_name'])): ?>Posted for <strong><?= e($req['poster_name']) ?></strong> · <?php endif; ?>
     <?php if (!empty($req['sector_code'])): ?>Sector <?= e($req['sector_code']) ?> · <?php endif; ?>
     <?php if (!empty($req['discipline_code'])): ?>Discipline <?= e($req['discipline_code']) ?> · <?php endif; ?>
@@ -63,8 +74,8 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
     <?php if (!empty($req['start_date'])): ?><?= e($req['start_date']) ?><?php if (!empty($req['end_date'])): ?> → <?= e($req['end_date']) ?><?php endif; endif; ?>
   </div>
   <?php if (!empty($req['description'])): ?><p style="margin:0;white-space:pre-line"><?= e($req['description']) ?></p><?php endif; ?>
-  <?php $cxPostTo = '/connect-requirement'; include __DIR__ . '/_cx_closing.php'; ?>
-  <?php if (in_array(strtoupper((string)$req['status']), ['DRAFT', 'OPEN', 'SHORTLISTING'], true)):
+  <?php $cxPostTo = '/connect-requirement'; $cxReadOnly = !$can_act; include __DIR__ . '/_cx_closing.php'; ?>
+  <?php if ($can_act && in_array(strtoupper((string)$req['status']), ['DRAFT', 'OPEN', 'SHORTLISTING'], true)):
         $edPartners = ops_all("SELECT id, COALESCE(NULLIF(display_name,''), legal_name) AS nm FROM business_partners WHERE COALESCE(status,'ACTIVE')='ACTIVE' AND COALESCE(is_client,0)=1 ORDER BY nm") ?: []; ?>
   <details style="margin-top:10px"><summary style="cursor:pointer;font-size:13px;color:var(--brand,#0f5f5c)">✎ Change the details</summary>
     <form method="post" action="/connect-requirement" style="margin-top:8px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px">
@@ -84,7 +95,7 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
   </details>
   <?php endif; ?>
 
-  <?php if ($req_next): ?>
+  <?php if ($req_next && $can_act): ?>
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
     <?php foreach ($req_next as $to): if ($to==='AWARDED') continue; /* award happens per-application below */ ?>
       <form method="post" action="/connect-requirement" class="inline">
@@ -111,15 +122,16 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
           <td><?= (int)$p['seq'] ?></td><td><?= e($p['role']) ?></td><td><?= e($p['discipline_code']) ?></td>
           <td><?= (int)$p['quantity'] ?></td><td>₹<?= (int)$p['rate'] ?>/<?= e($p['unit']) ?></td><td><?= e($p['shift_pattern']) ?></td>
           <td>₹<?= nf((int)$p['quantity']*(float)$p['rate'],0) ?></td>
-          <td><form method="post" action="/connect-requirement" onsubmit="return confirm('Remove this position?');">
+          <td><?php if ($can_act): ?><form method="post" action="/connect-requirement" onsubmit="return confirm('Remove this position?');">
             <input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="position_id" value="<?= (int)$p['id'] ?>"><input type="hidden" name="action" value="position_delete">
-            <button class="btn secondary" type="submit" style="font-size:12px">Remove</button></form></td>
+            <button class="btn secondary" type="submit" style="font-size:12px">Remove</button></form><?php endif; ?></td>
         </tr>
       <?php endforeach; ?>
       </tbody>
       <?php if ($crew): ?><tfoot><tr><th colspan="6" style="text-align:right">Crew total</th><th>₹<?= nf((float)$crew['value'],0) ?></th><th></th></tr></tfoot><?php endif; ?>
     </table></div>
   <?php endif; ?>
+  <?php if ($can_act): ?>
   <details style="margin-top:8px"><summary style="cursor:pointer;font-weight:600">➕ Add a position</summary>
     <form method="post" action="/connect-requirement" style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr;gap:8px;margin-top:8px">
       <input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="action" value="position_add">
@@ -131,6 +143,7 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
       <input type="text" name="shift_pattern" placeholder="Shift (e.g. 12h day)" style="grid-column:1/3;padding:9px;border:1px solid var(--line,#dde3e2);border-radius:9px">
     </form>
   </details>
+  <?php endif; ?>
 </div>
 
 <?php //  Owner, 10 Nov 2026 — closing an awarded requirement used to remove its
@@ -149,6 +162,8 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
     <p class="cxmeta" style="margin:6px 0 0">Finance approves and attests the real invoice from there — the books ledger stays the single money truth.</p>
   <?php elseif ($vInv > 0): ?>
     <p class="cxmeta" style="margin:0">This job is billed through its approved vouchers — <?= (int)$vInv ?> invoice(s) drafted so far. "Send to billing" is not offered, so the same work is not charged twice.</p>
+  <?php elseif (!$can_act): ?>
+    <p class="cxmeta" style="margin:0">Not sent to billing yet — that is for the office this requirement belongs to.</p>
   <?php else: ?>
     <p class="cxmeta" style="margin:0 0 10px">Two ways to bill, use one: <b>send the whole booking to billing now</b> (below), or <b>approve the person's vouchers</b> as the work is done — each approved voucher drafts its own invoice. Whichever you use first is the one used.</p>
     <form method="post" action="/connect-requirement" class="inline">
@@ -173,10 +188,14 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
       <a href="/job?id=<?= (int)$deploy['id'] ?>">Open the deployment →</a>
     </p>
     <?php if (!$assigned): ?><p class="cxmeta" style="margin:6px 0 0">No internal inspector is on it yet — link the awarded professional to an inspector (<a href="/connect-identity">Professional identity</a>) and press Sync, so competence checks and the schedule apply.</p><?php endif; ?>
+    <?php if ($can_act): ?>
     <form method="post" action="/connect-requirement" class="inline" style="margin-top:8px">
       <input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="action" value="deploy_to_ops">
       <button class="btn secondary" type="submit">↻ Sync deployment</button>
     </form>
+    <?php endif; ?>
+  <?php elseif (!$can_act): ?>
+    <p class="cxmeta" style="margin:0">Not handed to Operations yet — that is for the office this requirement belongs to.</p>
   <?php else: ?>
     <p class="cxmeta" style="margin:0 0 10px">Hand this awarded person to Operations as a deputation — it becomes a PDSO deployment (mobilization, attendance, site register) in your existing scheduler, with no re-entry.</p>
     <form method="post" action="/connect-requirement" class="inline">
@@ -238,10 +257,10 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <?php if ($isPro): ?>
             <?php if (!empty($m['passport_token'])): ?><a class="btn secondary" href="/p/<?= e($m['passport_token']) ?>" target="_blank" rel="noopener" style="font-size:13px">Passport ↗</a><?php endif; ?>
-          <?php else: ?>
+          <?php elseif (!function_exists('connect_passport_scope_ok') || connect_passport_scope_ok(ops_one("SELECT home_office_id FROM inspectors WHERE id=?", [(int)$m['id']]))): /* DEF-MKT-008 — own office's team only */ ?>
             <a class="btn secondary" href="/passport-share?id=<?= (int)$m['id'] ?>" style="font-size:13px">Passport</a>
           <?php endif; ?>
-          <?php if ($m['eligibility'] !== 'BLOCKED'): ?>
+          <?php if ($can_act && $m['eligibility'] !== 'BLOCKED'): ?>
           <form method="post" action="/connect-requirement" class="inline">
             <input type="hidden" name="id" value="<?= (int)$req['id'] ?>">
             <input type="hidden" name="<?= $isPro ? 'applicant_professional_id' : 'inspector_id' ?>" value="<?= (int)$m['id'] ?>">
@@ -278,7 +297,7 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
       <div class="cxmeta">Status: <?= e(ucfirst(strtolower((string)$engagement['status']))) ?><?php if (!empty($engagement['subject_name'])): ?> · <?= e($engagement['subject_name']) ?><?php endif; ?><?php if (function_exists('connect_engv_summary_for_subject') && !empty($engagement['subject_kind'])): $vs = connect_engv_summary_for_subject($engagement['subject_kind'], (int)$engagement['subject_id']); if ($vs['total'] > 0): ?> · <?= (int)$vs['total'] ?> voucher<?= $vs['total']===1?'':'s' ?> (<?= (int)$vs['submitted']+(int)$vs['approved'] ?> pending)<?php endif; endif; ?></div>
     </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <?php foreach (['ACTIVE'=>'Mark active','COMPLETED'=>'Mark completed','CANCELLED'=>'Cancel'] as $s=>$lbl): if (strtoupper((string)$engagement['status'])===$s) continue; ?>
+        <?php if ($can_act) foreach (['ACTIVE'=>'Mark active','COMPLETED'=>'Mark completed','CANCELLED'=>'Cancel'] as $s=>$lbl): if (strtoupper((string)$engagement['status'])===$s) continue; ?>
           <form method="post" action="/connect-requirement" class="inline">
             <input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="action" value="engagement_status">
             <input type="hidden" name="engagement_id" value="<?= (int)$engagement['id'] ?>"><input type="hidden" name="status" value="<?= e($s) ?>">
@@ -288,6 +307,9 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
       </div>
     </div>
   <?php endif; ?>
+  <?php if (!$can_act): ?>
+    <?php if (!$engagement): ?><p class="cxmeta" style="margin:0">No booking recorded yet.</p><?php endif; ?>
+  <?php else: ?>
   <details<?= $engagement ? '' : ' open' ?> style="margin-top:8px">
     <summary style="cursor:pointer;font-weight:600;font-size:14px"><?= $engagement ? 'Edit booking' : 'Record the booking' ?></summary>
     <form method="post" action="/connect-requirement" style="margin-top:10px">
@@ -327,7 +349,9 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
       <button class="btn" type="submit"><?= $engagement ? 'Update booking' : 'Record booking' ?></button>
     </form>
   </details>
+  <?php endif; ?>
 </div>
+<?php if ($can_act): ?>
 <script>
   var EGB = <?= json_encode(array_map(fn($b)=>['q'=>!empty($b['needs_qty']),'f'=>!empty($b['needs_freq']),'e'=>!empty($b['needs_end']),'ql'=>$b['qty_label']],$engage_bases)) ?>;
   function egSync(){ var v=document.getElementById('egBasis').value, c=EGB[v]||{};
@@ -337,10 +361,11 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
     if(c.ql) document.getElementById('egQtyLabel').textContent=c.ql; }
   egSync();
 </script>
+<?php endif; ?>
 
 <?php // Owner, 11 Nov 2026 — one person per award; if they cannot do the job it
       // is awarded to someone else (see cx_requirement_replace).
-  if (strtoupper((string)$req['status']) === 'AWARDED'):
+  if ($can_act && strtoupper((string)$req['status']) === 'AWARDED'):
     $replace_candidates = $replace_candidates ?? [];
     $awApp = null; foreach ($apps as $aa) if ((int)$aa['id'] === (int)$req['awarded_application_id']) $awApp = $aa;
     $engEnded = $engagement && strtoupper((string)$engagement['status']) === 'CANCELLED';
@@ -401,7 +426,7 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
         : 'A marketplace freelancer raises their own in the portal; here the desk approves and pays, and can raise one for an on-roll inspector or bench person.' ?>
   </p>
 
-  <?php if (!$client_posted): ?>
+  <?php if (!$client_posted && $can_act): ?>
   <form method="post" action="/connect-requirement" style="margin:0 0 12px">
     <input type="hidden" name="id" value="<?= (int)$req['id'] ?>"><input type="hidden" name="action" value="engv_raise">
     <input type="hidden" name="engagement_id" value="<?= (int)$engagement['id'] ?>">
@@ -426,6 +451,7 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
 
       <?php if ($client_posted): ?>
         <p class="cxmeta" style="margin:8px 0 0">🔒 The client reviews &amp; approves this voucher in their portal.</p>
+      <?php elseif (!$can_act): /* seen, not acted on — DEF-MKT-006 */ ?>
       <?php elseif ($vdraft): ?>
       <details style="margin-top:8px">
         <summary style="cursor:pointer;font-size:13px;font-weight:600">Add a <?= e($engUnit) ?></summary>
@@ -466,7 +492,7 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
       <?php // K21 — supporting documents (receipts) the approver verifies
         $engv_files = $engv_files ?? [];
         $vfiles = $engv_files[(int)$vv['id']] ?? [];
-        $vCanAttach = in_array(strtoupper((string)$vv['status']), ['DRAFT','SUBMITTED'], true);
+        $vCanAttach = $can_act && in_array(strtoupper((string)$vv['status']), ['DRAFT','SUBMITTED'], true);
         $vkb = fn($n) => $n >= 1048576 ? round($n/1048576,1).' MB' : max(1,(int)round($n/1024)).' KB';
       ?>
       <?php if ($vfiles || $vCanAttach): ?>
@@ -533,7 +559,7 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
           $mUnread = function_exists('connect_msg_thread_unread') ? connect_msg_thread_unread((int)$a['id'], 'staff', (int)(function_exists('current_user') ? (current_user()['id'] ?? 0) : 0)) : 0; ?>
           <a class="btn secondary" href="/connect-messages?a=<?= (int)$a['id'] ?>">💬 Message<?php if ($mUnread > 0): ?> (<?= (int)$mUnread ?>)<?php endif; ?></a>
         <?php endif; ?>
-        <?php foreach ($next as $to=>$lbl): ?>
+        <?php if ($can_act) foreach ($next as $to=>$lbl): ?>
           <form method="post" action="/connect-requirement" class="inline">
             <input type="hidden" name="id" value="<?= (int)$req['id'] ?>">
             <input type="hidden" name="application_id" value="<?= (int)$a['id'] ?>">
@@ -542,7 +568,7 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
             <button class="btn secondary" type="submit"><?= e($lbl) ?></button>
           </form>
         <?php endforeach; ?>
-        <?php if (in_array($st,['SHORTLISTED','OFFERED'],true) && in_array('AWARDED', $req_next, true)): ?>
+        <?php if ($can_act && in_array($st,['SHORTLISTED','OFFERED'],true) && in_array('AWARDED', $req_next, true)): ?>
           <form method="post" action="/connect-requirement" class="inline" onsubmit="return confirm('Award this requirement to <?= e(addslashes($a['applicant_name'])) ?>?');">
             <input type="hidden" name="id" value="<?= (int)$req['id'] ?>">
             <input type="hidden" name="application_id" value="<?= (int)$a['id'] ?>">
@@ -554,7 +580,7 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
     </div>
   <?php endforeach; endif; ?>
 
-  <?php if (in_array(strtoupper((string)$req['status']), ['OPEN','SHORTLISTING','AWARDED'], true)): ?>
+  <?php if ($can_act && in_array(strtoupper((string)$req['status']), ['OPEN','SHORTLISTING','AWARDED'], true)): ?>
   <form method="post" action="/connect-requirement" style="margin-top:12px;border-top:1px solid var(--line,#eee);padding-top:12px">
     <input type="hidden" name="id" value="<?= (int)$req['id'] ?>">
     <input type="hidden" name="action" value="apply">
@@ -586,6 +612,8 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
         <div><?= str_repeat('★', (int)$done['stars']) . str_repeat('☆', 5 - (int)$done['stars']) ?>
           <?php if ((int)$done['would_rehire']): ?><span class="cxpill ok">Would work again</span><?php endif; ?></div>
         <?php if (!empty($done['comment'])): ?><div class="cxmeta" style="margin-top:4px"><?= e($done['comment']) ?></div><?php endif; ?>
+      <?php elseif (!$can_act): ?>
+        <div class="cxmeta">Not rated yet.</div>
       <?php else: ?>
         <form method="post" action="/connect-requirement" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
           <input type="hidden" name="id" value="<?= (int)$req['id'] ?>">
@@ -621,7 +649,7 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
           <?php if (!empty($d['resolution'])): ?><div class="cxmeta" style="margin-top:4px"><strong>Resolution:</strong> <?= e($d['resolution']) ?></div><?php endif; ?>
         </div>
       </div>
-      <?php $opts = $dnext[$st] ?? []; if ($opts): ?>
+      <?php $opts = $can_act ? ($dnext[$st] ?? []) : []; if ($opts): ?>
       <form method="post" action="/connect-requirement" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px">
         <input type="hidden" name="id" value="<?= (int)$req['id'] ?>">
         <input type="hidden" name="dispute_id" value="<?= (int)$d['id'] ?>">
@@ -635,6 +663,8 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
     </div>
   <?php endforeach; ?>
 
+  <?php if (!$disputes && !$can_act): ?><p class="cxmeta" style="margin:0">No concerns raised.</p><?php endif; ?>
+  <?php if ($can_act): ?>
   <details style="margin-top:6px"><summary style="cursor:pointer;font-weight:600">Raise a concern</summary>
     <form method="post" action="/connect-requirement" style="margin-top:8px">
       <input type="hidden" name="id" value="<?= (int)$req['id'] ?>">
@@ -650,6 +680,7 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
       <button class="btn secondary" type="submit" style="margin-top:8px">Raise concern</button>
     </form>
   </details>
+  <?php endif; ?>
 </div>
 
 <?php if ($readiness_items): ?>
@@ -663,6 +694,12 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
     </p>
   <?php endif; ?>
   <?php foreach ($readiness_items as $key => [$lbl, $mand]): $on = !empty($readiness[$key]); ?>
+    <?php if (!$can_act): ?>
+    <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line,#eee)">
+      <span style="width:26px;text-align:center;font-size:15px"><?= $on ? '✓' : '—' ?></span>
+      <span><?= e($lbl) ?><?php if ($mand): ?> <span class="cxpill bad" style="font-size:10px">required</span><?php endif; ?></span>
+    </div>
+    <?php continue; endif; ?>
     <form method="post" action="/connect-requirement" style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line,#eee)">
       <input type="hidden" name="id" value="<?= (int)$req['id'] ?>">
       <input type="hidden" name="action" value="readiness_toggle">
@@ -679,6 +716,14 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
 <div class="panel" style="margin-top:12px">
   <h3 style="margin:0 0 4px">Commercial terms</h3>
   <p class="cxmeta" style="margin:0 0 10px">Agree these before mobilization — waiting charges, travel, PPE, revisit and cancellation. <?= function_exists('cx_terms_complete') && cx_terms_complete((int)$req['id']) ? '<span class="cxpill ok">Complete</span>' : '<span class="cxpill warn">Incomplete</span>' ?></p>
+  <?php if (!$can_act): ?>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <?php foreach ($terms_fields as $f => $lbl): ?>
+        <div><div style="font-size:12.5px;color:var(--muted)"><?= e($lbl) ?></div><div><?= e((string)($terms[$f] ?? '') !== '' ? $terms[$f] : '—') ?></div></div>
+      <?php endforeach; ?>
+    </div>
+    <p class="cxmeta" style="margin:10px 0 0"><?= !empty($terms['accepted']) ? '✓ Both sides have accepted these terms.' : 'Not yet accepted by both sides.' ?></p>
+  <?php else: ?>
   <form method="post" action="/connect-requirement">
     <input type="hidden" name="id" value="<?= (int)$req['id'] ?>">
     <input type="hidden" name="action" value="terms_save">
@@ -691,5 +736,6 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
     <label style="display:flex;align-items:center;gap:6px;margin-top:10px;font-size:13px"><input type="checkbox" name="accepted" value="1" <?= !empty($terms['accepted'])?'checked':'' ?>> Both sides have accepted these terms</label>
     <button class="btn secondary" type="submit" style="margin-top:8px">Save terms</button>
   </form>
+  <?php endif; ?>
 </div>
 <?php endif; ?>

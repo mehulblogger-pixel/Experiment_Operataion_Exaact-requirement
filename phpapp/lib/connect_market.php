@@ -99,6 +99,120 @@ function connect_market_migrate() {
         ensure_column('cx_requirements', 'est_sac',     "VARCHAR(20) DEFAULT ''"); // SAC / HSN code (manpower supply = 998519)
         ensure_column('cx_requirements', 'reimb_terms', "TEXT DEFAULT ''");     // JSON: {head:{mode,ceiling,per}}
     }
+    //  DEF-MKT-006 (owner, 16 Nov 2026, branch batch B7) — which of OUR offices
+    //  posted a requirement. Inside the company only: no outside-facing screen
+    //  (/pro, the client and agency portals, the public board) reads it. Older
+    //  rows are filled once, the first time the column is added.
+    if (function_exists('ensure_column')) {
+        $hadOffice = function_exists('column_exists') ? column_exists('cx_requirements', 'office_id') : true;
+        ensure_column('cx_requirements', 'office_id', 'INT NULL');
+        if (!$hadOffice) cx_requirement_backfill_office();
+    }
+}
+
+// ============================================================================
+//  WHICH OFFICE A REQUIREMENT BELONGS TO — DEF-MKT-006, owner 16 Nov 2026 (B7).
+//
+//  docs/02 (owner, 13 Oct 2026): discovery is deliberately NOT office-scoped —
+//  every office sees every posting and its applicants — but every ACTION keeps
+//  the record's own scope. A requirement had no office, so a Mumbai coordinator
+//  could award, book and bill a posting Ahmedabad had made.
+//
+//    • A posting remembers the office of the staff member who made it (their
+//      home office), or the office of the requisition it was made from. Never
+//      from the form — a browser cannot choose the office.
+//    • Only someone whose office scope covers that office (company-wide roles
+//      cover them all) may act on it. Everyone else still sees it.
+//    • A posting with NO office — older rows whose poster could not be traced,
+//      client- or agency-posted work, seeds — stays actionable by every office
+//      that may use the Marketplace desk, exactly as before. Nothing existing is
+//      locked away.
+// ============================================================================
+
+/** The home office of the staff member signed in, or null (no staff session, no office). */
+function cx_requirement_poster_office() {
+    $u = function_exists('current_user') ? current_user() : null;
+    $off = is_array($u) ? (int)($u['home_office_id'] ?? 0) : 0;
+    return $off > 0 ? $off : null;
+}
+
+/** Record which of our offices a requirement belongs to (null clears it). */
+function cx_requirement_set_office($id, $officeId) {
+    $officeId = (int)$officeId > 0 ? (int)$officeId : null;
+    db()->prepare("UPDATE cx_requirements SET office_id=? WHERE id=?")->execute([$officeId, (int)$id]);
+}
+
+/** One-off fill for rows made before the column existed: the requisition's
+ *  office where it was made from one, else the home office of the staff member
+ *  whose name is on it — only when exactly one user carries that name, so a
+ *  shared name never guesses. Anything else stays without an office. */
+function cx_requirement_backfill_office() {
+    try {
+        $rows = ops_all("SELECT id, created_by, COALESCE(requisition_id,0) AS requisition_id FROM cx_requirements WHERE office_id IS NULL") ?: [];
+        if (!$rows) return 0;
+        $byName = [];
+        foreach (ops_all("SELECT username, first_name, last_name, home_office_id FROM users") ?: [] as $u) {
+            $nm = trim(trim((string)($u['first_name'] ?? '') . ' ' . (string)($u['last_name'] ?? '')));
+            if ($nm === '') $nm = (string)($u['username'] ?? '');
+            if ($nm === '') continue;
+            $byName[$nm][] = (int)($u['home_office_id'] ?? 0);
+        }
+        $n = 0;
+        foreach ($rows as $r) {
+            $off = 0;
+            if ((int)$r['requisition_id'] > 0) {
+                try { $off = (int)(ops_val("SELECT office_id FROM requisitions WHERE id=?", [(int)$r['requisition_id']]) ?: 0); } catch (Throwable $e) { $off = 0; }
+            }
+            if ($off <= 0) {
+                $cands = $byName[trim((string)$r['created_by'])] ?? [];
+                if (count($cands) === 1 && $cands[0] > 0) $off = $cands[0];
+            }
+            if ($off > 0) { cx_requirement_set_office((int)$r['id'], $off); $n++; }
+        }
+        return $n;
+    } catch (Throwable $e) { return 0; }
+}
+
+/** The office's name, for the desk ('' when the posting has none). */
+function cx_requirement_office_name($req) {
+    $off = is_array($req) ? (int)($req['office_id'] ?? 0) : 0;
+    if ($off <= 0) return '';
+    try { return (string)(ops_val("SELECT name FROM offices WHERE id=?", [$off]) ?: ''); } catch (Throwable $e) { return ''; }
+}
+
+/** May the person signed in ACT on this requirement (award, book, bill, deploy,
+ *  close, change, add people …)? Seeing it is not asked here — every office
+ *  sees every posting. A posting with no office is everyone's on the desk. */
+function cx_requirement_can_act($req) {
+    if (!is_array($req) || !connect_market_can()) return false;
+    $off = (int)($req['office_id'] ?? 0);
+    if ($off <= 0) return true;
+    return !function_exists('scope_office_allows') || scope_office_allows($off);
+}
+
+/** The plain refusal shown to an office that may see a posting but not act on it. */
+function cx_requirement_refusal($req) {
+    $nm = cx_requirement_office_name($req);
+    return 'This requirement belongs to the ' . ($nm !== '' ? $nm . ' office' : 'office that posted it')
+        . '. You can see it and its applicants, but only that office (or a company-wide role) can act on it.';
+}
+
+/** Does the item a desk form names (application, booking, voucher) belong to
+ *  this requirement? A form for one requirement must not reach another's. */
+function cx_requirement_owns_post_item($requirementId, array $post) {
+    $rid = (int)$requirementId;
+    try {
+        if ((int)($post['application_id'] ?? 0) > 0
+            && (int)ops_val("SELECT requirement_id FROM cx_applications WHERE id=?", [(int)$post['application_id']]) !== $rid) return false;
+        if ((int)($post['engagement_id'] ?? 0) > 0
+            && (int)ops_val("SELECT requirement_id FROM cx_engagements WHERE id=?", [(int)$post['engagement_id']]) !== $rid) return false;
+        if ((int)($post['voucher_id'] ?? 0) > 0) {
+            $v = ops_one("SELECT v.requirement_id AS vr, e.requirement_id AS er FROM cx_engagement_vouchers v
+                          LEFT JOIN cx_engagements e ON e.id = v.engagement_id WHERE v.id=?", [(int)$post['voucher_id']]);
+            if (!$v || ((int)$v['vr'] > 0 ? (int)$v['vr'] : (int)$v['er']) !== $rid) return false;
+        }
+    } catch (Throwable $e) { return false; }
+    return true;
 }
 
 /** Is a reimbursable head claimable on a voucher, given how the client set it?
@@ -264,6 +378,9 @@ function cx_requirement_create(array $in, $post = false) {
             function_exists('user_name') ? user_name(current_user()) : '', $now, $post ? $now : '', $now,
         ]);
     $id = (int)db()->lastInsertId();
+    //  DEF-MKT-006 — the office of the staff member posting it (never from the
+    //  form). No staff session (a portal, a seed, the CLI) → no office.
+    if (($off = cx_requirement_poster_office()) !== null) cx_requirement_set_office($id, $off);
     //  Posted straight away: it gets its closing date now (owner, 11 Nov 2026).
     if ($post) db()->prepare("UPDATE cx_requirements SET closes_on=? WHERE id=?")->execute([cx_req_closes_default(['posted_at' => $now, 'start_date' => (string)($in['start_date'] ?? '')]), $id]);
     // Deputation / rate terms, when the posting form supplied them.
@@ -465,6 +582,8 @@ function cx_requirement_from_requisition($requisitionId) {
         'description'=> implode("\n", $lines),
     ], false);
     db()->prepare("UPDATE cx_requirements SET requisition_id=? WHERE id=?")->execute([(int)$rq['id'], $id]);
+    //  DEF-MKT-006 — it belongs to the requisition's office, not the poster's.
+    if ((int)($rq['office_id'] ?? 0) > 0) cx_requirement_set_office($id, (int)$rq['office_id']);
     if (function_exists('act_log')) try {
         act_log('REQUISITION', (int)$rq['id'], 'SYSTEM', 'Marketplace draft ' . (cx_requirement_get($id)['ref_code'] ?? '') . ' made from this ' . $word);
         act_log('CX_REQUIREMENT', $id, 'SYSTEM', 'Made from ' . $word . ' ' . (string)($rq['req_code'] ?? ('#' . $rq['id'])));
@@ -791,6 +910,8 @@ function ops_connect_requirements($route, $method) {
     view('ops/connect_requirements', [
         'summary'    => cx_market_summary(),
         'rows'       => cx_requirements_list(),
+        // DEF-MKT-006 — which office each posting belongs to (inside the company only).
+        'office_names' => (function () { try { return array_column(ops_all("SELECT id, name FROM offices") ?: [], 'name', 'id'); } catch (Throwable $e) { return []; } })(),
         'sectors'    => function_exists('connect_tx_rows') ? connect_tx_rows('cx_sectors') : [],
         'disciplines'=> function_exists('connect_tx_rows') ? connect_tx_rows('cx_disciplines') : [],
         'partners'   => ops_all("SELECT id, COALESCE(NULLIF(display_name,''), legal_name) AS nm FROM business_partners WHERE COALESCE(status,'ACTIVE')='ACTIVE' ORDER BY nm") ?: [],
@@ -828,6 +949,14 @@ function ops_connect_requirement($method) {
     $id = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
     if ($method === 'POST') {
         $act = (string)($_POST['action'] ?? '');
+        //  DEF-MKT-006 — every office SEES the posting; only an office whose scope
+        //  covers it ACTS on it. "Duplicate" is the one exception: it acts on
+        //  nothing here, it starts the person's own new draft (in their office).
+        $guardReq = cx_requirement_get($id);
+        if ($guardReq && $act !== 'duplicate') {
+            if (!cx_requirement_can_act($guardReq)) { flash(cx_requirement_refusal($guardReq), 'error'); redirect('/connect-requirement?id=' . $id); }
+            if (!cx_requirement_owns_post_item($id, $_POST)) { flash('That item does not belong to this requirement — nothing was changed.', 'error'); redirect('/connect-requirement?id=' . $id); }
+        }
         if ($act === 'req_edit') {
             [$eok, $emsg] = cx_requirement_update($id, $_POST);
             flash($eok ? $emsg . (cx_applications_for($id) ? ' People who already applied see the new details.' : '') : $emsg, $eok ? 'success' : 'error');
@@ -914,6 +1043,9 @@ function ops_connect_requirement($method) {
     $open = in_array(strtoupper((string)$req['status']), ['OPEN', 'SHORTLISTING'], true);
     view('ops/connect_requirement', [
         'req'          => $req,
+        // DEF-MKT-006 — may this person act on it, or only see it?
+        'can_act'      => cx_requirement_can_act($req),
+        'office_name'  => cx_requirement_office_name($req),
         'apps'         => cx_applications_for($id),
         'replace_candidates' => cx_replacement_candidates($id),
         'inspectors'   => ops_all("SELECT id, name FROM inspectors WHERE COALESCE(status,'ACTIVE')='ACTIVE' ORDER BY name") ?: [],

@@ -121,12 +121,14 @@ $pill = function ($s) {
     <p class="muted" style="margin:0">No requirements yet. Post the first one above.</p>
   <?php else: ?>
     <div class="tbl-wrap"><table class="tbl">
-      <thead><tr><th>Ref</th><th>Requirement</th><th>Location</th><th>Positions</th><th>Status</th></tr></thead>
+      <?php $office_names = $office_names ?? []; ?>
+      <thead><tr><th>Ref</th><th>Requirement</th><th>Office</th><th>Location</th><th>Positions</th><th>Status</th></tr></thead>
       <tbody>
       <?php foreach ($rows as $r): ?>
         <tr>
           <td><a href="/connect-requirement?id=<?= (int)$r['id'] ?>"><?= e($r['ref_code']) ?></a></td>
           <td><a href="/connect-requirement?id=<?= (int)$r['id'] ?>"><?= e($r['title']) ?></a></td>
+          <td><?= ($rOff = (int)($r['office_id'] ?? 0)) > 0 ? e($office_names[$rOff] ?? '—') : '<span class="muted">Any office</span>' ?></td>
           <td><?= e($r['location']) ?></td>
           <td><?= (int)$r['positions'] ?></td>
           <td><?= $pill($r['status']) ?><?php $cxL = (in_array(strtoupper((string)$r['status']), ['OPEN','SHORTLISTING'], true) && function_exists('cx_req_days_left')) ? cx_req_days_left($r) : null;

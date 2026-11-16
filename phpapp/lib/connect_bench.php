@@ -241,6 +241,11 @@ function ops_connect_bench($method) {
         if ($act === 'add')            [$ok, $msg] = connect_bench_add($orgId, $_POST);
         elseif ($act === 'update')     [$ok, $msg] = connect_bench_update((int)($_POST['id'] ?? 0), $orgId, $_POST);
         elseif ($act === 'toggle')     [$ok, $msg] = connect_bench_toggle((int)($_POST['id'] ?? 0), $orgId);
+        elseif ($act === 'allocate' && ($alReq = function_exists('cx_requirement_get') ? cx_requirement_get((int)($_POST['requirement_id'] ?? 0)) : null)
+                && function_exists('cx_requirement_can_act') && !cx_requirement_can_act($alReq)) {
+            //  DEF-MKT-006 — allocating to a requirement acts on it: its office's scope applies.
+            $ok = false; $msg = cx_requirement_refusal($alReq);
+        }
         elseif ($act === 'allocate')   [$ok, $msg] = connect_bench_allocate((int)($_POST['bench_id'] ?? 0), $orgId, (int)($_POST['requirement_id'] ?? 0), (int)($_POST['position_id'] ?? 0), (string)($_POST['note'] ?? ''));
         elseif ($act === 'alloc_set')  [$ok, $msg] = connect_bench_alloc_set((int)($_POST['alloc_id'] ?? 0), $orgId, (string)($_POST['status'] ?? ''));
         else { $ok = false; $msg = 'Unknown action.'; }
@@ -253,9 +258,11 @@ function ops_connect_bench($method) {
 
     // Requirements this agency can fulfil (open / shortlisting / awarded).
     $reqs = [];
-    try { $reqs = ops_all("SELECT id, ref_code, title, status FROM cx_requirements
+    try { $reqs = ops_all("SELECT * FROM cx_requirements
                            WHERE status IN ('OPEN','SHORTLISTING','AWARDED') ORDER BY id DESC LIMIT 60") ?: []; }
     catch (Throwable $e) {}
+    //  DEF-MKT-006 — offer only the requirements this person may act on.
+    if (function_exists('cx_requirement_can_act')) $reqs = array_values(array_filter($reqs, 'cx_requirement_can_act'));
 
     view('ops/connect_bench', [
         'agencies' => $agencies,
