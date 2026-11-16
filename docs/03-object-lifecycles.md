@@ -1172,6 +1172,16 @@ candidate's, else the requirement's or its position's) is written onto their tea
 record (`inspectors.department`) and their login if it has none, and the Department
 hub counts them.
 
+**"In process with an office" (Branch batch B6, owner 16 Nov 2026) — derived, not a
+stage.** A candidate linked to a requisition whose classification is not closed out
+(`reqf_classify()` ≠ LOST) is *in recruitment* with that requisition's office; FILLED
+with no `joined_at` is *in onboarding*. Every office sees it as a badge
+("Recruitment in process — <office> (<stage>)" / "Onboarding in process — <office>"),
+and no office outside that one may move, close or otherwise work on the candidate
+(`cand_other_office_block()`, see docs/02 footnote 8). A move to REJECTED, WITHDRAWN or
+OFFER_DECLINED ends the process and the candidate is back in the shared pool. **Adds no
+stage and no transition.**
+
 **Public entry point (Phase 7 — additive).** Besides staff creation, a candidate
 may now enter at the **same `RECEIVED` start** through the opt-in public careers
 page (`careers.php`): a self-application creates the row with `source=CAREERS`,

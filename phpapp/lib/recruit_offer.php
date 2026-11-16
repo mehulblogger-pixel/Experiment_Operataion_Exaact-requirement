@@ -307,6 +307,9 @@ function offer_guard_by_offer($offerId, $action = 'OFFER') {
 }
 
 function offer_create($candidateId, $post) {
+    //  B6 — no other office drafts an offer for a candidate in process elsewhere.
+    if (function_exists('cand_other_office_block')
+        && cand_other_office_block((int) $candidateId, ['process_only' => true]) !== '') return 0;
     $why = offer_guard($candidateId);
     if ($why !== '') return 0;
     recruit_offer_migrate();
@@ -562,6 +565,9 @@ function ops_candidate_offer($route, $method) {
     }
 
     ops_require(is_coordinator_level(), 'Only coordinators / administrators can manage offers.');
+    //  B6 — salary, HR discussion, draft, submit, issue, accept, decline: none of
+    //  it by an office other than the one running this candidate's process.
+    if ($method === 'POST' && function_exists('cand_other_office_require')) cand_other_office_require($cand);
     if ($method === 'POST') {
         $do = (string)($_POST['do'] ?? '');
         if ($do === 'sal_save') {

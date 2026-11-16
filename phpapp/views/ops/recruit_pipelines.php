@@ -58,6 +58,9 @@ $applySummary = function ($p) use ($e) {
   <form method="post"><input type="hidden" name="do" value="pipeline_new"><button class="rp-btn">＋ New workflow</button></form>
 </div>
 
+<?php // B6 — the Master Admin's switch for the shared candidate pool (draws nothing for anyone else). ?>
+<?php if (function_exists('rpool_switch_panel')) rpool_switch_panel(); ?>
+
 <div class="rp-wrap">
   <!-- Left: workflows -->
   <div class="rp-card">

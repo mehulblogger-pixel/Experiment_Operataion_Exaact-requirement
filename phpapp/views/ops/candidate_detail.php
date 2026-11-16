@@ -6,12 +6,36 @@
 <div class="master-head">
   <div><h1><?= e(candidate_name($cand)) ?>
       <span class="badge <?= $stageBadge[$cur] ?? 'AMBER' ?>" style="vertical-align:middle"><?= e(lk_options_or('candidate_stage', CAND_STAGES)[$cur] ?? $cur) ?></span></h1>
-    <p class="sub"><?= e($cand['cand_code']) ?><?= $cand['trade_label']?' · '.e($cand['trade_label']):'' ?><?= $cand['skill_label']?' / '.e($cand['skill_label']):'' ?> · <?= e(lk_options_or('candidate_source', CAND_SOURCES)[$cand['source']] ?? $cand['source']) ?></p></div>
+    <p class="sub"><?= e($cand['cand_code']) ?><?= $cand['trade_label']?' · '.e($cand['trade_label']):'' ?><?= $cand['skill_label']?' / '.e($cand['skill_label']):'' ?> · <?= e(lk_options_or('candidate_source', CAND_SOURCES)[$cand['source']] ?? $cand['source']) ?></p>
+    <?php // B6 — every office sees whose process this is. ?>
+    <?php $poolBadge = $poolBadge ?? ''; $poolBlock = $poolBlock ?? ''; $poolLocked = !empty($poolLocked); ?>
+    <?php if ($poolBadge !== ''): ?><p style="margin:4px 0 0"><span class="pill p-warn" style="font-size:12px;white-space:normal">🔒 <?= e($poolBadge) ?></span></p><?php endif; ?></div>
   <div class="row-actions">
-    <a class="btn secondary" href="/candidate-edit?id=<?= (int)$cand['id'] ?>">Edit</a>
+    <?php if (!$poolLocked): ?><a class="btn secondary" href="/candidate-edit?id=<?= (int)$cand['id'] ?>">Edit</a><?php endif; ?>
     <a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a>
   </div>
 </div>
+
+<?php if ($poolBlock !== ''): ?>
+<div class="panel" role="status" style="border-left:4px solid var(--amber,#d97706);background:#fffdf5;padding:12px 15px">
+  <b style="color:#92400e"><?= $poolLocked ? 'You can view this ' . e(Tl('candidate')) . ', not work on them.' : 'Back in the pool.' ?></b>
+  <span><?= e($poolBlock) ?></span>
+</div>
+<?php if ($poolLocked): ?>
+<script>
+  //  B6 — the hard block is enforced by every route; this only spares the person
+  //  pressing a button that will be refused. Candidate forms only.
+  document.addEventListener('DOMContentLoaded', function () {
+    var why = <?= json_encode($poolBlock, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    document.querySelectorAll('form').forEach(function (f) {
+      var a = (f.getAttribute('action') || '');
+      if (!/^\/(candidate|offer-letter)/.test(a) || (f.getAttribute('method') || '').toLowerCase() !== 'post') return;
+      f.querySelectorAll('button, input[type=submit], select, input, textarea').forEach(function (el) { el.disabled = true; el.title = why; });
+    });
+  });
+</script>
+<?php endif; ?>
+<?php endif; ?>
 
 <?php //  B3 — the next stage comes from recruitpipe_cand_state(), the configured
       //  pipeline this workspace actually uses. An ACCEPTED candidate with no

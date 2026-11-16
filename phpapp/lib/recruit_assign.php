@@ -60,6 +60,7 @@ const RASG_CODES = [
     'NO_PERMISSION'          => 'you may not change recruitment ownership',
     'NO_RECORD'              => 'that record does not exist',
     'OUT_OF_SCOPE'           => 'that record is outside your office / branch scope',
+    'IN_PROCESS_ELSEWHERE'   => 'this candidate is in process with another office — only that office can work on them until their process ends',
     'BAD_STATE'              => 'ownership cannot be moved in this state',
     'M4_BLOCKED'             => 'the hiring request behind this requisition is awaiting re-approval',
     'RECRUITER_UNKNOWN'      => 'that person does not exist in this workspace',
@@ -272,6 +273,14 @@ function rasg_may_touch($subject, $id, array $opt = []) {
     //  4 · THE ACTOR'S OWN SCOPE over that record.
     [$off, $sbu] = rasg_row_scope($subject, $row, $opt);
     if (function_exists('scope_allows') && !scope_allows($off, $sbu)) return 'OUT_OF_SCOPE';
+
+    //  4b · BRANCH BATCH B6 — a candidate whose process is running with an office
+    //  the actor does not cover cannot be given a recruiter by anybody else,
+    //  even through an edit that also moves them onto the actor's own
+    //  requisition (the scope above is then asked of the DESTINATION). Asked of
+    //  the person doing it, so the public careers intake (no person) is unaffected.
+    if (($s['entity'] ?? '') === 'CANDIDATE' && function_exists('cand_other_office_block')
+        && cand_other_office_block($row, ['process_only' => true]) !== '') return 'IN_PROCESS_ELSEWHERE';
     return 'OK';
 }
 

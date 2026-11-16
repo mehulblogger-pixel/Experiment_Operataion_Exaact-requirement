@@ -960,6 +960,24 @@ function recruit_sbu_clause($col = 'c.sbu') {
     return ["($col IN ($in) OR COALESCE($col,'')='')", array_values($s)];
 }
 
+//  BRANCH BATCH B6 / DEF-REC-003 — the scope of a candidate WORK LIST.
+//
+//  The Recruitment home's "Today" and "Risks" panels are each office's own
+//  to-do list (owner, 16 Nov 2026): interviews today, follow-ups, offers out,
+//  joinings, dormant candidates, overdue interviews. They asked the Business
+//  Unit only (recruit_sbu_clause), so a Mumbai candidate sat on Ahmedabad's
+//  list with a link to open them. They now ask the SAME candidate rule the
+//  command centre and the candidate register's counters use — rasg_cand_scope():
+//  the office through the requisition the candidate is worked against (an
+//  unattached candidate belongs to nobody and stays on everybody's list), plus
+//  the Business Unit. No rule is invented; the existing one is applied where it
+//  was missing. The shared candidate POOL is a different question — see
+//  lib/recruit_pool.php.
+function recruit_worklist_clause($alias = 'c') {
+    if (function_exists('rasg_cand_scope')) return rasg_cand_scope($alias);
+    return recruit_sbu_clause("$alias.sbu");
+}
+
 // ---- Data ------------------------------------------------------------------
 // Module 35 — interviews whose date has PASSED with no outcome recorded. Every
 // other interview query in this module filters interview_date >= today (upcoming
@@ -970,7 +988,7 @@ function recruit_sbu_clause($col = 'c.sbu') {
 function recruit_overdue_interviews($limit = 50) {
     if (function_exists('req_migrate')) req_migrate();
     $today = date('Y-m-d');
-    [$cw, $ca] = recruit_sbu_clause('c.sbu');
+    [$cw, $ca] = recruit_worklist_clause('c');   // DEF-REC-003 — the office's own list
     $lim = max(1, min(500, (int)$limit));
     try {
         return ops_all(
@@ -988,7 +1006,7 @@ function recruit_overdue_interviews($limit = 50) {
 function recruit_overdue_interviews_count() {
     if (function_exists('req_migrate')) req_migrate();
     $today = date('Y-m-d');
-    [$cw, $ca] = recruit_sbu_clause('c.sbu');
+    [$cw, $ca] = recruit_worklist_clause('c');   // DEF-REC-003 — the office's own list
     try {
         return (int)(ops_one(
             "SELECT COUNT(*) n FROM candidates c" . reqf_class_join('c') . "
@@ -1015,7 +1033,10 @@ function recruit_data() {
 
     [$rw, $ra]   = function_exists('scope_clause') ? scope_clause('r.office_id', 'r.sbu') : ['1=1', []];
     [$jw, $ja]   = function_exists('scope_clause') ? scope_clause('j.executing_office_id', "''") : ['1=1', []];
-    [$cw, $ca]   = recruit_sbu_clause('c.sbu');
+    //  DEF-REC-003 — Today / Risks / the KPI counts are this office's own work.
+    [$cw, $ca]   = recruit_worklist_clause('c');
+    //  B6 — the re-approach list below is the shared POOL, not a to-do list.
+    [$pw, $pa]   = function_exists('rpool_list_clause') ? rpool_list_clause('c') : [$cw, $ca];
     //  GATE 1B — the dashboard asks the classification choke point, not a list of
     //  literal stage values. $KJ/$KE classify; $KK answers stage-specific
     //  questions by KIND ("how many offers are out"), so a workspace that renames
@@ -1115,7 +1136,7 @@ function recruit_data() {
                            FROM candidates c $KJ
                            WHERE $KE='LOST' AND COALESCE(c.designation,'')<>''
                              AND EXISTS (SELECT 1 FROM requisitions r WHERE r.status='OPEN' AND r.designation=c.designation)
-                             AND $cw ORDER BY c.id DESC LIMIT 6", $ca);
+                             AND $pw ORDER BY c.id DESC LIMIT 6", $pa);
     $d['o_extensions'] = $d['t_expiring'];   // same set, framed as an extension opportunity
 
     $d['counts'] = [

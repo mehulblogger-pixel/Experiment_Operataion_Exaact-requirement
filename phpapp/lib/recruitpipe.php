@@ -572,6 +572,17 @@ function ops_recruit_pipelines($route, $method) {
 
     if ($method === 'POST') {
         $do = (string)($_POST['do'] ?? '');
+        //  B6 — the Master Admin switch "Offices can see each other's candidate
+        //  pool". It sits on this setup screen, but only a Master Admin may change
+        //  it; an administrator who posts it anyway is refused and nothing changes.
+        if ($do === 'pool_shared') {
+            ops_require(is_master(), "Only the Master Admin can change whether offices see each other's candidate pool.");
+            $on = (string)($_POST['pool_shared'] ?? '1') !== '0';
+            if (function_exists('rpool_set_shared')) rpool_set_shared($on);
+            flash($on ? "Saved — offices can see each other's candidate pool."
+                      : "Saved — each office now sees only its own candidate pool.");
+            redirect('/recruit-pipelines'); return true;
+        }
         if ($do === 'pipeline_save') {
             $id = recruitpipe_pipeline_save((int)($_POST['id'] ?? 0), $_POST);
             flash('Workflow saved.'); redirect('/recruit-pipelines?id=' . $id); return true;
@@ -644,6 +655,9 @@ function recruitpipe_cand_goto($cand, $targetStageId, $remark, $actor) {
     //  boundary holds on one screen and not on the other.
     if (function_exists('rexec_cand_block_reason')
         && rexec_cand_block_reason((int) ($cand['id'] ?? 0), 'ADVANCE') !== '') return false;
+    //  B6 — and no other office moves a candidate whose process is with another.
+    if (function_exists('cand_other_office_block')
+        && cand_other_office_block((int) ($cand['id'] ?? 0), ['process_only' => true]) !== '') return false;
     [$pipe, $eff, $idx] = recruitpipe_cand_state($cand);
     if (!$pipe || !$eff) return false;
     $target = null; foreach ($eff as $s) if ((int)$s['id'] === (int)$targetStageId) { $target = $s; break; }
@@ -1102,6 +1116,7 @@ function ops_recruit_candidate_flow($route, $method) {
     $cand = ops_one("SELECT * FROM candidates WHERE id=?", [$id]);
     if (!$cand) { http_response_code(404); view('notfound'); return true; }
     if ($method !== 'POST') { redirect('/candidate?id=' . $id); return true; }
+    if (function_exists('cand_other_office_require')) cand_other_office_require($cand);   // B6 — the other-office block
 
     //  GATE 1B — asked of the current state. A closed candidate is one whose
     //  CONFIGURED STAGE KIND is closed, or — while they are still un-migrated —
@@ -1348,6 +1363,7 @@ function ops_recruit_candidate_stage($route, $method) {
     $id = (int)($_GET['id'] ?? 0);
     $cand = ops_one("SELECT * FROM candidates WHERE id=?", [$id]);
     if (!$cand) { http_response_code(404); view('notfound'); return true; }
+    if ($method === 'POST' && function_exists('cand_other_office_require')) cand_other_office_require($cand);   // B6
     if ($method === 'POST') {
         $do = (string)($_POST['do'] ?? '');
         $stageId = (int)($_POST['stage_id'] ?? 0);

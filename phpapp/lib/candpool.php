@@ -184,11 +184,20 @@ function candpool_cand_matches($pro, $limit = 20) {
 // The full overlap worklist: candidates that also exist as a marketplace
 // professional, one row per candidate with its best (strongest) match. Read-only.
 function candpool_scan($limit = 200) {
+    //  BRANCH BATCH B6 (owner, 16 Nov 2026) — the company's own candidate pool is
+    //  shared by every office: with "Offices can see each other's candidate pool"
+    //  ON (the default) every office sees every candidate who has not joined; OFF,
+    //  only its own office's and the unattached ones. This list had no scope at all
+    //  (DEF-REC-003). The professional side is untouched: it is the Marketplace's.
+    [$pw, $pa] = function_exists('rpool_list_clause') ? rpool_list_clause('c') : ['1=1', []];
     try { $cands = ops_all("SELECT c.id, c.cand_code, c.first_name, c.last_name, c.mobile, c.email, c.stage, c.client_id,
+                               c.requisition_id, c.pipeline_id, c.pipeline_stage_id, c.joined_at, c.sbu,
                                r.req_code, bp.legal_name client_name
                             FROM candidates c LEFT JOIN requisitions r ON r.id=c.requisition_id
-                            LEFT JOIN business_partners bp ON bp.id=c.client_id
-                            ORDER BY c.id DESC LIMIT 2000") ?: []; }
+                            LEFT JOIN business_partners bp ON bp.id=c.client_id"
+                            . (function_exists('reqf_class_join') ? reqf_class_join('c') : '') . "
+                            WHERE $pw
+                            ORDER BY c.id DESC LIMIT 2000", $pa) ?: []; }
     catch (Throwable $e) { $cands = []; }
     // Confirmed candidate↔professional links (P11), read once → {candidate_id => professional_id}.
     $confirmed = [];
@@ -212,6 +221,8 @@ function candpool_scan($limit = 200) {
             'verification_tier' => (string)$best['verification_tier'], 'availability' => (string)$best['availability'],
             'reason' => (string)$best['reason'], 'match_count' => count($m),
             'confirmed' => $linkedPro > 0,
+            //  B6 — whose process this person is in, for every office to see.
+            'in_process' => function_exists('cand_process_badge') ? cand_process_badge($c) : '',
         ];
         if (count($out) >= $limit) break;
     }
@@ -226,7 +237,10 @@ function candpool_count() { return count(candpool_scan(100000)); }
 function candpool_summary() {
     $s = ['candidates' => 0, 'professionals' => 0, 'overlap' => 0,
           'by_mobile' => 0, 'by_email' => 0, 'by_name' => 0];
-    try { $s['candidates']    = (int)ops_val("SELECT COUNT(*) FROM candidates"); } catch (Throwable $e) {}
+    //  B6 — counted under the same pool rule as the list beside it.
+    [$pw, $pa] = function_exists('rpool_list_clause') ? rpool_list_clause('c') : ['1=1', []];
+    try { $s['candidates']    = (int)ops_val("SELECT COUNT(*) FROM candidates c"
+                                    . (function_exists('reqf_class_join') ? reqf_class_join('c') : '') . " WHERE $pw", $pa); } catch (Throwable $e) {}
     try { $s['professionals'] = (int)ops_val("SELECT COUNT(*) FROM cx_professionals WHERE COALESCE(is_active,1)=1"); } catch (Throwable $e) {}
     foreach (candpool_scan(100000) as $r) {
         $s['overlap']++;

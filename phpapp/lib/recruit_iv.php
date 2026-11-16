@@ -243,6 +243,9 @@ function iv_round_state($candidateId, $round) {
 function iv_schedule($candidateId, $post) {
     recruit_iv_migrate();
     iv_last_error('');
+    //  B6 — the other-office block, asked at the write as well as on the route.
+    if (function_exists('cand_other_office_block')
+        && ($b6why = cand_other_office_block((int) $candidateId, ['process_only' => true])) !== '') { iv_last_error($b6why); return 0; }
     if (function_exists('rexec_cand_block_reason')
         && rexec_cand_block_reason((int) $candidateId, 'INTERVIEW') !== '') return 0;
     $round = in_array($post['round'] ?? '', IV_ROUNDS, true) ? $post['round'] : 'L1';
@@ -608,6 +611,9 @@ function ops_candidate_interview($route, $method) {
     $id = (int)($_GET['id'] ?? 0);
     $cand = ops_one("SELECT * FROM candidates WHERE id=?", [$id]);
     if (!$cand) { http_response_code(404); view('notfound'); return true; }
+    //  B6 — no other office starts anything with a candidate in process elsewhere
+    //  (scheduling, recording, scoring); refused naming the office.
+    if ($method === 'POST' && function_exists('cand_other_office_require')) cand_other_office_require($cand);
     if ($method === 'POST') {
         $do = (string)($_POST['do'] ?? '');
         //  PHASE 3 · M6 (adversarial audit) — SAY WHAT ACTUALLY HAPPENED.
@@ -647,6 +653,7 @@ function ops_candidate_doc($route, $method) {
     $id = (int)($_GET['id'] ?? 0);
     $cand = ops_one("SELECT * FROM candidates WHERE id=?", [$id]);
     if (!$cand) { http_response_code(404); view('notfound'); return true; }
+    if ($method === 'POST' && function_exists('cand_other_office_require')) cand_other_office_require($cand);   // B6
     if ($method === 'POST') {
         $do = (string)($_POST['do'] ?? '');
         if ($do === 'add') { doc_add($id, $_POST); flash('Document added to the checklist.'); }
