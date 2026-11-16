@@ -453,6 +453,37 @@ administrator. Raise it with the owner before widening.
 > `tests/test_marketplace_region_filter.php` fails if anyone wraps the pool
 > search in `scope_clause()`.
 
+**Branch batch B7 — owner, 16 Nov 2026 (DEF-MKT-006). Applies the
+"action keeps its own scope" row above to the Marketplace's own records. No new
+permission, no new status.** Everything here is *inside the posting company*:
+no outside-facing screen (`/pro/*`, the public job board, careers, the client
+and agency portals, search, matching,
+notifications, e-mail) shows or depends on a posting's office, and how
+professionals and outside clients find, apply to or post work is unchanged.
+
+- **A requirement belongs to one of our offices** (`cx_requirements.office_id`,
+  additive). It is set automatically — the posting staff member's home office,
+  or the requisition's office when made with "Post to Marketplace" from a
+  requisition — and never taken from the form. Older rows were filled once
+  from the requisition's office, else the home office of the one user whose
+  name is on the posting; a row that could not be traced, and any posting made
+  with no staff member signed in (client/agency portal, seed, CLI), has **no
+  office**.
+- **Seeing stays company-wide:** every office on the desk sees every posting
+  and its applicants, on the board and on the posting itself.
+- **Acting follows the office:** awarding, booking, billing, deploying,
+  closing, changing, extending, adding or moving applicants, ratings,
+  concerns, terms, readiness, vouchers, inviting from `/connect-talent` and
+  allocating from `/connect-bench` (`cx_requirement_can_act`) are for a person
+  whose office scope covers the posting's office (`scope_office_allows`);
+  company-wide roles cover every office. Anyone else gets a plain refusal and
+  does not see those buttons. "Duplicate" stays open to all: it makes the
+  person's own new draft, in their own office. A form may not point at an
+  application, booking or voucher of a different posting.
+- **A posting with no office** stays actionable by every office that may use
+  the Marketplace desk, exactly as before — no existing data is locked away.
+  (`tests/test_branch_batch_marketplace.php`)
+
 The manpower-marketplace staff desk (K2a) reuses coordinator/master and adds **no**
 permission. The **professional-identity console** (`/connect-identity`, linking an
 internal `inspectors` record to a marketplace `cx_professionals` record — a

@@ -470,7 +470,12 @@ function ops_connect_talent($method) {
     // Invite a professional onto an open requirement (records an application).
     if ($method === 'POST' && ($_POST['action'] ?? '') === 'invite' && function_exists('cx_application_add')) {
         $rid = (int)($_POST['requirement_id'] ?? 0); $pid = (int)($_POST['professional_id'] ?? 0);
-        if ($rid && $pid) {
+        //  DEF-MKT-006 — inviting someone onto a requirement is an action on it,
+        //  so it keeps that requirement's office scope (finding people does not).
+        $invReq = ($rid && function_exists('cx_requirement_get')) ? cx_requirement_get($rid) : null;
+        if ($invReq && function_exists('cx_requirement_can_act') && !cx_requirement_can_act($invReq)) {
+            flash(cx_requirement_refusal($invReq), 'error');
+        } elseif ($rid && $pid) {
             $nm = (string)ops_val("SELECT name FROM cx_professionals WHERE id=?", [$pid]);
             $newId = cx_application_add($rid, ['applicant_professional_id' => $pid, 'applicant_name' => $nm]);
             flash($newId ? ($nm . ' added to the requirement.') : ($nm . ' has already applied to that requirement.'), $newId ? 'success' : 'error');
@@ -492,7 +497,10 @@ function ops_connect_talent($method) {
         'pool'        => connect_pro_pool_count(),
         'disciplines' => function_exists('connect_tx_rows') ? connect_tx_rows('cx_disciplines') : [],
         'work_types'  => cx_pro_work_types(),
-        'open_reqs'   => function_exists('cx_open_requirements') ? cx_open_requirements() : [],
+        //  Only the requirements this person may act on are offered for "Invite to…".
+        'open_reqs'   => function_exists('cx_open_requirements')
+                            ? array_values(array_filter(cx_open_requirements(), fn($r) => !function_exists('cx_requirement_can_act') || cx_requirement_can_act($r)))
+                            : [],
     ]);
     return true;
 }
