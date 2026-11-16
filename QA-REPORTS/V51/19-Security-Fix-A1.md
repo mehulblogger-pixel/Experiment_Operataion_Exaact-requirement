@@ -39,14 +39,19 @@ On a server already set to India time it says "same as India time". It only read
 | New automatic test `tests/test_connect_messages_escaping.php` | **On the old code: 1 passed, 5 failed** (it catches the hole). **On the fixed code: 6 passed, 0 failed** |
 | The original attack, repeated in a browser on a private copy with made-up data | **Old V51.1 code:** a pop-up appeared in the Coordinator's inbox ("127.0.0.1") and a live `<img onerror>` element was in the page. **Fixed code:** no pop-up, no live element; the message shows as plain text |
 | Robot: the 12 Marketplace tests that use Messages (MKT-006, 073–079, 081, 083, 114, SCR-connect-messages) | **No test got worse.** 11 of the 12 give exactly their V51.1 result, step by step: 9 pass, 2 "needs you" (real WhatsApp provider; contact masking is your question, Marketplace C14), and MKT-114 still has the known DEF-MKT-019 step. **MKT-076, which caught the hole, failed on V51.1 and passes now** |
-| Full automatic suite, SQLite | SUITE_SQLITE |
-| Full automatic suite, MariaDB | SUITE_MARIADB |
+| Full automatic suite, SQLite | **20,251 passed, 1 failed** on the code before the release stamp. The one failure was the deploy-check stamp being out of date, which is expected until the stamp is regenerated. After regenerating it, that test passes (14/14) |
+| Full automatic suite, MariaDB | **No new failures compared with V51.1.** It stops at the same known test-harness crash as the V51.1 and Sales batch B runs (test_workspace_requests_visible.php, a test-order problem in the tests, not the app). Before that point **20,243 checks passed** (V51.1: 20,171; batch B: 20,236). The only extra failure was the same out-of-date stamp |
 
 **A setup slip of mine, recorded for honesty:** on the first robot run, two tests could not sign in as admin. The cause was my private copy: I had left out the robot's own settings file, so the app set the admin password from its default. This is the app's intended way of recovering the admin login. With the settings file restored, both tests ran normally. It has nothing to do with the fix, and the update zip never contains a settings file.
 
 ## The update zip — for the TEST COPY only
 
-ZIP_DETAILS
+`EXAACT-V51.1-SecurityA1-TEST-COPY-update.zip`
+- **Contents:** 814 files, placed at the top of the zip, so extracting overwrites them in place.
+- **Compared file by file with the previous test-copy zip:** exactly 4 files differ: `views/ops/connect_messages.php` (the fix), `deploy-check.php` and `tools/deploy_check_template.php` (the Time zone line and the new stamp), and `VERSION.txt` (the build note).
+- **Left out:** no `tests/` folder, `config.local.php`, `tenants.php` registry, database file, or `exaact_data` / `exaact_backups` folder. (`lib/tenants.php`, `views/ops/tenants.php` and `tools/reset-admin.php` are ordinary program files, the same as in every zip.)
+- **Release stamp:** code `815edb8`.
+- **SHA-256:** `4eee58879641ae18c1e61ceaa4faec902fe11375a8e25878e59e7939f204ac43`
 
 **What is in it:** everything in the previous test-copy zip (fix batch 1 and Sales batch B) **plus** this security fix and the time-zone line. If you have not installed the Sales batch B zip yet, this one includes it.
 
@@ -54,7 +59,7 @@ ZIP_DETAILS
 1. Back up the opstest app folder and its data first.
 2. Upload the zip into the opstest **app** folder.
 3. Extract it, overwriting the existing files.
-4. Open `/deploy-check.php`. It should show code COMMIT, the green tick, the red TEST COPY bar and the new **Time zone** line. **Please send me that screenshot**: it answers the time-zone question for opstest.
+4. Open `/deploy-check.php`. It should show code 815edb8, the green tick, the red TEST COPY bar and the new **Time zone** line. **Please send me that screenshot**: it answers the time-zone question for opstest.
 5. Optional check: as Coordinator open **Marketplace → Messages**. It works as before.
 
 **Not for the live site yet.** This is a security fix, so I recommend it goes live soon after you have checked it on the test copy. When you are happy, tell me and I will ask "Shall I prepare the live update?"
