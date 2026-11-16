@@ -189,17 +189,26 @@ foreach (array_merge($stale, $missing) as $r) {
 }
 arsort($byDir);
 
-// The clock the application stamps its records with. The app sets no time zone
-// of its own, so it uses whatever the server's PHP is set to. Shown next to
-// India time so anyone can see at a glance whether the two differ (QA audit
-// V51.1, Reporting C18: the CERT-In six-hour clock and "when it was noticed"
-// depend on it). Reads only.
-$__tz    = date_default_timezone_get();
+// The clock the application stamps its records with. Since 16 Nov 2026 (owner
+// decision T1) the app sets India time itself, in lib/timezone.php; an older
+// release set nothing and used whatever the server's PHP is set to. The line
+// shows the clock the app uses, the server's own clock beside it, and whether
+// the app's clock matches India time (QA audit V51.1, Reporting C18: the
+// CERT-In six-hour clock and "when it was noticed" depend on it). The app's zone
+// is READ from that file, not loaded, so this page never changes its own clock.
+$__tz    = date_default_timezone_get();                       // the server's own PHP zone
 $__srv   = new DateTime('now');
+$__appTz = '';
+$__tzSrc = is_file(__DIR__ . '/lib/timezone.php') ? (string) @file_get_contents(__DIR__ . '/lib/timezone.php') : '';
+if ($__tzSrc !== '' && preg_match("/define\\('APP_TIMEZONE',\\s*'([A-Za-z_\\/+-]+)'\\)/", $__tzSrc, $__m)
+    && in_array($__m[1], timezone_identifiers_list(), true)) $__appTz = $__m[1];
+$__app   = new DateTime('now', new DateTimeZone($__appTz !== '' ? $__appTz : $__tz));
 $__ist   = new DateTime('now', new DateTimeZone('Asia/Kolkata'));
-$__gap   = $__ist->getOffset() - $__srv->getOffset();
-$CLOCK   = 'server clock ' . $__srv->format('j M Y, H:i') . ' (' . $__tz . ') · India time ' . $__ist->format('j M Y, H:i')
-         . ($__gap === 0 ? ' · same as India time' : ' · differs from India time by ' . floor(abs($__gap) / 3600) . ' h ' . ((abs($__gap) % 3600) / 60) . ' min');
+$__gap   = $__ist->getOffset() - $__app->getOffset();
+$CLOCK   = 'the app uses ' . ($__appTz === 'Asia/Kolkata' ? 'India time (Asia/Kolkata)' : ($__appTz !== '' ? $__appTz : 'the server clock (' . $__tz . ')'))
+         . ': ' . $__app->format('j M Y, H:i') . ' · server clock ' . $__srv->format('j M Y, H:i') . ' (' . $__tz . ')'
+         . ($__gap === 0 ? ' · same as India time'
+                         : ' · India time ' . $__ist->format('j M Y, H:i') . ' · differs from India time by ' . floor(abs($__gap) / 3600) . ' h ' . ((abs($__gap) % 3600) / 60) . ' min');
 
 if ($IS_CLI) {
     echo "EXAACT deployment check — release {$RELEASE}\n";

@@ -1,6 +1,9 @@
 <?php
 // Database connection, schema creation, admin bootstrap and first-run seed.
 
+// The app's clock is India time — set before anything reads the time (lib/timezone.php).
+require_once __DIR__ . '/timezone.php';
+
 // The database "epoch" — a counter bumped every time db(true) switches the live
 // connection to a different store (choosing a company at login, provisioning a
 // new company, pushing a change into a company). The per-request, run-once
