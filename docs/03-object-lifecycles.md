@@ -570,7 +570,7 @@ adds **no new status**. A customer whose `business_partners.status` is
 **BLACKLISTED, INACTIVE or ON_HOLD**, or whose `hold_status` is **HOLD or BLOCKED**,
 gets **nothing new** (`partner_trade_block()`, `lib/ops.php`): no enquiry, no
 quotation, no submission, approval, sending or acceptance of one, no contract, no
-work order (from the form or from a won deal), no job. A quotation may still be
+work order (from the form, from a won deal, or from "Accept & raise the call" on a client's portal request — DEF-FLOW-007, branch batch P5; the request stays open), no job. A quotation may still be
 marked **lost**. Invoices for work already done, payment reminders and receipts
 are untouched — that is the "payment reminder" the owner kept. A person unblocks
 them: a manager clears the hold under **Client holds**; someone who may edit the

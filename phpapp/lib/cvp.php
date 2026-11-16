@@ -818,25 +818,116 @@ function cvp_notify_sync($audience, $partnerId) {
     } catch (Throwable $e) { /* the feed must never break the page */ }
 }
 
+// ----------------------------------------------------------------------------
+//  DEF-CP-002 — an alert is shown only to a person who may open what it is about.
+//
+//  The feed is stored once per company, and it used to be shown whole to every
+//  colleague: an accounts-only person was told "Report X issued to you" and
+//  "Nonconformity Y needs your response", and each link then refused them — so
+//  the alert itself told them about records they may not see. A site-limited
+//  person was told about reports from sites outside their limit.
+//
+//  Each event names the portal permission that opens it (the same one the
+//  target address checks), and a report alert also needs the report itself to
+//  be one this person may open — the site limit is applied by the same reads
+//  the report pages use. An event not listed here is shown to nobody until
+//  somebody says who may open it: refuse rather than hide.
+//
+//  With nobody signed in to that portal for that company (staff tools, the
+//  sync itself, the CLI) there is no person to filter for and the company's
+//  feed is returned as before.
+// ----------------------------------------------------------------------------
+const CVP_EVENT_NEEDS = [
+    'REPORT_ISSUED'          => 'reports',
+    'REPORT_SHARED'          => 'reports',
+    'NCR_RAISED'             => 'issues',
+    'NCR_DECIDED'            => 'issues',
+    'QUALIFICATION_EXPIRING' => 'qualification',
+    'MKT_REQ_CLOSING'        => 'market.post',
+    'MKT_REQ_DECIDE'         => 'market.post',
+    'MKT_REQ_EXPIRED'        => 'market.post',
+    'VISIT_SCHEDULED'        => 'calls',          // written by the demo data only
+];
+
+// The test for the person signed in to $audience's portal for $partnerId, or
+// null when nobody is (see above). Returns fn(array $notificationRow): bool.
+function cvp_notify_viewer($audience, $partnerId) {
+    $audience = strtoupper((string)$audience); $partnerId = (int)$partnerId;
+    if (!$partnerId) return null;
+    if ($audience === 'CLIENT') {
+        $u = function_exists('portal_user') ? portal_user() : null;
+        if (!$u || (int)($u['partner_id'] ?? 0) !== $partnerId || !function_exists('pcan')) return null;
+        $can = 'pcan';
+        // The reports this person may open: the same rule as portal_report()
+        // (issued, not deleted, and within their site limit).
+        $reportSql = "SELECT d.id FROM report_docs d LEFT JOIN calls c ON c.id = d.call_id
+                      WHERE d.client_id = ? AND d.finalized = 1 AND COALESCE(d.deleted,0) = 0
+                        AND (d.call_id IS NULL OR " . (function_exists('portal_site_sql') ? portal_site_sql('c') : '1=1') . ")";
+    } elseif ($audience === 'VENDOR') {
+        $u = function_exists('cvp_vendor_user') ? cvp_vendor_user() : null;
+        if (!$u || (int)($u['vendor_id'] ?? 0) !== $partnerId) return null;
+        $can = 'vcan';
+        // The same rule as cvp_vendor_report(): theirs, issued and shared.
+        $reportSql = "SELECT d.id FROM report_docs d
+                      WHERE d.vendor_id = ? AND d.finalized = 1 AND COALESCE(d.deleted,0) = 0
+                        AND COALESCE(d.vendor_visible,0) = 1";
+    } else {
+        return null;
+    }
+    $reports = null;   // read once, and only if a report alert is actually asked about
+    return function (array $n) use ($can, $reportSql, $partnerId, &$reports) {
+        $need = CVP_EVENT_NEEDS[(string)($n['event'] ?? '')] ?? null;
+        if ($need === null || !$can($need)) return false;
+        if ((string)($n['ref_kind'] ?? '') === 'report') {
+            if ($reports === null)
+                $reports = array_flip(array_map('intval', array_column(
+                    portal_try(fn() => ops_all($reportSql, [$partnerId]), []), 'id')));
+            return isset($reports[(int)($n['ref_id'] ?? 0)]);
+        }
+        return true;
+    };
+}
+
 function cvp_notifications($audience, $partnerId, $unreadOnly = false, $limit = 100) {
     $partnerId = (int)$partnerId; if (!$partnerId) return [];
     $w = $unreadOnly ? ' AND is_read=0' : '';
-    return portal_try(fn() => ops_all(
+    $see = cvp_notify_viewer($audience, $partnerId);
+    // Filtered BEFORE the limit, so a colleague's hidden alerts cannot push this
+    // person's own ones off the end of the list.
+    $rows = portal_try(fn() => ops_all(
         "SELECT * FROM portal_notifications WHERE audience=? AND partner_id=?$w
-         ORDER BY is_read ASC, id DESC LIMIT " . max(1, (int)$limit),
+         ORDER BY is_read ASC, id DESC" . ($see ? '' : ' LIMIT ' . max(1, (int)$limit)),
         [strtoupper((string)$audience), $partnerId]), []);
+    if (!$see) return $rows;
+    return array_slice(array_values(array_filter($rows, $see)), 0, max(1, (int)$limit));
 }
 function cvp_notify_count($audience, $partnerId) {
     $partnerId = (int)$partnerId; if (!$partnerId) return 0;
+    $see = cvp_notify_viewer($audience, $partnerId);
+    if ($see) return count(cvp_notifications($audience, $partnerId, true, PHP_INT_MAX));
     return (int)(portal_try(fn() => ops_val(
         "SELECT COUNT(*) FROM portal_notifications WHERE audience=? AND partner_id=? AND is_read=0",
         [strtoupper((string)$audience), $partnerId]), 0));
 }
+// Marking read acts only on alerts this person can see: one colleague's
+// "mark all read" must not clear another colleague's alerts they never saw.
 function cvp_notify_read($audience, $partnerId, $id) {
+    $see = cvp_notify_viewer($audience, $partnerId);
+    if ($see) {
+        $n = portal_try(fn() => ops_one("SELECT * FROM portal_notifications WHERE id=? AND audience=? AND partner_id=?",
+            [(int)$id, strtoupper((string)$audience), (int)$partnerId]), null);
+        if (!$n || !$see($n)) return;
+    }
     db()->prepare("UPDATE portal_notifications SET is_read=1 WHERE id=? AND audience=? AND partner_id=?")
         ->execute([(int)$id, strtoupper((string)$audience), (int)$partnerId]);
 }
 function cvp_notify_read_all($audience, $partnerId) {
+    if (cvp_notify_viewer($audience, $partnerId)) {
+        foreach (cvp_notifications($audience, $partnerId, true, PHP_INT_MAX) as $n)
+            db()->prepare("UPDATE portal_notifications SET is_read=1 WHERE id=? AND audience=? AND partner_id=?")
+                ->execute([(int)$n['id'], strtoupper((string)$audience), (int)$partnerId]);
+        return;
+    }
     db()->prepare("UPDATE portal_notifications SET is_read=1 WHERE audience=? AND partner_id=? AND is_read=0")
         ->execute([strtoupper((string)$audience), (int)$partnerId]);
 }
@@ -859,7 +950,9 @@ function cvp_action_centre($audience, $partnerId, $can) {
             if ($n > 0) $out[] = ['label' => $n . ' report' . ($n > 1 ? 's' : '') . ' to accept or reject', 'count' => $n, 'url' => '/portal/reports'];
         }
         if ($can('deputation.approve') && function_exists('pdso_portal_approvals')) {
-            $ap = portal_try(fn() => pdso_portal_approvals($partnerId), []);
+            // DEF-CP-003 — only the periods this person may approve: their site limit.
+            $sites = function_exists('portal_site_ids') ? portal_site_ids() : [];
+            $ap = portal_try(fn() => pdso_portal_approvals($partnerId, false, $sites), []);
             $n = 0; foreach ((array)$ap as $a) if (in_array(($a['status'] ?? ''), ['SUBMITTED','CLIENT_REVIEW'], true)) $n++;
             if ($n > 0) $out[] = ['label' => $n . ' attendance period' . ($n > 1 ? 's' : '') . ' to approve', 'count' => $n, 'url' => '/portal/deputations'];
         }

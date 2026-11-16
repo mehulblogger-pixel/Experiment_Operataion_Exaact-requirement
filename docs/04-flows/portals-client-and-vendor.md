@@ -69,6 +69,17 @@ guarded by `connect_enabled()`, so a staff-only / fresh install is unaffected.
   404s); one agency can never see another's roster. **No new permission** — the tab
   is gated by the data (being an agency), not a right. The **bench is private**: these
   people are never written to the shared self-listed pool (`cx_professionals`).
+- **One person's reach (branch batch, 16 Nov 2026):** a person limited to some
+  sites sees and approves the deputations and attendance periods of those sites
+  only (DEF-CP-003), and every person's Alerts show only what that person may
+  open — their portal permissions and site limit (DEF-CP-002). See doc 02,
+  "The site limit and the alerts".
+- **Staff side:** staff manage the portal people of their own office's clients
+  only (company-wide roles: all). "New link" e-mails a fresh sign-in link to the
+  client person; staff never see it. "Change permissions" edits exactly the
+  person clicked (DEF-DIR-005, fixed at the root in `view()`: the page frame now
+  runs in its own scope). "Accept & raise the call" is refused for a client on
+  hold (D-12), and the request stays open (DEF-FLOW-007).
 - **Boundary:** a client sees only their own records — never other clients', never
   internal money/cost figures. Marketplace postings are scoped to the poster party
   (`cx_requirements_for_party`); an agency's bench and allocations are scoped to its

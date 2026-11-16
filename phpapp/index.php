@@ -790,15 +790,38 @@ function view($name, $vars = []) {
     ob_start();
     // Field-finding #9/#10 — a screen requested inside the in-page popup renders bare (no chrome) and every
     // form on it carries the _embed flag, so its post-save redirect closes the popup instead of navigating it.
-    $embed = function_exists('is_embed') && is_embed();
-    require __DIR__ . ($embed ? '/views/layout_embed_top.php' : '/views/layout_top.php');
+    $__embed = function_exists('is_embed') && is_embed();
+    // DEF-DIR-005 / DEF-QUA-010 — THE FRAME IS DRAWN IN ITS OWN SCOPE.
+    //
+    // The layout used to be required right here, in the screen's own scope, so
+    // every variable it set for itself landed on top of the screen's: $u (the
+    // signed-in user) replaced the portal user the "Change permissions" screen
+    // was given — it showed the staff member and saved onto whichever portal
+    // user had the same id; the flash loop's $m replaced the method on the
+    // method screens; $office replaced the audit log's office filter. Now the
+    // frame gets only what it reads from the screen (the title and the
+    // breadcrumb hints), keeps everything it sets to itself, and hands the
+    // bottom half only the two things it needs from the top. Nothing the
+    // handler passed to view() can be overwritten by the frame, on any page.
+    $__frame = static function ($__part, array $__in) {
+        extract($__in);
+        require __DIR__ . $__part;
+        return ['cur' => $cur ?? null, 'isInsp' => $isInsp ?? false];
+    };
+    // The current address. Screens have always read it as $cur for their back
+    // link (nav_back($cur)); it is given to them here, and only when the
+    // handler did not pass a $cur of its own.
+    $__route = trim((string)parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH), '/');
+    if (!array_key_exists('cur', $vars)) $cur = $__route;
+    $__top = $__frame($__embed ? '/views/layout_embed_top.php' : '/views/layout_top.php',
+        ['title' => $title ?? null, 'nav_crumbs' => $nav_crumbs ?? null, 'nav_leaf' => $nav_leaf ?? null]);
     // A missing view file must never white-screen the whole app with a fatal
     // "Failed opening required" — that almost always means a stale or partial
     // deployment (the code asked for a page whose file is not on the server).
     // Show a contained message with a way back instead of taking the app down.
-    $viewFile = __DIR__ . "/views/$__view.php";
-    if (is_file($viewFile)) {
-        require $viewFile;
+    $__viewFile = __DIR__ . "/views/$__view.php";
+    if (is_file($__viewFile)) {
+        require $__viewFile;
     } else {
         http_response_code(500);
         echo '<div class="panel" style="border-left:4px solid var(--bad)">'
@@ -807,9 +830,10 @@ function view($name, $vars = []) {
            . 'This usually means the app files are out of date — a full redeploy of the application usually fixes it.</p>'
            . '<p style="margin-bottom:0"><a class="btn" href="/">← Back to dashboard</a></p></div>';
     }
-    require __DIR__ . ($embed ? '/views/layout_embed_bottom.php' : '/views/layout_bottom.php');
+    $__frame($__embed ? '/views/layout_embed_bottom.php' : '/views/layout_bottom.php',
+        ['cur' => $__top['cur'] ?? $__route, 'isInsp' => $__top['isInsp'] ?? false]);
     $out = csrf_stamp_forms((string)ob_get_clean());
-    if ($embed && function_exists('embed_stamp_forms')) $out = embed_stamp_forms($out);
+    if ($__embed && function_exists('embed_stamp_forms')) $out = embed_stamp_forms($out);
     echo $out;
 }
 

@@ -13,6 +13,7 @@
 
 <form method="post" action="/portal-user-perms" class="panel" style="margin-top:16px;max-width:720px">
   <input type="hidden" name="id" value="<?= (int)$u['id'] ?>">
+  <input type="hidden" name="partner_id" value="<?= (int)$u['partner_id'] ?>">
 
   <h3 style="margin-top:0">Start from</h3>
   <p class="muted" style="margin:0 0 10px">A starting point, not a cage — tick and untick whatever you like afterwards.</p>

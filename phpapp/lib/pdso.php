@@ -752,27 +752,46 @@ function pdso_deputations($filter = []) {
 // ---------------------------------------------------------------------------
 //  Client-portal reads (§64) — client-safe columns only; always filtered to the
 //  signed-in client's partner id by the caller. No internal notes, no cost data.
+//
+//  DEF-CP-003 — and to the person's SITE LIMIT. A client person limited to one
+//  site (Directory → Client portal → Change → "Which sites") saw every
+//  deputation of the company and could approve the attendance of another site,
+//  which is the man-day quantity billing is drawn from. $siteIds is the
+//  person's limit (portal_site_ids()); empty = every site, as before. The rule
+//  is the one portal_site_sql() applies to work orders and reports: the site is
+//  the work order's (calls.site_address_id), and a deputation whose work order
+//  has no site recorded stays visible, so nothing unlocated vanishes.
 // ---------------------------------------------------------------------------
-function pdso_portal_deputations($clientId) {
+function pdso_portal_site_sql(array $siteIds, $alias = 'c') {
+    $ids = array_values(array_filter(array_map('intval', $siteIds)));
+    if (!$ids) return '1=1';
+    return "($alias.site_address_id IS NULL OR $alias.site_address_id IN (" . implode(',', $ids) . '))';
+}
+function pdso_portal_deputations($clientId, array $siteIds = []) {
     $clientId = (int)$clientId; if (!$clientId) return [];
     return ops_all("SELECT j.id, j.job_code, j.dep_status, j.dep_site,
                         j.inspection_start_date, j.inspection_end_date, i.name AS person_name
                     FROM jobs j LEFT JOIN calls c ON c.id=j.call_id LEFT JOIN inspectors i ON i.id=j.inspector_id
                     WHERE c.client_id=? AND (j.dep_status<>'' OR c.inspection_type='DEPUTATION' OR j.job_type='DEPUTATION')
+                      AND " . pdso_portal_site_sql($siteIds, 'c') . "
                     ORDER BY j.id DESC", [$clientId]) ?: [];
 }
-function pdso_portal_approvals($clientId, $pendingOnly = false) {
+function pdso_portal_approvals($clientId, $pendingOnly = false, array $siteIds = []) {
     $clientId = (int)$clientId; if (!$clientId) return [];
     $w = "a.client_id=?"; $a = [$clientId];
     if ($pendingOnly) $w .= " AND a.status IN ('SUBMITTED','CLIENT_REVIEW')";
+    $w .= " AND " . pdso_portal_site_sql($siteIds, 'c');
     return ops_all("SELECT a.*, j.job_code, i.name AS person_name
                     FROM dep_att_approval a LEFT JOIN jobs j ON j.id=a.job_id LEFT JOIN inspectors i ON i.id=j.inspector_id
+                    LEFT JOIN calls c ON c.id=j.call_id
                     WHERE $w ORDER BY a.period_from DESC, a.id DESC", $a) ?: [];
 }
-// The one row a portal decision may act on — proves it belongs to this client.
-function pdso_portal_approval($id, $clientId) {
+// The one row a portal decision may act on — proves it belongs to this client
+// AND lies within the person's site limit (the same rule as the lists above).
+function pdso_portal_approval($id, $clientId, array $siteIds = []) {
     $clientId = (int)$clientId; if (!$clientId) return null;
-    return ops_one("SELECT * FROM dep_att_approval WHERE id=? AND client_id=?", [(int)$id, $clientId]) ?: null;
+    return ops_one("SELECT a.* FROM dep_att_approval a LEFT JOIN jobs j ON j.id=a.job_id LEFT JOIN calls c ON c.id=j.call_id
+                    WHERE a.id=? AND a.client_id=? AND " . pdso_portal_site_sql($siteIds, 'c'), [(int)$id, $clientId]) ?: null;
 }
 
 // ---------------------------------------------------------------------------
