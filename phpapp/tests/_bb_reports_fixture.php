@@ -123,6 +123,9 @@ function bbr_cleanup() {
     $q("DELETE FROM inspectors WHERE name LIKE 'BBR %'");
     $q("DELETE FROM users WHERE id IN (" . $in($users) . ")");
     $q("DELETE FROM offices WHERE id IN (" . $in($offs) . ")");
+    // The IRN counters of the fixture's offices (codes BBA / BBM / BBP), so a
+    // numbering series started by a test does not linger.
+    foreach (['BBA', 'BBM', 'BBP'] as $oc) $q("DELETE FROM idems_counters WHERE scope_key LIKE ?", ['%/' . $oc . '/%']);
     unset($GLOBALS['__bbr_fx']);
     unset($_SESSION['uid']); if (function_exists('current_user')) current_user(true); if (function_exists('ua')) ua(true);
 }

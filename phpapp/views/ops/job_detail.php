@@ -592,8 +592,12 @@
         <td><?= e($pi['inspector_name'] ?: '—') ?></td>
         <td><?= e(($pi['on_date'] ?? '') !== '' ? fdate(substr((string)$pi['on_date'], 0, 10)) : '—') ?></td>
         <td class="num" style="white-space:nowrap">
+          <?php // Point 5 — an Inspector opens only their own reports; no dead-end buttons.
+                $piFull = function_exists('idems_doc_access') ? ops_one("SELECT * FROM report_docs WHERE id=?", [(int)$pi['id']]) : null;
+                if (!$piFull || idems_doc_access($piFull) !== ''): ?>
           <a class="btn small secondary" href="/document?id=<?= (int)$pi['id'] ?>">Open</a>
           <a class="btn small secondary" href="/document-pdf?id=<?= (int)$pi['id'] ?>" target="_blank" rel="noopener">PDF</a>
+          <?php endif; ?>
           <?php if ($canMakeReport): ?>
             <a class="btn small" href="/document-new?job=<?= (int)$job['id'] ?><?= $job['call_id'] ? '&call='.(int)$job['call_id'] : '' ?>&continue_from=<?= (int)$pi['id'] ?>&type=<?= e($pi['type_code']) ?>" title="Start this inspection's report from this one — scope &amp; QAP carried">↩ Continue</a>
           <?php endif; ?>
@@ -610,6 +614,42 @@
               <button class="btn small secondary" type="submit" title="Stop forwarding this report">Unforward</button>
             </form>
           <?php endif; ?>
+        </td>
+      </tr>
+    <?php endforeach; ?>
+  </table>
+</div>
+<?php endif; ?>
+
+<?php // Stage inspection reports (owner, 17 Nov 2026, QA-REPORTS/V51/29 §B) —
+      // the inspector of this job sees the approved / issued reports of the SAME
+      // work order and starts the next stage from one of them: the next number,
+      // filled in from it. They need not (and, being another inspector's, may
+      // not) open that report itself.
+  $nsRows = [];
+  if (!empty($job['call_id']) && function_exists('idems_next_stage_actor') && function_exists('job_owned_by_me') && job_owned_by_me((int)$job['id'])) {
+      foreach (ops_all("SELECT * FROM report_docs WHERE call_id=? AND deleted=0 AND (status IN ('APPROVED','ISSUED') OR COALESCE(finalized,0)=1)
+                        AND COALESCE(revised_by_id,0)=0 ORDER BY id DESC LIMIT 20", [(int)$job['call_id']]) as $sr) {
+          $sa = idems_next_stage_actor($sr);
+          if (($sa['as'] ?? '') === 'INSPECTOR') $nsRows[] = $sr;
+      }
+  }
+  if ($nsRows): ?>
+<div class="panel" id="next-stage" data-tab="Reports &amp; QA">
+  <div class="ctitle" style="margin-top:0"><h3>Continue the previous stage <span class="muted">(<?= count($nsRows) ?>)</span></h3></div>
+  <p class="muted" style="margin:0 0 10px">Approved and issued <?= e(Tlp('report')) ?> on this <?= e(Tl('call')) ?>. <b>Start next stage report</b> makes your <?= e(Tl('report')) ?> with the next number, filled in from that one — you add this stage's result, inspection date, photos and signature.</p>
+  <table class="grid"><tr><th><?= e(TH('report')) ?></th><th>Type</th><th>Status</th><th></th></tr>
+    <?php foreach ($nsRows as $sr): ?>
+      <tr>
+        <td><b><?= e($sr['irn']) ?></b></td>
+        <td><?= e($sr['type_code'] ?: '—') ?></td>
+        <td><?= e(IDEMS_STATUS[$sr['status']] ?? $sr['status']) ?></td>
+        <td class="num">
+          <form method="post" action="/document-next-stage" style="display:inline">
+            <input type="hidden" name="id" value="<?= (int)$sr['id'] ?>">
+            <input type="hidden" name="job_id" value="<?= (int)$job['id'] ?>">
+            <button class="btn small" type="submit">⏭ Start next stage report</button>
+          </form>
         </td>
       </tr>
     <?php endforeach; ?>
