@@ -255,11 +255,9 @@ $awardedId = (int)($req['awarded_application_id'] ?? 0);
         <?php if (!empty($m['ai_reason'])): ?><div class="cxmeta" style="margin:2px 0 6px"><span class="cxpill info" style="font-size:10px">✨ AI</span> <?= e($m['ai_reason']) ?></div><?php endif; ?>
         <?php if (!empty($m['skills'])): ?><div class="cxmeta" style="margin-bottom:8px"><?= e($m['skills']) ?></div><?php endif; ?>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <?php if ($isPro): ?>
-            <?php if (!empty($m['passport_token'])): ?><a class="btn secondary" href="/p/<?= e($m['passport_token']) ?>" target="_blank" rel="noopener" style="font-size:13px">Passport ↗</a><?php endif; ?>
-          <?php else: ?>
-            <a class="btn secondary" href="/passport-share?id=<?= (int)$m['id'] ?>" style="font-size:13px">Passport</a>
-          <?php endif; ?>
+          <?php // Point 14 / D — only a Marketplace professional has a passport; a
+                // company team member in the suggestions gets no Passport button. ?>
+          <?php if ($isPro && !empty($m['passport_token'])): ?><a class="btn secondary" href="/p/<?= e($m['passport_token']) ?>" target="_blank" rel="noopener" style="font-size:13px">Passport ↗</a><?php endif; ?>
           <?php if ($can_act && $m['eligibility'] !== 'BLOCKED'): ?>
           <form method="post" action="/connect-requirement" class="inline">
             <input type="hidden" name="id" value="<?= (int)$req['id'] ?>">

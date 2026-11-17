@@ -352,11 +352,48 @@ function cvp_vendor_qualification_events($limit = 50) {
 function cvp_vendor_users_for($vendorId) {
     return portal_try(fn() => ops_all("SELECT * FROM vendor_users WHERE vendor_id=? ORDER BY name, id", [(int)$vendorId]));
 }
+// Point 10 (owner, 17 Nov 2026) — whose vendor portal people a staff member
+// may see and manage: the vendors of the same offices the invite list offers
+// (vendors_list() limits by the vendor's home branch through
+// partner_office_sql()). The SAME rule as the client register
+// (portal_staff_partner_sql(), CP-021): company-wide roles see every vendor; a
+// vendor with no home branch belongs to nobody and stays visible to all.
+function cvp_vendor_staff_partner_sql($alias = 'p') {
+    if (function_exists('portal_staff_partner_sql')) return portal_staff_partner_sql($alias);
+    if (function_exists('is_master') && is_master()) return '1=1';
+    return function_exists('partner_office_sql') ? partner_office_sql($alias . '.home_branch_id') : '1=1';
+}
 function cvp_vendor_users_all() {
     return portal_try(fn() => ops_all(
         "SELECT vu.*, COALESCE(p.display_name, p.legal_name) partner_name
          FROM vendor_users vu LEFT JOIN business_partners p ON p.id = vu.vendor_id
+         WHERE " . cvp_vendor_staff_partner_sql('p') . "
          ORDER BY partner_name, vu.name"));
+}
+// One vendor portal user, but only if they belong to a vendor this staff member
+// may manage; null otherwise (so a typed id of another office's vendor person
+// is "not found" and nothing changes).
+function cvp_vendor_staff_user($id) {
+    return portal_try(fn() => ops_one(
+        "SELECT vu.*, COALESCE(p.display_name, p.legal_name) partner_name
+         FROM vendor_users vu JOIN business_partners p ON p.id = vu.vendor_id
+         WHERE vu.id = ? AND " . cvp_vendor_staff_partner_sql('p'), [(int)$id]), null) ?: null;
+}
+// Point 10 — e-mail a fresh sign-in link to the vendor person's OWN address,
+// exactly as portal_send_new_link() does for a client person (CP-021). Sent as a
+// 'portal_reset' message, so the e-mail log keeps no copy of the link and it
+// goes out through the accounts sender. Returns whether it was sent; the caller
+// tells staff "sent" or "could not be sent", never the link.
+function cvp_vendor_send_new_link(array $u, $link) {
+    if (!function_exists('ops_mail')) return false;
+    $who = function_exists('user_name') && function_exists('current_user') && current_user() ? user_name(current_user()) : app_name();
+    return (bool)ops_mail((string)$u['email'], app_name() . ' — your new sign-in link for the vendor portal',
+        "Hello " . ((string)($u['name'] ?? '') ?: 'there') . ",\n\n"
+        . $who . " at " . app_name() . " has made you a new sign-in link for the vendor portal.\n"
+        . "Your old password no longer works. Open this link within seven days and choose your own password:\n\n"
+        . $link . "\n\n"
+        . "Nobody at " . app_name() . " knows or chooses your password. If you did not expect this e-mail, reply to let us know.\n",
+        '', 'portal_reset');
 }
 function cvp_vendor_invite($vendorId, $email, $name, $contactId = 0) {
     $vendorId = (int)$vendorId; $contactId = (int)$contactId;
@@ -943,8 +980,12 @@ function cvp_action_centre($audience, $partnerId, $can) {
     if ($audience === 'CLIENT') {
         if ($can('reports.decide')) {
             // Finalized reports with no client decision recorded for the current rev.
+            // Point 12 — only the reports within this person's site limit, the
+            // ones /portal/reports actually lists for them to decide.
             $n = (int)(portal_try(fn() => ops_val(
-                "SELECT COUNT(*) FROM report_docs d WHERE d.client_id=? AND d.finalized=1 AND COALESCE(d.deleted,0)=0
+                "SELECT COUNT(*) FROM report_docs d LEFT JOIN calls c ON c.id = d.call_id
+                 WHERE d.client_id=? AND d.finalized=1 AND COALESCE(d.deleted,0)=0
+                 AND (d.call_id IS NULL OR " . cvp_client_site_sql('c') . ")
                  AND NOT EXISTS (SELECT 1 FROM report_client_reviews r WHERE r.report_doc_id=d.id AND r.rev=d.rev)",
                 [$partnerId]), 0));
             if ($n > 0) $out[] = ['label' => $n . ' report' . ($n > 1 ? 's' : '') . ' to accept or reject', 'count' => $n, 'url' => '/portal/reports'];
@@ -1028,6 +1069,14 @@ function cvp_client_team_expiry($partnerId, $userId, $date) {
 // ============================================================================
 function cvp_ai_available() { return function_exists('ai_active') && ai_active(); }
 
+// Point 12 (owner, 17 Nov 2026) — the signed-in client person's SITE LIMIT, as
+// SQL on `calls <alias>`. It is portal_site_sql() itself (one rule for work
+// orders, reports and deputations: a work order with no site stays visible),
+// and '1=1' when nobody is limited or the portal is not loaded.
+function cvp_client_site_sql($alias = 'c') {
+    return function_exists('portal_site_sql') ? portal_site_sql($alias) : '1=1';
+}
+
 // The context the assistant may read. Scoped TWICE, and both scopes matter:
 // by COMPANY (the partner id in every WHERE clause, so no other client's data
 // is reachable) and by the signed-in USER'S OWN PERMISSIONS -- because the
@@ -1041,9 +1090,15 @@ function cvp_ai_scope_context($audience, $partnerId, $can = null) {
     $lines = [];
     if ($can('reports')) {
     if ($audience === 'CLIENT') {
+        // Point 12 — and only the reports within this person's site limit: the
+        // same rule as portal_reports() (a report with no work order, or a work
+        // order with no site, stays in).
         $reps = portal_try(fn() => ops_all(
-            "SELECT irn, title, result, release_status, inspection_date FROM report_docs
-             WHERE client_id=? AND finalized=1 AND COALESCE(deleted,0)=0 ORDER BY id DESC LIMIT 40", [$partnerId]), []);
+            "SELECT d.irn, d.title, d.result, d.release_status, d.inspection_date FROM report_docs d
+             LEFT JOIN calls c ON c.id = d.call_id
+             WHERE d.client_id=? AND d.finalized=1 AND COALESCE(d.deleted,0)=0
+               AND (d.call_id IS NULL OR " . cvp_client_site_sql('c') . ")
+             ORDER BY d.id DESC LIMIT 40", [$partnerId]), []);
     } else {
         $reps = portal_try(fn() => ops_all(
             "SELECT irn, title, result, release_status, inspection_date FROM report_docs
@@ -1142,7 +1197,8 @@ function ops_cvp_vendor_admin($route, $method) {
 
     if ($route === 'vendor-user-toggle' && $method === 'POST') {
         $id = (int)($_POST['id'] ?? 0);
-        $u = portal_try(fn() => ops_one("SELECT * FROM vendor_users WHERE id=?", [$id]), null);
+        $u = cvp_vendor_staff_user($id);   // point 10 — own office's vendors only
+        if (!$u) flash('That person is not one of your vendors’ portal users.', 'error');
         if ($u) {
             db()->prepare("UPDATE vendor_users SET is_active=? WHERE id=?")->execute([empty($u['is_active']) ? 1 : 0, $id]);
             flash(empty($u['is_active']) ? 'Access restored for ' . $u['email'] . '.'
@@ -1153,13 +1209,22 @@ function ops_cvp_vendor_admin($route, $method) {
 
     if ($route === 'vendor-user-reinvite' && $method === 'POST') {
         $id = (int)($_POST['id'] ?? 0);
-        $u = portal_try(fn() => ops_one("SELECT * FROM vendor_users WHERE id=?", [$id]), null);
+        $u = cvp_vendor_staff_user($id);   // point 10 — own office's vendors only
+        if (!$u) flash('That person is not one of your vendors’ portal users.', 'error');
         if ($u) {
+            // Point 10 — the link that sets this person's password goes to THEIR
+            // OWN e-mail, never onto a staff screen or into the staff session:
+            // whoever opens it chooses the password (the same fix as CP-021).
             $token = bin2hex(random_bytes(24));
             db()->prepare("UPDATE vendor_users SET invite_token=?, invite_expires=?, password_hash='', must_change=1 WHERE id=?")
                 ->execute([$token, date('c', time() + 7 * 86400), $id]);
-            $_SESSION['vendor_invite_link'] = portal_base_url() . '/vendor/accept?t=' . $token;
-            flash('A new invitation link has been made for ' . $u['email'] . '. Their old password no longer works.');
+            unset($_SESSION['vendor_invite_link']);
+            $sent = cvp_vendor_send_new_link($u, portal_base_url() . '/vendor/accept?t=' . $token);
+            if ($sent) flash('A new sign-in link has been sent to ' . $u['email']
+                . '. Their old password no longer works.');
+            else flash('A new sign-in link was made for ' . $u['email'] . ', but the e-mail could not be sent'
+                . ' (check Settings → E-mail). Their old password no longer works. Once e-mail works, press'
+                . ' “New link” again.', 'error');
         }
         redirect('/vendor-users');
     }

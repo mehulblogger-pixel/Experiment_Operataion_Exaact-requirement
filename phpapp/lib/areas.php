@@ -65,7 +65,9 @@ function ops_area_def($area) {
 
                 $sec('Your people and partners');
                 $t(true, '🏗️', 'Agency bench', '/connect-bench', 'People an agency keeps ready for you — allocate them to a requirement.');
-                $t(true, '🪪', 'Team passports', '/passport-share', 'A shareable, verifiable credential page for each of your own team members.');
+                //  Point 14 / D (owner, 17 Nov 2026) — no "Team passports" tile:
+                //  passports are for Marketplace professionals; a company's own
+                //  team members do not have one (/passport-share now says so).
 
                 $sec('Checks and trust');
                 $t(true, '✅', 'Verification desk', '/connect-verify', 'Check the certificates and identity people upload, then verify or reject.',

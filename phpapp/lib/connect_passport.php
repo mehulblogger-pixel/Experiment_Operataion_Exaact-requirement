@@ -57,12 +57,15 @@ function connect_passport_lookup($token) {
     $token = trim((string)$token);
     if ($token === '' || !preg_match('/^[a-f0-9]{16,40}$/', $token)) return null;
     connect_passport_migrate();
-    $insp = ops_one("SELECT * FROM inspectors WHERE passport_token=?", [$token]);
-    if ($insp) { $insp['_kind'] = 'inspector'; return $insp; }
+    // Point 14 / D — the Marketplace professional's own record is asked FIRST,
+    // so a professional's passport can never be shadowed by a team member's
+    // token (the public page refuses the internal kind).
     try {
         $pro = ops_one("SELECT * FROM cx_professionals WHERE passport_token=?", [$token]);
         if ($pro) { $pro['_kind'] = 'professional'; return $pro; }
     } catch (Throwable $e) {}
+    $insp = ops_one("SELECT * FROM inspectors WHERE passport_token=?", [$token]);
+    if ($insp) { $insp['_kind'] = 'inspector'; return $insp; }
     return null;
 }
 
@@ -173,10 +176,42 @@ function connect_passport_public_data($insp) {
     ];
 }
 
+/**
+ * Point 14 / section D (owner, 17 Nov 2026) — "if I am an employee with SGS and
+ * SGS uses this app, as an inspector I will not have any passport." A passport
+ * is a MARKETPLACE PROFESSIONAL's (a `cx_professionals` row, its own
+ * `passport_token`, shown on /pro/profile and the pro dashboard). A company's
+ * internal team member (an `inspectors` row) has none.
+ *
+ * The two are told apart by WHICH TABLE holds the token — the `_kind` that
+ * connect_passport_lookup() already tags. The tables are separate records
+ * (connect_identity links an inspector to a professional; it never merges
+ * them), so an inspector who is also a registered professional keeps their
+ * PROFESSIONAL passport — its token is on their cx_professionals row — while a
+ * token minted on their inspector row (the old staff "Team passports" screen)
+ * stops. Nothing is deleted: inspectors.passport_token stays in the database,
+ * unused.
+ */
+function connect_passport_is_internal($row) {
+    return is_array($row) && ($row['_kind'] ?? '') === 'inspector';
+}
+/** The plain words for the staff screen that used to hand out team passports. */
+const CONNECT_PASSPORT_TEAM_REFUSAL = 'Passports are for Marketplace professionals; your own team members do not have one.';
+
 /** Render the standalone PUBLIC passport page and exit (dispatched pre-login). */
 function connect_passport_route($token) {
     if (function_exists('connect_enabled') && !connect_enabled()) { http_response_code(404); echo 'Not available.'; exit; }
     $insp = connect_passport_lookup($token);
+    // Point 14 / D — an internal team member's link shows a plain "not
+    // available": nothing about them, and nothing that says whose it was.
+    if (connect_passport_is_internal($insp)) {
+        http_response_code(404);
+        $GLOBALS['__passport'] = null;
+        $GLOBALS['__passport_url'] = '';
+        $GLOBALS['__passport_unavailable'] = true;
+        require __DIR__ . '/../views/ops/connect_passport_public.php';
+        exit;
+    }
     $data = $insp ? connect_passport_public_data($insp) : null;
     // Only ACTIVE professionals expose a public page (inspectors use `status`,
     // self-registered professionals use `is_active`).
@@ -202,23 +237,19 @@ function connect_passport_can() {
     return false;
 }
 
-/** Staff screen: get/copy an inspector's public passport link + QR + preview. */
+/**
+ * The staff "Team passports" screen (/passport-share). Point 14 / D — it is
+ * gone from every menu, tile and search, and the address itself now refuses
+ * with a plain message: a company's own team members have no passport. It no
+ * longer mints, shows or regenerates a team member's link (GET or POST). Its
+ * old view, views/ops/connect_passport_share.php, is no longer drawn by any
+ * route (left in place so the deploy file list is unchanged).
+ */
 function ops_connect_passport_share($method) {
     ops_require(connect_passport_can(), 'You cannot manage passport links.');
-    $id = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
-    if ($method === 'POST' && $id > 0 && ($_POST['action'] ?? '') === 'regenerate') {
-        connect_passport_regenerate($id);
-        flash('A new passport link was generated — any previously shared link no longer works.');
-        redirect('/passport-share?id=' . $id);
-    }
-    $insp = $id > 0 ? ops_one("SELECT * FROM inspectors WHERE id=?", [$id]) : null;
-    $token = $insp ? connect_passport_token($id) : '';
-    view('ops/connect_passport_share', [
-        'inspector' => $insp,
-        'token'     => $token,
-        'url'       => $token !== '' ? connect_passport_url($token) : '',
-        'data'      => $insp ? connect_passport_public_data(array_merge($insp, ['passport_token' => $token])) : null,
-        'inspectors'=> ops_all("SELECT id, name FROM inspectors WHERE COALESCE(status,'ACTIVE')='ACTIVE' ORDER BY name") ?: [],
-    ]);
+    if (function_exists('ops_access_notice'))
+        return ops_access_notice('Passports', CONNECT_PASSPORT_TEAM_REFUSAL,
+            'A Marketplace professional builds and shares their own passport from their professional account.');
+    ops_require(false, CONNECT_PASSPORT_TEAM_REFUSAL);
     return true;
 }

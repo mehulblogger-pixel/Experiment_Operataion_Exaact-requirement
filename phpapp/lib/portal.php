@@ -873,13 +873,27 @@ function portal_accept($token, $password, $confirm) {
     return '';
 }
 
+// Point 11 (owner, 17 Nov 2026) — "What clients have asked for" lists only the
+// requests of clients this staff member's office looks after: the same rule as
+// the portal people register (portal_staff_partner_sql(), CP-021). Company-wide
+// roles see every request; a client with no home branch stays visible to all.
+// The Directory tile's "new requests" count asks this same function.
 function portal_requests_all($status = '') {
-    $w = $status !== '' ? "WHERE r.status = ?" : '';
-    $a = $status !== '' ? [$status] : [];
+    $w = "WHERE " . portal_staff_partner_sql('p');
+    $a = [];
+    if ($status !== '') { $w .= " AND r.status = ?"; $a[] = $status; }
     return portal_try(fn() => ops_all(
         "SELECT r.*, COALESCE(p.display_name, p.legal_name) partner_name
          FROM portal_requests r LEFT JOIN business_partners p ON p.id = r.partner_id
          $w ORDER BY r.id DESC", $a));
+}
+// One request, but only if it comes from a client this staff member's office
+// looks after; null otherwise, so answering or converting another office's
+// request by a typed id changes nothing.
+function portal_staff_request($id) {
+    return portal_try(fn() => ops_one(
+        "SELECT r.* FROM portal_requests r LEFT JOIN business_partners p ON p.id = r.partner_id
+         WHERE r.id = ? AND " . portal_staff_partner_sql('p'), [(int)$id]), null) ?: null;
 }
 
 function portal_can_manage() { return is_master() || can('mod.portal.edit'); }
@@ -1810,7 +1824,12 @@ function ops_portal_admin($route, $method) {
     }
 
     if ($route === 'portal-request' && $method === 'POST') {
-        $r = portal_try(fn() => ops_one("SELECT * FROM portal_requests WHERE id=?", [(int)($_POST['id'] ?? 0)]), null);
+        // Point 11 — only a request from one of this office's clients.
+        $r = portal_staff_request((int)($_POST['id'] ?? 0));
+        if (!$r) {
+            flash('That request is not from one of your office’s clients. Nothing was changed.', 'error');
+            redirect('/portal-users');
+        }
         $to = (string)($_POST['status'] ?? '');
         if ($r && isset(PORTAL_REQ_STATUS[$to]) && $to !== 'NEW') {
             $reply = trim((string)($_POST['reply'] ?? ''));

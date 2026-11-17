@@ -141,3 +141,14 @@ scope are shown, and only to people who may already raise a work order (`ops.cal
 ended without work drops off. If the client has no work yet, open "No work yet — remind me later", pick the
 date it should come back (and a note if you like) and press "Put aside" — it returns on that date by
 itself, or press "Back on the list now".
+
+### Marketplace and the client/vendor portals — your own office (owner, 17 Nov 2026, batch 2)
+
+- On a Marketplace requirement, **"Put forward one of your own team"** and the suggested matches offer
+  **your own office's team members** only; another office's person cannot be put forward by a typed id.
+  Professionals on the Marketplace are offered as before. Company-wide roles see everyone.
+- Your team members have **no passport** — passports belong to Marketplace professionals. The old
+  "Team passports" screen is gone.
+- **Client requests** ("What clients have asked for") and the **vendor portal people** list show your
+  own office's clients and vendors only. **"New link"** for a vendor person is e-mailed to them; you
+  are told only whether it was sent. See doc 02, "Batch 2".

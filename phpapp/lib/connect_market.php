@@ -190,6 +190,34 @@ function cx_requirement_can_act($req) {
     return !function_exists('scope_office_allows') || scope_office_allows($off);
 }
 
+/**
+ * Point 13 (owner, 17 Nov 2026) — "Put forward one of your own team" offers
+ * only the signed-in staff member's OWN office's people: the active team
+ * members whose home office is within their office scope
+ * (the office-only scope rule on inspectors.home_office_id). It reads the
+ * company's own `inspectors`, never the shared pool (cx_professionals), so
+ * discovery stays cross-branch (test_marketplace_region_filter.php). Company-wide roles (Master Admin,
+ * Admin, Business Director …) see everyone; a team member with no home office
+ * belongs to nobody and stays offered to all, the same "unassigned must not
+ * vanish" rule partner_office_sql() uses. Internal only — nothing a
+ * professional, client or agency sees depends on it.
+ */
+function cx_own_team_inspectors() {
+    [$w, $a] = function_exists('scope_office_clause') ? scope_office_clause('home_office_id') : ['1=1', []];
+    try {
+        return ops_all("SELECT id, name, home_office_id FROM inspectors WHERE COALESCE(status,'ACTIVE')='ACTIVE' AND $w ORDER BY name", $a) ?: [];
+    } catch (Throwable $e) { return []; }
+}
+/** Is this team member one of the signed-in staff member's own office's people? */
+function cx_own_team_allows($inspectorId) {
+    $inspectorId = (int)$inspectorId;
+    if ($inspectorId <= 0) return false;
+    try { $row = ops_one("SELECT id, home_office_id FROM inspectors WHERE id=?", [$inspectorId]); }
+    catch (Throwable $e) { $row = null; }
+    if (!$row) return false;
+    return !function_exists('scope_office_allows') || scope_office_allows($row['home_office_id'] ?? null);
+}
+
 /** The plain refusal shown to an office that may see a posting but not act on it. */
 function cx_requirement_refusal($req) {
     $nm = cx_requirement_office_name($req);
@@ -971,6 +999,13 @@ function ops_connect_requirement($method) {
             [$rok, $rmsg] = cx_requirement_replace($id, (int)($_POST['application_id'] ?? 0), $_POST, function_exists('user_name') ? user_name(current_user()) : '');
             flash($rmsg, $rok ? 'success' : 'error');
         } elseif ($act === 'apply') {
+            //  Point 13 — a team member put forward must be one of this office's
+            //  own people (company-wide roles: anyone). A typed id of another
+            //  office's person is refused and nothing is recorded.
+            if ((int)($_POST['inspector_id'] ?? 0) > 0 && !cx_own_team_allows((int)$_POST['inspector_id'])) {
+                flash('You can put forward only your own office’s team members. Nothing was recorded.', 'error');
+                redirect('/connect-requirement?id=' . $id);
+            }
             $newId = cx_application_add($id, $_POST);
             flash($newId ? 'Application recorded.' : 'That professional has already applied to this requirement.', $newId ? 'success' : 'error');
         } elseif ($act === 'app_transition') {
@@ -1048,18 +1083,23 @@ function ops_connect_requirement($method) {
         'office_name'  => cx_requirement_office_name($req),
         'apps'         => cx_applications_for($id),
         'replace_candidates' => cx_replacement_candidates($id),
-        'inspectors'   => ops_all("SELECT id, name FROM inspectors WHERE COALESCE(status,'ACTIVE')='ACTIVE' ORDER BY name") ?: [],
+        // Point 13 — "Put forward one of your own team": this office's people only.
+        'inspectors'   => cx_own_team_inspectors(),
         'req_next'     => CX_REQ_TRANSITIONS[strtoupper((string)$req['status'])] ?? [],
         // K3 — ranked recommendations from the pool (only worth showing while open).
         // #6 — optional AI re-ranking when a provider is configured and ?ai=1 asked.
+        // Point 13 — the internal team members among them are this office's own
+        // people too (the same rule as the picker below, and as "apply"); the
+        // Marketplace professionals are unchanged.
         'matches'      => ($open && function_exists('connect_match_for_requirement'))
                             ? (function () use ($req) {
+                                $own = array_map('intval', array_column(cx_own_team_inspectors(), 'id'));
                                 $wantAi = ($_GET['ai'] ?? '') === '1' && function_exists('connect_match_ai_available') && connect_match_ai_available();
                                 if ($wantAi && function_exists('connect_match_for_requirement_ranked')) {
-                                    [$rows, $used] = connect_match_for_requirement_ranked($req, 6, true);
+                                    [$rows, $used] = connect_match_for_requirement_ranked($req, 6, true, null, $own);
                                     $GLOBALS['__cx_ai_used'] = $used; return $rows;
                                 }
-                                return connect_match_for_requirement($req, 6);
+                                return connect_match_for_requirement($req, 6, $own);
                               })() : [],
         'ai_available' => function_exists('connect_match_ai_available') && connect_match_ai_available(),
         'ai_used'      => $GLOBALS['__cx_ai_used'] ?? false,

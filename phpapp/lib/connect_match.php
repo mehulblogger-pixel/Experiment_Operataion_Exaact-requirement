@@ -306,8 +306,17 @@ function connect_match_location_bonus($cand, $job) {
  * Ranked recommendations for a requirement — the card list. Eligible-and-strong
  * float to the top; BLOCKED professionals sink to the bottom (shown, not hidden,
  * so the desk sees why). Excludes anyone who already applied.
+ *
+ * $inspectorIds (point 13, owner 17 Nov 2026): when an array is given, the
+ * internal-team pool is limited to those team members — the staff requirement
+ * page passes the signed-in person's own office's people. It is applied BEFORE
+ * the one-person de-duplication, so a Marketplace professional who is also
+ * another office's team member is still offered as the professional. null (the
+ * default) = the whole internal pool, exactly as before. The professional pool
+ * is never limited by it.
  */
-function connect_match_for_requirement($req, $limit = 8) {
+function connect_match_for_requirement($req, $limit = 8, $inspectorIds = null) {
+    $onlyInsp = is_array($inspectorIds) ? array_flip(array_map('intval', $inspectorIds)) : null;
     if (!is_array($req)) return [];
     $reqId = (int)($req['id'] ?? 0);
     // Who already applied — separately per pool, so neither is double-counted.
@@ -328,6 +337,7 @@ function connect_match_for_requirement($req, $limit = 8) {
     // Pool A — internal inspectors (full scoring: eligibility + rating + trust).
     foreach (ops_all("SELECT id, name, skills, sbu, designation, staff_kind, passport_token FROM inspectors WHERE COALESCE(status,'ACTIVE')='ACTIVE'") ?: [] as $insp) {
         if (!empty($appliedInsp[(int)$insp['id']])) continue;
+        if ($onlyInsp !== null && !isset($onlyInsp[(int)$insp['id']])) continue;   // point 13
         $insp['kind'] = 'inspector';
         $m = cx_match_score($insp, $req, $reqTerms);
         // Gap-2 — the inspector pool gets the same concept/synonym/hierarchical taxonomy
@@ -488,8 +498,8 @@ function connect_match_ai_rerank($req, array $rows, $chat = null) {
  * when $useAi and a provider is available, it overlays the AI order + reasons.
  * Returns [rows, ai_used].
  */
-function connect_match_for_requirement_ranked($req, $limit = 8, $useAi = false, $chat = null) {
-    $rows = connect_match_for_requirement($req, $limit);
+function connect_match_for_requirement_ranked($req, $limit = 8, $useAi = false, $chat = null, $inspectorIds = null) {
+    $rows = connect_match_for_requirement($req, $limit, $inspectorIds);
     if (!$useAi || !$rows) return [$rows, false];
     if (!$chat && !connect_match_ai_available()) return [$rows, false];
     return connect_match_ai_rerank($req, $rows, $chat);

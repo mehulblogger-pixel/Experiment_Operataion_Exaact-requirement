@@ -42,8 +42,18 @@ t_ok(strpos($src, 'is_coordinator_level()') !== false,
 // ---- and it is NOT clamped to the searcher's own office -------------------
 //  The whole point of the owner's Ahmedabad -> Chennai example. If somebody
 //  later wraps the pool search in scope_clause(), this fails.
+//  Batch 2 (owner, 17 Nov 2026 — plan 29, point 13): the ONE office-scoped
+//  query allowed in these files is cx_own_team_inspectors(), the picker of the
+//  company's OWN team members for "Put forward one of your own team". It is not
+//  the shared pool (cx_professionals) and nothing outsiders see; it is cut out
+//  before the check, so any other scope_clause() still fails here.
 foreach (['connect_pro.php', 'connect_market.php'] as $f) {
     $s = file_get_contents(__DIR__ . '/../lib/' . $f);
+    if ($f === 'connect_market.php') {
+        $n = 0;
+        $s = preg_replace('/function cx_own_team_inspectors\(\) \{.*?\n\}\n/s', '', $s, 1, $n);
+        t_eq($n, 1, 'connect_market.php: the own-team picker (point 13) is the only office-scoped query, and it reads inspectors, not the pool');
+    }
     t_ok(strpos($s, 'scope_clause(') === false && strpos($s, 'scope_office_clause(') === false,
         "$f does not office-scope the shared pool — discovery is cross-branch by design");
 }

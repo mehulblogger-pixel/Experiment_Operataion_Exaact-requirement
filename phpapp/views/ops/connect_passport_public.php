@@ -50,7 +50,14 @@ $qr = ($d && $url !== '' && function_exists('qr_svg')) ? qr_svg($url, 150, 'M', 
 </style>
 </head><body>
 <div class="wrap">
-<?php if (!$d): ?>
+<?php if (!$d && !empty($GLOBALS['__passport_unavailable'])): ?>
+  <?php // Point 14 / D — a link made for a company's own team member: plain words, nothing about the person. ?>
+  <div class="card" style="text-align:center;padding:48px 22px">
+    <div style="font-size:40px">🔒</div>
+    <h1 style="margin:12px 0 6px;font-size:22px">This passport is not available.</h1>
+    <p class="empty">Passports on <?= e($appName) ?> belong to Marketplace professionals.</p>
+  </div>
+<?php elseif (!$d): ?>
   <div class="card" style="text-align:center;padding:48px 22px">
     <div style="font-size:40px">🔍</div>
     <h1 style="margin:12px 0 6px;font-size:22px">Passport not found</h1>

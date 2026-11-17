@@ -570,6 +570,43 @@ professionals and outside clients find, apply to or post work is unchanged.
   the Marketplace desk, exactly as before — no existing data is locked away.
   (`tests/test_branch_batch_marketplace.php`)
 
+**Batch 2 — owner, 17 Nov 2026 (plan 29, point 13). No new permission.**
+"Put forward one of your own team" on a requirement (`/connect-requirement`)
+offers **the staff member's own office's team members only**
+(`cx_own_team_inspectors()`: active `inspectors` whose home office is within
+their office scope, `scope_office_clause('home_office_id')`). Company-wide roles
+see everyone; a team member with no home office stays offered to all. The
+`apply` action refuses a typed id of another office's team member
+(`cx_own_team_allows()`), and the **suggested matches** offer only own-office
+team members too (`connect_match_for_requirement(..., $inspectorIds)`, applied
+before the one-person de-duplication). **Marketplace professionals, discovery
+(`/connect-talent`, `/connect-bench`) and everything outsiders see are
+unchanged.** (`tests/test_batch2_marketplace_own_team_passports.php`)
+
+**Passports are for Marketplace professionals only — owner, 17 Nov 2026 (plan
+29, point 14 and section D).** *"If I am an employee with SGS and SGS uses this
+app, as an inspector I will not have any passport."* No permission is added or
+removed; a staff screen and a public page stop serving the internal team.
+
+- A **passport** belongs to a Marketplace professional: a `cx_professionals`
+  row with its own `passport_token`, built on `/pro/profile` and shared from the
+  professional's dashboard as `/p/<token>`. **Unchanged.**
+- A company's **internal team member** (an `inspectors` row) has **no
+  passport**. The staff "Team passports" tile is removed from the Marketplace
+  area (and so from "Go to anything"); `/passport-share` keeps its gate
+  (`connect_passport_can`) but now only says *"Passports are for Marketplace
+  professionals; your own team members do not have one."* — it mints, shows and
+  regenerates nothing. The requirement page's suggested matches show no
+  "Passport" button for a team member (a professional's stays).
+- The public page `/p/<token>` tells the two apart by **which table holds the
+  token** (`connect_passport_lookup()` `_kind`, professionals asked first): a
+  token on an inspector record shows *"This passport is not available."* (404,
+  nothing about the person). A professional who is **linked** to an inspector
+  record (`cx_identity_link` — a relationship, never a merge) keeps their own
+  professional passport; only the inspector record's token stops.
+- **No data is deleted:** `inspectors.passport_token` stays in the database,
+  unused.
+
 The manpower-marketplace staff desk (K2a) reuses coordinator/master and adds **no**
 permission. The **professional-identity console** (`/connect-identity`, linking an
 internal `inspectors` record to a marketplace `cx_professionals` record — a
@@ -826,6 +863,46 @@ roles); the reach is narrowed to match the invite list:
   client it was drawn for; a save is refused whole unless the portal user
   belongs to that client and the client is within the staff member's reach, and
   a site limit can only name that client's own sites.
+
+**Batch 2 — owner, 17 Nov 2026 (plan 29, points 10, 11, 12).** No permission is
+added, removed or given to anyone new; each point narrows the reach of a right
+people already hold, to match the client register above.
+
+- **Vendor portal register (point 10).** Still `mod.portal.edit` (unchanged
+  roles). The "Who can sign in" list on `/vendor-users` and its actions —
+  Withdraw / Restore (`/vendor-user-toggle`) and New link
+  (`/vendor-user-reinvite`) — cover **the vendors of the staff member's own
+  office(s)**, the same rule as the client register (`partner_office_sql()` on
+  the vendor's home branch, through `cvp_vendor_staff_partner_sql()` =
+  `portal_staff_partner_sql()`). Company-wide roles see every vendor; a vendor
+  with no home branch is visible to all. Another office's vendor person is
+  refused and nothing changes. **New link** is **e-mailed to the vendor
+  person's own address** (`cvp_vendor_send_new_link()` → `ops_mail`, kind
+  `portal_reset`, so the e-mail log keeps no copy of the link). Staff see only
+  "sent" / "could not be sent" — never the link, and nothing is left in the
+  staff session. (A brand-new vendor invitation is unchanged: the link is shown
+  once so staff can pass it on.)
+- **Client requests (point 11).** "What clients have asked for" on
+  `/portal-users`, the Directory tile's "new requests" count, and every answer
+  on `/portal-request` (Accept & raise the call, Just acknowledge, Decline,
+  Raise the call now) cover **requests from the clients of the staff member's
+  own office(s)** (`portal_requests_all()` / `portal_staff_request()`, the same
+  `partner_office_sql('p.home_branch_id')` rule). Company-wide roles see all; a
+  request from a client with no home branch is visible to all. Another office's
+  request is refused: no status change, no work order.
+- **Site limit — the last three places (point 12).** A client person limited to
+  some sites is shown only those sites (the work order's site; a work order with
+  no site, or a report with no work order, stays in — the same rule as their
+  report and deputation lists) in: the portal **assistant's report list**
+  (`cvp_ai_scope_context`), the **"reports to accept or reject"** count
+  (`cvp_action_centre`), and the client **dashboard tiles** for deputations
+  (Active Projects, Resources Deployed, Upcoming Deployments, Pending
+  Mobilizations, Schedule Conflicts, Pending Site Actions, Pending Client
+  Approval) and reports (Pending Technical Reviews, Reports Issued)
+  (`connect_client_dash($party, $role, $siteIds)`). No site limit = every site,
+  as before. The money tiles (billable events) carry no site and are unchanged.
+  (`tests/test_batch2_portal_vendor_link_requests.php`,
+  `tests/test_batch2_portal_site_counts.php`)
 
 The **professional portal** (`/pro/*`, `cx_professionals`) has no per-user
 permission layer by design: an account there is **one individual**, with no

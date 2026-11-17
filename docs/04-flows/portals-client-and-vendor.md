@@ -80,6 +80,12 @@ guarded by `connect_enabled()`, so a staff-only / fresh install is unaffected.
   person clicked (DEF-DIR-005, fixed at the root in `view()`: the page frame now
   runs in its own scope). "Accept & raise the call" is refused for a client on
   hold (D-12), and the request stays open (DEF-FLOW-007).
+- **Batch 2 (owner, 17 Nov 2026):** "What clients have asked for" and every
+  answer to a request are for the staff member's own office's clients only
+  (company-wide roles: all) — point 11. A person limited to some sites now sees
+  only those sites also in the portal assistant, the "reports to accept or
+  reject" count and the dashboard's deputation and report tiles — point 12. See
+  doc 02, "Batch 2".
 - **Boundary:** a client sees only their own records — never other clients', never
   internal money/cost figures. Marketplace postings are scoped to the poster party
   (`cx_requirements_for_party`); an agency's bench and allocations are scoped to its
@@ -91,6 +97,20 @@ guarded by `connect_enabled()`, so a staff-only / fresh install is unaffected.
 - **Typical journey:** log in → dashboard → see **their own** inspection activity and
   raised issues; respond to issues.
 - **Boundary:** scoped strictly to that vendor's own activity.
+- **Staff side (batch 2, owner, 17 Nov 2026 — point 10):** staff manage the
+  vendor portal people of their own office's vendors only (company-wide roles:
+  all), exactly like the client register. "New link" e-mails a fresh sign-in
+  link to the vendor person; staff are told only whether it was sent and never
+  see the link. A brand-new invitation still shows its link once.
+
+## Marketplace professionals and passports
+
+- **Only a Marketplace professional has a passport** (`/pro/profile`, shared as
+  `/p/<token>` from the professional's dashboard). A company's own team members
+  have none (owner, 17 Nov 2026 — plan 29, point 14 / D): the staff "Team
+  passports" screen is gone, and an old link made for a team member shows "This
+  passport is not available." A professional's passport is unchanged, also when
+  that professional is linked to one of the company's team-member records.
 
 > Because these use `pcan()` / `vendor_users` rather than the staff `can()` model, none
 > of the staff permission matrix (doc 02) applies to them. Keep them documented

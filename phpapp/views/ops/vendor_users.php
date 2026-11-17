@@ -26,7 +26,9 @@
   </form>
 </div>
 
-<?php $link = $invite['link'] ?? ($_SESSION['vendor_invite_link'] ?? ''); unset($_SESSION['vendor_invite_link']); ?>
+<?php // Point 10 — only a brand-new invitation's link is shown here (once). "New
+      // link" e-mails the link to the vendor person; it never comes back to staff.
+      $link = $invite['link'] ?? ''; unset($_SESSION['vendor_invite_link']); ?>
 <?php if ($link !== ''): ?>
 <div class="panel" style="border:1px solid var(--info);background:color-mix(in srgb,var(--info) 7%,transparent)">
   <b>Send them this link — it works once, and lasts seven days</b>
@@ -127,7 +129,7 @@
             <button class="btn btn-sm" type="submit"><?= empty($r['is_active']) ? 'Restore' : 'Withdraw' ?></button>
           </form>
           <form method="post" action="/vendor-user-reinvite" style="display:inline"
-                onsubmit="return confirm('This cancels their current password and makes a fresh invitation link. Continue?')">
+                onsubmit="return confirm('This cancels their current password and e-mails them a fresh sign-in link. Continue?')">
             <input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
             <button class="btn btn-sm" type="submit">New link</button>
           </form>
