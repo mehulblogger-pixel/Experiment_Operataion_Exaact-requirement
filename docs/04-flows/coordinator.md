@@ -88,6 +88,20 @@ never reopened: **More ▾ → Reissue as new revision** makes R1, R2 … for th
 inspector to correct, and it is approved and issued again. Someone acting for you
 through Approval delegation can do the same while you are away.
 
+**Report batch of 17 Nov 2026 (`QA-REPORTS/V51/29` — Change 1, points 4–6, §B):**
+- When an approver **rejects or sends back** a report, the approvers after them no
+  longer see it waiting; it reappears from level 1 when the inspector resubmits. An
+  old browser tab cannot approve it ("no longer waiting for approval").
+- **Reissue as new revision** is also offered to the **issuing** office's
+  Coordinator (or above), when the issuing office is not the executing office.
+- The **contracting** office edits a draft but does not submit it — the issuing or
+  executing office (or the report's own inspector) submits.
+- On an **approved or issued** report, **⏭ Start next stage report** (choose the
+  inspector: those allocated to the work order, else your executing office's
+  inspectors) makes the next report of the series, filled in from this one, as a
+  Draft for that inspector. Offered to a Coordinator (or above) of the issuing or
+  executing office.
+
 **If Reassign says "choose a different resource":** it is asking you to pick
 somebody. The box opens on nobody and no longer offers whoever currently holds
 the job — who that is, is written beside it. There is no limit on how many times

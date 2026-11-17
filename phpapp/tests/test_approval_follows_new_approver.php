@@ -83,7 +83,11 @@ try {
     $pdo->prepare("INSERT INTO inspectors (name, status, created_at) VALUES ('Map Probe','ACTIVE',?)")->execute([date('c')]);
     $ins = (int) $pdo->lastInsertId();
     $pdo->prepare("INSERT INTO idems_approver_map (inspector_id, approver_user_id, active, updated_at) VALUES (?,?,1,?)")->execute([$ins, $x, date('c')]);
-    $pdo->prepare("INSERT INTO report_docs (inspector_id, status, created_at) VALUES (?, 'SUBMITTED', ?)")->execute([$ins, date('c')]);
+    // A report waiting on its approvers is UNDER_REVIEW: since DEF-REP-016 (owner,
+    // 17 Nov 2026) only such a report's steps are re-routed — a report sent back or
+    // rejected has nothing waiting on anyone. (This probe used 'SUBMITTED', a status
+    // the app never sets.)
+    $pdo->prepare("INSERT INTO report_docs (inspector_id, status, created_at) VALUES (?, 'UNDER_REVIEW', ?)")->execute([$ins, date('c')]);
     $doc = (int) $pdo->lastInsertId();
     $pdo->prepare("INSERT INTO report_approvals (report_doc_id, level, approver_kind, approver_role, approver_user_id, resolved_user_id, status, created_at) VALUES (?,1,'INSPECTOR_MAP','',?,?,'PENDING',?)")->execute([$doc, $x, $x, date('c')]);
     $ra = (int) $pdo->lastInsertId();

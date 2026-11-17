@@ -2,7 +2,8 @@
 <div class="master-head">
   <div><h1><?= e(T_DETAIL('report', $doc['irn'])) ?> <?= $doc['finalized'] ? '🔒' : '' ?></h1>
     <p class="sub" style="margin:2px 0 0"><span class="pill p-info"><?= e($doc['type_code']) ?></span> <?= e($doc['type_name'] ?: $doc['title']) ?> · <span class="pill <?= idems_status_pill($doc['status']) ?>"><?= e(lk_options_or('report_status', IDEMS_STATUS)[$doc['status']] ?? $doc['status']) ?></span></p></div>
-  <?php $canSubmit = idems_can_edit_doc($doc) && in_array($doc['status'],['DRAFT','REJECTED'],true);
+  <?php // Point 6 — the contracting office may edit a draft but not submit it.
+        $canSubmit = (function_exists('idems_can_submit_doc') ? idems_can_submit_doc($doc) : idems_can_edit_doc($doc)) && in_array($doc['status'],['DRAFT','REJECTED'],true);
         $comp = $canSubmit ? idems_completeness_check($doc) : null; ?>
   <?php
     // Work out the workflow state up front so the bar can show ONE clear next step.
@@ -111,6 +112,40 @@
   <span class="muted" style="font-size:12px"><?= $rnOn
     ? 'A Release Note will be raised from this report once it is issued and all hold / deviation points and client acceptance are cleared.'
     : 'Tick this if a Release Note / IRN is to be issued for this report. Until it is ticked, a Release Note cannot be generated.' ?></span>
+</div>
+<?php endif; ?>
+
+<?php // ---- Stage inspection reports (owner, 17 Nov 2026, QA-REPORTS/V51/29 §B) ----
+      // On an approved or issued report: the next stage's inspector, or a
+      // Coordinator (or above) of the issuing / executing office who picks the
+      // inspector, starts the NEXT report — next number, filled in from this one.
+  $nsAct = function_exists('idems_next_stage_actor') ? idems_next_stage_actor($doc) : ['as' => ''];
+  if (($nsAct['as'] ?? '') !== ''):
+    $nsIns = $nsAct['as'] === 'OFFICE' ? idems_next_stage_inspectors($doc) : []; ?>
+<div class="panel" id="next-stage" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;border:1px solid var(--line,#e5e7eb)">
+  <form method="post" action="/document-next-stage" style="margin:0;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <input type="hidden" name="id" value="<?= (int)$doc['id'] ?>">
+    <?php if ($nsAct['as'] === 'OFFICE'): ?>
+      <?php if ($nsIns): ?>
+        <label for="ns-ins" style="font-weight:600">Next stage for</label>
+        <select class="form-control" id="ns-ins" name="inspector_id" required style="max-width:240px">
+          <?php if (count($nsIns) > 1): ?><option value="">Choose the inspector…</option><?php endif; ?>
+          <?php foreach ($nsIns as $ni): ?><option value="<?= (int)$ni['id'] ?>"><?= e($ni['name']) ?></option><?php endforeach; ?>
+        </select>
+        <button class="btn" type="submit">⏭ Start next stage report</button>
+      <?php endif; ?>
+    <?php else: ?>
+      <?php if (count($nsAct['jobs']) > 1): ?>
+        <select class="form-control" name="job_id" style="max-width:220px" aria-label="Your <?= e(Tl('job')) ?>">
+          <?php foreach ($nsAct['jobs'] as $nj): ?><option value="<?= (int)$nj['id'] ?>"><?= e($nj['job_code'] ?: ('#' . (int)$nj['id'])) ?></option><?php endforeach; ?>
+        </select>
+      <?php else: ?><input type="hidden" name="job_id" value="<?= (int)($nsAct['jobs'][0]['id'] ?? 0) ?>"><?php endif; ?>
+      <button class="btn" type="submit">⏭ Start next stage report</button>
+    <?php endif; ?>
+  </form>
+  <span class="muted" style="font-size:12px"><?= ($nsAct['as'] === 'OFFICE' && !$nsIns)
+    ? 'No inspector is allocated to this ' . e(Tl('call')) . ', and none is posted in its executing office, so a next stage report cannot be started yet.'
+    : 'Makes the next ' . e(Tl('report')) . ' in this series, filled in from this one (' . e(Tl('client')) . ', P.O., item, specifications, form and findings). The result, inspection date, photos and signatures are left for the new stage. This ' . e(Tl('report')) . ' does not change.' ?></span>
 </div>
 <?php endif; ?>
 
@@ -343,6 +378,19 @@
     · revises <a href="/document?id=<?= (int)$pv['id'] ?>"><?= e($pv['irn']) ?></a><?php endif; endif; ?>
   <?php if (!empty($doc['revised_by_id'])): $nx = ops_one("SELECT id, irn FROM report_docs WHERE id=?", [(int)$doc['revised_by_id']]); if ($nx): ?>
     · superseded by <a href="/document?id=<?= (int)$nx['id'] ?>"><?= e($nx['irn']) ?></a> — this is no longer the current revision<?php endif; endif; ?>
+</div>
+<?php endif; ?>
+
+<?php // ---- Stage lineage: "Continues from …" / "Next stage: …" (§B) ---------
+  $nsPrev = !empty($doc['prev_stage_doc_id']) ? ops_one("SELECT id, irn FROM report_docs WHERE id=?", [(int)$doc['prev_stage_doc_id']]) : null;
+  $nsNext = function_exists('idems_next_stages_of') ? idems_next_stages_of((int)$doc['id']) : [];
+  $nsLink = function ($r) { $full = ops_one("SELECT * FROM report_docs WHERE id=?", [(int)$r['id']]);
+      return ($full && idems_doc_access($full) !== '') ? '<a href="/document?id=' . (int)$r['id'] . '">' . e($r['irn']) . '</a>' : '<b>' . e($r['irn']) . '</b>'; };
+  if ($nsPrev || $nsNext): ?>
+<div class="panel" data-tab="Report" style="padding:10px 14px;margin:0 0 12px;font-size:13.5px">
+  <?php if ($nsPrev): ?>Continues from <?= $nsLink($nsPrev) ?> (the previous stage)<?php endif; ?>
+  <?php if ($nsPrev && $nsNext): ?> · <?php endif; ?>
+  <?php if ($nsNext): ?>Next stage: <?= implode(', ', array_map($nsLink, $nsNext)) ?><?php endif; ?>
 </div>
 <?php endif; ?>
 

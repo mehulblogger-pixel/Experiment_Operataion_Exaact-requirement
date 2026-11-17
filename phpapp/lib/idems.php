@@ -263,6 +263,11 @@ function idems_migrate() {
         // `created_by` holds a name only, which is kept as the fallback for rows
         // written before this column existed.
         ensure_column('report_docs', 'created_by_user_id', 'INT NULL');
+        // Stage inspection reports (owner, 17 Nov 2026, QA-REPORTS/V51/29 §B) —
+        // the report a "Start next stage report" copy continues from. The new
+        // report shows "Continues from <IRN>"; the earlier one, found by this
+        // column, shows "Next stage: <IRN>" and is itself never changed.
+        ensure_column('report_docs', 'prev_stage_doc_id', 'INT NULL');
     }
     ensure_column('users', 'signature', 'MEDIUMTEXT');          // base64 data-URL of the signature image
     ensure_column('inspectors', 'signature', 'MEDIUMTEXT');
@@ -3842,6 +3847,16 @@ function idems_doc_offices($doc) {
 function idems_doc_access($doc) {
     if (empty($doc)) return '';
     if (function_exists('is_master') && is_master()) return 'ISSUING';
+    $via = idems_doc_office_access($doc);
+    // Point 5 (owner, 17 Nov 2026) — an Inspector reads only their own reports.
+    if ($via !== '' && !idems_inspector_may_read($doc)) return '';
+    return $via;
+}
+// The office part of idems_doc_access(): which of the report's offices the
+// signed-in person's scope covers ('ISSUING' / 'EXECUTING' / 'CONTRACTING' / '').
+function idems_doc_office_access($doc) {
+    if (empty($doc)) return '';
+    if (function_exists('is_master') && is_master()) return 'ISSUING';
     $sbu = $doc['sbu'] ?? null;
     if (scope_allows($doc['office_id'] ?? null, $sbu)) return 'ISSUING';
     $o = idems_doc_offices($doc);
@@ -3849,15 +3864,65 @@ function idems_doc_access($doc) {
     foreach ($o['contracting_all'] as $x) if (scope_allows($x, $sbu)) return 'CONTRACTING';
     return '';
 }
-// The one refusal sentence for a report outside the person's reach.
-function idems_scope_refusal() {
+// Point 5 (owner, 17 Nov 2026, QA-REPORTS/V51/29: "own reports only, for
+// reading too") — may the signed-in person READ this report as an Inspector?
+// Anyone who is not a field inspector: yes (their office reach decides). An
+// Inspector / Senior Inspector: their own report (the inspector on it, or its
+// creator); a report whose approval chain names them (they must read what they
+// approve); or, holding the vetting / issue right (`idems.finalize`, the Senior
+// Inspector's "Finalise"), the reports that right exists for.
+function idems_inspector_may_read($doc) {
+    if (!function_exists('is_field_inspector') || !is_field_inspector()) return true;
+    if (idems_is_own_report($doc)) return true;
+    if (function_exists('can') && can('idems.finalize')) return true;
+    $uid = (int)(current_user()['id'] ?? 0); $id = (int)($doc['id'] ?? 0);
+    if ($uid && $id) {
+        try {
+            if ((int)ops_val("SELECT COUNT(*) FROM report_approvals WHERE report_doc_id=? AND (resolved_user_id=? OR delegated_to=?)", [$id, $uid, $uid]) > 0) return true;
+        } catch (Throwable $e) {}
+    }
+    return false;
+}
+// The SQL twin of idems_inspector_may_read() for registers and lists (alias
+// `d` = report_docs). ['1=1', []] for everyone but a field inspector.
+function idems_inspector_own_sql() {
+    if (!function_exists('is_field_inspector') || !is_field_inspector()) return ['1=1', []];
+    if (function_exists('can') && can('idems.finalize')) return ['1=1', []];
+    $u = current_user() ?: [];
+    $uid = (int)($u['id'] ?? 0); $ins = (int)($u['inspector_id'] ?? 0);
+    $nm = trim((string)user_name($u));
+    $w = "(d.inspector_id=? OR d.created_by_user_id=?"
+       . " OR (COALESCE(d.created_by_user_id,0)=0 AND d.created_by<>'' AND d.created_by=?)"
+       . " OR EXISTS (SELECT 1 FROM report_approvals ra WHERE ra.report_doc_id=d.id AND (ra.resolved_user_id=? OR ra.delegated_to=?)))";
+    return [$w, [$ins ?: -1, $uid ?: -1, ($nm !== '' && $nm !== 'System') ? $nm : "\0", $uid ?: -1, $uid ?: -1]];
+}
+// The one refusal sentence for a report outside the person's reach. Given the
+// report, an Inspector turned away only because it is another inspector's is
+// told exactly that.
+function idems_scope_refusal($doc = null) {
+    if (is_array($doc) && $doc && function_exists('is_field_inspector') && is_field_inspector()
+        && idems_doc_office_access($doc) !== '' && !idems_inspector_may_read($doc))
+        return 'This is another inspector\'s ' . Tl('report') . '. Inspectors open only their own ' . Tlp('report') . ' — the ones they inspected or created.';
     return 'This ' . Tl('report') . ' is outside your office / branch scope.';
+}
+// Point 6 (owner, 17 Nov 2026) — may the signed-in person SUBMIT this report?
+// Whoever may edit it, except the CONTRACTING office: it may edit a draft
+// before submission, but only the issuing or executing office — or the
+// report's own inspector — submits it.
+function idems_can_submit_doc($doc) {
+    if (!idems_can_edit_doc($doc)) return false;
+    if (function_exists('is_master') && is_master()) return true;
+    if (array_key_exists('id', $doc) && idems_doc_office_access($doc) === 'CONTRACTING' && !idems_is_own_report($doc)) return false;
+    return true;
+}
+function idems_submit_refusal_contracting() {
+    return 'Only the issuing or executing office (or the report\'s own inspector) can submit this ' . Tl('report') . '. As the contracting office you can still edit it before it is submitted.';
 }
 // Why this person may not edit this report — the plain sentence for the refusal.
 function idems_edit_refusal($doc, $default = 'This report is finalized and can no longer be edited.') {
-    if (!empty($doc) && array_key_exists('id', $doc) && idems_doc_access($doc) === '') return idems_scope_refusal();
+    if (!empty($doc) && array_key_exists('id', $doc) && idems_doc_access($doc) === '') return idems_scope_refusal($doc);
     if (!empty($doc) && empty($doc['finalized']) && function_exists('is_field_inspector') && is_field_inspector() && !idems_is_own_report($doc))
-        return 'This is another inspector\'s ' . Tl('report') . '. You can open it, but only the inspector on it (or the person who created it) can change it.';
+        return 'This is another inspector\'s ' . Tl('report') . '. Only the inspector on it (or the person who created it) can change it.';
     if (!empty($doc) && empty($doc['finalized']) && !idems_status_allows_edit($doc['status'] ?? 'DRAFT'))
         return 'This ' . Tl('report') . ' has been submitted, so it can no longer be changed. A Coordinator (or above) of the executing office can send it back to the inspector.';
     return $default;
@@ -3867,6 +3932,12 @@ function idems_edit_refusal($doc, $default = 'This report is finalized and can n
 // order or job, within the person's offices; Business Unit as scope_clause().
 function idems_doc_scope_sql() {
     if (function_exists('is_master') && is_master()) return ['1=1', []];
+    [$w, $a] = idems_doc_office_scope_sql();
+    // Point 5 — an Inspector's registers list only their own reports.
+    [$iw, $ia] = idems_inspector_own_sql();
+    return $iw === '1=1' ? [$w, $a] : ["(($w) AND $iw)", array_merge($a, $ia)];
+}
+function idems_doc_office_scope_sql() {
     [$w, $a] = scope_clause('d.office_id', 'd.sbu');
     $off = scope_offices();
     if ($off === 'ALL' || !is_array($off) || !$off) return [$w, $a];   // nothing further to widen
@@ -3934,22 +4005,44 @@ function idems_reopen_actor($doc, $forRevision = false) {
     $st = strtoupper((string)($doc['status'] ?? ''));
     if ($forRevision) {
         if (empty($doc['finalized']) && $st !== 'ISSUED') return '';
-    } else {
-        if (!empty($doc['finalized']) || !in_array($st, IDEMS_REOPEN_STATES, true)) return '';
+        return idems_revision_actor($doc)['actor'];
     }
+    if (!empty($doc['finalized']) || !in_array($st, IDEMS_REOPEN_STATES, true)) return '';
+    return idems_office_actor($doc, idems_doc_exec_office($doc));
+}
+// Is the signed-in person a Coordinator-or-above of $officeId for this report,
+// or acting for one through Approval delegation (for everything, for that
+// office or every office)? '' (no), 'SELF' or 'DELEGATE:<delegator id>'.
+// The one rule behind sending back (executing office) and revisions.
+function idems_office_actor($doc, $officeId) {
     if (function_exists('is_master') && is_master()) return 'SELF';
     $u = function_exists('current_user') ? current_user() : null;
     if (!$u) return '';
-    $exe = idems_doc_exec_office($doc);
     $sbu = (string)($doc['sbu'] ?? '');
-    if (idems_user_runs_office_reports($u, $exe, $sbu, true)) return 'SELF';
+    if (idems_user_runs_office_reports($u, $officeId, $sbu, true)) return 'SELF';
     if (function_exists('appr_delegators_for')) {
-        foreach (appr_delegators_for((int)($u['id'] ?? 0), 'REPORT', $exe ?: null) as $dl) {
+        foreach (appr_delegators_for((int)($u['id'] ?? 0), 'REPORT', $officeId ?: null) as $dl) {
             $du = ops_one("SELECT * FROM users WHERE id=? AND is_active=1", [(int)$dl]);
-            if ($du && idems_user_runs_office_reports($du, $exe, $sbu, false)) return 'DELEGATE:' . (int)$dl;
+            if ($du && idems_user_runs_office_reports($du, $officeId, $sbu, false)) return 'DELEGATE:' . (int)$dl;
         }
     }
     return '';
+}
+// Point 4 (owner, 17 Nov 2026, QA-REPORTS/V51/29) — who may start a new
+// revision of an ISSUED report: a Coordinator-or-above of the EXECUTING office,
+// and also of the ISSUING office (report_docs.office_id) when that is a
+// different office — each with their Approval delegate, as for sending back.
+// Returns ['actor' => ''|'SELF'|'DELEGATE:<id>', 'office' => id, 'role' => words].
+function idems_revision_actor($doc) {
+    $exe = idems_doc_exec_office($doc);
+    $a = idems_office_actor($doc, $exe);
+    if ($a !== '') return ['actor' => $a, 'office' => $exe, 'role' => 'executing office'];
+    $iss = (int)($doc['office_id'] ?? 0);
+    if ($iss && $iss !== (int)$exe) {
+        $a = idems_office_actor($doc, $iss);
+        if ($a !== '') return ['actor' => $a, 'office' => $iss, 'role' => 'issuing office'];
+    }
+    return ['actor' => '', 'office' => $exe, 'role' => 'executing office'];
 }
 // The words for who did it, for the History: "Neha Shah (Mumbai — executing office)",
 // with "acting for <delegator>" when it was done through a delegation.
@@ -4070,6 +4163,8 @@ function idems_report_playbook($doc, $approvals = [], $hasSchema = true) {
     $vetted   = strtoupper((string)($doc['vet_status'] ?? '')) === 'VETTED';
     $canVet   = function_exists('idems_can_vet') && idems_can_vet();
     $canEdit  = function_exists('idems_can_edit_doc') ? idems_can_edit_doc($doc) : false;
+    // Point 6 — the contracting office may edit but not submit.
+    $canSubmit = $canEdit && (!function_exists('idems_can_submit_doc') || idems_can_submit_doc($doc));
     // The approver may not also issue: whoever approved this report cannot finalise
     // it (master/admin excepted). Keeps the button off the approver's own screen so
     // the UI matches the server rule below.
@@ -4139,6 +4234,9 @@ function idems_report_playbook($doc, $approvals = [], $hasSchema = true) {
     if ($submitted) {
         $steps[] = ['key'=>'submit', 'label'=>'Submitted for review', 'state'=>'done',
             'line'=>$vetGate ? 'The report has gone forward — to the vetting authority first.' : 'The report has gone forward for approval.'];
+    } elseif ($isDraft && $canEdit && !$canSubmit) {
+        $steps[] = ['key'=>'submit', 'label'=>'Sent forward by the issuing or executing office', 'state'=>'info',
+            'line'=>'As the contracting office you can edit this ' . Tl('report') . ' now. The issuing or executing office (or its own inspector) sends it forward for approval.'];
     } elseif ($isDraft && $canEdit) {
         if ($comp && !empty($comp['ok'])) {
             $steps[] = ['key'=>'submit', 'label'=>'Submit for review', 'state'=>'now',
@@ -4310,7 +4408,7 @@ function idems_rn_blocker_links($doc) {
         $out[] = ['label' => 'Reissue as a new revision (then tick “Release Note to be issued”)', 'post' => '/document-revise', 'id' => $docId,
                   'confirm' => 'Create a new revision of this report? The original stays on file, unchanged.'];
     elseif (empty($doc['rn_to_issue']) && $docId)
-        $out[] = ['label' => 'Ask a Coordinator of the executing office to reissue it as a new revision (then tick “Release Note to be issued”)', 'href' => '/document?id=' . $docId];
+        $out[] = ['label' => 'Ask a Coordinator of the executing or issuing office to reissue it as a new revision (then tick “Release Note to be issued”)', 'href' => '/document?id=' . $docId];
     if ($jobId && function_exists('hwp_open_count') && (int)hwp_open_count($jobId) > 0)
         $out[] = ['label' => 'Clear the open hold / witness points (on the job)', 'href' => '/job?id=' . $jobId . '#holdpoints'];
     $ncrOpen = 0;
@@ -5052,7 +5150,7 @@ function ops_idems_documents($route, $method) {
         if (!$doc) { http_response_code(404); view('notfound'); return true; }
         // Phase 2 §51 / B4 — the issuing office, or the executing / contracting
         // office of its work order; anyone else is refused, like the register.
-        ops_require(idems_doc_access($doc) !== '', idems_scope_refusal());
+        ops_require(idems_doc_access($doc) !== '', idems_scope_refusal($doc));
         $approver = $doc['approver_user_id'] ? ops_one("SELECT first_name, last_name, username FROM users WHERE id=?", [$doc['approver_user_id']]) : null;
         $audit = ops_all("SELECT * FROM idems_audit WHERE entity='report_doc' AND entity_id=? ORDER BY id DESC", [$doc['id']]);
         $sections = idems_sections($doc['report_type_id']);
@@ -5104,7 +5202,7 @@ function ops_idems_documents($route, $method) {
             FROM report_docs d LEFT JOIN business_partners bp ON bp.id=d.client_id LEFT JOIN business_partners v ON v.id=d.vendor_id LEFT JOIN report_types rt ON rt.id=d.report_type_id
             WHERE d.id=? AND d.deleted=0", [(int)($_POST['id'] ?? 0)]);
         if (!$doc) { http_response_code(404); view('notfound'); return true; }
-        ops_require(idems_doc_access($doc) !== '', idems_scope_refusal());
+        ops_require(idems_doc_access($doc) !== '', idems_scope_refusal($doc));
         ops_require(can('mod.idems.edit') || can('idems.finalize') || is_master_of('idems'), 'You cannot run a review on this report.');
         $fx = idems_fields($doc['report_type_id']);
         $dt = json_decode($doc['data'] ?: '[]', true) ?: [];
@@ -5121,7 +5219,7 @@ function ops_idems_documents($route, $method) {
         // inspector / coordinator even after the report is locked from editing.
         $doc = ops_one("SELECT * FROM report_docs WHERE id=? AND deleted=0", [(int)($_POST['id'] ?? 0)]);
         if (!$doc) { http_response_code(404); view('notfound'); return true; }
-        ops_require(idems_doc_access($doc) !== '', idems_scope_refusal());
+        ops_require(idems_doc_access($doc) !== '', idems_scope_refusal($doc));
         ops_require(can('mod.idems.edit') || is_master_of('idems'), 'You cannot change this report.');
         $v = !empty($_POST['rn_to_issue']) ? 1 : 0;
         $pdo->prepare("UPDATE report_docs SET rn_to_issue=?, updated_at=? WHERE id=?")->execute([$v, date('c'), $doc['id']]);
@@ -5133,6 +5231,8 @@ function ops_idems_documents($route, $method) {
         $doc = ops_one("SELECT * FROM report_docs WHERE id=? AND deleted=0", [(int)($_GET['id'] ?? $_POST['id'] ?? 0)]);
         if (!$doc) { http_response_code(404); view('notfound'); return true; }
         ops_require(idems_can_edit_doc($doc), idems_edit_refusal($doc, 'This report can no longer be changed.'));
+        // Point 6 (owner, 17 Nov 2026) — the contracting office edits, but does not submit.
+        ops_require(idems_can_submit_doc($doc), idems_submit_refusal_contracting());
         // §gate — Inspection Completeness Check. A report must pass every applicable
         // mandatory check before it goes for approval. A super-admin may override a
         // failing gate, but only with a recorded reason (kept in the audit trail).
@@ -5320,10 +5420,53 @@ function ops_idems_documents($route, $method) {
         flash($issuedMsg);
         redirect('/document?id=' . $doc['id']);
     }
+    // Stage inspection reports (owner, 17 Nov 2026, §B) — "Start next stage report".
+    if ($route === 'document-next-stage' && $method === 'POST') {
+        $src = ops_one("SELECT * FROM report_docs WHERE id=? AND deleted=0", [(int)($_POST['id'] ?? 0)]);
+        if (!$src) { http_response_code(404); view('notfound'); return true; }
+        ops_require(idems_doc_office_access($src) !== '', idems_scope_refusal());
+        if (!idems_next_stage_source_ok($src)) {
+            flash('A next stage report can be started only from an approved or issued ' . Tl('report') . '.', 'warning');
+            redirect(idems_doc_access($src) !== '' ? '/document?id=' . $src['id'] : '/documents');
+        }
+        if (!empty($src['revised_by_id'])) {
+            flash('This ' . Tl('report') . ' has a newer revision. Start the next stage from the current revision.', 'warning');
+            redirect(idems_doc_access($src) !== '' ? '/document?id=' . (int)$src['revised_by_id'] : '/documents');
+        }
+        $act = idems_next_stage_actor($src);
+        ops_require($act['as'] !== '', 'Only an inspector allocated to a ' . Tl('job') . ' on this ' . Tl('call')
+            . ', or a Coordinator or above of the issuing or executing office, can start the next stage report.');
+        $me = current_user();
+        if ($act['as'] === 'INSPECTOR') {
+            $insId = (int)($me['inspector_id'] ?? 0);
+            $want = (int)($_POST['job_id'] ?? 0); $jobId = (int)$act['jobs'][0]['id'];
+            foreach ($act['jobs'] as $j) if ((int)$j['id'] === $want) $jobId = $want;
+            $words = user_name($me) . ' (' . $act['role'] . ')';
+        } else {
+            $insId = (int)($_POST['inspector_id'] ?? 0);
+            $allowed = array_map('intval', array_column(idems_next_stage_inspectors($src), 'id'));
+            if (!$insId || !in_array($insId, $allowed, true)) {
+                flash('Choose the inspector for the next stage from the list — an inspector allocated to this ' . Tl('call') . ' (or, if none is, of the executing office).', 'error');
+                redirect('/document?id=' . $src['id'] . '#next-stage');
+            }
+            $jobs = idems_stage_jobs_of((int)($src['call_id'] ?? 0), $insId);
+            $jobId = $jobs ? (int)$jobs[0]['id'] : 0;
+            $words = idems_actor_words($act['office'], $act['role']);
+        }
+        [$newId, $err] = idems_start_next_stage($src, $insId, $jobId, $words);
+        if ($err === 'EXISTS') {
+            flash('The next stage report for this inspector has already been started: ' . ops_val("SELECT irn FROM report_docs WHERE id=?", [$newId]) . '. Nothing was made twice.', 'warning');
+            redirect('/document?id=' . $newId);
+        }
+        if ($err) { flash($err, 'error'); redirect(idems_doc_access($src) !== '' ? '/document?id=' . $src['id'] : '/documents'); }
+        flash('Next stage report ' . ops_val("SELECT irn FROM report_docs WHERE id=?", [$newId]) . ' started, continuing from ' . $src['irn']
+            . '. It is filled in from that report; the result, inspection date, photos and signatures are left for this stage. ' . $src['irn'] . ' is unchanged.');
+        redirect('/document?id=' . $newId);
+    }
     if ($route === 'document-revise' && $method === 'POST') {
         $doc = ops_one("SELECT * FROM report_docs WHERE id=? AND deleted=0", [(int)($_POST['id'] ?? 0)]);
         if (!$doc) { http_response_code(404); view('notfound'); return true; }
-        ops_require(idems_doc_access($doc) !== '', idems_scope_refusal());
+        ops_require(idems_doc_access($doc) !== '', idems_scope_refusal($doc));
         // Reporting A3 / 0.3 — an issued report is corrected by a new revision,
         // started by a Coordinator-or-above of the executing office (or their
         // delegate). The issued original never changes.
@@ -5331,12 +5474,13 @@ function ops_idems_documents($route, $method) {
             flash('A revision of this report already exists.', 'warning'); redirect('/document?id=' . (int)$ex['id']);
         }
         $actor = idems_reopen_actor($doc, true);
-        ops_require($actor !== '', 'Only a Coordinator or above of the executing office (or the person acting for them) can start a new revision of an issued ' . Tl('report') . '.');
+        ops_require($actor !== '', 'Only a Coordinator or above of the executing or issuing office (or the person acting for them) can start a new revision of an issued ' . Tl('report') . '.');
+        $ra = idems_revision_actor($doc);
         [$newId, $err] = idems_revise_doc($doc);
         if ($err === 'EXISTS') { flash('A revision of this report already exists.', 'warning'); redirect('/document?id=' . $newId); }
         if ($err) { flash($err, 'error'); redirect('/document?id=' . $doc['id']); }
         idems_log('report_doc', (int)$doc['id'], 'REVISION_STARTED', ['irn' => $doc['irn'],
-            'new' => 'New revision started by ' . idems_actor_words(idems_doc_exec_office($doc), 'executing office', $actor)]);
+            'new' => 'New revision started by ' . idems_actor_words($ra['office'], $ra['role'], $actor)]);
         flash('Revision drafted as ' . ops_val("SELECT irn FROM report_docs WHERE id=?", [$newId])
             . '. Amend it, then submit and issue it — the original stays on file, unchanged.');
         redirect('/document?id=' . $newId);
@@ -5352,7 +5496,7 @@ function ops_idems_documents($route, $method) {
     if ($route === 'document-reopen' && $method === 'POST') {
         $doc = ops_one("SELECT * FROM report_docs WHERE id=? AND deleted=0", [(int)($_POST['id'] ?? 0)]);
         if (!$doc) { http_response_code(404); view('notfound'); return true; }
-        ops_require(idems_doc_access($doc) !== '', idems_scope_refusal());
+        ops_require(idems_doc_access($doc) !== '', idems_scope_refusal($doc));
         if (!empty($doc['finalized']) || strtoupper((string)$doc['status']) === 'ISSUED') {
             flash('This ' . Tl('report') . ' has been issued, so it is not sent back. Start a new revision instead — the issued original stays on file, unchanged.', 'warning');
             redirect('/document?id=' . $doc['id']);
@@ -6324,8 +6468,8 @@ function idems_file_authorized($id) {
     $row = ops_one("SELECT rf.*, d.deleted FROM report_files rf JOIN report_docs d ON d.id=rf.report_doc_id
                     WHERE rf.id=?", [(int)$id]);
     if (!$row || $row['deleted']) return null;
-    $doc = ops_one("SELECT id, office_id, sbu, call_id, job_id FROM report_docs WHERE id=?", [(int)$row['report_doc_id']]);
-    if (!$doc || idems_doc_access($doc) === '') return null;
+    $doc = ops_one("SELECT id, office_id, sbu, call_id, job_id, inspector_id, created_by, created_by_user_id FROM report_docs WHERE id=?", [(int)$row['report_doc_id']]);
+    if (!$doc || idems_doc_access($doc) === '') return null;   // + point 5: an Inspector's own reports only
     return $row;
 }
 function ops_idems_file($method) {
@@ -6653,11 +6797,48 @@ function idems_user_approved_doc($doc, $uid) {
     if ((int)($doc['approver_user_id'] ?? 0) === $uid && ($doc['status'] ?? '') === 'APPROVED') return true;
     return false;
 }
+// DEF-REP-016 — is this report waiting on its approvers right now? Only an
+// UNDER_REVIEW report is. (A step with no report id — never written by the
+// app — is left to the caller's other checks.)
+function idems_report_under_review($docId) {
+    $docId = (int)$docId;
+    if (!$docId) return true;
+    return strtoupper((string)ops_val("SELECT status FROM report_docs WHERE id=? AND deleted=0", [$docId])) === 'UNDER_REVIEW';
+}
+// DEF-REP-016 — when an approver rejects or sends a report back, every
+// approval step still waiting after theirs is closed (removed), so the report
+// leaves the later approvers' pending lists, dashboard counts, inbox and SLA
+// reminders at once. Resubmitting rebuilds the whole chain from level 1
+// (idems_build_approval_chain() clears report_approvals first), so nothing is
+// lost. Returns the closed steps in plain words ("level 2 (Sunil Rao)").
+function idems_close_later_steps($docId, $actedStepId) {
+    $closed = [];
+    foreach (ops_all("SELECT * FROM report_approvals WHERE report_doc_id=? AND status='PENDING' AND id<>? ORDER BY level, id", [(int)$docId, (int)$actedStepId]) ?: [] as $st) {
+        $who = idems_user_display((int)(($st['delegated_to'] ?? 0) ?: ($st['resolved_user_id'] ?? 0)));
+        if ($who === '' && !empty($st['approver_role'])) $who = (string)(ORG_ROLES[$st['approver_role']] ?? $st['approver_role']);
+        $closed[] = 'level ' . (int)$st['level'] . ($who !== '' ? ' (' . $who . ')' : '');
+    }
+    db()->prepare("DELETE FROM report_approvals WHERE report_doc_id=? AND status='PENDING' AND id<>?")->execute([(int)$docId, (int)$actedStepId]);
+    return $closed;
+}
+// DEF-REP-016 — the History line for a reject / send-back:
+// "Rejected at level 1 by Neha Shah: <reason>. The approval still waiting
+// after it was closed: level 2 (Sunil Rao). …"
+function idems_return_history_line($verb, $step, $remarks, array $closed) {
+    $line = $verb . ' at level ' . (int)($step['level'] ?? 1) . ' by ' . user_name(current_user()) . ': ' . $remarks;
+    if ($closed) $line .= '. The approval' . (count($closed) === 1 ? '' : 's') . ' still waiting after it ' . (count($closed) === 1 ? 'was' : 'were')
+        . ' closed: ' . implode(', ', $closed) . '. When the inspector submits it again, approval starts again from level 1.';
+    return $line;
+}
 function idems_current_step($docId) {
     return ops_one("SELECT * FROM report_approvals WHERE report_doc_id=? AND status='PENDING' ORDER BY level, id LIMIT 1", [(int)$docId]);
 }
 function idems_can_act_step($step) {
     if (!$step || ($step['status'] ?? '') !== 'PENDING') return false;
+    // DEF-REP-016 (owner, 17 Nov 2026) — a step is acted on only while its
+    // report is UNDER REVIEW. A report sent back, rejected, reopened or already
+    // approved has nothing waiting on any approver, whatever an old step says.
+    if (!idems_report_under_review((int)($step['report_doc_id'] ?? 0))) return false;
     if (is_master()) return true;
     $uid = (int)(current_user()['id'] ?? 0);
     if (!empty($step['delegated_to']) && (int)$step['delegated_to'] === $uid) return true;
@@ -6970,6 +7151,15 @@ function ops_idems_approve($method) {
     if ($method !== 'POST') redirect('/documents');
     $doc = ops_one("SELECT * FROM report_docs WHERE id=? AND deleted=0", [(int)($_POST['id'] ?? 0)]);
     if (!$doc) { http_response_code(404); view('notfound'); return true; }
+    // DEF-REP-016 — approve, reject, send back and delegate only while the
+    // report is under review. An old browser tab, or a later approver after an
+    // earlier one sent it back, is told so in plain words and nothing changes.
+    if (strtoupper((string)($doc['status'] ?? '')) !== 'UNDER_REVIEW') {
+        $back = in_array(strtoupper((string)$doc['status']), ['DRAFT', 'REJECTED'], true);
+        flash('This ' . Tl('report') . ' is no longer waiting for approval (it is now "' . idems_status_label($doc) . '"), so nothing was changed.'
+            . ($back ? ' It is back with the inspector; when they submit it again, approval starts again from the first level.' : ''), 'warning');
+        redirect('/document?id=' . $doc['id']);
+    }
     $step = idems_current_step($doc['id']);
     ops_require(idems_can_act_step($step), 'You are not the current approver for this report.');
     $decision = $_POST['decision'] ?? '';
@@ -7000,16 +7190,28 @@ function ops_idems_approve($method) {
         }
     } elseif ($decision === 'reject') {
         if ($remarks === '') { flash('A remark is mandatory when rejecting.', 'error'); redirect('/document?id=' . $doc['id']); }
-        $pdo->prepare("UPDATE report_approvals SET status='REJECTED', acted_by=?, acted_at=?, remarks=?, correction_area=?, correction_deadline=? WHERE id=?")->execute([user_name(current_user()), date('c'), $remarks, $corrArea, $corrDeadline, $step['id']]);
-        $pdo->prepare("UPDATE report_docs SET status='REJECTED', updated_at=? WHERE id=?")->execute([date('c'), $doc['id']]);
-        idems_log('report_doc', $doc['id'], 'REJECT', ['irn'=>$doc['irn'], 'reason'=>$remarks]);
+        $pdo->beginTransaction();
+        try {
+            $pdo->prepare("UPDATE report_approvals SET status='REJECTED', acted_by=?, acted_at=?, remarks=?, correction_area=?, correction_deadline=? WHERE id=?")->execute([user_name(current_user()), date('c'), $remarks, $corrArea, $corrDeadline, $step['id']]);
+            $closed = idems_close_later_steps($doc['id'], $step['id']);   // DEF-REP-016
+            $pdo->prepare("UPDATE report_docs SET status='REJECTED', updated_at=? WHERE id=?")->execute([date('c'), $doc['id']]);
+            $pdo->commit();
+        } catch (Throwable $e) { if ($pdo->inTransaction()) $pdo->rollBack(); throw $e; }
+        idems_log('report_doc', $doc['id'], 'REJECT', ['irn'=>$doc['irn'], 'field'=>'level ' . (int)$step['level'],
+            'new'=>idems_return_history_line('Rejected', $step, $remarks, $closed), 'reason'=>$remarks]);
         try { idems_notify_inspector_returned($doc, 'reject', $remarks); } catch (Throwable $e) {}
         flash('Report rejected and returned to the inspector.');
     } elseif ($decision === 'sendback') {
         if ($remarks === '') { flash('A remark is mandatory when sending back for correction.', 'error'); redirect('/document?id=' . $doc['id']); }
-        $pdo->prepare("UPDATE report_approvals SET status='SENTBACK', acted_by=?, acted_at=?, remarks=?, correction_area=?, correction_deadline=? WHERE id=?")->execute([user_name(current_user()), date('c'), $remarks, $corrArea, $corrDeadline, $step['id']]);
-        $pdo->prepare("UPDATE report_docs SET status='DRAFT', updated_at=? WHERE id=?")->execute([date('c'), $doc['id']]);
-        idems_log('report_doc', $doc['id'], 'SENDBACK', ['irn'=>$doc['irn'], 'reason'=>$remarks]);
+        $pdo->beginTransaction();
+        try {
+            $pdo->prepare("UPDATE report_approvals SET status='SENTBACK', acted_by=?, acted_at=?, remarks=?, correction_area=?, correction_deadline=? WHERE id=?")->execute([user_name(current_user()), date('c'), $remarks, $corrArea, $corrDeadline, $step['id']]);
+            $closed = idems_close_later_steps($doc['id'], $step['id']);   // DEF-REP-016
+            $pdo->prepare("UPDATE report_docs SET status='DRAFT', updated_at=? WHERE id=?")->execute([date('c'), $doc['id']]);
+            $pdo->commit();
+        } catch (Throwable $e) { if ($pdo->inTransaction()) $pdo->rollBack(); throw $e; }
+        idems_log('report_doc', $doc['id'], 'SENDBACK', ['irn'=>$doc['irn'], 'field'=>'level ' . (int)$step['level'],
+            'new'=>idems_return_history_line('Sent back', $step, $remarks, $closed), 'reason'=>$remarks]);
         try { idems_notify_inspector_returned($doc, 'sendback', $remarks); } catch (Throwable $e) {}
         flash('Sent back to the inspector for correction.');
     } elseif ($decision === 'delegate') {
@@ -7175,7 +7377,7 @@ function ops_idems_vet_review($method) {
         FROM report_docs d LEFT JOIN business_partners bp ON bp.id=d.client_id LEFT JOIN business_partners v ON v.id=d.vendor_id LEFT JOIN report_types rt ON rt.id=d.report_type_id
         WHERE d.id=? AND d.deleted=0", [(int)($_GET['id'] ?? 0)]);
     if (!$doc) { http_response_code(404); view('notfound'); return true; }
-    ops_require(idems_doc_access($doc) !== '', idems_scope_refusal());   // B4 — issuing / executing / contracting office only
+    ops_require(idems_doc_access($doc) !== '', idems_scope_refusal($doc));   // B4 — issuing / executing / contracting office only
     ops_require(idems_can_vet(), 'You are not permitted to vet reports.');
     view('ops/idems/vet_review', [
         'doc' => $doc,
@@ -7257,7 +7459,10 @@ function idems_rule_reroute_pending(array $old, array $new) {
     if ((string)$old['approver_kind'] === (string)$new['approver_kind'] && (int)$old['approver_user_id'] === (int)$new['approver_user_id']
         && (string)$old['approver_role'] === (string)$new['approver_role']) return 0;
     $isUser = (string)$old['approver_kind'] === 'USER' && (int)$old['approver_user_id'] > 0;
-    $rows = ops_all("SELECT * FROM report_approvals WHERE status='PENDING' AND (rule_id=? OR ((rule_id IS NULL OR rule_id=0) AND level=? AND approver_kind=? AND COALESCE(approver_role,'')=?"
+    // DEF-REP-016 — only the steps of reports actually waiting on their approvers.
+    $rows = ops_all("SELECT * FROM report_approvals WHERE status='PENDING'"
+                  . " AND report_doc_id IN (SELECT d.id FROM report_docs d WHERE d.status='UNDER_REVIEW' AND d.deleted=0)"
+                  . " AND (rule_id=? OR ((rule_id IS NULL OR rule_id=0) AND level=? AND approver_kind=? AND COALESCE(approver_role,'')=?"
                   . ($isUser ? " AND approver_user_id=?" : "") . "))",
                     array_merge([(int)$old['id'], (int)$old['level'], (string)$old['approver_kind'], (string)$old['approver_role']], $isUser ? [(int)$old['approver_user_id']] : [])) ?: [];
     $n = 0;
@@ -7271,7 +7476,8 @@ function idems_rule_reroute_pending(array $old, array $new) {
 }
 function idems_map_reroute_pending($inspectorId) {
     $rows = ops_all("SELECT a.* FROM report_approvals a JOIN report_docs d ON d.id=a.report_doc_id
-                      WHERE a.status='PENDING' AND a.approver_kind='INSPECTOR_MAP' AND d.inspector_id=?", [(int)$inspectorId]) ?: [];
+                      WHERE a.status='PENDING' AND a.approver_kind='INSPECTOR_MAP' AND d.inspector_id=?
+                        AND d.status='UNDER_REVIEW' AND d.deleted=0", [(int)$inspectorId]) ?: [];   // DEF-REP-016
     $n = 0;
     foreach ($rows as $st) if (idems_reroute_step($st, 'INSPECTOR_MAP', '', null, "the inspector's approver was changed")) $n++;
     return $n;
@@ -8594,7 +8800,7 @@ function ops_idems_pdf($method) {
     ops_require(can('mod.idems.view') || is_master_of('idems'), 'You cannot view this report.');
     // Phase 2 §51 / B4 — scope the PDF like the report page: the issuing office,
     // or the executing / contracting office of its work order.
-    ops_require(idems_doc_access($doc) !== '', idems_scope_refusal());
+    ops_require(idems_doc_access($doc) !== '', idems_scope_refusal($doc));
     // Original / Duplicate / Triplicate — only meaningful once the report is
     // finalized; a draft always prints as DRAFT regardless.
     $copyMap = ['original' => 'ORIGINAL', 'duplicate' => 'DUPLICATE', 'triplicate' => 'TRIPLICATE'];
@@ -8749,7 +8955,7 @@ function ops_idems_timestamp($method) {
     if ($method !== 'POST') redirect('/documents');
     $doc = ops_one("SELECT * FROM report_docs WHERE id=? AND deleted=0", [(int)($_POST['id'] ?? 0)]);
     if (!$doc) { http_response_code(404); view('notfound'); return true; }
-    ops_require(idems_doc_access($doc) !== '', idems_scope_refusal());   // B4 — issuing / executing / contracting office only
+    ops_require(idems_doc_access($doc) !== '', idems_scope_refusal($doc));   // B4 — issuing / executing / contracting office only
     ops_require(is_master() || can('idems.timestamp.edit'), 'Only the Branch Application Manager may adjust locked dates.');
     $field = $_POST['field'] ?? '';
     $allowed = ['inspection_date','issue_date'];
@@ -9006,7 +9212,7 @@ function ops_idems_docx($method) {
         FROM report_docs d LEFT JOIN business_partners bp ON bp.id=d.client_id LEFT JOIN business_partners v ON v.id=d.vendor_id LEFT JOIN inspectors i ON i.id=d.inspector_id LEFT JOIN report_types rt ON rt.id=d.report_type_id
         WHERE d.id=? AND d.deleted=0", [(int)($_GET['id'] ?? 0)]);
     if (!$doc) { http_response_code(404); echo 'Not found'; return true; }
-    ops_require(idems_doc_access($doc) !== '', idems_scope_refusal());   // B4 — issuing / executing / contracting office only
+    ops_require(idems_doc_access($doc) !== '', idems_scope_refusal($doc));   // B4 — issuing / executing / contracting office only
     ops_require(can('mod.idems.view') || is_master_of('idems'), 'You cannot generate this report.');
     $tpl = idems_render_template($doc);   // §33 — the frozen template for an issued report, else the current pick
     [$secs, $fields] = idems_render_schema($doc);   // frozen once issued, live for a draft
@@ -10113,7 +10319,7 @@ function ops_idems_smart($method) {
         FROM report_docs d LEFT JOIN business_partners bp ON bp.id=d.client_id LEFT JOIN business_partners v ON v.id=d.vendor_id LEFT JOIN report_types rt ON rt.id=d.report_type_id
         WHERE d.id=? AND d.deleted=0", [(int)($_GET['id'] ?? $_POST['id'] ?? 0)]);
     if (!$doc) { http_response_code(404); view('notfound'); return true; }
-    ops_require(idems_doc_access($doc) !== '', idems_scope_refusal());   // B4 — issuing / executing / contracting office only
+    ops_require(idems_doc_access($doc) !== '', idems_scope_refusal($doc));   // B4 — issuing / executing / contracting office only
     $fields = idems_fields($doc['report_type_id']);
     $data = json_decode($doc['data'] ?: '[]', true) ?: [];
     $p = idems_smart_remarks($doc, $fields, $data);
@@ -10130,6 +10336,176 @@ function ops_idems_smart($method) {
     }
     view('ops/idems/smart', ['doc'=>$doc, 'p'=>$p, 'text'=>idems_smart_remarks_text($p)]);
     return true;
+}
+
+// ===========================================================================
+//  STAGE INSPECTION REPORTS — "Start next stage report"
+//  (owner, 17 Nov 2026, QA-REPORTS/V51/29 §B: "the next inspector must have a
+//  direct editable copy of the report from the previous inspection … or the
+//  coordinator can select the report for the inspector, editable, with the
+//  next report number.")
+//
+//  On an APPROVED or ISSUED report, a NEW report is made as a DRAFT (no new
+//  status or move): the next number in the same IRN series, the chosen
+//  inspector on it, everything that describes the order and the item copied,
+//  and everything that belongs to one visit left empty (result / conclusion,
+//  inspection date, photos and files, signatures, approvals, release status).
+//  It is linked back (report_docs.prev_stage_doc_id). The earlier report is
+//  never changed; both Histories say what happened.
+// ===========================================================================
+// Is the report at a stage another can continue from?
+function idems_next_stage_source_ok($doc) {
+    if (empty($doc) || !empty($doc['deleted'])) return false;
+    if (in_array(strtoupper((string)($doc['type_code'] ?? '')), ['RN', 'IRN'], true)) return false;   // a Release Note is not an inspection stage
+    $st = strtoupper((string)($doc['status'] ?? ''));
+    return $st === 'APPROVED' || $st === 'ISSUED' || !empty($doc['finalized']);
+}
+// The jobs on the report's work order allocated to $inspectorId (the job's
+// engineer, or one of its visit engineers) — open jobs first, newest first.
+function idems_stage_jobs_of($callId, $inspectorId) {
+    $callId = (int)$callId; $inspectorId = (int)$inspectorId;
+    if (!$callId || !$inspectorId) return [];
+    $vis = '';
+    try { db()->query("SELECT 1 FROM job_visits LIMIT 1"); $vis = " OR j.id IN (SELECT v.job_id FROM job_visits v WHERE v.inspector_id=?)"; } catch (Throwable $e) {}
+    $args = $vis ? [$callId, $inspectorId, $inspectorId] : [$callId, $inspectorId];
+    return ops_all("SELECT j.id, j.job_code, j.closed_flag FROM jobs j WHERE j.call_id=? AND (j.inspector_id=?$vis)
+                    ORDER BY COALESCE(j.closed_flag,0), j.id DESC", $args) ?: [];
+}
+// Who may press "Start next stage report" on this report, and as what:
+//   · 'INSPECTOR' — an Inspector allocated to a job on the same work order
+//                   (call_id): the next stage is theirs;
+//   · 'OFFICE'    — a Coordinator-or-above (holding the report right) of the
+//                   ISSUING or EXECUTING office, who picks the inspector.
+// Returns ['as' => 'INSPECTOR'|'OFFICE'|'', 'office' => id, 'role' => words, 'jobs' => [...]].
+function idems_next_stage_actor($doc) {
+    $none = ['as' => '', 'office' => 0, 'role' => '', 'jobs' => []];
+    if (!idems_next_stage_source_ok($doc)) return $none;
+    if (!empty($doc['revised_by_id'])) return $none;   // continue from the current revision
+    if (function_exists('is_master') && is_master()) return ['as' => 'OFFICE', 'office' => idems_doc_exec_office($doc), 'role' => 'executing office', 'jobs' => []];
+    $u = function_exists('current_user') ? current_user() : null;
+    if (!$u) return $none;
+    // The report's office reach, whatever its inspector — the next inspector
+    // may not READ another inspector's report (point 5), but may continue it.
+    if (idems_doc_office_access($doc) === '') return $none;
+    if (function_exists('is_field_inspector') && is_field_inspector()) {
+        if (!(can('mod.idems.edit') || is_master_of('idems'))) return $none;
+        $jobs = idems_stage_jobs_of((int)($doc['call_id'] ?? 0), (int)($u['inspector_id'] ?? 0));
+        return $jobs ? ['as' => 'INSPECTOR', 'office' => (int)($u['home_office_id'] ?? 0), 'role' => 'inspector allocated to this ' . Tl('call'), 'jobs' => $jobs] : $none;
+    }
+    $sbu = (string)($doc['sbu'] ?? '');
+    $exe = idems_doc_exec_office($doc);
+    if (idems_user_runs_office_reports($u, $exe, $sbu, true)) return ['as' => 'OFFICE', 'office' => $exe, 'role' => 'executing office', 'jobs' => []];
+    $iss = (int)($doc['office_id'] ?? 0);
+    if ($iss && $iss !== (int)$exe && idems_user_runs_office_reports($u, $iss, $sbu, true))
+        return ['as' => 'OFFICE', 'office' => $iss, 'role' => 'issuing office', 'jobs' => []];
+    return $none;
+}
+// The inspectors a Coordinator may pick for the next stage: those allocated to
+// jobs on the report's work order; when there are none, the active inspectors
+// of the executing office. [['id','name'], …]
+function idems_next_stage_inspectors($doc) {
+    $callId = (int)($doc['call_id'] ?? 0);
+    $rows = [];
+    if ($callId) {
+        $vis = '';
+        try { db()->query("SELECT 1 FROM job_visits LIMIT 1"); $vis = " OR i.id IN (SELECT v.inspector_id FROM job_visits v JOIN jobs j2 ON j2.id=v.job_id WHERE j2.call_id=?)"; } catch (Throwable $e) {}
+        $rows = ops_all("SELECT i.id, i.name FROM inspectors i WHERE i.status='ACTIVE'
+                         AND (i.id IN (SELECT j.inspector_id FROM jobs j WHERE j.call_id=? AND j.inspector_id IS NOT NULL)$vis) ORDER BY i.name",
+                        $vis ? [$callId, $callId] : [$callId]) ?: [];
+    }
+    if (!$rows) {
+        $exe = idems_doc_exec_office($doc);
+        if ($exe) $rows = ops_all("SELECT id, name FROM inspectors WHERE status='ACTIVE' AND home_office_id=? ORDER BY name", [$exe]) ?: [];
+    }
+    return $rows;
+}
+// The body (form data) the next stage starts from: every finding of the
+// earlier visit, without what belongs to that visit only. Read from the
+// report type's own field definitions:
+//   · photo / file / signature / sign-off / GPS fields — never carried;
+//   · result-like fields (result, conclusion, verdict, outcome, disposition,
+//     release, recommendation, decision) — left empty;
+//   · the inspection date and the inspector's name, report number and job —
+//     left empty, so the fill screen fills them afresh from the new report;
+//   · anything recorded as the automatic "NA" for a blank — left blank again.
+// Tables (PO items, scope, reference documents, instruments …) and the
+// observations carry over, so the next inspector edits the previous findings.
+function idems_next_stage_data($doc) {
+    $data = json_decode((string)($doc['data'] ?? '') ?: '[]', true);
+    if (!is_array($data)) return [];
+    $alias = function_exists('idems_field_aliases') ? idems_field_aliases() : [];
+    $visitKeys = array_merge($alias['inspection_date'] ?? [], $alias['inspector_name'] ?? [], $alias['irn'] ?? [], $alias['job_code'] ?? []);
+    $outcome = '/(^|_)(result|results|conclusion|conclusions|verdict|outcome|disposition|release|released|recommendation|recommendations|decision)(_|$)/';
+    $drop = [];
+    foreach (idems_fields((int)($doc['report_type_id'] ?? 0)) as $f) {
+        $k = (string)($f['fkey'] ?? ''); if ($k === '') continue;
+        $t = (string)($f['ftype'] ?? ''); $lk = strtolower($k); $lbl = strtolower((string)($f['label'] ?? ''));
+        if (in_array($t, ['photo', 'file', 'signature', 'sigblock', 'gps'], true)
+            || preg_match($outcome, $lk) || preg_match('/\b(result|conclusion|verdict|outcome|release status|recommendation)\b/', $lbl)
+            || in_array($lk, $visitKeys, true)
+            || (in_array($t, ['date', 'time'], true) && preg_match('/inspect|visit|witness/', $lk . ' ' . $lbl)))
+            $drop[$k] = true;
+    }
+    $na = function_exists('setting_get') ? (setting_get('report_blank_fill', '') ?: 'NA') : 'NA';
+    foreach (array_keys($data) as $k) {
+        $base = strpos((string)$k, '__') !== false ? substr((string)$k, 0, strpos((string)$k, '__')) : (string)$k;   // photos__photo_denied → photos
+        if (isset($drop[$k]) || isset($drop[$base])) { unset($data[$k]); continue; }
+        if (is_string($data[$k]) && trim($data[$k]) === $na) unset($data[$k]);
+    }
+    unset($data['source_report_id'], $data['source_irn']);
+    return $data;
+}
+// Make the next stage report. Returns [newId, ''] or [0, plain reason]; an
+// existing next stage of this report for the same inspector is returned as
+// [id, 'EXISTS'] rather than made twice.
+function idems_start_next_stage($src, $inspectorId, $jobId, $actorWords) {
+    $inspectorId = (int)$inspectorId; $jobId = (int)$jobId;
+    if (!idems_next_stage_source_ok($src)) return [0, 'A next stage report can be started only from an approved or issued ' . Tl('report') . '.'];
+    if (!$inspectorId) return [0, 'Choose the inspector for the next stage.'];
+    $dup = ops_one("SELECT id FROM report_docs WHERE prev_stage_doc_id=? AND inspector_id=? AND deleted=0 ORDER BY id DESC LIMIT 1", [(int)$src['id'], $inspectorId]);
+    if ($dup) return [(int)$dup['id'], 'EXISTS'];
+    $insName = (string)(ops_val("SELECT name FROM inspectors WHERE id=?", [$inspectorId]) ?: '');
+    $fields = [
+        'report_type_id' => $src['report_type_id'], 'type_code' => $src['type_code'], 'title' => $src['title'],
+        'client_id' => $src['client_id'], 'vendor_id' => $src['vendor_id'], 'call_id' => $src['call_id'] ?: null,
+        'job_id' => $jobId ?: null, 'client_code' => $src['client_code'], 'project_code' => $src['project_code'],
+        'project_name' => $src['project_name'], 'office_id' => $src['office_id'], 'sbu' => $src['sbu'],
+        'po_ref' => $src['po_ref'], 'drawing_no' => $src['drawing_no'], 'drawing_rev' => $src['drawing_rev'],
+        'qap_rev' => $src['qap_rev'], 'standards' => $src['standards'], 'location' => $src['location'],
+        'product_category' => $src['product_category'], 'material_grade' => $src['material_grade'],
+        'inspector_id' => $inspectorId, 'approver_user_id' => null,          // the new inspector's approver is worked out afresh
+        'inspection_date' => '', 'result' => '', 'release_status' => '',      // this visit's own — left empty
+        'remarks' => (string)($src['remarks'] ?? ''),
+    ];
+    // The next number in the report's existing IRN series (the same engine as a new report).
+    [$irn, $serial] = idems_generate_irn($fields);
+    $tok = idems_tokens_for($fields);
+    $me = current_user();
+    $row = $fields + [
+        'irn' => $irn, 'company_code' => $tok['{COMPANY}'], 'branch_code' => $tok['{BRANCH}'], 'fy_label' => $tok['{FY}'],
+        'serial' => $serial, 'status' => 'DRAFT', 'rev' => 0, 'finalized' => 0,
+        'data' => json_encode((object)idems_next_stage_data($src)),
+        'prev_stage_doc_id' => (int)$src['id'],
+        'created_by' => user_name($me), 'created_by_user_id' => (int)($me['id'] ?? 0) ?: null,
+        'created_at' => date('c'), 'updated_at' => date('c'),
+    ];
+    $keys = array_keys($row);
+    db()->prepare("INSERT INTO report_docs (" . implode(',', $keys) . ") VALUES (" . implode(',', array_fill(0, count($keys), '?')) . ")")
+        ->execute(array_values($row));
+    $newId = (int)db()->lastInsertId();
+    idems_log('report_doc', $newId, 'CREATE', ['irn' => $irn]);
+    idems_log('report_doc', $newId, 'IRN_GEN', ['irn' => $irn, 'new' => $irn]);
+    idems_log('report_doc', $newId, 'CONTINUES_FROM', ['irn' => $irn, 'field' => 'stage',
+        'new' => 'Continues from ' . $src['irn'] . ' — next stage report for ' . ($insName ?: 'the inspector') . ', started by ' . $actorWords
+               . '. Copied: client, vendor, P.O., project, drawing, specifications, location, report type and the form; left empty: result, conclusion, inspection date, photos, signatures and approvals.']);
+    idems_log('report_doc', (int)$src['id'], 'NEXT_STAGE', ['irn' => $src['irn'], 'field' => 'stage',
+        'new' => 'Next stage: ' . $irn . ' started for ' . ($insName ?: 'the inspector') . ' by ' . $actorWords . '. This report is unchanged.']);
+    return [$newId, ''];
+}
+// The reports that continue this one (its next stages), oldest first.
+function idems_next_stages_of($docId) {
+    try { return ops_all("SELECT id, irn, status FROM report_docs WHERE prev_stage_doc_id=? AND deleted=0 ORDER BY id", [(int)$docId]) ?: []; }
+    catch (Throwable $e) { return []; }
 }
 
 // ---- Reissue: amend a finalized report as a new revision --------------------
@@ -10337,7 +10713,7 @@ function ops_idems_release_note($method) {
         FROM report_docs d LEFT JOIN business_partners bp ON bp.id=d.client_id LEFT JOIN business_partners v ON v.id=d.vendor_id LEFT JOIN report_types rt ON rt.id=d.report_type_id
         WHERE d.id=? AND d.deleted=0", [(int)($_POST['id'] ?? 0)]);
     if (!$src) { http_response_code(404); view('notfound'); return true; }
-    ops_require(idems_doc_access($src) !== '', idems_scope_refusal());   // B4 — issuing / executing / contracting office only
+    ops_require(idems_doc_access($src) !== '', idems_scope_refusal($src));   // B4 — issuing / executing / contracting office only
     ops_require(can('mod.idems.edit') || is_master_of('idems'), 'You cannot create reports.');
     // A Release Note is raised only once the inspection report is ACCEPTED — i.e.
     // issued (finalised). A draft or a merely-approved-but-not-issued report cannot
@@ -11092,7 +11468,7 @@ function ops_idems_review($route, $method) {
         FROM report_docs d LEFT JOIN business_partners bp ON bp.id=d.client_id LEFT JOIN business_partners v ON v.id=d.vendor_id LEFT JOIN report_types rt ON rt.id=d.report_type_id
         WHERE d.id=? AND d.deleted=0", [(int)($_GET['id'] ?? $_POST['id'] ?? 0)]);
     if (!$doc) { http_response_code(404); view('notfound'); return true; }
-    ops_require(idems_doc_access($doc) !== '', idems_scope_refusal());   // B4 — issuing / executing / contracting office only
+    ops_require(idems_doc_access($doc) !== '', idems_scope_refusal($doc));   // B4 — issuing / executing / contracting office only
     $pdo = db();
     if ($method === 'POST') {
         $do = $_POST['_do'] ?? '';
@@ -11153,7 +11529,7 @@ function ops_idems_review($route, $method) {
 function ops_idems_evidence($method) {
     $doc = ops_one("SELECT d.*, rt.name type_name FROM report_docs d LEFT JOIN report_types rt ON rt.id=d.report_type_id WHERE d.id=? AND d.deleted=0", [(int)($_GET['id'] ?? $_POST['id'] ?? 0)]);
     if (!$doc) { http_response_code(404); view('notfound'); return true; }
-    ops_require(idems_doc_access($doc) !== '', idems_scope_refusal());   // B4 — issuing / executing / contracting office only
+    ops_require(idems_doc_access($doc) !== '', idems_scope_refusal($doc));   // B4 — issuing / executing / contracting office only
     $pdo = db();
     if ($method === 'POST') {
         ops_require(idems_can_edit_doc($doc), 'This report is finalized — its evidence is locked.');

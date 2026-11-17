@@ -126,6 +126,7 @@ document-evidence	idems	map
 document-fill	idems	map
 document-finalize	idems	map
 document-new	idems	map
+document-next-stage	idems	map
 document-pdf	idems	map
 document-polish-text	idems	map
 document-release-note	idems	map

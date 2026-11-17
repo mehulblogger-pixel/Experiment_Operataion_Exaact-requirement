@@ -298,6 +298,11 @@ function search_sources() {
         function ($q, $n) use ($like) {
             $l = $like($q);
             [$sw, $sa] = scope_clause('d.office_id', 'd.sbu');
+            // Point 5 (owner, 17 Nov 2026) — an Inspector finds only their own reports.
+            if (function_exists('idems_inspector_own_sql')) {
+                [$iw, $ia] = idems_inspector_own_sql();
+                if ($iw !== '1=1') { $sw = "($sw) AND $iw"; $sa = array_merge($sa, $ia); }
+            }
             return array_map(fn($r) => [
                 'title'    => ($r['irn'] ?: 'no reference') . ((int)$r['rev'] ? ' rev ' . (int)$r['rev'] : ''),
                 'subtitle' => $r['title'] ?: ($r['project_name'] ?: ''),

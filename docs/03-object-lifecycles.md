@@ -710,19 +710,20 @@ the row at issue. `ARCHIVED` is defined but never set (vestigial).
 ```mermaid
 stateDiagram-v2
   [*] --> DRAFT : document-new · idems.edit/master (idems.php:4250, guard 4185)
+  [*] --> DRAFT : document-next-stage — a NEW report continuing an APPROVED / ISSUED one (owner §B, 17 Nov 2026); no new status
   DRAFT --> VETTING : document-submit, vetting gate ON · idems_can_edit_doc (idems.php:4430)
   DRAFT --> UNDER_REVIEW : document-submit, no vetting gate · idems_can_edit_doc (idems.php:4446)
   VETTING --> UNDER_REVIEW : vet VETTED (auto-forward) · idems_can_vet = master/idems.finalize (idems.php:5892)
   VETTING --> DRAFT : vet RETURNED · idems_can_vet (idems.php:5875-5877)
-  UNDER_REVIEW --> UNDER_REVIEW : approve, more chain levels · idems_can_act_step (idems.php:5740)
+  UNDER_REVIEW --> UNDER_REVIEW : approve, more chain levels · idems_can_act_step — only while UNDER_REVIEW (DEF-REP-016)
   UNDER_REVIEW --> APPROVED : approve, last level · idems_can_act_step (idems.php:5743)
-  UNDER_REVIEW --> REJECTED : reject (remark required) · idems_can_act_step (idems.php:5750)
-  UNDER_REVIEW --> DRAFT : sendback (remark required) · idems_can_act_step (idems.php:5757)
+  UNDER_REVIEW --> REJECTED : reject (remark required) · idems_can_act_step; later pending steps closed (DEF-REP-016)
+  UNDER_REVIEW --> DRAFT : sendback (remark required) · idems_can_act_step; later pending steps closed (DEF-REP-016)
   VETTING --> DRAFT : document-reopen, reason required · idems_reopen_actor (executing-office Coordinator+ or delegate)
   UNDER_REVIEW --> DRAFT : document-reopen, reason required · idems_reopen_actor (executing-office Coordinator+ or delegate)
   APPROVED --> DRAFT : document-reopen, reason required · idems_reopen_actor — NEW (owner C2, 16 Nov 2026); approvals cleared, chain runs again on resubmit
   APPROVED --> ISSUED : document-finalize · idems.finalize/master, approver≠issuer (idems.php:4518, seg 4460)
-  ISSUED --> [*] : locked (finalized=1); document-revise spawns a NEW DRAFT revision R1, R2 … · idems_reopen_actor forRevision
+  ISSUED --> [*] : locked (finalized=1); document-revise spawns a NEW DRAFT revision R1, R2 … · idems_revision_actor (executing or issuing office, point 4)
   REJECTED --> DRAFT : editable again (idems_status_allows_edit idems.php:3463)
 ```
 
@@ -752,6 +753,42 @@ gain it. Route `document-reopen` (`idems_reopen_actor()`, `IDEMS_REOPEN_STATES`)
 - No status is added: DRAFT is the existing status. The existing approver send-back
   and the vetting return are unchanged.
 
+**Report batch of 17 Nov 2026 (`QA-REPORTS/V51/29`, owner's go-ahead) — no status and
+no transition added:**
+- **Approve / reject / send back only while UNDER_REVIEW (Change 1, DEF-REP-016).**
+  `ops_idems_approve()` refuses every decision (approve, reject, send back, delegate)
+  unless the report is UNDER_REVIEW, and `idems_can_act_step()` asks the same, so no
+  screen offers the buttons. On **reject** (→ REJECTED) and **send back** (→ DRAFT)
+  every approval step still PENDING after the acting one is deleted
+  (`idems_close_later_steps()`); the acting step stays (REJECTED / SENTBACK) so the
+  inspector sees who and why. History: *"Rejected at level 1 by <name>: <reason>.
+  The approval still waiting after it was closed: level 2 (<name>) …"*. Resubmit
+  rebuilds the chain from level 1 (`idems_build_approval_chain()` clears
+  `report_approvals`), exactly as before. Pending counts, the inbox, the approver
+  re-routes and the SLA reminder all require UNDER_REVIEW.
+- **Revision (point 4).** `document-revise` is also open to a Coordinator-or-above
+  of the **issuing** office (`report_docs.office_id`) when it differs from the
+  executing office, and to their delegate (`idems_revision_actor()`).
+- **Submit (point 6).** DRAFT / REJECTED → VETTING / UNDER_REVIEW is no longer done by
+  the **contracting** office (`idems_can_submit_doc()`); it may still edit before
+  submission. The issuing or executing office, or the report's own inspector, submits.
+- **Reading (point 5).** An Inspector opens only their own reports (inspector or
+  creator); see `docs/02`, item 18.
+- **Next stage report (§B).** `document-next-stage` on an **APPROVED or ISSUED** report
+  **creates a new report** — it moves nothing: the new one starts as **DRAFT** (the
+  existing first status), with the next number of the same IRN series
+  (`idems_generate_irn()`, no contract token — the owner's Q1 is for later), the chosen
+  inspector on it and the presser as creator, `report_docs.prev_stage_doc_id` = the
+  earlier report. Copied: report type, title, client, vendor, work order, project,
+  P.O., drawing, specifications, location, product / material, remarks and the form's
+  data except result-like, photo / file / signature / sign-off / GPS fields, the
+  inspection date, the inspector's name and report number fields and automatic "NA"
+  blanks (`idems_next_stage_data()`). Empty: result, release status, inspection date,
+  approver, photos and files, signatures, approvals. The earlier report's row is never
+  changed; its page shows "Next stage: <IRN>" (found by `prev_stage_doc_id`), the new
+  one "Continues from <IRN>", and both Histories record it (`NEXT_STAGE`,
+  `CONTINUES_FROM`). Pressing again for the same inspector opens the one already made.
+
 
 - **Segregation (new, this codebase):** at finalize, if the current user approved this
   report, issue is refused — approver ≠ issuer (`idems_issue_blocked_for_approver()`), master excepted.
@@ -773,7 +810,10 @@ gain it. Route `document-reopen` (`idems_reopen_actor()`, `IDEMS_REOPEN_STATES`)
   *"Edited by <name> (<office> — contracting office): <fields> changed"*
   (`CONTRACTING_EDIT`). Anyone else is refused (`idems_doc_access()`). An Inspector edits
   only their own reports — the inspector on it, or its creator (`idems_is_own_report()`,
-  `report_docs.created_by_user_id`). Issue and approve rules are unchanged.
+  `report_docs.created_by_user_id`) — and, since 17 Nov 2026 (point 5), **opens** only
+  those too (except a report naming them as approver, and the Senior Inspector's
+  vetting / issue work). The contracting office no longer submits (point 6). Issue
+  rules are unchanged; approval runs only while UNDER_REVIEW (DEF-REP-016).
 
 ---
 
