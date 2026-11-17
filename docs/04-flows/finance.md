@@ -42,6 +42,8 @@ Charts → … The pending-tasks panel shows "contracts to register" (`ops.php:6
 - Refused lines (a deputation already on another invoice) are reported, not dropped (`booksui.php:217-224`).
 - A same-office call bills from the **contract's branch** so it always has a numbering series (invoice office resolution `invoice_office_for`, `ops.php`).
 
+- **Expense claims (Expenses Phase 1, owner 17 Nov 2026):** Finance sees a claim when it reaches the Finance level of its chain, in the offices it covers; it **approves at its level** (always last) or **sends back with a reason** — it never changes a line (V2). Anything unusual (a different distance, an amount above a limit, a "no bill" line over its daily limit) is listed in amber at the top. After APPROVED, **Mark paid** asks for the **advance** already paid to the person (E6); left blank, an advance already on an older voucher is kept. The amount paid (total − advance − office-incurred) is written to History.
+
 **Handoff points (named):**
 - **Operations → Finance:** a closed job (`closed_flag=1`) appears in **/to-bill** (`books_billable_jobs`, `booksui.php:123`).
 - **Sales → Finance:** accepted quotes without a contract number surface as "contracts to register" (`ops.php:6306`).

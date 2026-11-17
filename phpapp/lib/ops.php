@@ -8055,6 +8055,10 @@ function voucher_register_rows() {
                     WHERE (user_id=? OR on_behalf_user_id=?) AND action IN ('APPROVED','ALREADY_SIGNED','SENT_BACK')", [$me, $me]) ?: [], 'voucher_id')); }
             catch (Throwable $e) { $extra = []; }
             foreach (voucher_waiting_on_me() as $w) $extra[] = (int)$w['id'];
+            // Expenses Phase 1 — a claim whose claimant asked their N+1 to reopen it
+            // after a deadline waits for that N+1 (can_view_voucher decides).
+            try { foreach (ops_all("SELECT id FROM vouchers WHERE status='DRAFT' AND COALESCE(reopen_asked_at,'')<>''") ?: [] as $rr) $extra[] = (int)$rr['id']; }
+            catch (Throwable $e) {}
         }
         foreach (array_unique($extra) as $xid) {
             if (isset($byId[$xid])) continue;

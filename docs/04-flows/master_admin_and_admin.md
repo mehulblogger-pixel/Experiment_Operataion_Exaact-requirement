@@ -43,3 +43,13 @@ flowchart TD
 "Reopen as draft" on an approved costing unless they gave its highest approval themselves (or are
 that approver's delegate or above them in the reporting line).
 
+**Expense claims (Expenses Phase 1, owner 17 Nov 2026).** The Master Admin sets the expense rules
+at Admin → Approvals → Expense vouchers → *Claim period, deadlines, expense types and bands*
+(`/voucher-rules`): the claim period (weekly / fortnightly / monthly), the two deadlines (a day's
+expenses for N days; a claim within M days after its period — 8 and 8 to start), the distance
+tolerance, the band list and what each band may claim (amounts, limits, from a date). Expense types
+stay on Masters → Expense heads; a person's band and own amounts on their team-member record
+(Allowances & rates). The Master Admin and an Admin **view** every claim and may approve where
+nobody else can, mark Paid and reopen as before — but since V2 they **no longer edit, submit or open
+a claim for someone else**, and they do not reopen a claim locked by a deadline (only the claimant's N+1).
+

@@ -16,9 +16,9 @@ flowchart TD
   D --> E[/document-fill → write body/]
   E --> F[Submit for review<br/>completeness gate must pass]
   F --> G((Handoff: report → Vetter/Approver))
-  B --> H[Close job & record expenses<br/>/job-close popup]
+  B --> H[Close the day & confirm its expenses<br/>/job-close · own visit day → /voucher-day]
   H --> I((Handoff: closed job → Finance /to-bill))
-  H --> J[/vouchers → submit monthly claim/]
+  H --> J[/the claim for the period fills itself → Submit/]
   J --> K((Handoff: voucher → approver))
 ```
 
@@ -38,8 +38,8 @@ board shows **no money figure**; the monthly voucher stays a link, not a total.
 4. **New report** → `/document-new?job=&call=` (`job_detail.php:504`) — prefilled (client/vendor/PO/scope carried from the call), pick the report type, Save.
 5. **Fill** → `/document-fill?id=` — write the body (dictation/AI-polish helpers available).
 6. **Submit for review** → `/document-submit` (`idems.php:4392`). A completeness gate must pass first (`idems.php:4399-4409`); untouched text fields default to "NA".
-7. **Close the job & record expenses** — the close popup on `/my-jobs` posts to `/job-close` (`my_jobs.php:220`), capturing the day's travel/food/lodging.
-8. **Voucher** → `/vouchers` — a monthly draft is generated from the inspector's jobs (`voucher_generate`, `ops.php:4766`); submit it for approval. Travel & incidental expenses go here (the voucher is also the timesheet). **On a phone** the 12-column grid reflows into one card per day (`voucher_detail.php`, `@media ≤720px`): each cell becomes a "Label: value" line and inputs go full-width — the same inputs and the same live-total JS, just stacked so it is usable with a thumb instead of scrolling sideways.
+7. **Close the day & confirm its expenses** (Expenses Phase 1, owner 17 Nov 2026 — design v3 screen 1). "Close the day" on `/my-jobs` or the job opens `/job-close`; a multi-day job's own visit day is closed on the job's day-by-day panel (the engineer allocated to that day may close it) and leads to `/voucher-day`. **Today's expenses** are already filled in: travel = the usual distance for that site × the rate of his band or profile, the per-day allowances that are "added by itself", and a tick box for each one "added when he ticks it" (e.g. *Outstation today*); each figure says where it came from. A different distance than the approved usual one needs a reason (the approver sees it in amber). **＋ Add a bill** (ticket, hotel, cab: amount + photo) or a "no bill" expense (auto-rickshaw, food: amount + a short note, within its daily limit) — only the types his band or profile allows. Then **Close the day** — "no expenses today" is fine. The lines go into his claim for the period by themselves, with job, client, site and date; nothing is written to the job's `expenses`. If a coordinator closed the job, the day appears on his claim as "needs its expenses confirmed".
+8. **The claim** → `/vouchers` → the period (weekly, fortnightly or monthly — the company setting). One card per day and job (job no., client, site, amounts), the total on top, "It will go to: N+1 → … → Finance", then **Submit ₹…**. He can change or remove his own lines while it is a draft and within the deadlines (a day's expenses for 8 days after the day, the claim within 8 days after the period — the owner's values, settings). After a deadline it is locked: he taps **Ask to reopen** and only his N+1 can reopen it, with a reason. "Not for a job" types (e.g. a courier from home) appear under **＋ Add an expense** only when switched on for his band or for him. A bill needs its photo before he can submit. He no longer types the advance — Finance enters it when paying. An older month voucher still opens with its own figures, and its month sheet (hours, days off, amounts per head) stays available while it is a draft; "Pull working days" is kept there for those months.
 
 **The job view is phone-first and stripped for the inspector.** The job screen
 (`views/ops/job_detail.php`) is shared with coordinators and managers, so it carries
@@ -73,6 +73,7 @@ coordinator, manager or anyone holding the money permissions still sees the full
 - **Inspector → Vetter/Approver:** on submit the report leaves the inspector and shows on the approver's dashboard "Reports awaiting your approval" and their pending tasks (`dashboard.php:253`, `ops.php:6336`). A rejected report returns as "to fix & resubmit" (`ops.php:6370`).
 - **Inspector → Report issuer:** once approved, an `idems.finalize` holder sees "to issue" (`ops.php:6342`) and produces the locked PDF.
 - **Inspector/Coordinator → Finance:** closing the job (`closed_flag=1`) makes it appear in Finance's **/to-bill** (`booksui.php:123`).
+- **Approvers never edit (V2):** an approver, Finance, the Master Admin or an Admin approves or sends back with a reason; none of them changes his lines or submits for him.
 - **Inspector → Voucher approver:** submitting the voucher starts its approval chain (branch batch R5): it shows as "vouchers to approve" for the person the inspector reports to (N+1), then — if the amount needs it — N+2 and above and any role level the Master Admin set (a Business Director above an amount, for example; someone already signed is not asked twice), then Finance. Each approver sees the voucher only once it reaches them; nobody sees it because of their role (`lib/voucher_approval.php`, `docs/02` footnote 3). An approver may send it back with a reason; the inspector sees the reason on the voucher and as "voucher sent back — correct it", corrects it and submits again.
 
 **Click-count — fill & submit a report:** open job (1) → New report → Save (2) →

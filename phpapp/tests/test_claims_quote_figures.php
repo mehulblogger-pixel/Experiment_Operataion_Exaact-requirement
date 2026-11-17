@@ -47,7 +47,13 @@ t_ok($before($ops, 'figures_problem($f)', 'UPDATE voucher_entries SET hours=?, l
      'the claim sheet save checks every hour, km and amount before its first UPDATE');
 t_ok($before($ops, "figures_problem([[\$b['hours']", 'UPDATE voucher_entries SET hours=?, line_no=?, file_no=?, notes=?', "\$route === 'voucher-entry'"),
      'editing or adding a day checks the hours before writing');
-t_ok($before($ops, 'figures_problem($expF)', 'INSERT INTO expenses (job_id,inspector_id', '// collect any configurable (extra) headings') || $before($ops, 'figures_problem($expF)', 'INSERT INTO expenses (job_id,inspector_id', 'The day\'s expenses are real money'),
+// Expenses Phase 1 (owner, 17 Nov 2026): closing the day writes the claim's lines,
+// not `expenses`. exp_day_check() refuses a negative or non-numeric km (and a
+// missing reason for a different distance) before exp_day_confirm() writes a line,
+// and the job close asks it before the job is closed.
+$exl = file_get_contents(__DIR__ . '/../lib/expenses.php');
+t_ok($before($exl, "return ['The distance must be a number of km (0 or more).'", 'exp_insert_line($v, $travel', 'function exp_day_check(')
+     && $before($ops, 'exp_day_check($expIns', "UPDATE jobs SET closed_flag=1", "\$route === 'job-close'"),
      'job closure checks the day\'s expenses before recording them');
 t_ok($before($crm, 'crm_quote_figures_problem($b)', 'UPDATE quotations SET $set', "\$route === 'quote-new' || \$route === 'quote-edit'"),
      'the quotation save checks the figures before it writes the header or the lines');
@@ -55,9 +61,11 @@ t_ok($before($crm, 'crm_quote_figures_problem($b)', 'INSERT INTO quotations (', 
      'the external-quotation save checks them too');
 
 // ---- the forms say no first --------------------------------------------------------
-$vd = file_get_contents(__DIR__ . '/../views/ops/voucher_detail.php');
+$vd = file_get_contents(__DIR__ . '/../views/ops/voucher_detail.php') . file_get_contents(__DIR__ . '/../views/ops/voucher_grid.php');   // Phase 1 — the month sheet is a partial
 t_ok(substr_count($vd, 'min="0"') >= 5, 'the claim sheet\'s hours, km and amount fields carry min="0"');
 $qf = file_get_contents(__DIR__ . '/../views/ops/crm/quote_form.php');
 t_ok(strpos($qf, 'min="0" max="100" id="gst_pct"') !== false && strpos($qf, 'min="0" name="l_qty[]"') !== false, 'the quotation form limits GST to 0–100 and quantity to 0 or more');
-$jc = file_get_contents(__DIR__ . '/../views/ops/job_close.php');
-t_eq(preg_match_all('/min="0" name="(travel|local|food|lodging|misc)"/', $jc), 5, 'the five job-closure expense fields carry min="0"');
+// Phase 1 — the day close asks for the km only (everything else is filled in from
+// the band / profile); that field carries min="0".
+$jc = file_get_contents(__DIR__ . '/../views/ops/_exp_day_fields.php');
+t_eq(preg_match_all('/min="0" name="km"/', $jc), 1, 'the day-close distance field carries min="0"');

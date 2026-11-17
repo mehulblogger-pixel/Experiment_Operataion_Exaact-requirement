@@ -13,7 +13,7 @@ foreach ($plan['bills'] as $h) $limitTxt[$h['code']] = $h['_limit'] !== null
 <div class="master-head">
   <div><h1><?= e($job['job_code']) ?> · <?= e(date('j M', strtotime($date))) ?></h1>
     <p class="sub" style="margin:2px 0 0"><?= e(exp_job_client($job) ?: '—') ?><?= exp_job_site($job) !== exp_job_client($job) ? ' · ' . e(exp_job_site($job)) : '' ?><?= !empty($job['contract_number']) ? ' · ' . e(T('boss')) . ' ' . e($job['contract_number']) : '' ?></p></div>
-  <a class="btn secondary" href="<?= e($back) ?>">← <?= $claim ? 'My claim' : e(ucfirst(Tl('job'))) ?></a>
+  <a class="btn secondary" href="<?= e($back) ?>">← <?= $claim ? 'My ' . e(Tl('voucher')) : e(ucfirst(Tl('job'))) ?></a>
 </div>
 
 <?php if ($problem !== ''): ?>

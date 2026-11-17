@@ -134,6 +134,11 @@ try {
     db()->prepare("INSERT INTO vouchers (inspector_id, office_id, month, period_start, period_end, status, total, reopen_asked_at, created_at) VALUES (?,?, '2026-01', '2026-01-01', '2026-01-31', 'DRAFT', 0, ?, ?)")
         ->execute([$f['amit_ins'], $f['mum'], date('c'), date('c')]);
     $late = (int) db()->lastInsertId(); $f['vids'][] = $late;
+    $r = bbv_route('vouchers', 'GET', $f['neha'], 0);
+    t_ok($opened($r, 'ops/voucher_list') && strpos($r['out'], 'January 2026') !== false && strpos($r['out'], 'Your turn') !== false,
+         'deadline · the request to reopen is in his N+1\'s list as "Your turn"');
+    $r = bbv_route('vouchers', 'GET', $f['sunil'], 0);
+    t_ok(strpos((string) ($r['out'] ?? ''), 'January 2026') === false, 'deadline · N+2 does not see it');
     $r = bbv_route('voucher-status', 'POST', $f['sunil'], $late, ['action' => 'deadline_reopen', 'reason' => 'ok']);
     t_eq((string) ops_val("SELECT deadline_open_until FROM vouchers WHERE id=?", [$late]), '', 'deadline · N+2 cannot reopen it');
     $r = bbv_route('voucher-status', 'POST', $f['neha'], $late, ['action' => 'deadline_reopen', 'reason' => '']);

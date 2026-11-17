@@ -102,8 +102,8 @@ runs *inside* SUBMITTED, and a send-back returns to DRAFT.
 
 ```mermaid
 stateDiagram-v2
-  [*] --> DRAFT : voucher find-or-create — your OWN month (anyone linked to a team member); for someone else, Master Admin / Admin only
-  DRAFT --> SUBMITTED : submit · the claimant (own) OR Master Admin / Admin; starts a new approval round
+  [*] --> DRAFT : find-or-create — your OWN claim for the period (anyone linked to a team member); nobody opens one for someone else (V2)
+  DRAFT --> SUBMITTED : submit · the claimant only, within M days after the period; starts a new approval round
   SUBMITTED --> SUBMITTED : approve one level · the person (or delegate) at the current level · a level whose signer already signed an earlier one counts as signed
   SUBMITTED --> APPROVED : approve the LAST level · Finance (always last)
   SUBMITTED --> DRAFT : send back · whoever may sign the current level, reason REQUIRED
@@ -113,6 +113,27 @@ stateDiagram-v2
   SUBMITTED --> DRAFT : reopen · Master Admin / Admin (approvers send back instead)
 ```
 
+- **Periods (Expenses Phase 1, owner 17 Nov 2026 — E1).** A voucher is one person's claim
+  for one **period**: weekly (Monday–Sunday), fortnightly (1–15, 16–end) or monthly — a
+  company setting (`exp_claim_period`, default monthly). A period never crosses a month
+  end; `vouchers.period_start` / `period_end` hold it and `month` stays the period's
+  YYYY-MM, so the month freeze, the cost run and the reports read it as before. Every
+  voucher made before periods existed is its whole month and keeps its lines and figures.
+- **Lines come from closing the day (V1).** When the claimant closes a day on their own
+  allocated job (job close, or their own visit day), its travel (usual km × rate) and
+  per-day allowances become lines of the claim for that day's period, with job, client,
+  site and date; bills (photo) and "no bill" lines (amount + note) are added to that day;
+  fixed-per-month types are added once a month by themselves. Only the claimant adds,
+  changes or removes a line, while DRAFT (V2). This is not a status change.
+- **Deadlines (E4) — no new status.** A day's lines can be added or changed for **N** days
+  after the day (`exp_day_deadline_days`), and the claim submitted within **M** days after
+  its period ends (`exp_claim_deadline_days`); the owner's values are 8 and 8. After that the
+  DRAFT is locked (like the month freeze). The claimant asks their **N+1**, who alone may
+  reopen it with a reason — the existing *reopen to DRAFT*: it stays a DRAFT and is open
+  again for M days (`deadline_open_until`), logged as `REOPENED` (level `DEADLINE`). A send-back
+  also re-opens the correction window. Days and claims before the rules started
+  (`exp_rules_from`) are never locked by them.
+- **Paid (E6).** Finance enters the advance when it marks the claim Paid.
 - **Actors (batch 2, owner 17 Nov 2026 — plan 29 Change 2, points 1–3, A, Q3).** Every
   individual raises, edits and submits **their own** voucher. Approving is the chain only.
   Reopen: an **approved** voucher by Finance (its offices) or the Master Admin / Admin; a
