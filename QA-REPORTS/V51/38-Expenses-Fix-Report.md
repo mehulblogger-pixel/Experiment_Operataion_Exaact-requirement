@@ -1,4 +1,4 @@
-# Expenses — fix report and opstest update ({{DATE}})
+# Expenses — fix report and opstest update (18 Nov 2026)
 
 **What this zip contains.** The new expense module you approved: design v3 and the "existing vs needed" table (document 36). Nothing else changed. The foundation fix (themes 1–2) is **not** in this zip; it waits for your OK on plan 37.
 
@@ -27,15 +27,25 @@
 **Your old vouchers** (for example the ₹30,000 one) open with all their figures and history, exactly as before.
 
 ## How it was tested
-{{TESTS}}
+| Check | Result |
+| --- | --- |
+| New automatic tests for the expense rules (2 files) | **135 checks, all pass**: periods, bands and person amounts with dates, day close, bill photo, no-bill note and limit, duplicates (amount and photo), distance, deadlines and reopen by N+1, approvers cannot edit, Finance advance, ₹0 totals, Save not wiping amounts, old vouchers unchanged, counted once |
+| Full suite, SQLite | **21,266 passed.** 3 failed in a database-lock **timing** test that needs a quiet machine; it passes on every rerun (18 of 18) and has nothing to do with expenses |
+| Full suite, MariaDB (your server's database type) | **21,258 passed.** The 24 failures are exactly the known MariaDB test-order list, line for line, the same as before this change. **No new failure** |
+| Robot: 83 real-screen tests that touch vouchers, job closing, profit, money and the whole-journey flows, before vs after | **Only the voucher screens changed, as intended.** Every job-closing, profit, invoice and journey screen behaves exactly as before. One old test (OPS-085) now finds the "Add an expense" box moved to "＋ Add a bill" on the day page; its checks (amount 0 or minus refused, photo over 6 MB refused) are still there. The earlier fault on the voucher screen is gone |
+| I also opened the new screens myself | Close the day (phone), My expenses, and the Expense rules page |
 
 ## The zip — for opstest only
-{{ZIP}}
+`EXAACT-V51.1-Expenses-TEST-COPY-update.zip`
+- **Contents:** 808 files at the top of the zip. Compared with the batch 2 zip, **19 differ**: 5 new screens/files (`lib/expenses.php`, `voucher_day.php`, `voucher_rules.php`, `voucher_grid.php`, `_exp_day_fields.php`) and 14 changed.
+- **Release stamp:** 24028c5. Deploy-check on the build: **728 of 728 files match.**
+- **SHA-256:** `929b6335b6cecffe49a4ea3ff93857612ca0dd65593de4ecb3e80446bb5e3287`
+- **Left out, as always:** `config.local.php`, `tenants.php`, `tests/`, database files, `exaact_data*` / `exaact_backups*`.
 
 **Install** (the same steps as last time, see guide 33):
 1. Back up opstest.
 2. File Manager → opstest app folder → upload → Extract (overwrite) → delete the zip.
-3. Open `deploy-check.php`: Release **{{REL}}**, green ✓. Send me the screenshot.
+3. Open `deploy-check.php`: Release **24028c5**, green ✓. Send me the screenshot.
 
 **Database:** only additions, made automatically:
 - one new list (bands);
