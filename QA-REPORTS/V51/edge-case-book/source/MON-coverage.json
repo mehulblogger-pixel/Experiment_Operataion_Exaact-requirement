@@ -1,0 +1,708 @@
+{
+ "routes": {
+  "job-invoice": {
+   "cases": [
+    "EC-MON-061",
+    "EC-MON-062"
+   ],
+   "buttons": {
+    "Save invoice / payment": [
+     "EC-MON-061",
+     "EC-MON-062"
+    ]
+   }
+  },
+  "job-bill": {
+   "cases": [
+    "EC-MON-063",
+    "EC-MON-064",
+    "EC-MON-074"
+   ],
+   "buttons": {
+    "🧾 Raise GST invoice from this deputation →": [
+     "EC-MON-063",
+     "EC-MON-064"
+    ],
+    "🧾 Raise invoice for what is due (man-day / man-month job)": [
+     "EC-MON-074"
+    ]
+   }
+  },
+  "invoicing": {
+   "cases": [
+    "EC-MON-059",
+    "EC-MON-060"
+   ],
+   "buttons": {
+    "Invoice pending / Awaiting payment / Overdue / Credit not received cards": [
+     "EC-MON-059",
+     "EC-MON-060"
+    ],
+    "⬇ Download CSV": [
+     "EC-MON-059"
+    ],
+    "Confirm →": "navigation only",
+    "⏳ Ageing": "navigation only",
+    "📤 Tally export": "navigation only"
+   }
+  },
+  "tally": {
+   "cases": [
+    "EC-MON-065",
+    "EC-MON-068"
+   ],
+   "buttons": {
+    "Show": [
+     "EC-MON-065"
+    ],
+    "Show what has already gone": [
+     "EC-MON-068"
+    ],
+    "What (Sales / Receipt / Credit notes)": [
+     "EC-MON-065"
+    ],
+    "Open job →": "not shown to any test user: no row was blocked in the runs (it links /job?id=<invoice id>, same pattern as EC-MON-049)"
+   }
+  },
+  "tally-export": {
+   "cases": [
+    "EC-MON-066",
+    "EC-MON-070"
+   ],
+   "buttons": {
+    "⬇ Tally XML (import this)": [
+     "EC-MON-066"
+    ],
+    "⬇ CSV (to look at first)": [
+     "EC-MON-066",
+     "EC-MON-070"
+    ],
+    "Also create the party ledgers": [
+     "EC-MON-066"
+    ]
+   }
+  },
+  "tally-settings": {
+   "cases": [
+    "EC-MON-003",
+    "EC-MON-069",
+    "EC-MON-070"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-MON-069",
+     "EC-MON-070",
+     "EC-MON-003"
+    ]
+   }
+  },
+  "tally-undo": {
+   "cases": [
+    "EC-MON-067",
+    "EC-MON-070"
+   ],
+   "buttons": {
+    "Undo": [
+     "EC-MON-067",
+     "EC-MON-070"
+    ]
+   }
+  },
+  "receivables": {
+   "cases": [
+    "EC-MON-048",
+    "EC-MON-049",
+    "EC-MON-050"
+   ],
+   "buttons": {
+    "Due date": [
+     "EC-MON-048"
+    ],
+    "Invoice date": [
+     "EC-MON-048"
+    ],
+    "⬇ Download CSV": [
+     "EC-MON-048"
+    ],
+    "Client row (detail)": [
+     "EC-MON-049"
+    ],
+    "Open →": [
+     "EC-MON-049"
+    ],
+    "Clear →": [
+     "EC-MON-049"
+    ]
+   }
+  },
+  "invoices": {
+   "cases": [
+    "EC-MON-002",
+    "EC-MON-021",
+    "EC-MON-051",
+    "EC-MON-052"
+   ],
+   "buttons": {
+    "Open / Paid / Draft / Cancelled / All": [
+     "EC-MON-051",
+     "EC-MON-052"
+    ],
+    "Find": [
+     "EC-MON-051"
+    ],
+    "⬇ CSV": [
+     "EC-MON-051"
+    ],
+    "+ New invoice": [
+     "EC-MON-002",
+     "EC-MON-021"
+    ],
+    "Work waiting to be billed": "navigation only",
+    "Money in": "navigation only",
+    "Columns / Rows per page": "navigation only"
+   }
+  },
+  "invoice": {
+   "cases": [
+    "EC-MON-002",
+    "EC-MON-003",
+    "EC-MON-005",
+    "EC-MON-053",
+    "EC-MON-054",
+    "EC-MON-055",
+    "EC-MON-095"
+   ],
+   "buttons": {
+    "🖨 Print / PDF": [
+     "EC-MON-053",
+     "EC-MON-005"
+    ],
+    "Set branch": [
+     "EC-MON-055"
+    ],
+    "Record money received": [
+     "EC-MON-054"
+    ],
+    "Customer ledger": [
+     "EC-MON-054"
+    ],
+    "Client name link": "navigation only",
+    "Jobs on this invoice": "navigation only"
+   }
+  },
+  "invoice-new": {
+   "cases": [
+    "EC-MON-017",
+    "EC-MON-018",
+    "EC-MON-019",
+    "EC-MON-020",
+    "EC-MON-021"
+   ],
+   "buttons": {
+    "Start the draft": [
+     "EC-MON-017",
+     "EC-MON-018",
+     "EC-MON-019",
+     "EC-MON-020",
+     "EC-MON-021"
+    ],
+    "Cancel": [
+     "EC-MON-020"
+    ],
+    "+ Add new (customer)": "navigation only"
+   }
+  },
+  "invoice-line-add": {
+   "cases": [
+    "EC-MON-004",
+    "EC-MON-005",
+    "EC-MON-006",
+    "EC-MON-007",
+    "EC-MON-008",
+    "EC-MON-009",
+    "EC-MON-010",
+    "EC-MON-011",
+    "EC-MON-012"
+   ],
+   "buttons": {
+    "Add the line": [
+     "EC-MON-004",
+     "EC-MON-005",
+     "EC-MON-006",
+     "EC-MON-007",
+     "EC-MON-008",
+     "EC-MON-009",
+     "EC-MON-010",
+     "EC-MON-011",
+     "EC-MON-012"
+    ]
+   }
+  },
+  "invoice-line-delete": {
+   "cases": [
+    "EC-MON-012",
+    "EC-MON-013"
+   ],
+   "buttons": {
+    "Remove": [
+     "EC-MON-013",
+     "EC-MON-012"
+    ]
+   }
+  },
+  "invoice-issue": {
+   "cases": [
+    "EC-MON-001",
+    "EC-MON-014",
+    "EC-MON-015",
+    "EC-MON-016",
+    "EC-MON-022",
+    "EC-MON-023"
+   ],
+   "buttons": {
+    "Issue this invoice": [
+     "EC-MON-001",
+     "EC-MON-014",
+     "EC-MON-015",
+     "EC-MON-016",
+     "EC-MON-022",
+     "EC-MON-023"
+    ]
+   }
+  },
+  "invoice-cancel": {
+   "cases": [
+    "EC-MON-022",
+    "EC-MON-024",
+    "EC-MON-025",
+    "EC-MON-068"
+   ],
+   "buttons": {
+    "Cancel this invoice": [
+     "EC-MON-024",
+     "EC-MON-025",
+     "EC-MON-068",
+     "EC-MON-022"
+    ]
+   }
+  },
+  "to-bill": {
+   "cases": [
+    "EC-MON-001",
+    "EC-MON-056",
+    "EC-MON-057",
+    "EC-MON-058"
+   ],
+   "buttons": {
+    "Month (by closed date) / Apply": [
+     "EC-MON-056"
+    ],
+    "Clear": [
+     "EC-MON-056"
+    ],
+    "Ledger": [
+     "EC-MON-056"
+    ],
+    "Include (tick)": [
+     "EC-MON-057"
+    ],
+    "Draft invoice for the ticked work": [
+     "EC-MON-001",
+     "EC-MON-057",
+     "EC-MON-058"
+    ],
+    "Draft this project only": [
+     "EC-MON-057"
+    ],
+    "all inspection calls →": "navigation only"
+   }
+  },
+  "receipts": {
+   "cases": [
+    "EC-MON-032",
+    "EC-MON-038",
+    "EC-MON-042",
+    "EC-MON-096"
+   ],
+   "buttons": {
+    "+ Record money received": [
+     "EC-MON-032"
+    ],
+    "All": [
+     "EC-MON-042"
+    ],
+    "Not yet matched": [
+     "EC-MON-042",
+     "EC-MON-038"
+    ],
+    "Find": [
+     "EC-MON-042"
+    ],
+    "⬇ CSV": [
+     "EC-MON-042"
+    ]
+   }
+  },
+  "receipt": {
+   "cases": [
+    "EC-MON-034",
+    "EC-MON-038",
+    "EC-MON-040"
+   ],
+   "buttons": {
+    "Match it": [
+     "EC-MON-034"
+    ],
+    "Unmatch": [
+     "EC-MON-038"
+    ],
+    "Invoice links": "navigation only"
+   }
+  },
+  "receipt-new": {
+   "cases": [
+    "EC-MON-032",
+    "EC-MON-033",
+    "EC-MON-041",
+    "EC-MON-043"
+   ],
+   "buttons": {
+    "Record it": [
+     "EC-MON-032",
+     "EC-MON-033",
+     "EC-MON-041",
+     "EC-MON-043"
+    ],
+    "Cancel": [
+     "EC-MON-041"
+    ],
+    "+ Add new (customer)": "navigation only"
+   }
+  },
+  "receipt-allocate": {
+   "cases": [
+    "EC-MON-034",
+    "EC-MON-035",
+    "EC-MON-036",
+    "EC-MON-037",
+    "EC-MON-039"
+   ],
+   "buttons": {
+    "Match it": [
+     "EC-MON-034",
+     "EC-MON-035",
+     "EC-MON-036",
+     "EC-MON-037",
+     "EC-MON-039"
+    ]
+   }
+  },
+  "receipt-unallocate": {
+   "cases": [
+    "EC-MON-038",
+    "EC-MON-039"
+   ],
+   "buttons": {
+    "Unmatch": [
+     "EC-MON-038",
+     "EC-MON-039"
+    ]
+   }
+  },
+  "credit-note-new": {
+   "cases": [
+    "EC-MON-026",
+    "EC-MON-027",
+    "EC-MON-028",
+    "EC-MON-029",
+    "EC-MON-030",
+    "EC-MON-031"
+   ],
+   "buttons": {
+    "Raise the credit note": [
+     "EC-MON-026",
+     "EC-MON-027",
+     "EC-MON-028",
+     "EC-MON-029",
+     "EC-MON-030",
+     "EC-MON-031"
+    ]
+   }
+  },
+  "ledger": {
+   "cases": [
+    "EC-MON-044",
+    "EC-MON-045",
+    "EC-MON-046",
+    "EC-MON-047",
+    "EC-MON-051",
+    "EC-MON-054"
+   ],
+   "buttons": {
+    "Apply": [
+     "EC-MON-045"
+    ],
+    "Whole history": [
+     "EC-MON-045"
+    ],
+    "⬇ CSV": [
+     "EC-MON-045",
+     "EC-MON-051"
+    ],
+    "Credit-note reference link": [
+     "EC-MON-046"
+    ],
+    "Customer 360": "navigation only",
+    "Record money received": [
+     "EC-MON-054"
+    ],
+    "New invoice": "navigation only"
+   }
+  },
+  "profitability": {
+   "cases": [
+    "EC-MON-087",
+    "EC-MON-094"
+   ],
+   "buttons": {
+    "⬇ Download CSV": [
+     "EC-MON-087"
+    ],
+    "Contract number row (detail)": [
+     "EC-MON-087"
+    ],
+    "+ (expense breakdown)": "not shown to any test user: no voucher lines on the contract in the runs",
+    "Management dashboard": [
+     "EC-MON-094"
+    ],
+    "Business Unit P&L": "navigation only"
+   }
+  },
+  "boss-renew": {
+   "cases": [
+    "EC-MON-088"
+   ],
+   "buttons": {
+    "Renew & carry forward": [
+     "EC-MON-088"
+    ]
+   }
+  },
+  "office-finance": {
+   "cases": [
+    "EC-MON-089",
+    "EC-MON-090",
+    "EC-MON-091",
+    "EC-MON-092"
+   ],
+   "buttons": {
+    "Show": [
+     "EC-MON-089"
+    ],
+    "Save November 2026": [
+     "EC-MON-089",
+     "EC-MON-091",
+     "EC-MON-092"
+    ],
+    "Copy last month": [
+     "EC-MON-089"
+    ],
+    "Save (per-office %)": [
+     "EC-MON-090"
+    ],
+    "Save default (global %)": "not shown to any test user: Master Admin only; same handler as EC-MON-090 (code reading)",
+    "Save (business units)": "not run: tab 'Business units' — same office check as EC-MON-091",
+    "Edit expense heads": "navigation only"
+   }
+  },
+  "cost-run": {
+   "cases": [
+    "EC-MON-092"
+   ],
+   "buttons": {
+    "Show": [
+     "EC-MON-092"
+    ],
+    "Calculate and store": [
+     "EC-MON-092"
+    ],
+    "Close the month": [
+     "EC-MON-092"
+    ],
+    "Reopen the month": [
+     "EC-MON-092"
+    ]
+   }
+  },
+  "sbu-pl": {
+   "cases": [
+    "EC-MON-086",
+    "EC-MON-094"
+   ],
+   "buttons": {
+    "Show (span / month / financial year)": [
+     "EC-MON-086"
+    ],
+    "Month-end run": "navigation only",
+    "Enter office costs": "navigation only",
+    "Management dashboard": [
+     "EC-MON-094"
+    ]
+   }
+  },
+  "call-profit": {
+   "cases": [
+    "EC-MON-084",
+    "EC-MON-085",
+    "EC-MON-093",
+    "EC-MON-094"
+   ],
+   "buttons": {
+    "Show (year / month / business unit / office / engineer)": [
+     "EC-MON-084",
+     "EC-MON-085",
+     "EC-MON-093"
+    ],
+    "Management dashboard": [
+     "EC-MON-094"
+    ],
+    "Business Unit profit & loss": "navigation only"
+   }
+  },
+  "billable-events": {
+   "cases": [
+    "EC-MON-075",
+    "EC-MON-078"
+   ],
+   "buttons": {
+    "Status filter": [
+     "EC-MON-078"
+    ],
+    "Cards": [
+     "EC-MON-078"
+    ],
+    "← Money": "navigation only"
+   }
+  },
+  "billable-sync": {
+   "cases": [
+    "EC-MON-071",
+    "EC-MON-075"
+   ],
+   "buttons": {
+    "⟳ Sync from closed work": [
+     "EC-MON-071",
+     "EC-MON-075"
+    ]
+   }
+  },
+  "billable-approve": {
+   "cases": [
+    "EC-MON-072",
+    "EC-MON-075"
+   ],
+   "buttons": {
+    "Approve": [
+     "EC-MON-072",
+     "EC-MON-075"
+    ],
+    "Re-approve": [
+     "EC-MON-072"
+    ]
+   }
+  },
+  "billable-invoice": {
+   "cases": [
+    "EC-MON-074",
+    "EC-MON-075",
+    "EC-MON-083"
+   ],
+   "buttons": {
+    "🧾 Raise one invoice for the ticked units →": [
+     "EC-MON-074",
+     "EC-MON-075",
+     "EC-MON-083"
+    ]
+   }
+  },
+  "job-billing": {
+   "cases": [
+    "EC-MON-079",
+    "EC-MON-080",
+    "EC-MON-081"
+   ],
+   "buttons": {
+    "Save billing terms": [
+     "EC-MON-079",
+     "EC-MON-080"
+    ],
+    "Stop earning on this date (End early)": [
+     "EC-MON-079",
+     "EC-MON-080"
+    ],
+    "Add charge": [
+     "EC-MON-079"
+    ],
+    "Release ticked for billing now": [
+     "EC-MON-081"
+    ],
+    "Save (suspension charged)": [
+     "EC-MON-079"
+    ]
+   }
+  },
+  "contract-billing": {
+   "cases": [
+    "EC-MON-082"
+   ],
+   "buttons": {
+    "Save billing terms": [
+     "EC-MON-082"
+    ],
+    "Request the change (needs two signatures)": [
+     "EC-MON-082"
+    ]
+   }
+  },
+  "billable-cancel": {
+   "cases": [
+    "EC-MON-073"
+   ],
+   "buttons": {
+    "(no button — typed address)": [
+     "EC-MON-073"
+    ]
+   }
+  },
+  "billable-dispute": {
+   "cases": [
+    "EC-MON-072"
+   ],
+   "buttons": {
+    "Dispute": [
+     "EC-MON-072"
+    ]
+   }
+  },
+  "billable-bill": {
+   "cases": [
+    "EC-MON-076"
+   ],
+   "buttons": {
+    "Mark billed": [
+     "EC-MON-076"
+    ]
+   }
+  },
+  "billable-bill-partial": {
+   "cases": [
+    "EC-MON-077"
+   ],
+   "buttons": {
+    "(no button — typed address)": [
+     "EC-MON-077"
+    ]
+   }
+  }
+ }
+}

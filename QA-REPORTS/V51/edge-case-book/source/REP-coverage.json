@@ -1,0 +1,1343 @@
+{
+ "routes": {
+  "documents": {
+   "cases": [
+    "EC-REP-001",
+    "EC-REP-052",
+    "EC-REP-083"
+   ],
+   "buttons": {
+    "Save (approval rule)": [
+     "EC-REP-001"
+    ],
+    "Save (approver mapping)": [
+     "EC-REP-001"
+    ],
+    "Search": [
+     "EC-REP-052",
+     "EC-REP-083"
+    ],
+    "Awaiting my approval": [
+     "EC-REP-083"
+    ],
+    "+ New report": [
+     "EC-REP-083"
+    ],
+    "Release Notes": [
+     "EC-REP-083"
+    ],
+    "Vendors": [
+     "EC-REP-083"
+    ],
+    "← All reports": "navigation only",
+    "Row click (open report)": "navigation only"
+   }
+  },
+  "document": {
+   "cases": [
+    "EC-REP-019",
+    "EC-REP-020",
+    "EC-REP-021",
+    "EC-REP-022",
+    "EC-REP-023",
+    "EC-REP-024",
+    "EC-REP-025",
+    "EC-REP-026",
+    "EC-REP-027",
+    "EC-REP-028",
+    "EC-REP-029",
+    "EC-REP-030",
+    "EC-REP-031",
+    "EC-REP-032",
+    "EC-REP-033",
+    "EC-REP-034",
+    "EC-REP-035",
+    "EC-REP-036",
+    "EC-REP-037",
+    "EC-REP-038",
+    "EC-REP-039",
+    "EC-REP-040",
+    "EC-REP-042",
+    "EC-REP-043",
+    "EC-REP-044",
+    "EC-REP-045",
+    "EC-REP-046",
+    "EC-REP-047",
+    "EC-REP-048",
+    "EC-REP-049",
+    "EC-REP-050",
+    "EC-REP-053",
+    "EC-REP-054",
+    "EC-REP-057",
+    "EC-REP-058",
+    "EC-REP-060",
+    "EC-REP-061",
+    "EC-REP-062",
+    "EC-REP-063",
+    "EC-REP-065",
+    "EC-REP-066",
+    "EC-REP-069",
+    "EC-REP-070",
+    "EC-REP-116",
+    "EC-REP-067"
+   ],
+   "buttons": {
+    "⚠ Completeness": [
+     "EC-REP-019"
+    ],
+    "✍ Fill report": [
+     "EC-REP-019"
+    ],
+    "Save report body": [
+     "EC-REP-019"
+    ],
+    "✓ Submit for review": [
+     "EC-REP-019",
+     "EC-REP-020",
+     "EC-REP-021",
+     "EC-REP-022",
+     "EC-REP-026",
+     "EC-REP-057"
+    ],
+    "Generate report": [
+     "EC-REP-021"
+    ],
+    "Save (approver mapping)": [
+     "EC-REP-021"
+    ],
+    "Approve": [
+     "EC-REP-023",
+     "EC-REP-025",
+     "EC-REP-028",
+     "EC-REP-029",
+     "EC-REP-030",
+     "EC-REP-054"
+    ],
+    "Send back": [
+     "EC-REP-024"
+    ],
+    "Reject": [
+     "EC-REP-027"
+    ],
+    "Delegate": [
+     "EC-REP-030"
+    ],
+    "Finalize & issue": [
+     "EC-REP-031",
+     "EC-REP-032",
+     "EC-REP-034",
+     "EC-REP-039"
+    ],
+    "♻️ Reissue as new revision": [
+     "EC-REP-033",
+     "EC-REP-038",
+     "EC-REP-039",
+     "EC-REP-040",
+     "EC-REP-116"
+    ],
+    "Send back to the inspector": [
+     "EC-REP-035",
+     "EC-REP-036",
+     "EC-REP-037",
+     "EC-REP-047"
+    ],
+    "⏭ Start next stage report": [
+     "EC-REP-042",
+     "EC-REP-043",
+     "EC-REP-044",
+     "EC-REP-046",
+     "EC-REP-047",
+     "EC-REP-048",
+     "EC-REP-049",
+     "EC-REP-050",
+     "EC-REP-116"
+    ],
+    "Submit for approval →": [
+     "EC-REP-057"
+    ],
+    "Delete": [
+     "EC-REP-060"
+    ],
+    "📋 Draft Release Note": [
+     "EC-REP-061",
+     "EC-REP-062",
+     "EC-REP-063",
+     "EC-REP-116"
+    ],
+    "☐ Mark: Release Note to be issued": [
+     "EC-REP-061",
+     "EC-REP-065"
+    ],
+    "Apply & log": [
+     "EC-REP-066"
+    ],
+    "✓ Vet (cleared)": [
+     "EC-REP-069"
+    ],
+    "↩ Return for correction": [
+     "EC-REP-070"
+    ],
+    "More ▾": "navigation only (opens the menu)",
+    "🔍 Document review": [
+     "EC-REP-087"
+    ],
+    "🖼 Evidence & photos": [
+     "EC-REP-087"
+    ],
+    "💡 Suggested remarks": [
+     "EC-REP-087"
+    ],
+    "Design this form": "not shown to any test user on a type with a form: shown only when the report type has no form yet (REP-043)",
+    "report-equip-add / report-equip-del (instrument rows)": "not in this route list; instrument rows covered by completeness in EC-REP-019",
+    "Open profile": "navigation only"
+   }
+  },
+  "document-new": {
+   "cases": [
+    "EC-REP-002",
+    "EC-REP-003",
+    "EC-REP-004",
+    "EC-REP-005",
+    "EC-REP-006",
+    "EC-REP-012",
+    "EC-REP-013",
+    "EC-REP-014",
+    "EC-REP-015",
+    "EC-REP-016",
+    "EC-REP-017",
+    "EC-REP-041"
+   ],
+   "buttons": {
+    "Load": [
+     "EC-REP-002",
+     "EC-REP-014"
+    ],
+    "Generate report": [
+     "EC-REP-002",
+     "EC-REP-003",
+     "EC-REP-004",
+     "EC-REP-005",
+     "EC-REP-006",
+     "EC-REP-012",
+     "EC-REP-013",
+     "EC-REP-015",
+     "EC-REP-017",
+     "EC-REP-041"
+    ],
+    "Save report": [
+     "EC-REP-015"
+    ],
+    "Cancel": "navigation only (back to register, nothing saved)"
+   }
+  },
+  "document-edit": {
+   "cases": [
+    "EC-REP-018",
+    "EC-REP-056",
+    "EC-REP-059"
+   ],
+   "buttons": {
+    "✎ Edit details": [
+     "EC-REP-018",
+     "EC-REP-056"
+    ],
+    "Save report": [
+     "EC-REP-018",
+     "EC-REP-056",
+     "EC-REP-059"
+    ],
+    "Cancel": [
+     "EC-REP-056"
+    ]
+   }
+  },
+  "document-submit": {
+   "cases": [
+    "EC-REP-019",
+    "EC-REP-020",
+    "EC-REP-022",
+    "EC-REP-026",
+    "EC-REP-027",
+    "EC-REP-057"
+   ],
+   "buttons": {
+    "✓ Submit for review": [
+     "EC-REP-020",
+     "EC-REP-022",
+     "EC-REP-026",
+     "EC-REP-057"
+    ]
+   }
+  },
+  "document-finalize": {
+   "cases": [
+    "EC-REP-031",
+    "EC-REP-032",
+    "EC-REP-034"
+   ],
+   "buttons": {
+    "Finalize & issue": [
+     "EC-REP-031",
+     "EC-REP-032",
+     "EC-REP-034"
+    ]
+   }
+  },
+  "document-delete": {
+   "cases": [
+    "EC-REP-050",
+    "EC-REP-060"
+   ],
+   "buttons": {
+    "Delete (Master Admin / Finalise)": [
+     "EC-REP-050",
+     "EC-REP-060"
+    ]
+   }
+  },
+  "document-fill": {
+   "cases": [
+    "EC-REP-084",
+    "EC-REP-085",
+    "EC-REP-019",
+    "EC-REP-057"
+   ],
+   "buttons": {
+    "Save report body": [
+     "EC-REP-084"
+    ],
+    "Cancel": [
+     "EC-REP-084"
+    ],
+    "+ Add row": [
+     "EC-REP-084"
+    ],
+    "📷 Take photo": "needs a real phone camera — code reading only",
+    "⬆ Upload photo(s)": [
+     "EC-REP-084"
+    ],
+    "📍 Capture": "needs real phone GPS — code reading only",
+    "🎤 Dictate": "not testable by robot: real phone microphone (REP-074)",
+    "✒️ Improve wording": [
+     "EC-REP-084"
+    ],
+    "✨ Polish / translate": [
+     "EC-REP-084"
+    ],
+    "✍️ My signature": "navigation only",
+    "📄 See in your format": "navigation only (download)"
+   }
+  },
+  "release-notes": {
+   "cases": [
+    "EC-REP-064",
+    "EC-REP-061"
+   ],
+   "buttons": {
+    "Search": [
+     "EC-REP-064"
+    ]
+   }
+  },
+  "document-ai-review": {
+   "cases": [
+    "EC-REP-089"
+   ],
+   "buttons": {
+    "🤖 Run AI review": [
+     "EC-REP-089"
+    ],
+    "✨ Polish / translate": [
+     "EC-REP-089"
+    ]
+   }
+  },
+  "document-rn-flag": {
+   "cases": [
+    "EC-REP-115",
+    "EC-REP-061",
+    "EC-REP-065"
+   ],
+   "buttons": {
+    "☐ Mark: Release Note to be issued": [
+     "EC-REP-061",
+     "EC-REP-065",
+     "EC-REP-115"
+    ]
+   }
+  },
+  "document-scope-from-qap": {
+   "cases": [
+    "EC-REP-110"
+   ],
+   "buttons": {
+    "✨ Polish / translate": [
+     "EC-REP-110"
+    ]
+   }
+  },
+  "document-polish-text": {
+   "cases": [
+    "EC-REP-110",
+    "EC-REP-089"
+   ],
+   "buttons": {
+    "✨ Polish / translate": [
+     "EC-REP-089",
+     "EC-REP-110"
+    ],
+    "✒️ Improve wording": [
+     "EC-REP-084"
+    ]
+   }
+  },
+  "vendors": {
+   "cases": [
+    "EC-REP-101"
+   ],
+   "buttons": {
+    "Search": [
+     "EC-REP-101"
+    ],
+    "Reports": "navigation only"
+   }
+  },
+  "vendor-profile": {
+   "cases": [
+    "EC-REP-100"
+   ],
+   "buttons": {
+    "Save profile": [
+     "EC-REP-100"
+    ],
+    "← Register": "navigation only"
+   }
+  },
+  "vendor-profile-save": {
+   "cases": [
+    "EC-REP-100"
+   ],
+   "buttons": {
+    "Save profile": [
+     "EC-REP-100"
+    ]
+   }
+  },
+  "expediting": {
+   "cases": [
+    "EC-REP-102"
+   ],
+   "buttons": {
+    "+ New expediting report": [
+     "EC-REP-102"
+    ],
+    "Projects view": [
+     "EC-REP-102"
+    ],
+    "Search": [
+     "EC-REP-102"
+    ],
+    "PO register": [
+     "EC-REP-102"
+    ],
+    "Reports": "navigation only"
+   }
+  },
+  "expediting-projects": {
+   "cases": [
+    "EC-REP-102"
+   ],
+   "buttons": {
+    "PO register": "navigation only",
+    "Search": [
+     "EC-REP-102"
+    ]
+   }
+  },
+  "report-types": {
+   "cases": [
+    "EC-REP-076",
+    "EC-REP-078"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-REP-076"
+    ],
+    "Edit": [
+     "EC-REP-076"
+    ],
+    "Hide empty type": [
+     "EC-REP-076"
+    ],
+    "Show all hidden type again": [
+     "EC-REP-076"
+    ],
+    "Repair split table rows": [
+     "EC-REP-076"
+    ],
+    "Set up the ready inspection report": [
+     "EC-REP-076"
+    ],
+    "Design form": [
+     "EC-REP-076"
+    ],
+    "Preview": [
+     "EC-REP-076"
+    ],
+    "☑ Review & issue rules": "navigation only",
+    "Edit form": "navigation only"
+   }
+  },
+  "report-type-edit": {
+   "cases": [
+    "EC-REP-077",
+    "EC-REP-076"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-REP-077"
+    ],
+    "Cancel": [
+     "EC-REP-077"
+    ],
+    "Edit": [
+     "EC-REP-076",
+     "EC-REP-077"
+    ]
+   }
+  },
+  "report-builder": {
+   "cases": [
+    "EC-REP-079",
+    "EC-REP-078"
+   ],
+   "buttons": {
+    "Add section": [
+     "EC-REP-079"
+    ],
+    "🔍 Live preview": [
+     "EC-REP-079"
+    ],
+    "👁 Open preview": [
+     "EC-REP-079"
+    ],
+    "Save layout": [
+     "EC-REP-079"
+    ],
+    "Use the clean inspection layout": [
+     "EC-REP-079"
+    ],
+    "Create a report with this form →": "navigation only",
+    "Upload my report format & build the form": [
+     "EC-REP-106"
+    ],
+    "🪄 Build from my Word file (no codes)": [
+     "EC-REP-106"
+    ],
+    "Create table": "code reading only via EC-REP-080",
+    "+ Add column": "code reading only via EC-REP-080",
+    "↻ Refresh": "navigation only",
+    "← Report types": "navigation only",
+    "Edit": [
+     "EC-REP-080"
+    ],
+    "Delete": [
+     "EC-REP-080"
+    ],
+    "Hide": [
+     "EC-REP-080"
+    ],
+    "▭ Full / ▯ Half": "layout toggle — no data change (covered by Save layout in EC-REP-079)"
+   }
+  },
+  "report-preview": {
+   "cases": [
+    "EC-REP-081",
+    "EC-REP-078"
+   ],
+   "buttons": {
+    "👥 Persona preview": [
+     "EC-REP-081"
+    ]
+   }
+  },
+  "report-field-edit": {
+   "cases": [
+    "EC-REP-080"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-REP-080"
+    ],
+    "Delete": [
+     "EC-REP-080"
+    ],
+    "Hide": [
+     "EC-REP-080"
+    ],
+    "Cancel": "navigation only"
+   }
+  },
+  "report-file": {
+   "cases": [
+    "EC-REP-086"
+   ],
+   "buttons": {
+    "Download file link": [
+     "EC-REP-086"
+    ]
+   }
+  },
+  "irn-rules": {
+   "cases": [
+    "EC-REP-007",
+    "EC-REP-008",
+    "EC-REP-009",
+    "EC-REP-010",
+    "EC-REP-011"
+   ],
+   "buttons": {
+    "Save numbering rules": [
+     "EC-REP-007",
+     "EC-REP-008",
+     "EC-REP-009"
+    ],
+    "Save (per-office pattern)": [
+     "EC-REP-010"
+    ]
+   }
+  },
+  "audit-log": {
+   "cases": [
+    "EC-REP-082"
+   ],
+   "buttons": {
+    "Filter": [
+     "EC-REP-082"
+    ],
+    "Clear": [
+     "EC-REP-082"
+    ],
+    "⭳ Export CSV": [
+     "EC-REP-082"
+    ]
+   }
+  },
+  "document-approve": {
+   "cases": [
+    "EC-REP-023",
+    "EC-REP-024",
+    "EC-REP-025",
+    "EC-REP-027",
+    "EC-REP-028",
+    "EC-REP-029",
+    "EC-REP-030"
+   ],
+   "buttons": {
+    "Approve": [
+     "EC-REP-023",
+     "EC-REP-025",
+     "EC-REP-028",
+     "EC-REP-029",
+     "EC-REP-030"
+    ],
+    "Send back": [
+     "EC-REP-024"
+    ],
+    "Reject": [
+     "EC-REP-027"
+    ],
+    "Delegate": [
+     "EC-REP-030"
+    ]
+   }
+  },
+  "document-vet": {
+   "cases": [
+    "EC-REP-068",
+    "EC-REP-069",
+    "EC-REP-070"
+   ],
+   "buttons": {
+    "✓ Vet (cleared)": [
+     "EC-REP-068",
+     "EC-REP-069"
+    ],
+    "↩ Return for correction": [
+     "EC-REP-068",
+     "EC-REP-070"
+    ],
+    "🗣 Record debrief": "code reading only (REP-012 covers debrief)"
+   }
+  },
+  "document-vet-review": {
+   "cases": [
+    "EC-REP-071"
+   ],
+   "buttons": {
+    "Open PDF in a new tab ↗": [
+     "EC-REP-071"
+    ],
+    "← Back to the report": [
+     "EC-REP-071"
+    ]
+   }
+  },
+  "vetting-checklist": {
+   "cases": [
+    "EC-REP-068",
+    "EC-REP-072"
+   ],
+   "buttons": {
+    "Save rules": [
+     "EC-REP-068",
+     "EC-REP-072"
+    ],
+    "✓ Vet (cleared)": [
+     "EC-REP-068"
+    ],
+    "↩ Return for correction": [
+     "EC-REP-068"
+    ],
+    "🗣 Record debrief": [
+     "EC-REP-068"
+    ],
+    "Back to report types": [
+     "EC-REP-072"
+    ]
+   }
+  },
+  "approver-map": {
+   "cases": [
+    "EC-REP-073",
+    "EC-REP-021"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-REP-073"
+    ],
+    "Approval rules →": [
+     "EC-REP-073"
+    ]
+   }
+  },
+  "idems-approval-rules": {
+   "cases": [
+    "EC-REP-074",
+    "EC-REP-001"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-REP-074"
+    ],
+    "✕": [
+     "EC-REP-074"
+    ],
+    "Edit": [
+     "EC-REP-074"
+    ],
+    "Approver mapping →": [
+     "EC-REP-074"
+    ]
+   }
+  },
+  "idems-approval-rule-edit": {
+   "cases": [
+    "EC-REP-075"
+   ],
+   "buttons": {
+    "Edit": [
+     "EC-REP-075"
+    ],
+    "Save": [
+     "EC-REP-075"
+    ]
+   }
+  },
+  "document-pdf": {
+   "cases": [
+    "EC-REP-067"
+   ],
+   "buttons": {
+    "📄 Download draft PDF": [
+     "EC-REP-067"
+    ],
+    "📄 Download PDF": [
+     "EC-REP-067"
+    ],
+    "📄 Duplicate copy": [
+     "EC-REP-067"
+    ],
+    "📄 Triplicate copy": [
+     "EC-REP-067"
+    ],
+    "📝 Word (.docx)": [
+     "EC-REP-067"
+    ],
+    "Open PDF in a new tab ↗": [
+     "EC-REP-071"
+    ]
+   }
+  },
+  "document-timestamp": {
+   "cases": [
+    "EC-REP-113",
+    "EC-REP-066"
+   ],
+   "buttons": {
+    "Apply & log": [
+     "EC-REP-113"
+    ]
+   }
+  },
+  "document-docx": {
+   "cases": [
+    "EC-REP-067"
+   ],
+   "buttons": {
+    "📄 Your format (client format)": "shown only when a client/company Word format exists — none on opstest; code reading via EC-REP-105"
+   }
+  },
+  "report-type-preview": {
+   "cases": [
+    "EC-REP-111"
+   ],
+   "buttons": {
+    "Preview": [
+     "EC-REP-111"
+    ],
+    "👁 Preview": [
+     "EC-REP-111"
+    ],
+    "← Back to builder": [
+     "EC-REP-111"
+    ]
+   }
+  },
+  "report-template-preview": {
+   "cases": [
+    "EC-REP-111"
+   ],
+   "buttons": {}
+  },
+  "report-templates": {
+   "cases": [
+    "EC-REP-105"
+   ],
+   "buttons": {
+    "Upload my Word file & build the form →": [
+     "EC-REP-105"
+    ],
+    "📤 Submit for review": [
+     "EC-REP-105"
+    ],
+    "✓ Approve": [
+     "EC-REP-105"
+    ],
+    "✕ Send back": [
+     "EC-REP-105"
+    ],
+    "↩ Withdraw": [
+     "EC-REP-105"
+    ],
+    "＋ New version": [
+     "EC-REP-105"
+    ],
+    "👁 Preview": [
+     "EC-REP-105"
+    ],
+    "🪄 Build form": [
+     "EC-REP-105"
+    ],
+    "Edit": "navigation only",
+    "Cancel": "navigation only"
+   }
+  },
+  "report-template-edit": {
+   "cases": [
+    "EC-REP-105"
+   ],
+   "buttons": {}
+  },
+  "report-template-download": {
+   "cases": [
+    "EC-REP-112"
+   ],
+   "buttons": {}
+  },
+  "report-form-from-template": {
+   "cases": [
+    "EC-REP-106"
+   ],
+   "buttons": {
+    "Create field(s)": [
+     "EC-REP-106"
+    ],
+    "Read the file & detect fields": [
+     "EC-REP-106"
+    ],
+    "Fine-tune the fields": "navigation only",
+    "Open builder instead": "navigation only",
+    "See the full token list": "navigation only",
+    "← Templates": "navigation only"
+   }
+  },
+  "report-autoform": {
+   "cases": [
+    "EC-REP-106"
+   ],
+   "buttons": {}
+  },
+  "endorsements": {
+   "cases": [
+    "EC-REP-096",
+    "EC-REP-097"
+   ],
+   "buttons": {
+    "+ New endorsement": [
+     "EC-REP-096"
+    ],
+    "Search": [
+     "EC-REP-097"
+    ]
+   }
+  },
+  "endorsement": {
+   "cases": [
+    "EC-REP-097",
+    "EC-REP-098"
+   ],
+   "buttons": {
+    "Edit": [
+     "EC-REP-097"
+    ],
+    "✓ Endorse": [
+     "EC-REP-097"
+    ],
+    "Endorse with comments": [
+     "EC-REP-097"
+    ],
+    "✕ Reject": [
+     "EC-REP-097"
+    ],
+    "📄 Endorsement certificate": [
+     "EC-REP-098"
+    ]
+   }
+  },
+  "endorsement-new": {
+   "cases": [
+    "EC-REP-096"
+   ],
+   "buttons": {
+    "Create endorsement": [
+     "EC-REP-096"
+    ],
+    "Submit for endorsement": [
+     "EC-REP-096"
+    ]
+   }
+  },
+  "endorsement-edit": {
+   "cases": [
+    "EC-REP-097",
+    "EC-REP-098"
+   ],
+   "buttons": {}
+  },
+  "endorsement-submit": {
+   "cases": [
+    "EC-REP-096"
+   ],
+   "buttons": {
+    "Submit for endorsement": [
+     "EC-REP-096"
+    ]
+   }
+  },
+  "endorsement-approve": {
+   "cases": [
+    "EC-REP-098",
+    "EC-REP-097"
+   ],
+   "buttons": {
+    "✕ Reject": [
+     "EC-REP-098"
+    ],
+    "✓ Endorse": [
+     "EC-REP-098"
+    ],
+    "📄 Endorsement certificate": [
+     "EC-REP-098"
+    ]
+   }
+  },
+  "endorsement-delete": {
+   "cases": [
+    "EC-REP-099"
+   ],
+   "buttons": {
+    "Archive": "not shown to any test user: there is no archive button (B8); tested by sending the action in EC-REP-099"
+   }
+  },
+  "endorsement-file": {
+   "cases": [
+    "EC-REP-098"
+   ],
+   "buttons": {
+    "Upload original / supporting file": "needs a real file upload — code reading via EC-REP-098 (submit refuses without the original, EC-REP-096)"
+   }
+  },
+  "endorsement-cert": {
+   "cases": [
+    "EC-REP-098"
+   ],
+   "buttons": {}
+  },
+  "phrase-library": {
+   "cases": [
+    "EC-REP-103"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-REP-103"
+    ],
+    "Edit": [
+     "EC-REP-103"
+    ],
+    "Cancel": [
+     "EC-REP-103"
+    ],
+    "← Writing assistant": [
+     "EC-REP-103"
+    ]
+   }
+  },
+  "phrase-edit": {
+   "cases": [
+    "EC-REP-103"
+   ],
+   "buttons": {
+    "Edit": [
+     "EC-REP-103"
+    ],
+    "Cancel": "navigation only"
+   }
+  },
+  "learning": {
+   "cases": [
+    "EC-REP-104"
+   ],
+   "buttons": {
+    "★ Standardise": [
+     "EC-REP-104"
+    ],
+    "Mute": [
+     "EC-REP-104"
+    ],
+    "Restore": [
+     "EC-REP-104"
+    ],
+    "Phrase library": "navigation only"
+   }
+  },
+  "document-smart": {
+   "cases": [
+    "EC-REP-088",
+    "EC-REP-087"
+   ],
+   "buttons": {
+    "Apply to report": [
+     "EC-REP-088"
+    ],
+    "Cancel": [
+     "EC-REP-088"
+    ]
+   }
+  },
+  "document-release-note": {
+   "cases": [
+    "EC-REP-114",
+    "EC-REP-061",
+    "EC-REP-062",
+    "EC-REP-063"
+   ],
+   "buttons": {
+    "📋 Draft Release Note": [
+     "EC-REP-114"
+    ]
+   }
+  },
+  "document-review": {
+   "cases": [
+    "EC-REP-087",
+    "EC-REP-089"
+   ],
+   "buttons": {
+    "Save the review": [
+     "EC-REP-087"
+    ],
+    "Upload": "needs a real file upload — code reading",
+    "✕": "removes an uploaded review file — code reading"
+   }
+  },
+  "document-evidence": {
+   "cases": [
+    "EC-REP-087"
+   ],
+   "buttons": {
+    "🖼 Evidence & photos": [
+     "EC-REP-087"
+    ],
+    "🔍 Document review": [
+     "EC-REP-087"
+    ],
+    "💡 Suggested remarks": [
+     "EC-REP-087"
+    ],
+    "Add evidence": [
+     "EC-REP-087"
+    ],
+    "Attach": [
+     "EC-REP-087"
+    ],
+    "Remove": [
+     "EC-REP-087"
+    ],
+    "Save": [
+     "EC-REP-087"
+    ],
+    "Save the review": [
+     "EC-REP-087"
+    ],
+    "Apply to report": [
+     "EC-REP-087"
+    ],
+    "← Back to report": [
+     "EC-REP-087"
+    ]
+   }
+  },
+  "evidence-review": {
+   "cases": [
+    "EC-REP-055",
+    "EC-REP-107"
+   ],
+   "buttons": {
+    "Accept": [
+     "EC-REP-055",
+     "EC-REP-107"
+    ],
+    "Show the whole queue": [
+     "EC-REP-055"
+    ]
+   }
+  },
+  "evidence-reviewed": {
+   "cases": [
+    "EC-REP-107",
+    "EC-REP-055"
+   ],
+   "buttons": {
+    "Accept": [
+     "EC-REP-107"
+    ],
+    "Save": [
+     "EC-REP-107"
+    ]
+   }
+  },
+  "checkin-settings": {
+   "cases": [
+    "EC-REP-108"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-REP-108"
+    ]
+   }
+  },
+  "report-reviews": {
+   "cases": [
+    "EC-REP-109"
+   ],
+   "buttons": {
+    "Acknowledge": [
+     "EC-REP-109"
+    ]
+   }
+  },
+  "report-ack": {
+   "cases": [
+    "EC-REP-109"
+   ],
+   "buttons": {
+    "Acknowledge": [
+     "EC-REP-109"
+    ]
+   }
+  },
+  "hold-points": {
+   "cases": [
+    "EC-REP-090",
+    "EC-REP-094",
+    "EC-REP-063"
+   ],
+   "buttons": {
+    "Raise": [
+     "EC-REP-090"
+    ],
+    "Clear / waive": [
+     "EC-REP-090"
+    ],
+    "Waive": [
+     "EC-REP-090"
+    ],
+    "Clear": [
+     "EC-REP-090"
+    ],
+    "← Dashboard": "navigation only"
+   }
+  },
+  "hw-point-new": {
+   "cases": [
+    "EC-REP-091",
+    "EC-REP-090",
+    "EC-REP-094"
+   ],
+   "buttons": {
+    "Raise": [
+     "EC-REP-090",
+     "EC-REP-091"
+    ]
+   }
+  },
+  "hw-point-clear": {
+   "cases": [
+    "EC-REP-092",
+    "EC-REP-093",
+    "EC-REP-094"
+   ],
+   "buttons": {
+    "Clear": [
+     "EC-REP-092",
+     "EC-REP-093"
+    ]
+   }
+  },
+  "hw-point-waive": {
+   "cases": [
+    "EC-REP-090"
+   ],
+   "buttons": {
+    "Waive": [
+     "EC-REP-090"
+    ]
+   }
+  },
+  "hw-point-cancel": {
+   "cases": [
+    "EC-REP-093"
+   ],
+   "buttons": {
+    "Cancel": [
+     "EC-REP-093"
+    ],
+    "Clear": [
+     "EC-REP-093"
+    ]
+   }
+  },
+  "hw-point-reopen": {
+   "cases": [
+    "EC-REP-090"
+   ],
+   "buttons": {
+    "Reopen": [
+     "EC-REP-090"
+    ]
+   }
+  },
+  "hw-point-derive": {
+   "cases": [
+    "EC-REP-095",
+    "EC-REP-094"
+   ],
+   "buttons": {
+    "Scan issued reports": [
+     "EC-REP-095"
+    ]
+   }
+  },
+  "document-reopen": {
+   "cases": [
+    "EC-REP-035",
+    "EC-REP-036",
+    "EC-REP-037",
+    "EC-REP-047",
+    "EC-REP-033"
+   ],
+   "buttons": {
+    "Send back to the inspector": [
+     "EC-REP-035",
+     "EC-REP-036",
+     "EC-REP-037",
+     "EC-REP-047"
+    ]
+   }
+  },
+  "document-revise": {
+   "cases": [
+    "EC-REP-038",
+    "EC-REP-039",
+    "EC-REP-040",
+    "EC-REP-033"
+   ],
+   "buttons": {
+    "♻️ Reissue as new revision": [
+     "EC-REP-038",
+     "EC-REP-039",
+     "EC-REP-040"
+    ]
+   }
+  },
+  "document-next-stage": {
+   "cases": [
+    "EC-REP-042",
+    "EC-REP-043",
+    "EC-REP-044",
+    "EC-REP-045",
+    "EC-REP-046",
+    "EC-REP-047",
+    "EC-REP-048",
+    "EC-REP-049",
+    "EC-REP-050",
+    "EC-REP-051",
+    "EC-REP-116"
+   ],
+   "buttons": {
+    "⏭ Start next stage report": [
+     "EC-REP-042",
+     "EC-REP-043",
+     "EC-REP-044",
+     "EC-REP-046",
+     "EC-REP-047",
+     "EC-REP-048",
+     "EC-REP-049",
+     "EC-REP-050",
+     "EC-REP-051"
+    ]
+   }
+  },
+  "job": {
+   "cases": [
+    "EC-REP-051"
+   ],
+   "buttons": {
+    "⏭ Start next stage report": [
+     "EC-REP-051"
+    ]
+   }
+  }
+ }
+}

@@ -1,0 +1,966 @@
+{
+ "routes": {
+  "leads": {
+   "cases": [
+    "EC-SALA-014",
+    "EC-SALA-015",
+    "EC-SALA-016"
+   ],
+   "buttons": {
+    "+ New lead": "navigation only",
+    "⬇ CSV": [
+     "EC-SALA-015"
+    ],
+    "Board": [
+     "EC-SALA-014"
+    ],
+    "List": [
+     "EC-SALA-014"
+    ],
+    "Find": [
+     "EC-SALA-015"
+    ],
+    "Year": [
+     "EC-SALA-014"
+    ],
+    "Only leads created in FY 2026-27": [
+     "EC-SALA-014"
+    ],
+    "(lead card)": "navigation only",
+    "Column sort headings (REF, COMPANY, STAGE, VALUE, OWNER, IN STAGE, STATUS)": "navigation only",
+    "Allocate to…": [
+     "EC-SALA-077"
+    ],
+    "Take these myself": [
+     "EC-SALA-077"
+    ],
+    "Mark lost": [
+     "EC-SALA-013"
+    ]
+   }
+  },
+  "lead": {
+   "cases": [
+    "EC-SALA-005",
+    "EC-SALA-009",
+    "EC-SALA-010",
+    "EC-SALA-016"
+   ],
+   "buttons": {
+    "Overview / Contacts / Quotes / Documents / History / Actions (tabs)": "navigation only",
+    "Log a contact": "navigation only",
+    "More — change stage, mark lost…": "navigation only",
+    "Make the quote → / + Make a quote": "navigation only (quotation screens belong to SALB)",
+    "+ Project costing": [
+     "EC-SALA-055"
+    ],
+    "Work this as a deal →": [
+     "EC-SALA-031"
+    ],
+    "Won — customer →": [
+     "EC-SALA-011"
+    ],
+    "Delete / Delete this lead": [
+     "EC-SALA-012"
+    ]
+   }
+  },
+  "lead-new": {
+   "cases": [
+    "EC-SALA-001",
+    "EC-SALA-002"
+   ],
+   "buttons": {
+    "Create it": [
+     "EC-SALA-001",
+     "EC-SALA-002"
+    ],
+    "+ Add new": "navigation only"
+   }
+  },
+  "lead-edit": {
+   "cases": [
+    "EC-SALA-003",
+    "EC-SALA-004"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-SALA-003",
+     "EC-SALA-004"
+    ]
+   }
+  },
+  "lead-move": {
+   "cases": [
+    "EC-SALA-009"
+   ],
+   "buttons": {
+    "Contact made / Qualified (stage buttons)": [
+     "EC-SALA-009"
+    ],
+    "Not pursued": [
+     "EC-SALA-009"
+    ],
+    "Won — customer →": [
+     "EC-SALA-011"
+    ]
+   }
+  },
+  "lead-convert": {
+   "cases": [
+    "EC-SALA-011"
+   ],
+   "buttons": {
+    "Yes — make them a customer": [
+     "EC-SALA-011"
+    ],
+    "Not yet": [
+     "EC-SALA-011"
+    ],
+    "+ Add new": "navigation only"
+   }
+  },
+  "leads-bulk": {
+   "cases": [
+    "EC-SALA-013",
+    "EC-SALA-077"
+   ],
+   "buttons": {
+    "Mark lost (with preview)": [
+     "EC-SALA-013"
+    ],
+    "Allocate to…": [
+     "EC-SALA-077"
+    ],
+    "Take these myself": [
+     "EC-SALA-077"
+    ]
+   }
+  },
+  "lead-delete": {
+   "cases": [
+    "EC-SALA-012"
+   ],
+   "buttons": {
+    "Delete this lead": [
+     "EC-SALA-012"
+    ]
+   }
+  },
+  "lead-contact": {
+   "cases": [
+    "EC-SALA-005"
+   ],
+   "buttons": {
+    "Save this contact": [
+     "EC-SALA-005"
+    ]
+   }
+  },
+  "lead-files": {
+   "cases": [
+    "EC-SALA-006"
+   ],
+   "buttons": {
+    "Attach": [
+     "EC-SALA-006"
+    ]
+   }
+  },
+  "lead-file": {
+   "cases": [
+    "EC-SALA-007"
+   ],
+   "buttons": {
+    "(file name link)": [
+     "EC-SALA-007"
+    ]
+   }
+  },
+  "lead-file-delete": {
+   "cases": [
+    "EC-SALA-008"
+   ],
+   "buttons": {
+    "Remove": [
+     "EC-SALA-008"
+    ]
+   }
+  },
+  "opportunities": {
+   "cases": [
+    "EC-SALA-033"
+   ],
+   "buttons": {
+    "+ New opportunity": "navigation only",
+    "⬇ CSV": [
+     "EC-SALA-033"
+    ],
+    "Board": [
+     "EC-SALA-033"
+    ],
+    "List": [
+     "EC-SALA-020"
+    ],
+    "Find": [
+     "EC-SALA-033"
+    ],
+    "(deal card)": "navigation only"
+   }
+  },
+  "opportunity": {
+   "cases": [
+    "EC-SALA-028",
+    "EC-SALA-029",
+    "EC-SALA-023"
+   ],
+   "buttons": {
+    "Overview / Quotes / History / Actions (tabs)": "navigation only",
+    "Open quote → / Q-… links": "navigation only",
+    "See the lead / the lead": "navigation only",
+    "⇢ Whole thread": "navigation only",
+    "Move it on": "navigation only",
+    "＋ Create costing for this deal": [
+     "EC-SALA-055"
+    ],
+    "Attach (costing)": [
+     "EC-SALA-075"
+    ],
+    "Withdraw the request": [
+     "EC-SALA-023"
+    ],
+    "All approvals": "navigation only"
+   }
+  },
+  "opportunity-new": {
+   "cases": [
+    "EC-SALA-017",
+    "EC-SALA-018"
+   ],
+   "buttons": {
+    "Open the opportunity": [
+     "EC-SALA-017",
+     "EC-SALA-018"
+    ],
+    "Cancel": [
+     "EC-SALA-017"
+    ],
+    "+ Add new": "navigation only"
+   }
+  },
+  "opportunity-edit": {
+   "cases": [
+    "EC-SALA-019"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-SALA-019"
+    ]
+   }
+  },
+  "opportunity-delete": {
+   "cases": [
+    "EC-SALA-032"
+   ],
+   "buttons": {
+    "Delete": [
+     "EC-SALA-032"
+    ]
+   }
+  },
+  "opportunity-move": {
+   "cases": [
+    "EC-SALA-020",
+    "EC-SALA-021"
+   ],
+   "buttons": {
+    "Move it": [
+     "EC-SALA-020",
+     "EC-SALA-021"
+    ]
+   }
+  },
+  "opportunity-reopen": {
+   "cases": [
+    "EC-SALA-025"
+   ],
+   "buttons": {
+    "Reopen": [
+     "EC-SALA-025"
+    ]
+   }
+  },
+  "lead-reopen": {
+   "cases": [
+    "EC-SALA-010"
+   ],
+   "buttons": {
+    "Reopen": [
+     "EC-SALA-010"
+    ]
+   }
+  },
+  "opportunity-quote": {
+   "cases": [
+    "EC-SALA-027",
+    "EC-SALA-028"
+   ],
+   "buttons": {
+    "Attach": [
+     "EC-SALA-028"
+    ],
+    "Detach": [
+     "EC-SALA-027"
+    ]
+   }
+  },
+  "opportunity-from-lead": {
+   "cases": [
+    "EC-SALA-031"
+   ],
+   "buttons": {
+    "Work this as a deal →": [
+     "EC-SALA-031"
+    ]
+   }
+  },
+  "opportunity-raise-order": {
+   "cases": [
+    "EC-SALA-026"
+   ],
+   "buttons": {
+    "Raise the order": [
+     "EC-SALA-026"
+    ]
+   }
+  },
+  "opportunity-send-to-accounts": {
+   "cases": [
+    "EC-SALA-027"
+   ],
+   "buttons": {
+    "Send to Accounts to register the contract": [
+     "EC-SALA-027"
+    ]
+   }
+  },
+  "opportunity-add-customer": {
+   "cases": [
+    "EC-SALA-030"
+   ],
+   "buttons": {
+    "Add them as a customer": [
+     "EC-SALA-030"
+    ]
+   }
+  },
+  "opportunity-generate-quote": {
+   "cases": [
+    "EC-SALA-029"
+   ],
+   "buttons": {
+    "＋ Generate quotation": [
+     "EC-SALA-029"
+    ],
+    "＋ Create a new quotation (opportunity-new-quote)": [
+     "EC-SALA-029"
+    ]
+   }
+  },
+  "pipelines": {
+   "cases": [
+    "EC-SALA-034",
+    "EC-SALA-039"
+   ],
+   "buttons": {
+    "Create it": [
+     "EC-SALA-034"
+    ],
+    "Make default": [
+     "EC-SALA-036",
+     "EC-SALA-039"
+    ],
+    "Edit stages / pipeline name links": "navigation only"
+   }
+  },
+  "pipeline": {
+   "cases": [
+    "EC-SALA-035",
+    "EC-SALA-036"
+   ],
+   "buttons": {
+    "Save the funnel": [
+     "EC-SALA-035"
+    ],
+    "Order": [
+     "EC-SALA-035"
+    ],
+    "Remove": [
+     "EC-SALA-038"
+    ],
+    "Add it": [
+     "EC-SALA-037"
+    ],
+    "other pipeline links": "navigation only"
+   }
+  },
+  "pipeline-new": {
+   "cases": [
+    "EC-SALA-034"
+   ],
+   "buttons": {
+    "Create it": [
+     "EC-SALA-034"
+    ]
+   }
+  },
+  "pipeline-save": {
+   "cases": [
+    "EC-SALA-035",
+    "EC-SALA-036",
+    "EC-SALA-039"
+   ],
+   "buttons": {
+    "Save the funnel": [
+     "EC-SALA-035",
+     "EC-SALA-036"
+    ],
+    "In use": [
+     "EC-SALA-039"
+    ]
+   }
+  },
+  "pipeline-stage-add": {
+   "cases": [
+    "EC-SALA-037"
+   ],
+   "buttons": {
+    "Add it": [
+     "EC-SALA-037"
+    ]
+   }
+  },
+  "pipeline-stage-delete": {
+   "cases": [
+    "EC-SALA-038"
+   ],
+   "buttons": {
+    "Remove": [
+     "EC-SALA-038"
+    ]
+   }
+  },
+  "pipeline-default": {
+   "cases": [
+    "EC-SALA-039",
+    "EC-SALA-036"
+   ],
+   "buttons": {
+    "Make default": [
+     "EC-SALA-039",
+     "EC-SALA-036"
+    ]
+   }
+  },
+  "crm-dashboard": {
+   "cases": [
+    "EC-SALA-040"
+   ],
+   "buttons": {
+    "⬇ Funnel CSV": [
+     "EC-SALA-040"
+    ],
+    "30 days / 90 days / 6 months / 12 months / 2 years": [
+     "EC-SALA-040"
+    ],
+    "Pipeline (funnel) picker": [
+     "EC-SALA-040"
+    ],
+    "Pipeline board": "navigation only",
+    "deal links / All of it → / N customers": "navigation only"
+   }
+  },
+  "approval-act": {
+   "cases": [
+    "EC-SALA-021",
+    "EC-SALA-022",
+    "EC-SALA-023",
+    "EC-SALA-024"
+   ],
+   "buttons": {
+    "Approve": [
+     "EC-SALA-021",
+     "EC-SALA-022"
+    ],
+    "Send back": [
+     "EC-SALA-023"
+    ],
+    "Withdraw the request": [
+     "EC-SALA-023",
+     "EC-SALA-024"
+    ],
+    "Waiting / Approved / Rejected / Withdrawn (filters on Approvals)": [
+     "EC-SALA-023"
+    ]
+   }
+  },
+  "adspro": {
+   "cases": [
+    "EC-SALA-041"
+   ],
+   "buttons": {
+    "Show": "not shown to any test user in a useful state: reveals the stored token field; covered by save case EC-SALA-042",
+    "Waiting to go / Sent / Failed / Not sent (outbox filters)": [
+     "EC-SALA-043"
+    ]
+   }
+  },
+  "adspro-save": {
+   "cases": [
+    "EC-SALA-042"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-SALA-042"
+    ]
+   }
+  },
+  "adspro-test": {
+   "cases": [
+    "EC-SALA-042"
+   ],
+   "buttons": {
+    "Test the connection": [
+     "EC-SALA-042"
+    ]
+   }
+  },
+  "adspro-import": {
+   "cases": [
+    "EC-SALA-041",
+    "EC-SALA-043"
+   ],
+   "buttons": {
+    "Bring leads across": [
+     "EC-SALA-041",
+     "EC-SALA-043"
+    ]
+   }
+  },
+  "adspro-spend": {
+   "cases": [
+    "EC-SALA-043"
+   ],
+   "buttons": {
+    "Refresh 90 days of spend": [
+     "EC-SALA-043"
+    ]
+   }
+  },
+  "ads-roi": {
+   "cases": [
+    "EC-SALA-044"
+   ],
+   "buttons": {
+    "Apply": [
+     "EC-SALA-044"
+    ],
+    "Connect it": "navigation only"
+   }
+  },
+  "adspro-sync": {
+   "cases": [
+    "EC-SALA-043"
+   ],
+   "buttons": {
+    "⇄ Sync now, both ways": [
+     "EC-SALA-043"
+    ]
+   }
+  },
+  "adspro-backfill": {
+   "cases": [
+    "EC-SALA-043"
+   ],
+   "buttons": {
+    "Queue every lead we already have": [
+     "EC-SALA-043"
+    ],
+    "Queue every enquiry we already have": [
+     "EC-SALA-043"
+    ]
+   }
+  },
+  "stage-gates": {
+   "cases": [
+    "EC-SALA-045"
+   ],
+   "buttons": {
+    "＋ New rule": [
+     "EC-SALA-045"
+    ],
+    "Edit": [
+     "EC-SALA-045"
+    ],
+    "Remove": [
+     "EC-SALA-046"
+    ]
+   }
+  },
+  "stage-gate-save": {
+   "cases": [
+    "EC-SALA-045",
+    "EC-SALA-021",
+    "EC-SALA-022"
+   ],
+   "buttons": {
+    "Save rule": [
+     "EC-SALA-045"
+    ]
+   }
+  },
+  "stage-gate-delete": {
+   "cases": [
+    "EC-SALA-046"
+   ],
+   "buttons": {
+    "Remove": [
+     "EC-SALA-046"
+    ]
+   }
+  },
+  "inquiries": {
+   "cases": [
+    "EC-SALA-054"
+   ],
+   "buttons": {
+    "+ New inquiry": "navigation only",
+    "Search": [
+     "EC-SALA-054"
+    ],
+    "Year / status filters and cards": [
+     "EC-SALA-054"
+    ],
+    "Edit": [
+     "EC-SALA-050"
+    ],
+    "Quote / Open Q-… / + another": "navigation only (quotation screens belong to SALB)",
+    "business advisor": "navigation only",
+    "lead reference link": "navigation only"
+   }
+  },
+  "inquiry-new": {
+   "cases": [
+    "EC-SALA-047",
+    "EC-SALA-048",
+    "EC-SALA-049",
+    "EC-SALA-050"
+   ],
+   "buttons": {
+    "Create inquiry": [
+     "EC-SALA-047",
+     "EC-SALA-048"
+    ],
+    "Save it as a separate inquiry": [
+     "EC-SALA-049"
+    ],
+    "+ Add new": "navigation only"
+   }
+  },
+  "inquiry-edit": {
+   "cases": [
+    "EC-SALA-050"
+   ],
+   "buttons": {
+    "Save inquiry": [
+     "EC-SALA-050"
+    ],
+    "Cancel": [
+     "EC-SALA-050"
+    ],
+    "＋ Project costing": [
+     "EC-SALA-055"
+    ]
+   }
+  },
+  "inquiry-delete": {
+   "cases": [
+    "EC-SALA-053"
+   ],
+   "buttons": {
+    "Delete": [
+     "EC-SALA-053"
+    ]
+   }
+  },
+  "inquiry-drop": {
+   "cases": [
+    "EC-SALA-051"
+   ],
+   "buttons": {
+    "Drop": [
+     "EC-SALA-051"
+    ]
+   }
+  },
+  "inquiry-reopen": {
+   "cases": [
+    "EC-SALA-052"
+   ],
+   "buttons": {
+    "Reopen": [
+     "EC-SALA-052"
+    ]
+   }
+  },
+  "project-costings (extra)": {
+   "cases": [
+    "EC-SALA-055"
+   ],
+   "buttons": {
+    "Create costing": [
+     "EC-SALA-055"
+    ],
+    "Show (filters)": [
+     "EC-SALA-055"
+    ],
+    "costing / quotation links": "navigation only"
+   }
+  },
+  "project-costing (extra)": {
+   "cases": [
+    "EC-SALA-056",
+    "EC-SALA-076"
+   ],
+   "buttons": {
+    "Save settings": [
+     "EC-SALA-057",
+     "EC-SALA-071"
+    ],
+    "✎ Edit": [
+     "EC-SALA-057"
+    ],
+    "✕": [
+     "EC-SALA-072"
+    ],
+    "Add role": [
+     "EC-SALA-056"
+    ],
+    "Build the salary break-up": [
+     "EC-SALA-068",
+     "EC-SALA-069"
+    ],
+    "＋ Blank head / Start from a template / Add a head from the library": [
+     "EC-SALA-056"
+    ],
+    "Save as a template": [
+     "EC-SALA-070"
+    ],
+    "Submit for approval": [
+     "EC-SALA-058",
+     "EC-SALA-060"
+    ],
+    "Approve": [
+     "EC-SALA-062"
+    ],
+    "Send back": [
+     "EC-SALA-057",
+     "EC-SALA-062"
+    ],
+    "Reopen as draft": [
+     "EC-SALA-063"
+    ],
+    "📝 Create quotation": [
+     "EC-SALA-064"
+    ],
+    "🖨 Print / PDF": [
+     "EC-SALA-074"
+    ],
+    "→ Raise hiring requests for every role": [
+     "EC-SALA-073"
+    ],
+    "→ Requisition directly": [
+     "EC-SALA-073"
+    ]
+   }
+  },
+  "project-costing-new (extra)": {
+   "cases": [
+    "EC-SALA-055"
+   ],
+   "buttons": {
+    "Create costing": [
+     "EC-SALA-055"
+    ]
+   }
+  },
+  "project-costing-save (extra)": {
+   "cases": [
+    "EC-SALA-057",
+    "EC-SALA-071"
+   ],
+   "buttons": {
+    "Save settings": [
+     "EC-SALA-071"
+    ]
+   }
+  },
+  "project-costing-line-save (extra)": {
+   "cases": [
+    "EC-SALA-056",
+    "EC-SALA-061"
+   ],
+   "buttons": {
+    "Add role": [
+     "EC-SALA-056"
+    ]
+   }
+  },
+  "project-costing-line-preview (extra)": {
+   "cases": [
+    "EC-SALA-059",
+    "EC-SALA-065",
+    "EC-SALA-066",
+    "EC-SALA-067"
+   ],
+   "buttons": {
+    "(live figures)": [
+     "EC-SALA-059"
+    ]
+   }
+  },
+  "project-costing-line-delete (extra)": {
+   "cases": [
+    "EC-SALA-072"
+   ],
+   "buttons": {
+    "✕": [
+     "EC-SALA-072"
+    ]
+   }
+  },
+  "project-costing-submit (extra)": {
+   "cases": [
+    "EC-SALA-058",
+    "EC-SALA-060"
+   ],
+   "buttons": {
+    "Submit for approval": [
+     "EC-SALA-058"
+    ]
+   }
+  },
+  "project-costing-approve (extra)": {
+   "cases": [
+    "EC-SALA-062"
+   ],
+   "buttons": {
+    "Approve": [
+     "EC-SALA-062"
+    ]
+   }
+  },
+  "project-costing-reject (extra)": {
+   "cases": [
+    "EC-SALA-057",
+    "EC-SALA-062"
+   ],
+   "buttons": {
+    "Send back": [
+     "EC-SALA-057"
+    ]
+   }
+  },
+  "project-costing-reopen (extra)": {
+   "cases": [
+    "EC-SALA-063"
+   ],
+   "buttons": {
+    "Reopen as draft": [
+     "EC-SALA-063"
+    ]
+   }
+  },
+  "project-costing-to-quote (extra)": {
+   "cases": [
+    "EC-SALA-064"
+   ],
+   "buttons": {
+    "📝 Create quotation": [
+     "EC-SALA-064"
+    ]
+   }
+  },
+  "project-costing-attach (extra)": {
+   "cases": [
+    "EC-SALA-075"
+   ],
+   "buttons": {
+    "Unlink": [
+     "EC-SALA-075"
+    ],
+    "Attach": [
+     "EC-SALA-075"
+    ]
+   }
+  },
+  "project-costing-revise (extra)": {
+   "cases": [
+    "EC-SALA-075"
+   ],
+   "buttons": {
+    "✎ Change the costing for this revision": [
+     "EC-SALA-075"
+    ]
+   }
+  },
+  "project-costing-print (extra)": {
+   "cases": [
+    "EC-SALA-074"
+   ],
+   "buttons": {
+    "🖨 Print / PDF": [
+     "EC-SALA-074"
+    ]
+   }
+  },
+  "project-costing-heads (extra)": {
+   "cases": [
+    "EC-SALA-070"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-SALA-070"
+    ],
+    "Change / Retire / Add to the library / Remove": [
+     "EC-SALA-070"
+    ]
+   }
+  },
+  "project-costing-ctc-heads (extra)": {
+   "cases": [
+    "EC-SALA-068",
+    "EC-SALA-069"
+   ],
+   "buttons": {
+    "Build the salary break-up": [
+     "EC-SALA-068"
+    ]
+   }
+  },
+  "project-costing-to-hreq / to-req (extra)": {
+   "cases": [
+    "EC-SALA-073"
+   ],
+   "buttons": {
+    "→ Raise hiring requests for every role": [
+     "EC-SALA-073"
+    ],
+    "→ Requisition directly": [
+     "EC-SALA-073"
+    ]
+   }
+  }
+ },
+ "note": "Routes marked (extra) are the project-costing screens named in the task but absent from SALA.txt (the route file has no costing routes)."
+}

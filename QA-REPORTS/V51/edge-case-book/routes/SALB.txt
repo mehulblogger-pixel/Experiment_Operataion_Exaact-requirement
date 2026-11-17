@@ -1,0 +1,34 @@
+opportunity-contract	quotes	Sales	Opportunity contract
+contracts-to-register	quotes	Sales	Contracts to register
+quotes	quotes	Sales	Quotes
+quote	quotes	Sales	Quote
+quote-new	quotes	Sales	New
+quote-edit	quotes	Sales	Edit
+quote-revise	quotes	Sales	Quote revise
+quote-status	quotes	Sales	Quote status
+quote-doc	quotes	Sales	Quote doc
+quote-pdf	quotes	Sales	Quote pdf
+quote-approve	quotes	Sales	Quote approve
+quote-unapprove	quotes	Sales	Quote unapprove
+quote-approval-rules	quotes	Sales	Quotation approval rules
+quote-contract	quotes	Sales	Quote contract
+quote-add-contract	quotes	Sales	Quote add contract
+quote-float	quotes	Sales	Quote float
+quote-client	quotes	Sales	Quote client
+quote-files	quotes	Sales	Quote files
+quote-file	quotes	Sales	Quote file
+quote-file-delete	quotes	Sales	Quote file delete
+quote-unlock	quotes	Sales	Quote unlock
+quote-followup	quotes	Sales	Quote followup
+quote-external	quotes	Sales	Quote external
+quotes-export	quotes	Sales	Quotes export
+quote-final	quotes	Sales	Quote final
+quote-compose	quotes	Sales	Quote compose
+quote-costing-card	quotes	Sales	Quote costing card
+quote-costing-lines	quotes	Sales	Quote costing lines
+followup-compose	quotes	Sales	Followup compose
+quote-preorder-save	quotes	Sales	Quote preorder save
+quote-milestones	quotes	Sales	Quote milestones
+preorder-checklist	quotes	Sales	Preorder checklist
+sales-setup	quotes	Sales	Sales setup
+quote-delegations	quotes	Sales	Quote delegations

@@ -1,0 +1,2369 @@
+{
+ "routes": {
+  "marketplace": {
+   "cases": [
+    "EC-MKT-110"
+   ],
+   "buttons": {
+    "(tiles)": [
+     "EC-MKT-110"
+    ],
+    "(tiles to each screen)": "navigation only"
+   }
+  },
+  "connect-requirements": {
+   "cases": [
+    "EC-MKT-001",
+    "EC-MKT-002",
+    "EC-MKT-003",
+    "EC-MKT-011",
+    "EC-MKT-013",
+    "EC-MKT-014",
+    "EC-MKT-016",
+    "EC-MKT-027"
+   ],
+   "buttons": {
+    "Post it — open for applications": [
+     "EC-MKT-001",
+     "EC-MKT-002",
+     "EC-MKT-003"
+    ],
+    "Save as draft": [
+     "EC-MKT-003"
+    ],
+    "Save (commission)": [
+     "EC-MKT-011",
+     "EC-MKT-013"
+    ],
+    "Save (closing rules)": [
+     "EC-MKT-014"
+    ],
+    "(daily sweep)": [
+     "EC-MKT-016"
+    ],
+    "(open screen)": [
+     "EC-MKT-027"
+    ],
+    "💬 Guided post": "navigation only"
+   }
+  },
+  "connect-requirement": {
+   "cases": [
+    "EC-MKT-004",
+    "EC-MKT-005",
+    "EC-MKT-006",
+    "EC-MKT-007",
+    "EC-MKT-008",
+    "EC-MKT-009",
+    "EC-MKT-010",
+    "EC-MKT-012",
+    "EC-MKT-015",
+    "EC-MKT-017",
+    "EC-MKT-018",
+    "EC-MKT-019",
+    "EC-MKT-020",
+    "EC-MKT-021",
+    "EC-MKT-022",
+    "EC-MKT-023",
+    "EC-MKT-024",
+    "EC-MKT-025",
+    "EC-MKT-026",
+    "EC-MKT-033",
+    "EC-MKT-034",
+    "EC-MKT-036",
+    "EC-MKT-037",
+    "EC-MKT-038",
+    "EC-MKT-039",
+    "EC-MKT-040",
+    "EC-MKT-041",
+    "EC-MKT-117",
+    "EC-MKT-118",
+    "EC-MKT-119"
+   ],
+   "buttons": {
+    "Shortlist": [
+     "EC-MKT-004",
+     "EC-MKT-021"
+    ],
+    "🤝 Award": [
+     "EC-MKT-004",
+     "EC-MKT-005",
+     "EC-MKT-021",
+     "EC-MKT-022",
+     "EC-MKT-025",
+     "EC-MKT-026"
+    ],
+    "Record booking": [
+     "EC-MKT-006",
+     "EC-MKT-036"
+    ],
+    "+ Raise a voucher": [
+     "EC-MKT-007"
+    ],
+    "Add day": [
+     "EC-MKT-007",
+     "EC-MKT-008",
+     "EC-MKT-012",
+     "EC-MKT-117",
+     "EC-MKT-118",
+     "EC-MKT-119"
+    ],
+    "Submit for approval": [
+     "EC-MKT-009"
+    ],
+    "Approve": [
+     "EC-MKT-009"
+    ],
+    "Mark paid": [
+     "EC-MKT-009"
+    ],
+    "💷 Send to billing": [
+     "EC-MKT-010",
+     "EC-MKT-038"
+    ],
+    "+7 days": [
+     "EC-MKT-015"
+    ],
+    "+15 days": [
+     "EC-MKT-015"
+    ],
+    "+30 days": [
+     "EC-MKT-015"
+    ],
+    "Set date": [
+     "EC-MKT-015"
+    ],
+    "Open for applications": [
+     "EC-MKT-017"
+    ],
+    "✎ Change the details": [
+     "EC-MKT-018"
+    ],
+    "Save changes": [
+     "EC-MKT-018"
+    ],
+    "Close": [
+     "EC-MKT-019"
+    ],
+    "⧉ Duplicate": [
+     "EC-MKT-020"
+    ],
+    "Reject": [
+     "EC-MKT-021"
+    ],
+    "Cancel": [
+     "EC-MKT-022",
+     "EC-MKT-037"
+    ],
+    "Add application": [
+     "EC-MKT-023",
+     "EC-MKT-024"
+    ],
+    "Award to the replacement": [
+     "EC-MKT-033",
+     "EC-MKT-034"
+    ],
+    "Update booking": [
+     "EC-MKT-036",
+     "EC-MKT-037"
+    ],
+    "Mark completed": [
+     "EC-MKT-037"
+    ],
+    "➕ Add a position": [
+     "EC-MKT-039"
+    ],
+    "Add": [
+     "EC-MKT-039"
+    ],
+    "Remove": [
+     "EC-MKT-039"
+    ],
+    "🚀 Create deployment": [
+     "EC-MKT-040"
+    ],
+    "Save terms": [
+     "EC-MKT-041"
+    ],
+    "(readiness tick)": [
+     "EC-MKT-041"
+    ],
+    "Raise concern": [
+     "EC-MKT-041"
+    ],
+    "Save rating": [
+     "EC-MKT-041"
+    ],
+    "✎ Change the details / Save changes": [
+     "EC-MKT-018"
+    ],
+    "Start shortlisting / Mark expired / Open for applications": [
+     "EC-MKT-017",
+     "EC-MKT-004"
+    ],
+    "💬 Message": [
+     "EC-MKT-098"
+    ],
+    "↻ Sync deployment": [
+     "EC-MKT-040"
+    ],
+    "Make offer / Mark accepted / Declined": [
+     "EC-MKT-004"
+    ],
+    "Send back": [
+     "EC-MKT-009"
+    ],
+    "Upload / ✕ (voucher documents)": [
+     "EC-MKT-052"
+    ],
+    "Recommended professionals + Add to shortlist": [
+     "EC-MKT-023"
+    ]
+   }
+  },
+  "connect-voucher-file": {
+   "cases": [
+    "EC-MKT-115"
+   ],
+   "buttons": {
+    "(receipt link)": [
+     "EC-MKT-115"
+    ]
+   }
+  },
+  "connect-concierge": {
+   "cases": [
+    "EC-MKT-111"
+   ],
+   "buttons": {
+    "Next →": [
+     "EC-MKT-111"
+    ],
+    "← Back": [
+     "EC-MKT-111"
+    ],
+    "Post it": [
+     "EC-MKT-111"
+    ]
+   }
+  },
+  "connect-talent": {
+   "cases": [
+    "EC-MKT-097"
+   ],
+   "buttons": {
+    "Search": [
+     "EC-MKT-097"
+    ],
+    "Add": [
+     "EC-MKT-097"
+    ]
+   }
+  },
+  "connect-bench": {
+   "cases": [
+    "EC-MKT-099"
+   ],
+   "buttons": {
+    "Add": [
+     "EC-MKT-099"
+    ],
+    "Allocate": [
+     "EC-MKT-099"
+    ],
+    "Confirm": [
+     "EC-MKT-099"
+    ],
+    "Release": [
+     "EC-MKT-099"
+    ]
+   }
+  },
+  "connect-verify": {
+   "cases": [
+    "EC-MKT-085",
+    "EC-MKT-100"
+   ],
+   "buttons": {
+    "Submit for verification": [
+     "EC-MKT-085"
+    ],
+    "Verified": [
+     "EC-MKT-085",
+     "EC-MKT-100"
+    ],
+    "Rejected": [
+     "EC-MKT-100"
+    ],
+    "Open file": [
+     "EC-MKT-100"
+    ]
+   }
+  },
+  "connect-identity": {
+   "cases": [
+    "EC-MKT-101"
+   ],
+   "buttons": {
+    "Link by ID": [
+     "EC-MKT-101"
+    ],
+    "Unlink": [
+     "EC-MKT-101"
+    ]
+   }
+  },
+  "connect-source": {
+   "cases": [
+    "EC-MKT-102"
+   ],
+   "buttons": {
+    "Assign": [
+     "EC-MKT-102"
+    ]
+   }
+  },
+  "connect-match-weights": {
+   "cases": [
+    "EC-MKT-103"
+   ],
+   "buttons": {
+    "Save weights": [
+     "EC-MKT-103"
+    ],
+    "Reset to defaults": [
+     "EC-MKT-103"
+    ]
+   }
+  },
+  "connect-messages": {
+   "cases": [
+    "EC-MKT-098"
+   ],
+   "buttons": {
+    "Send": [
+     "EC-MKT-098"
+    ]
+   }
+  },
+  "connect-channels": {
+   "cases": [
+    "EC-MKT-104"
+   ],
+   "buttons": {
+    "Off (record only)": [
+     "EC-MKT-104"
+    ],
+    "Log (simulate)": [
+     "EC-MKT-104"
+    ],
+    "Live (provider)": [
+     "EC-MKT-104"
+    ],
+    "Save template": [
+     "EC-MKT-104"
+    ]
+   }
+  },
+  "connect-analytics": {
+   "cases": [
+    "EC-MKT-109"
+   ],
+   "buttons": {
+    "(read only)": [
+     "EC-MKT-109"
+    ],
+    "(no buttons; read-only)": "navigation only"
+   }
+  },
+  "connect-taxonomy": {
+   "cases": [
+    "EC-MKT-105"
+   ],
+   "buttons": {
+    "Add node": [
+     "EC-MKT-105"
+    ],
+    "Retire": [
+     "EC-MKT-105"
+    ],
+    "Filter": [
+     "EC-MKT-105"
+    ],
+    "⚙ Manage graph →": "navigation only"
+   }
+  },
+  "connect-taxonomy-admin": {
+   "cases": [
+    "EC-MKT-105"
+   ],
+   "buttons": {
+    "Add node": [
+     "EC-MKT-105"
+    ],
+    "Retire": [
+     "EC-MKT-105"
+    ],
+    "Filter": [
+     "EC-MKT-105"
+    ]
+   }
+  },
+  "connect-qualifications": {
+   "cases": [
+    "EC-MKT-106"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-MKT-106"
+    ],
+    "Switch off": [
+     "EC-MKT-106"
+    ],
+    "Delete": [
+     "EC-MKT-106"
+    ]
+   }
+  },
+  "connect-orgs": {
+   "cases": [
+    "EC-MKT-107"
+   ],
+   "buttons": {
+    "Register": [
+     "EC-MKT-107"
+    ],
+    "(type)": [
+     "EC-MKT-107"
+    ],
+    "Approve": [
+     "EC-MKT-107"
+    ],
+    "Reject": [
+     "EC-MKT-107"
+    ],
+    "Save capabilities": [
+     "EC-MKT-107"
+    ]
+   }
+  },
+  "access-requests": {
+   "cases": [
+    "EC-MKT-107"
+   ],
+   "buttons": {
+    "Register": [
+     "EC-MKT-107"
+    ],
+    "(type)": [
+     "EC-MKT-107"
+    ],
+    "Approve": [
+     "EC-MKT-107"
+    ],
+    "Reject": [
+     "EC-MKT-107"
+    ],
+    "Save capabilities": [
+     "EC-MKT-107"
+    ]
+   }
+  },
+  "connect-capabilities": {
+   "cases": [
+    "EC-MKT-107"
+   ],
+   "buttons": {
+    "Register": [
+     "EC-MKT-107"
+    ],
+    "(type)": [
+     "EC-MKT-107"
+    ],
+    "Approve": [
+     "EC-MKT-107"
+    ],
+    "Reject": [
+     "EC-MKT-107"
+    ],
+    "Save capabilities": [
+     "EC-MKT-107"
+    ]
+   }
+  },
+  "passport-share": {
+   "cases": [
+    "EC-MKT-082"
+   ],
+   "buttons": {
+    "(old link)": [
+     "EC-MKT-082"
+    ]
+   }
+  },
+  "rating-disputes": {
+   "cases": [
+    "EC-MKT-108"
+   ],
+   "buttons": {
+    "Report this rating": [
+     "EC-MKT-108"
+    ],
+    "Investigate": [
+     "EC-MKT-108"
+    ],
+    "Resolve": [
+     "EC-MKT-108"
+    ]
+   }
+  },
+  "marketplace-plans": {
+   "cases": [
+    "EC-MKT-112",
+    "EC-MKT-113"
+   ],
+   "buttons": {
+    "Add coupon": [
+     "EC-MKT-112"
+    ],
+    "Add plan": [
+     "EC-MKT-112"
+    ],
+    "Add pack": [
+     "EC-MKT-112"
+    ],
+    "Save": [
+     "EC-MKT-112"
+    ],
+    "Save settings": [
+     "EC-MKT-112"
+    ],
+    "Save gates": [
+     "EC-MKT-113"
+    ],
+    "Save version": [
+     "EC-MKT-113"
+    ],
+    "Add fee rule": [
+     "EC-MKT-113"
+    ],
+    "Save tax admins": [
+     "EC-MKT-113"
+    ],
+    "Add plan / × / Edit": [
+     "EC-MKT-056"
+    ],
+    "Add pack / ×": [
+     "EC-MKT-056"
+    ],
+    "Save (grace) / Save settings / Set free-until": [
+     "EC-MKT-086"
+    ]
+   }
+  },
+  "marketplace-escrow": {
+   "cases": [
+    "EC-MKT-114"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-MKT-114"
+    ],
+    "Release": [
+     "EC-MKT-114"
+    ],
+    "Refund": [
+     "EC-MKT-114"
+    ],
+    "Apply": [
+     "EC-MKT-114"
+    ],
+    "Save / Release / Refund": [
+     "EC-MKT-114"
+    ]
+   }
+  },
+  "compliance-rules": {
+   "cases": [
+    "EC-MKT-113"
+   ],
+   "buttons": {
+    "Save gates": [
+     "EC-MKT-113"
+    ],
+    "Save version": [
+     "EC-MKT-113"
+    ],
+    "Add fee rule": [
+     "EC-MKT-113"
+    ],
+    "Save tax admins": [
+     "EC-MKT-113"
+    ],
+    "Save version / Add fee rule / × / Save tax admins": [
+     "EC-MKT-113"
+    ]
+   }
+  },
+  "financial-control": {
+   "cases": [
+    "EC-MKT-114"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-MKT-114"
+    ],
+    "Release": [
+     "EC-MKT-114"
+    ],
+    "Refund": [
+     "EC-MKT-114"
+    ],
+    "Apply": [
+     "EC-MKT-114"
+    ],
+    "Apply (date filter)": [
+     "EC-MKT-114"
+    ]
+   }
+  },
+  "feature-gates": {
+   "cases": [
+    "EC-MKT-113"
+   ],
+   "buttons": {
+    "Save gates": [
+     "EC-MKT-113"
+    ],
+    "Save version": [
+     "EC-MKT-113"
+    ],
+    "Add fee rule": [
+     "EC-MKT-113"
+    ],
+    "Save tax admins": [
+     "EC-MKT-113"
+    ]
+   }
+  },
+  "marketplace-toggle": {
+   "cases": [
+    "EC-MKT-113",
+    "EC-MKT-116"
+   ],
+   "buttons": {
+    "Save gates": [
+     "EC-MKT-113"
+    ],
+    "Save version": [
+     "EC-MKT-113"
+    ],
+    "Add fee rule": [
+     "EC-MKT-113"
+    ],
+    "Save tax admins": [
+     "EC-MKT-113"
+    ]
+   }
+  },
+  "owner": {
+   "cases": [
+    "EC-MKT-116"
+   ],
+   "buttons": {
+    "Save changes": [
+     "EC-MKT-116"
+    ]
+   }
+  },
+  "requisition": {
+   "cases": [
+    "EC-MKT-028",
+    "EC-MKT-029",
+    "EC-MKT-030",
+    "EC-MKT-031",
+    "EC-MKT-032"
+   ],
+   "buttons": {
+    "🧑‍🏭 Post this to the Marketplace": [
+     "EC-MKT-028",
+     "EC-MKT-029",
+     "EC-MKT-030",
+     "EC-MKT-031",
+     "EC-MKT-032"
+    ]
+   }
+  },
+  "portal-users": {
+   "cases": [
+    "EC-MKT-090",
+    "EC-MKT-064",
+    "EC-MKT-070"
+   ],
+   "buttons": {
+    "New link": [
+     "EC-MKT-090"
+    ],
+    "Withdraw": [
+     "EC-MKT-090"
+    ],
+    "Change": [
+     "EC-MKT-090"
+    ],
+    "Create the invitation": [
+     "EC-MKT-090"
+    ]
+   }
+  },
+  "portal-user-toggle": {
+   "cases": [
+    "EC-MKT-090"
+   ],
+   "buttons": {
+    "New link": [
+     "EC-MKT-090"
+    ],
+    "Withdraw": [
+     "EC-MKT-090"
+    ],
+    "Change": [
+     "EC-MKT-090"
+    ]
+   }
+  },
+  "portal-user-reinvite": {
+   "cases": [
+    "EC-MKT-090"
+   ],
+   "buttons": {
+    "New link": [
+     "EC-MKT-090"
+    ],
+    "Withdraw": [
+     "EC-MKT-090"
+    ],
+    "Change": [
+     "EC-MKT-090"
+    ]
+   }
+  },
+  "portal-user-perms": {
+   "cases": [
+    "EC-MKT-090"
+   ],
+   "buttons": {
+    "New link": [
+     "EC-MKT-090"
+    ],
+    "Withdraw": [
+     "EC-MKT-090"
+    ],
+    "Change": [
+     "EC-MKT-090"
+    ]
+   }
+  },
+  "portal-settings": {
+   "cases": [
+    "EC-MKT-091",
+    "EC-MKT-070"
+   ],
+   "buttons": {
+    "Switch it off": [
+     "EC-MKT-091"
+    ],
+    "Switch it on": [
+     "EC-MKT-091"
+    ],
+    "Withdraw": [
+     "EC-MKT-091"
+    ]
+   }
+  },
+  "portal-request": {
+   "cases": [
+    "EC-MKT-065",
+    "EC-MKT-064"
+   ],
+   "buttons": {
+    "Accept & raise the call": [
+     "EC-MKT-065"
+    ],
+    "Decline": [
+     "EC-MKT-065"
+    ]
+   }
+  },
+  "vendor-users": {
+   "cases": [
+    "EC-MKT-089"
+   ],
+   "buttons": {
+    "New link": [
+     "EC-MKT-089"
+    ],
+    "Create the invitation": [
+     "EC-MKT-089"
+    ],
+    "Withdraw": [
+     "EC-MKT-091"
+    ]
+   }
+  },
+  "vendor-user-toggle": {
+   "cases": [
+    "EC-MKT-091"
+   ],
+   "buttons": {
+    "Switch it off": [
+     "EC-MKT-091"
+    ],
+    "Switch it on": [
+     "EC-MKT-091"
+    ],
+    "Withdraw": [
+     "EC-MKT-091"
+    ]
+   }
+  },
+  "vendor-user-reinvite": {
+   "cases": [
+    "EC-MKT-089"
+   ],
+   "buttons": {
+    "New link": [
+     "EC-MKT-089"
+    ]
+   }
+  },
+  "vendor-settings": {
+   "cases": [
+    "EC-MKT-091"
+   ],
+   "buttons": {
+    "Switch it off": [
+     "EC-MKT-091"
+    ],
+    "Switch it on": [
+     "EC-MKT-091"
+    ],
+    "Withdraw": [
+     "EC-MKT-091"
+    ]
+   }
+  },
+  "vendor-share": {
+   "cases": [
+    "EC-MKT-092"
+   ],
+   "buttons": {
+    "Share with vendor": [
+     "EC-MKT-092"
+    ]
+   }
+  },
+  "connect": {
+   "cases": [
+    "EC-MKT-096"
+   ],
+   "buttons": {
+    "Post a requirement →": [
+     "EC-MKT-096"
+    ],
+    "Create a company account →": [
+     "EC-MKT-096"
+    ],
+    "Create a professional profile →": [
+     "EC-MKT-096"
+    ],
+    "Create an agency account →": [
+     "EC-MKT-096"
+    ],
+    "Sign in as a professional": [
+     "EC-MKT-096"
+    ],
+    "Sign in as a company or agency": [
+     "EC-MKT-096"
+    ]
+   }
+  },
+  "connect/start": {
+   "cases": [
+    "EC-MKT-096"
+   ],
+   "buttons": {
+    "Post a requirement →": [
+     "EC-MKT-096"
+    ],
+    "Create a company account →": [
+     "EC-MKT-096"
+    ],
+    "Create a professional profile →": [
+     "EC-MKT-096"
+    ],
+    "Create an agency account →": [
+     "EC-MKT-096"
+    ],
+    "Sign in as a professional": [
+     "EC-MKT-096"
+    ],
+    "Sign in as a company or agency": [
+     "EC-MKT-096"
+    ]
+   }
+  },
+  "join": {
+   "cases": [
+    "EC-MKT-095",
+    "EC-MKT-096"
+   ],
+   "buttons": {
+    "Create my account →": [
+     "EC-MKT-095"
+    ]
+   }
+  },
+  "p/<token>": {
+   "cases": [
+    "EC-MKT-081",
+    "EC-MKT-082",
+    "EC-MKT-083"
+   ],
+   "buttons": {
+    "Open ↗": [
+     "EC-MKT-081",
+     "EC-MKT-083"
+    ],
+    "(old link)": [
+     "EC-MKT-082"
+    ]
+   }
+  },
+  "portal": {
+   "cases": [
+    "EC-MKT-072",
+    "EC-MKT-062"
+   ],
+   "buttons": {
+    "OPEN CONCERNS tile": [
+     "EC-MKT-072"
+    ],
+    "(overview tiles other than OPEN CONCERNS)": "navigation only"
+   }
+  },
+  "portal/login": {
+   "cases": [
+    "EC-MKT-069",
+    "EC-MKT-070"
+   ],
+   "buttons": {
+    "Sign in": [
+     "EC-MKT-069",
+     "EC-MKT-070"
+    ],
+    "Send me a link": [
+     "EC-MKT-069"
+    ],
+    "Sign out": [
+     "EC-MKT-069"
+    ]
+   }
+  },
+  "portal/logout": {
+   "cases": [
+    "EC-MKT-069"
+   ],
+   "buttons": {
+    "Sign in": [
+     "EC-MKT-069"
+    ],
+    "Send me a link": [
+     "EC-MKT-069"
+    ],
+    "Sign out": [
+     "EC-MKT-069"
+    ]
+   }
+  },
+  "portal/forgot": {
+   "cases": [
+    "EC-MKT-069"
+   ],
+   "buttons": {
+    "Sign in": [
+     "EC-MKT-069"
+    ],
+    "Send me a link": [
+     "EC-MKT-069"
+    ],
+    "Sign out": [
+     "EC-MKT-069"
+    ]
+   }
+  },
+  "portal/reset": {
+   "cases": [
+    "EC-MKT-069"
+   ],
+   "buttons": {
+    "Sign in": [
+     "EC-MKT-069"
+    ],
+    "Send me a link": [
+     "EC-MKT-069"
+    ],
+    "Sign out": [
+     "EC-MKT-069"
+    ]
+   }
+  },
+  "portal/accept": {
+   "cases": [
+    "EC-MKT-069"
+   ],
+   "buttons": {
+    "Sign in": [
+     "EC-MKT-069"
+    ],
+    "Send me a link": [
+     "EC-MKT-069"
+    ],
+    "Sign out": [
+     "EC-MKT-069"
+    ]
+   }
+  },
+  "portal/password": {
+   "cases": [
+    "EC-MKT-068"
+   ],
+   "buttons": {
+    "Save it": [
+     "EC-MKT-068"
+    ]
+   }
+  },
+  "portal/alerts": {
+   "cases": [
+    "EC-MKT-076"
+   ],
+   "buttons": {
+    "Mark all read": [
+     "EC-MKT-076"
+    ],
+    "Ask": [
+     "EC-MKT-076"
+    ]
+   }
+  },
+  "portal/assistant": {
+   "cases": [
+    "EC-MKT-076"
+   ],
+   "buttons": {
+    "Mark all read": [
+     "EC-MKT-076"
+    ],
+    "Ask": [
+     "EC-MKT-076"
+    ]
+   }
+  },
+  "portal/plans": {
+   "cases": [
+    "EC-MKT-056",
+    "EC-MKT-057",
+    "EC-MKT-058"
+   ],
+   "buttons": {
+    "Monthly": [
+     "EC-MKT-056",
+     "EC-MKT-057"
+    ],
+    "Yearly": [
+     "EC-MKT-056"
+    ],
+    "Buy pack": [
+     "EC-MKT-056"
+    ]
+   }
+  },
+  "portal/pay": {
+   "cases": [
+    "EC-MKT-059"
+   ],
+   "buttons": {
+    "(Razorpay)": [
+     "EC-MKT-059"
+    ]
+   }
+  },
+  "portal/reputation": {
+   "cases": [
+    "EC-MKT-076",
+    "EC-MKT-108"
+   ],
+   "buttons": {
+    "Mark all read": [
+     "EC-MKT-076"
+    ],
+    "Ask": [
+     "EC-MKT-076"
+    ],
+    "Report this rating": [
+     "EC-MKT-108"
+    ],
+    "Investigate": [
+     "EC-MKT-108"
+    ],
+    "Resolve": [
+     "EC-MKT-108"
+    ]
+   }
+  },
+  "portal/hiring": {
+   "cases": [
+    "EC-MKT-071"
+   ],
+   "buttons": {
+    "(save search)": [
+     "EC-MKT-071"
+    ],
+    "Remove": [
+     "EC-MKT-071"
+    ]
+   }
+  },
+  "portal/hire": {
+   "cases": [
+    "EC-MKT-042",
+    "EC-MKT-043",
+    "EC-MKT-044",
+    "EC-MKT-055",
+    "EC-MKT-058"
+   ],
+   "buttons": {
+    "Post it — open for applications": [
+     "EC-MKT-042",
+     "EC-MKT-043",
+     "EC-MKT-044",
+     "EC-MKT-058"
+    ],
+    "Duplicate": [
+     "EC-MKT-055"
+    ],
+    "★ Template": [
+     "EC-MKT-055"
+    ],
+    "Use": [
+     "EC-MKT-055"
+    ],
+    "Delete": [
+     "EC-MKT-055"
+    ]
+   }
+  },
+  "portal/hire-req": {
+   "cases": [
+    "EC-MKT-035",
+    "EC-MKT-045",
+    "EC-MKT-046",
+    "EC-MKT-047",
+    "EC-MKT-048",
+    "EC-MKT-053",
+    "EC-MKT-054"
+   ],
+   "buttons": {
+    "End booking": [
+     "EC-MKT-035"
+    ],
+    "🤝 Award to the replacement": [
+     "EC-MKT-035"
+    ],
+    "🤝 Award": [
+     "EC-MKT-045",
+     "EC-MKT-046"
+    ],
+    "Shortlist": [
+     "EC-MKT-046"
+    ],
+    "Reject": [
+     "EC-MKT-046"
+    ],
+    "Record the booking": [
+     "EC-MKT-047"
+    ],
+    "Save the booking": [
+     "EC-MKT-047",
+     "EC-MKT-048",
+     "EC-MKT-053"
+    ],
+    "(typed address)": [
+     "EC-MKT-054"
+    ],
+    "+7 days / +15 days / +30 days / Set date": [
+     "EC-MKT-046"
+    ],
+    "Start shortlisting / Close / Cancel / Mark expired": [
+     "EC-MKT-046",
+     "EC-MKT-045"
+    ],
+    "Award to the replacement": [
+     "EC-MKT-035"
+    ]
+   }
+  },
+  "portal/find": {
+   "cases": [
+    "EC-MKT-073"
+   ],
+   "buttons": {
+    "Request contact": [
+     "EC-MKT-073"
+    ],
+    "Request contact details": [
+     "EC-MKT-073"
+    ],
+    "approve": [
+     "EC-MKT-073"
+    ],
+    "Search the pool": [
+     "EC-MKT-073"
+    ],
+    "☆ Add to bench": [
+     "EC-MKT-074"
+    ]
+   }
+  },
+  "portal/talent": {
+   "cases": [
+    "EC-MKT-073"
+   ],
+   "buttons": {
+    "Request contact": [
+     "EC-MKT-073"
+    ],
+    "Request contact details": [
+     "EC-MKT-073"
+    ],
+    "approve": [
+     "EC-MKT-073"
+    ],
+    "★ Add to my bench": [
+     "EC-MKT-074"
+    ]
+   }
+  },
+  "portal/roster": {
+   "cases": [
+    "EC-MKT-074"
+   ],
+   "buttons": {
+    "Add to my bench": [
+     "EC-MKT-074"
+    ],
+    "☆ Add to bench": [
+     "EC-MKT-074"
+    ]
+   }
+  },
+  "portal/bench": {
+   "cases": [
+    "EC-MKT-075"
+   ],
+   "buttons": {
+    "Add to bench": [
+     "EC-MKT-075"
+    ]
+   }
+  },
+  "portal/voucher": {
+   "cases": [
+    "EC-MKT-050",
+    "EC-MKT-051",
+    "EC-MKT-054"
+   ],
+   "buttons": {
+    "✓ Approve voucher": [
+     "EC-MKT-050"
+    ],
+    "↩ Return for clarification": [
+     "EC-MKT-050",
+     "EC-MKT-051"
+    ],
+    "(typed address)": [
+     "EC-MKT-054"
+    ]
+   }
+  },
+  "portal/voucher-file": {
+   "cases": [
+    "EC-MKT-054"
+   ],
+   "buttons": {
+    "(typed address)": [
+     "EC-MKT-054"
+    ]
+   }
+  },
+  "portal/report-file": {
+   "cases": [
+    "EC-MKT-052",
+    "EC-MKT-054"
+   ],
+   "buttons": {
+    "(report link)": [
+     "EC-MKT-052"
+    ],
+    "(typed address)": [
+     "EC-MKT-054"
+    ]
+   }
+  },
+  "portal/calls": {
+   "cases": [
+    "EC-MKT-077"
+   ],
+   "buttons": {
+    "Approve": [
+     "EC-MKT-077"
+    ],
+    "Return": [
+     "EC-MKT-077"
+    ],
+    "Issue gate pass": [
+     "EC-MKT-077"
+    ],
+    "Send it": [
+     "EC-MKT-077"
+    ],
+    "Respond": [
+     "EC-MKT-077"
+    ]
+   }
+  },
+  "portal/call": {
+   "cases": [
+    "EC-MKT-077"
+   ],
+   "buttons": {
+    "Approve": [
+     "EC-MKT-077"
+    ],
+    "Return": [
+     "EC-MKT-077"
+    ],
+    "Issue gate pass": [
+     "EC-MKT-077"
+    ],
+    "Send it": [
+     "EC-MKT-077"
+    ],
+    "Respond": [
+     "EC-MKT-077"
+    ]
+   }
+  },
+  "portal/reports": {
+   "cases": [
+    "EC-MKT-062"
+   ],
+   "buttons": {
+    "(list)": [
+     "EC-MKT-062"
+    ]
+   }
+  },
+  "portal/report": {
+   "cases": [
+    "EC-MKT-061",
+    "EC-MKT-062"
+   ],
+   "buttons": {
+    "(typed address)": [
+     "EC-MKT-061"
+    ],
+    "(list)": [
+     "EC-MKT-062"
+    ]
+   }
+  },
+  "portal/report-decision": {
+   "cases": [
+    "EC-MKT-060",
+    "EC-MKT-061"
+   ],
+   "buttons": {
+    "Accept": [
+     "EC-MKT-060"
+    ],
+    "Reject": [
+     "EC-MKT-060"
+    ],
+    "(typed address)": [
+     "EC-MKT-061"
+    ]
+   }
+  },
+  "portal/deputations": {
+   "cases": [
+    "EC-MKT-077"
+   ],
+   "buttons": {
+    "Approve": [
+     "EC-MKT-077"
+    ],
+    "Return": [
+     "EC-MKT-077"
+    ],
+    "Issue gate pass": [
+     "EC-MKT-077"
+    ],
+    "Send it": [
+     "EC-MKT-077"
+    ],
+    "Respond": [
+     "EC-MKT-077"
+    ]
+   }
+  },
+  "portal/dep-gate": {
+   "cases": [
+    "EC-MKT-077"
+   ],
+   "buttons": {
+    "Approve": [
+     "EC-MKT-077"
+    ],
+    "Return": [
+     "EC-MKT-077"
+    ],
+    "Issue gate pass": [
+     "EC-MKT-077"
+    ],
+    "Send it": [
+     "EC-MKT-077"
+    ],
+    "Respond": [
+     "EC-MKT-077"
+    ]
+   }
+  },
+  "portal/dep-approve": {
+   "cases": [
+    "EC-MKT-077"
+   ],
+   "buttons": {
+    "Approve": [
+     "EC-MKT-077"
+    ],
+    "Return": [
+     "EC-MKT-077"
+    ],
+    "Issue gate pass": [
+     "EC-MKT-077"
+    ],
+    "Send it": [
+     "EC-MKT-077"
+    ],
+    "Respond": [
+     "EC-MKT-077"
+    ]
+   }
+  },
+  "portal/complaints": {
+   "cases": [
+    "EC-MKT-077"
+   ],
+   "buttons": {
+    "Approve": [
+     "EC-MKT-077"
+    ],
+    "Return": [
+     "EC-MKT-077"
+    ],
+    "Issue gate pass": [
+     "EC-MKT-077"
+    ],
+    "Send it": [
+     "EC-MKT-077"
+    ],
+    "Respond": [
+     "EC-MKT-077"
+    ]
+   }
+  },
+  "portal/complaint-new": {
+   "cases": [
+    "EC-MKT-077"
+   ],
+   "buttons": {
+    "Approve": [
+     "EC-MKT-077"
+    ],
+    "Return": [
+     "EC-MKT-077"
+    ],
+    "Issue gate pass": [
+     "EC-MKT-077"
+    ],
+    "Send it": [
+     "EC-MKT-077"
+    ],
+    "Respond": [
+     "EC-MKT-077"
+    ]
+   }
+  },
+  "portal/invoices": {
+   "cases": [
+    "EC-MKT-077"
+   ],
+   "buttons": {
+    "Approve": [
+     "EC-MKT-077"
+    ],
+    "Return": [
+     "EC-MKT-077"
+    ],
+    "Issue gate pass": [
+     "EC-MKT-077"
+    ],
+    "Send it": [
+     "EC-MKT-077"
+    ],
+    "Respond": [
+     "EC-MKT-077"
+    ]
+   }
+  },
+  "portal/request": {
+   "cases": [
+    "EC-MKT-064"
+   ],
+   "buttons": {
+    "Send it": [
+     "EC-MKT-064"
+    ]
+   }
+  },
+  "portal/issues": {
+   "cases": [
+    "EC-MKT-077"
+   ],
+   "buttons": {
+    "Approve": [
+     "EC-MKT-077"
+    ],
+    "Return": [
+     "EC-MKT-077"
+    ],
+    "Issue gate pass": [
+     "EC-MKT-077"
+    ],
+    "Send it": [
+     "EC-MKT-077"
+    ],
+    "Respond": [
+     "EC-MKT-077"
+    ]
+   }
+  },
+  "portal/issue": {
+   "cases": [
+    "EC-MKT-077"
+   ],
+   "buttons": {
+    "Approve": [
+     "EC-MKT-077"
+    ],
+    "Return": [
+     "EC-MKT-077"
+    ],
+    "Issue gate pass": [
+     "EC-MKT-077"
+    ],
+    "Send it": [
+     "EC-MKT-077"
+    ],
+    "Respond": [
+     "EC-MKT-077"
+    ]
+   }
+  },
+  "portal/team": {
+   "cases": [
+    "EC-MKT-066",
+    "EC-MKT-067",
+    "EC-MKT-063"
+   ],
+   "buttons": {
+    "Create the invitation": [
+     "EC-MKT-066"
+    ],
+    "Withdraw": [
+     "EC-MKT-066"
+    ],
+    "Set": [
+     "EC-MKT-066"
+    ],
+    "(open screen)": [
+     "EC-MKT-067"
+    ]
+   }
+  },
+  "pro": {
+   "cases": [
+    "EC-MKT-088",
+    "EC-MKT-120"
+   ],
+   "buttons": {
+    "Upload": [
+     "EC-MKT-088"
+    ],
+    "Scan & suggest": [
+     "EC-MKT-088"
+    ],
+    "Save privacy settings": [
+     "EC-MKT-088"
+    ],
+    "Send": [
+     "EC-MKT-088"
+    ],
+    "Sign out": [
+     "EC-MKT-088"
+    ],
+    "Send reset link": [
+     "EC-MKT-088"
+    ],
+    "🧾 Raise / track voucher →": [
+     "EC-MKT-120"
+    ],
+    "(menu links)": "navigation only"
+   }
+  },
+  "pro/login": {
+   "cases": [
+    "EC-MKT-088"
+   ],
+   "buttons": {}
+  },
+  "pro/register": {
+   "cases": [
+    "EC-MKT-078"
+   ],
+   "buttons": {
+    "Create my profile": [
+     "EC-MKT-078"
+    ]
+   }
+  },
+  "pro/logout": {
+   "cases": [
+    "EC-MKT-088"
+   ],
+   "buttons": {
+    "Upload": [
+     "EC-MKT-088"
+    ],
+    "Scan & suggest": [
+     "EC-MKT-088"
+    ],
+    "Save privacy settings": [
+     "EC-MKT-088"
+    ],
+    "Send": [
+     "EC-MKT-088"
+    ],
+    "Sign out": [
+     "EC-MKT-088"
+    ],
+    "Send reset link": [
+     "EC-MKT-088"
+    ]
+   }
+  },
+  "pro/forgot": {
+   "cases": [
+    "EC-MKT-088"
+   ],
+   "buttons": {
+    "Upload": [
+     "EC-MKT-088"
+    ],
+    "Scan & suggest": [
+     "EC-MKT-088"
+    ],
+    "Save privacy settings": [
+     "EC-MKT-088"
+    ],
+    "Send": [
+     "EC-MKT-088"
+    ],
+    "Sign out": [
+     "EC-MKT-088"
+    ],
+    "Send reset link": [
+     "EC-MKT-088"
+    ]
+   }
+  },
+  "pro/reset": {
+   "cases": [
+    "EC-MKT-088"
+   ],
+   "buttons": {
+    "Upload": [
+     "EC-MKT-088"
+    ],
+    "Scan & suggest": [
+     "EC-MKT-088"
+    ],
+    "Save privacy settings": [
+     "EC-MKT-088"
+    ],
+    "Send": [
+     "EC-MKT-088"
+    ],
+    "Sign out": [
+     "EC-MKT-088"
+    ],
+    "Send reset link": [
+     "EC-MKT-088"
+    ]
+   }
+  },
+  "pro/profile": {
+   "cases": [
+    "EC-MKT-084",
+    "EC-MKT-078"
+   ],
+   "buttons": {
+    "Save identity": [
+     "EC-MKT-078"
+    ],
+    "Add certification": [
+     "EC-MKT-084"
+    ],
+    "Add project": [
+     "EC-MKT-084"
+    ],
+    "Save tax details": [
+     "EC-MKT-084"
+    ],
+    "Add to my expertise / ✕": [
+     "EC-MKT-084"
+    ],
+    "Save location & mobility": [
+     "EC-MKT-084"
+    ]
+   }
+  },
+  "pro/jobs": {
+   "cases": [
+    "EC-MKT-079"
+   ],
+   "buttons": {
+    "Apply": [
+     "EC-MKT-079"
+    ]
+   }
+  },
+  "pro/applications": {
+   "cases": [
+    "EC-MKT-080"
+   ],
+   "buttons": {
+    "Withdraw": [
+     "EC-MKT-080"
+    ]
+   }
+  },
+  "pro/bookings": {
+   "cases": [
+    "EC-MKT-088",
+    "EC-MKT-120"
+   ],
+   "buttons": {
+    "Upload": [
+     "EC-MKT-088"
+    ],
+    "Scan & suggest": [
+     "EC-MKT-088"
+    ],
+    "Save privacy settings": [
+     "EC-MKT-088"
+    ],
+    "Send": [
+     "EC-MKT-088"
+    ],
+    "Sign out": [
+     "EC-MKT-088"
+    ],
+    "Send reset link": [
+     "EC-MKT-088"
+    ],
+    "🧾 Raise / track voucher →": [
+     "EC-MKT-120"
+    ]
+   }
+  },
+  "pro/vouchers": {
+   "cases": [
+    "EC-MKT-088",
+    "EC-MKT-120",
+    "EC-MKT-049"
+   ],
+   "buttons": {
+    "Upload": [
+     "EC-MKT-088"
+    ],
+    "Scan & suggest": [
+     "EC-MKT-088"
+    ],
+    "Save privacy settings": [
+     "EC-MKT-088"
+    ],
+    "Send": [
+     "EC-MKT-088"
+    ],
+    "Sign out": [
+     "EC-MKT-088"
+    ],
+    "Send reset link": [
+     "EC-MKT-088"
+    ],
+    "🧾 Raise / track voucher →": [
+     "EC-MKT-120"
+    ]
+   }
+  },
+  "pro/voucher": {
+   "cases": [
+    "EC-MKT-049",
+    "EC-MKT-087",
+    "EC-MKT-118"
+   ],
+   "buttons": {
+    "Raise →": [
+     "EC-MKT-049"
+    ],
+    "Add day": [
+     "EC-MKT-049",
+     "EC-MKT-118"
+    ],
+    "Submit": [
+     "EC-MKT-049"
+    ],
+    "(links)": [
+     "EC-MKT-087"
+    ]
+   }
+  },
+  "pro/voucher-file": {
+   "cases": [
+    "EC-MKT-087"
+   ],
+   "buttons": {
+    "(links)": [
+     "EC-MKT-087"
+    ]
+   }
+  },
+  "pro/report-file": {
+   "cases": [
+    "EC-MKT-087"
+   ],
+   "buttons": {
+    "(links)": [
+     "EC-MKT-087"
+    ]
+   }
+  },
+  "pro/messages": {
+   "cases": [
+    "EC-MKT-088",
+    "EC-MKT-098"
+   ],
+   "buttons": {
+    "Upload": [
+     "EC-MKT-088"
+    ],
+    "Scan & suggest": [
+     "EC-MKT-088"
+    ],
+    "Save privacy settings": [
+     "EC-MKT-088"
+    ],
+    "Send": [
+     "EC-MKT-088",
+     "EC-MKT-098"
+    ],
+    "Sign out": [
+     "EC-MKT-088"
+    ],
+    "Send reset link": [
+     "EC-MKT-088"
+    ]
+   }
+  },
+  "pro/credentials": {
+   "cases": [
+    "EC-MKT-084"
+   ],
+   "buttons": {
+    "Save identity": [
+     "EC-MKT-084"
+    ],
+    "Add certification": [
+     "EC-MKT-084"
+    ],
+    "Add project": [
+     "EC-MKT-084"
+    ]
+   }
+  },
+  "pro/documents": {
+   "cases": [
+    "EC-MKT-088"
+   ],
+   "buttons": {
+    "Upload": [
+     "EC-MKT-088"
+    ],
+    "Scan & suggest": [
+     "EC-MKT-088"
+    ],
+    "Save privacy settings": [
+     "EC-MKT-088"
+    ],
+    "Send": [
+     "EC-MKT-088"
+    ],
+    "Sign out": [
+     "EC-MKT-088"
+    ],
+    "Send reset link": [
+     "EC-MKT-088"
+    ]
+   }
+  },
+  "pro/file": {
+   "cases": [
+    "EC-MKT-087"
+   ],
+   "buttons": {
+    "(links)": [
+     "EC-MKT-087"
+    ]
+   }
+  },
+  "pro/cv": {
+   "cases": [
+    "EC-MKT-088"
+   ],
+   "buttons": {
+    "Upload": [
+     "EC-MKT-088"
+    ],
+    "Scan & suggest": [
+     "EC-MKT-088"
+    ],
+    "Save privacy settings": [
+     "EC-MKT-088"
+    ],
+    "Send": [
+     "EC-MKT-088"
+    ],
+    "Sign out": [
+     "EC-MKT-088"
+    ],
+    "Send reset link": [
+     "EC-MKT-088"
+    ]
+   }
+  },
+  "pro/privacy": {
+   "cases": [
+    "EC-MKT-073",
+    "EC-MKT-088"
+   ],
+   "buttons": {
+    "Request contact": [
+     "EC-MKT-073"
+    ],
+    "Request contact details": [
+     "EC-MKT-073"
+    ],
+    "approve": [
+     "EC-MKT-073"
+    ],
+    "Upload": [
+     "EC-MKT-088"
+    ],
+    "Scan & suggest": [
+     "EC-MKT-088"
+    ],
+    "Save privacy settings": [
+     "EC-MKT-088"
+    ],
+    "Send": [
+     "EC-MKT-088"
+    ],
+    "Sign out": [
+     "EC-MKT-088"
+    ],
+    "Send reset link": [
+     "EC-MKT-088"
+    ]
+   }
+  },
+  "pro/verify": {
+   "cases": [
+    "EC-MKT-085"
+   ],
+   "buttons": {
+    "Submit for verification": [
+     "EC-MKT-085"
+    ],
+    "Verified": [
+     "EC-MKT-085"
+    ]
+   }
+  },
+  "pro/plans": {
+   "cases": [
+    "EC-MKT-086"
+   ],
+   "buttons": {
+    "Choose Free": [
+     "EC-MKT-086"
+    ],
+    "Monthly": [
+     "EC-MKT-086"
+    ],
+    "Yearly": [
+     "EC-MKT-086"
+    ],
+    "Buy pack": [
+     "EC-MKT-086"
+    ]
+   }
+  },
+  "pro/pay": {
+   "cases": [
+    "EC-MKT-086"
+   ],
+   "buttons": {}
+  },
+  "pro/reputation": {
+   "cases": [
+    "EC-MKT-088",
+    "EC-MKT-108"
+   ],
+   "buttons": {
+    "Upload": [
+     "EC-MKT-088"
+    ],
+    "Scan & suggest": [
+     "EC-MKT-088"
+    ],
+    "Save privacy settings": [
+     "EC-MKT-088"
+    ],
+    "Send": [
+     "EC-MKT-088"
+    ],
+    "Sign out": [
+     "EC-MKT-088"
+    ],
+    "Send reset link": [
+     "EC-MKT-088"
+    ],
+    "Report this rating": [
+     "EC-MKT-108"
+    ],
+    "Investigate": [
+     "EC-MKT-108"
+    ],
+    "Resolve": [
+     "EC-MKT-108"
+    ]
+   }
+  },
+  "pro/geo": {
+   "cases": [
+    "EC-MKT-087"
+   ],
+   "buttons": {
+    "(links)": [
+     "EC-MKT-087"
+    ],
+    "(JSON lookup used by the passport form)": [
+     "EC-MKT-087"
+    ]
+   }
+  },
+  "pro/tax-children": {
+   "cases": [
+    "EC-MKT-087"
+   ],
+   "buttons": {
+    "(links)": [
+     "EC-MKT-087"
+    ]
+   }
+  },
+  "pro/tax-resolve": {
+   "cases": [
+    "EC-MKT-087"
+   ],
+   "buttons": {
+    "(links)": [
+     "EC-MKT-087"
+    ]
+   }
+  },
+  "pro/tax-roots": {
+   "cases": [
+    "EC-MKT-087"
+   ],
+   "buttons": {
+    "(links)": [
+     "EC-MKT-087"
+    ]
+   }
+  },
+  "pro/tax-suggest": {
+   "cases": [
+    "EC-MKT-087"
+   ],
+   "buttons": {
+    "(links)": [
+     "EC-MKT-087"
+    ]
+   }
+  },
+  "vendor": {
+   "cases": [
+    "EC-MKT-094"
+   ],
+   "buttons": {
+    "Save it": [
+     "EC-MKT-094"
+    ],
+    "Sign in": [
+     "EC-MKT-094"
+    ],
+    "Sign out": [
+     "EC-MKT-094"
+    ],
+    "(menu links)": "navigation only"
+   }
+  },
+  "vendor/login": {
+   "cases": [
+    "EC-MKT-094",
+    "EC-MKT-091"
+   ],
+   "buttons": {
+    "Save it": [
+     "EC-MKT-094"
+    ],
+    "Sign in": [
+     "EC-MKT-094"
+    ],
+    "Sign out": [
+     "EC-MKT-094"
+    ]
+   }
+  },
+  "vendor/logout": {
+   "cases": [
+    "EC-MKT-094"
+   ],
+   "buttons": {
+    "Save it": [
+     "EC-MKT-094"
+    ],
+    "Sign in": [
+     "EC-MKT-094"
+    ],
+    "Sign out": [
+     "EC-MKT-094"
+    ]
+   }
+  },
+  "vendor/accept": {
+   "cases": [
+    "EC-MKT-094"
+   ],
+   "buttons": {
+    "Save it": [
+     "EC-MKT-094"
+    ],
+    "Sign in": [
+     "EC-MKT-094"
+    ],
+    "Sign out": [
+     "EC-MKT-094"
+    ]
+   }
+  },
+  "vendor/password": {
+   "cases": [
+    "EC-MKT-094"
+   ],
+   "buttons": {
+    "Save it": [
+     "EC-MKT-094"
+    ],
+    "Sign in": [
+     "EC-MKT-094"
+    ],
+    "Sign out": [
+     "EC-MKT-094"
+    ]
+   }
+  },
+  "vendor/alerts": {
+   "cases": [
+    "EC-MKT-094"
+   ],
+   "buttons": {
+    "Save it": [
+     "EC-MKT-094"
+    ],
+    "Sign in": [
+     "EC-MKT-094"
+    ],
+    "Sign out": [
+     "EC-MKT-094"
+    ]
+   }
+  },
+  "vendor/assistant": {
+   "cases": [
+    "EC-MKT-094"
+   ],
+   "buttons": {
+    "Save it": [
+     "EC-MKT-094"
+    ],
+    "Sign in": [
+     "EC-MKT-094"
+    ],
+    "Sign out": [
+     "EC-MKT-094"
+    ]
+   }
+  },
+  "vendor/opportunities": {
+   "cases": [
+    "EC-MKT-093"
+   ],
+   "buttons": {
+    "Apply": [
+     "EC-MKT-093"
+    ]
+   }
+  },
+  "vendor/reports": {
+   "cases": [
+    "EC-MKT-094"
+   ],
+   "buttons": {
+    "Save it": [
+     "EC-MKT-094"
+    ],
+    "Sign in": [
+     "EC-MKT-094"
+    ],
+    "Sign out": [
+     "EC-MKT-094"
+    ]
+   }
+  },
+  "vendor/report": {
+   "cases": [
+    "EC-MKT-094"
+   ],
+   "buttons": {
+    "Save it": [
+     "EC-MKT-094"
+    ],
+    "Sign in": [
+     "EC-MKT-094"
+    ],
+    "Sign out": [
+     "EC-MKT-094"
+    ]
+   }
+  },
+  "vendor/issues": {
+   "cases": [
+    "EC-MKT-094"
+   ],
+   "buttons": {
+    "Save it": [
+     "EC-MKT-094"
+    ],
+    "Sign in": [
+     "EC-MKT-094"
+    ],
+    "Sign out": [
+     "EC-MKT-094"
+    ]
+   }
+  },
+  "vendor/issue": {
+   "cases": [
+    "EC-MKT-094"
+   ],
+   "buttons": {
+    "Save it": [
+     "EC-MKT-094"
+    ],
+    "Sign in": [
+     "EC-MKT-094"
+    ],
+    "Sign out": [
+     "EC-MKT-094"
+    ]
+   }
+  },
+  "vendor/qualification": {
+   "cases": [
+    "EC-MKT-094"
+   ],
+   "buttons": {
+    "Save it": [
+     "EC-MKT-094"
+    ],
+    "Sign in": [
+     "EC-MKT-094"
+    ],
+    "Sign out": [
+     "EC-MKT-094"
+    ]
+   }
+  },
+  "vendor/supplier": {
+   "cases": [
+    "EC-MKT-094"
+   ],
+   "buttons": {
+    "Save it": [
+     "EC-MKT-094"
+    ],
+    "Sign in": [
+     "EC-MKT-094"
+    ],
+    "Sign out": [
+     "EC-MKT-094"
+    ],
+    "(page)": "not shown to any test user: answers 404 for the seeded vendor (supplier qualification not set up)"
+   }
+  }
+ }
+}

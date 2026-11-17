@@ -1,0 +1,52 @@
+leads	leads	Sales	Leads
+lead	leads	Sales	Lead
+lead-new	leads	Sales	New
+lead-edit	leads	Sales	Edit
+lead-move	leads	Sales	Lead move
+lead-convert	leads	Sales	Lead convert
+leads-bulk	leads	Sales	Leads bulk
+lead-delete	leads	Sales	Lead delete
+lead-contact	leads	Sales	Lead contact
+lead-files	leads	Sales	Lead files
+lead-file	leads	Sales	Lead file
+lead-file-delete	leads	Sales	Lead file delete
+opportunities	leads	Sales	Opportunities
+opportunity	leads	Sales	Opportunity
+opportunity-new	leads	Sales	New
+opportunity-edit	leads	Sales	Edit
+opportunity-delete	leads	Sales	Opportunity delete
+opportunity-move	leads	Sales	Opportunity move
+opportunity-reopen	leads	Sales	Opportunity reopen
+lead-reopen	leads	Sales	Lead reopen
+opportunity-quote	leads	Sales	Opportunity quote
+opportunity-from-lead	leads	Sales	Opportunity from lead
+opportunity-raise-order	leads	Sales	Opportunity raise order
+opportunity-send-to-accounts	leads	Sales	Opportunity send to accounts
+opportunity-add-customer	leads	Sales	Opportunity add customer
+opportunity-generate-quote	leads	Sales	Opportunity generate quote
+pipelines	leads	Sales	Pipelines
+pipeline	leads	Sales	Pipeline
+pipeline-new	leads	Sales	New
+pipeline-save	leads	Sales	Pipeline save
+pipeline-stage-add	leads	Sales	New
+pipeline-stage-delete	leads	Sales	Pipeline stage delete
+pipeline-default	leads	Sales	Pipeline default
+crm-dashboard	crm_reports	Sales	Sales reports
+approval-act	leads	Sales	Approval act
+adspro	leads	Sales	Adspro
+adspro-save	leads	Sales	Adspro save
+adspro-test	leads	Sales	Adspro test
+adspro-import	leads	Sales	Adspro import
+adspro-spend	leads	Sales	Adspro spend
+ads-roi	leads	Sales	Ads roi
+adspro-sync	leads	Sales	Adspro sync
+adspro-backfill	leads	Sales	Adspro backfill
+stage-gates	leads	Sales	Stage gates
+stage-gate-save	leads	Sales	Stage gate save
+stage-gate-delete	leads	Sales	Stage gate delete
+inquiries	inquiries	Sales	Inquiries
+inquiry-new	inquiries	Sales	New
+inquiry-edit	inquiries	Sales	Edit
+inquiry-delete	inquiries	Sales	Inquiry delete
+inquiry-drop	inquiries	Sales	Inquiry drop
+inquiry-reopen	inquiries	Sales	Inquiry reopen

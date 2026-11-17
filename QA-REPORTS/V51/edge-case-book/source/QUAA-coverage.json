@@ -1,0 +1,930 @@
+{
+ "routes": {
+  "issues": {
+   "cases": [
+    "EC-QUAA-033"
+   ],
+   "buttons": {
+    "Show (status select)": [
+     "EC-QUAA-033"
+    ],
+    "Search → Filter": [
+     "EC-QUAA-033"
+    ],
+    "All types / type chips": [
+     "EC-QUAA-033"
+    ],
+    "Deviations & concessions": "navigation only",
+    "NCR register": "navigation only",
+    "Issue reports": "navigation only",
+    "Tile links (All issues, Major open, Overdue, Deviations)": [
+     "EC-QUAA-033"
+    ]
+   }
+  },
+  "departures": {
+   "cases": [
+    "EC-QUAA-039",
+    "EC-QUAA-040",
+    "EC-QUAA-035",
+    "EC-QUAA-037"
+   ],
+   "buttons": {
+    "All / Deviation / Concession / Waiver chips": [
+     "EC-QUAA-035"
+    ],
+    "Create — starts as Draft": [
+     "EC-QUAA-035"
+    ],
+    "Save (Move column)": [
+     "EC-QUAA-037"
+    ]
+   }
+  },
+  "issue-classify": {
+   "cases": [
+    "EC-QUAA-034",
+    "EC-QUAA-028"
+   ],
+   "buttons": {
+    "Save classification": [
+     "EC-QUAA-034"
+    ]
+   }
+  },
+  "departure-new": {
+   "cases": [
+    "EC-QUAA-035",
+    "EC-QUAA-036",
+    "EC-QUAA-042"
+   ],
+   "buttons": {
+    "Create — starts as Draft": [
+     "EC-QUAA-035",
+     "EC-QUAA-036"
+    ],
+    "Create (Draft) (from a nonconformity)": [
+     "EC-QUAA-042"
+    ]
+   }
+  },
+  "departure-status": {
+   "cases": [
+    "EC-QUAA-037",
+    "EC-QUAA-038",
+    "EC-QUAA-041"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-QUAA-037",
+     "EC-QUAA-038",
+     "EC-QUAA-041"
+    ]
+   }
+  },
+  "dispute-new": {
+   "cases": [
+    "EC-QUAA-043"
+   ],
+   "buttons": {
+    "Record — the finding is retained": [
+     "EC-QUAA-043"
+    ]
+   }
+  },
+  "dispute-decide": {
+   "cases": [
+    "EC-QUAA-044"
+   ],
+   "buttons": {
+    "(no button)": "not shown to any test user: no screen has a Decide button for a dispute; reachable only by a direct request (see EC case)"
+   }
+  },
+  "issue-extend": {
+   "cases": [
+    "EC-QUAA-045",
+    "EC-QUAA-047"
+   ],
+   "buttons": {
+    "Request (with / without approve now)": [
+     "EC-QUAA-045",
+     "EC-QUAA-047"
+    ]
+   }
+  },
+  "extension-approve": {
+   "cases": [
+    "EC-QUAA-046"
+   ],
+   "buttons": {
+    "(no button)": "not shown to any test user: no screen has an Approve button for an extension; reachable only by a direct request (see EC case)"
+   }
+  },
+  "data-control": {
+   "cases": [
+    "EC-QUAA-111",
+    "EC-QUAA-104",
+    "EC-QUAA-105",
+    "EC-QUAA-109",
+    "EC-QUAA-108",
+    "EC-QUAA-107",
+    "EC-QUAA-106"
+   ],
+   "buttons": {
+    "Compliance overview": "navigation only",
+    "Run them now": [
+     "EC-QUAA-104"
+    ],
+    "Record it (validation)": [
+     "EC-QUAA-105"
+    ],
+    "Save (failure row)": [
+     "EC-QUAA-109"
+    ],
+    "Raise a corrective action": [
+     "EC-QUAA-108"
+    ],
+    "Mark resolved": [
+     "EC-QUAA-107"
+    ],
+    "Record it (failure)": [
+     "EC-QUAA-106"
+    ],
+    "Roles & access link": "navigation only"
+   }
+  },
+  "data-check-run": {
+   "cases": [
+    "EC-QUAA-104"
+   ],
+   "buttons": {
+    "Run them now": [
+     "EC-QUAA-104"
+    ]
+   }
+  },
+  "sw-validation-add": {
+   "cases": [
+    "EC-QUAA-105"
+   ],
+   "buttons": {
+    "Record it": [
+     "EC-QUAA-105"
+    ]
+   }
+  },
+  "failure-add": {
+   "cases": [
+    "EC-QUAA-106"
+   ],
+   "buttons": {
+    "Record it": [
+     "EC-QUAA-106"
+    ]
+   }
+  },
+  "failure-update": {
+   "cases": [
+    "EC-QUAA-109",
+    "EC-QUAA-110",
+    "EC-QUAA-107"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-QUAA-107",
+     "EC-QUAA-109",
+     "EC-QUAA-110"
+    ]
+   }
+  },
+  "failure-resolve": {
+   "cases": [
+    "EC-QUAA-107",
+    "EC-QUAA-110"
+   ],
+   "buttons": {
+    "Mark resolved": [
+     "EC-QUAA-107"
+    ]
+   }
+  },
+  "failure-capa": {
+   "cases": [
+    "EC-QUAA-108"
+   ],
+   "buttons": {
+    "Raise a corrective action": [
+     "EC-QUAA-108"
+    ]
+   }
+  },
+  "confidentiality": {
+   "cases": [
+    "EC-QUAA-103",
+    "EC-QUAA-097",
+    "EC-QUAA-098",
+    "EC-QUAA-099"
+   ],
+   "buttons": {
+    "People / Client agreements / Breaches tiles": [
+     "EC-QUAA-103"
+    ],
+    "Open / Closed / All (breaches)": [
+     "EC-QUAA-103"
+    ],
+    "Breach and NCR links": "navigation only",
+    "Record it (undertaking)": [
+     "EC-QUAA-097"
+    ],
+    "Record it (client agreement)": [
+     "EC-QUAA-098"
+    ],
+    "+ Add new (client)": "navigation only",
+    "Record it (breach)": [
+     "EC-QUAA-099"
+    ]
+   }
+  },
+  "conf-undertaking-add": {
+   "cases": [
+    "EC-QUAA-097"
+   ],
+   "buttons": {
+    "Record it": [
+     "EC-QUAA-097"
+    ]
+   }
+  },
+  "conf-nda-add": {
+   "cases": [
+    "EC-QUAA-098"
+   ],
+   "buttons": {
+    "Record it": [
+     "EC-QUAA-098"
+    ]
+   }
+  },
+  "conf-breach": {
+   "cases": [
+    "EC-QUAA-100",
+    "EC-QUAA-102",
+    "EC-QUAA-101"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-QUAA-100",
+     "EC-QUAA-102"
+    ],
+    "Close CB-…": [
+     "EC-QUAA-101"
+    ],
+    "NCR link": "navigation only"
+   }
+  },
+  "conf-breach-add": {
+   "cases": [
+    "EC-QUAA-099"
+   ],
+   "buttons": {
+    "Record it": [
+     "EC-QUAA-099"
+    ]
+   }
+  },
+  "conf-breach-close": {
+   "cases": [
+    "EC-QUAA-101"
+   ],
+   "buttons": {
+    "Close CB-…": [
+     "EC-QUAA-101"
+    ]
+   }
+  },
+  "ncr": {
+   "cases": [
+    "EC-QUAA-010",
+    "EC-QUAA-011",
+    "EC-QUAA-013",
+    "EC-QUAA-014"
+   ],
+   "buttons": {
+    "+ Raise a nonconformity": [
+     "EC-QUAA-010"
+    ],
+    "Open / Major, still open / Past its date / No disposition yet (tiles)": [
+     "EC-QUAA-011"
+    ],
+    "Open / Closed / All (filter links)": [
+     "EC-QUAA-011"
+    ],
+    "Find (search)": [
+     "EC-QUAA-013"
+    ],
+    "Columns → Apply": [
+     "EC-QUAA-013"
+    ],
+    "Rows per page": "navigation only",
+    "⬇ CSV": [
+     "EC-QUAA-013"
+    ],
+    "Ref / title links": "navigation only",
+    "Nonconformity tab strip (Issues, Nonconformities, Corrective actions, Departures)": "navigation only"
+   }
+  },
+  "ncr-item": {
+   "cases": [
+    "EC-QUAA-015",
+    "EC-QUAA-016",
+    "EC-QUAA-024",
+    "EC-QUAA-028",
+    "EC-QUAA-029",
+    "EC-QUAA-068",
+    "EC-QUAA-019",
+    "EC-QUAA-017",
+    "EC-QUAA-018",
+    "EC-QUAA-021",
+    "EC-QUAA-022",
+    "EC-QUAA-026",
+    "EC-QUAA-034",
+    "EC-QUAA-042",
+    "EC-QUAA-043",
+    "EC-QUAA-045"
+   ],
+   "buttons": {
+    "🧭 360 view": "navigation only",
+    "Job link / CAPA link": "navigation only",
+    "Owner and date → Save": [
+     "EC-QUAA-019"
+    ],
+    "Step 1 Save": [
+     "EC-QUAA-017"
+    ],
+    "Step 2 Record it": [
+     "EC-QUAA-018"
+    ],
+    "Open a corrective action from this": [
+     "EC-QUAA-021"
+    ],
+    "Close NCR-…": [
+     "EC-QUAA-022"
+    ],
+    "Reopen": [
+     "EC-QUAA-026"
+    ],
+    "Save classification": [
+     "EC-QUAA-034"
+    ],
+    "➕ Raise a controlled departure from this issue → Create (Draft)": [
+     "EC-QUAA-042"
+    ],
+    "➕ Record a dispute / response → Record — the finding is retained": [
+     "EC-QUAA-043"
+    ],
+    "➕ Request a due-date extension → Request": [
+     "EC-QUAA-045"
+    ]
+   }
+  },
+  "ncr-new": {
+   "cases": [
+    "EC-QUAA-001",
+    "EC-QUAA-002",
+    "EC-QUAA-003",
+    "EC-QUAA-004",
+    "EC-QUAA-005",
+    "EC-QUAA-006",
+    "EC-QUAA-007",
+    "EC-QUAA-008",
+    "EC-QUAA-009",
+    "EC-QUAA-031",
+    "EC-QUAA-032"
+   ],
+   "buttons": {
+    "Raise it": [
+     "EC-QUAA-001",
+     "EC-QUAA-004",
+     "EC-QUAA-008",
+     "EC-QUAA-009"
+    ],
+    "Cancel": [
+     "EC-QUAA-004"
+    ]
+   }
+  },
+  "ncr-contain": {
+   "cases": [
+    "EC-QUAA-017",
+    "EC-QUAA-015",
+    "EC-QUAA-016",
+    "EC-QUAA-024"
+   ],
+   "buttons": {
+    "Save (step 1)": [
+     "EC-QUAA-017"
+    ]
+   }
+  },
+  "ncr-disposition": {
+   "cases": [
+    "EC-QUAA-018",
+    "EC-QUAA-030",
+    "EC-QUAA-016",
+    "EC-QUAA-024"
+   ],
+   "buttons": {
+    "Record it (step 2)": [
+     "EC-QUAA-018"
+    ]
+   }
+  },
+  "ncr-capa": {
+   "cases": [
+    "EC-QUAA-021",
+    "EC-QUAA-022",
+    "EC-QUAA-068"
+   ],
+   "buttons": {
+    "Open a corrective action from this": [
+     "EC-QUAA-021"
+    ]
+   }
+  },
+  "ncr-assign": {
+   "cases": [
+    "EC-QUAA-019",
+    "EC-QUAA-020",
+    "EC-QUAA-028"
+   ],
+   "buttons": {
+    "Save (Owner and date)": [
+     "EC-QUAA-019",
+     "EC-QUAA-020"
+    ]
+   }
+  },
+  "ncr-close": {
+   "cases": [
+    "EC-QUAA-012",
+    "EC-QUAA-022",
+    "EC-QUAA-023",
+    "EC-QUAA-025"
+   ],
+   "buttons": {
+    "Close NCR-…": [
+     "EC-QUAA-022",
+     "EC-QUAA-023",
+     "EC-QUAA-025",
+     "EC-QUAA-012"
+    ]
+   }
+  },
+  "ncr-reopen": {
+   "cases": [
+    "EC-QUAA-026",
+    "EC-QUAA-027"
+   ],
+   "buttons": {
+    "Reopen": [
+     "EC-QUAA-026",
+     "EC-QUAA-027"
+    ]
+   }
+  },
+  "capa": {
+   "cases": [
+    "EC-QUAA-051",
+    "EC-QUAA-057",
+    "EC-QUAA-058",
+    "EC-QUAA-066",
+    "EC-QUAA-048",
+    "EC-QUAA-064"
+   ],
+   "buttons": {
+    "Raise one": [
+     "EC-QUAA-048"
+    ],
+    "Ref links": "navigation only",
+    "Our own deadlines → Save": [
+     "EC-QUAA-064"
+    ],
+    "KPI tiles (read only)": [
+     "EC-QUAA-051"
+    ]
+   }
+  },
+  "capa-item": {
+   "cases": [
+    "EC-QUAA-061",
+    "EC-QUAA-065",
+    "EC-QUAA-052",
+    "EC-QUAA-053",
+    "EC-QUAA-054",
+    "EC-QUAA-055",
+    "EC-QUAA-056",
+    "EC-QUAA-059",
+    "EC-QUAA-060",
+    "EC-QUAA-062"
+   ],
+   "buttons": {
+    "← back": "navigation only",
+    "Complaint / follows / NCR links": "navigation only",
+    "Save (cause)": [
+     "EC-QUAA-052"
+    ],
+    "Save plan": [
+     "EC-QUAA-053"
+    ],
+    "Add (action)": [
+     "EC-QUAA-054"
+    ],
+    "Done / Drop / Reopen (action rows)": [
+     "EC-QUAA-055"
+    ],
+    "Record it (it was done)": [
+     "EC-QUAA-056"
+    ],
+    "Record the check": [
+     "EC-QUAA-059"
+    ],
+    "Close CAPA-…": [
+     "EC-QUAA-060"
+    ],
+    "Close as ineffective and raise a further action": [
+     "EC-QUAA-062"
+    ]
+   }
+  },
+  "capa-new": {
+   "cases": [
+    "EC-QUAA-048",
+    "EC-QUAA-049",
+    "EC-QUAA-050",
+    "EC-QUAA-067"
+   ],
+   "buttons": {
+    "Raise it": [
+     "EC-QUAA-048",
+     "EC-QUAA-049",
+     "EC-QUAA-067"
+    ],
+    "Cancel": [
+     "EC-QUAA-048"
+    ]
+   }
+  },
+  "capa-cause": {
+   "cases": [
+    "EC-QUAA-052",
+    "EC-QUAA-051"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-QUAA-052"
+    ]
+   }
+  },
+  "capa-plan": {
+   "cases": [
+    "EC-QUAA-053",
+    "EC-QUAA-061"
+   ],
+   "buttons": {
+    "Save plan": [
+     "EC-QUAA-053"
+    ]
+   }
+  },
+  "capa-done": {
+   "cases": [
+    "EC-QUAA-056",
+    "EC-QUAA-057"
+   ],
+   "buttons": {
+    "Record it": [
+     "EC-QUAA-056"
+    ]
+   }
+  },
+  "capa-verify": {
+   "cases": [
+    "EC-QUAA-059",
+    "EC-QUAA-061"
+   ],
+   "buttons": {
+    "Record the check": [
+     "EC-QUAA-059"
+    ]
+   }
+  },
+  "capa-close": {
+   "cases": [
+    "EC-QUAA-060",
+    "EC-QUAA-068",
+    "EC-QUAA-061"
+   ],
+   "buttons": {
+    "Close CAPA-…": [
+     "EC-QUAA-060",
+     "EC-QUAA-061"
+    ]
+   }
+  },
+  "capa-escalate": {
+   "cases": [
+    "EC-QUAA-062",
+    "EC-QUAA-063"
+   ],
+   "buttons": {
+    "Close as ineffective and raise a further action": [
+     "EC-QUAA-062",
+     "EC-QUAA-063"
+    ]
+   }
+  },
+  "capa-settings": {
+   "cases": [
+    "EC-QUAA-064"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-QUAA-064"
+    ]
+   }
+  },
+  "capa-from-complaint": {
+   "cases": [
+    "EC-QUAA-079",
+    "EC-QUAA-080"
+   ],
+   "buttons": {
+    "…or go straight to a corrective action": [
+     "EC-QUAA-079",
+     "EC-QUAA-080"
+    ]
+   }
+  },
+  "capa-action-add": {
+   "cases": [
+    "EC-QUAA-054"
+   ],
+   "buttons": {
+    "Add": [
+     "EC-QUAA-054"
+    ]
+   }
+  },
+  "capa-action-done": {
+   "cases": [
+    "EC-QUAA-055"
+   ],
+   "buttons": {
+    "Done": [
+     "EC-QUAA-055"
+    ]
+   }
+  },
+  "capa-action-cancel": {
+   "cases": [
+    "EC-QUAA-055"
+   ],
+   "buttons": {
+    "Drop": [
+     "EC-QUAA-055"
+    ]
+   }
+  },
+  "capa-action-reopen": {
+   "cases": [
+    "EC-QUAA-055"
+   ],
+   "buttons": {
+    "Reopen": [
+     "EC-QUAA-055"
+    ]
+   }
+  },
+  "complaints": {
+   "cases": [
+    "EC-QUAA-071",
+    "EC-QUAA-090",
+    "EC-QUAA-069",
+    "EC-QUAA-089"
+   ],
+   "buttons": {
+    "Record one": [
+     "EC-QUAA-069"
+    ],
+    "Published description": "navigation only",
+    "Ref links": "navigation only",
+    "Settings → Save": [
+     "EC-QUAA-089"
+    ]
+   }
+  },
+  "complaint": {
+   "cases": [
+    "EC-QUAA-083",
+    "EC-QUAA-075",
+    "EC-QUAA-077",
+    "EC-QUAA-088",
+    "EC-QUAA-031"
+   ],
+   "buttons": {
+    "They are appealing": [
+     "EC-QUAA-088"
+    ],
+    "Raise a nonconformity link": [
+     "EC-QUAA-031"
+    ],
+    "Job / CAPA links": "navigation only"
+   }
+  },
+  "complaint-new": {
+   "cases": [
+    "EC-QUAA-069",
+    "EC-QUAA-070",
+    "EC-QUAA-088",
+    "EC-QUAA-091"
+   ],
+   "buttons": {
+    "Record it": [
+     "EC-QUAA-069",
+     "EC-QUAA-070",
+     "EC-QUAA-091"
+    ],
+    "Cancel": [
+     "EC-QUAA-069"
+    ]
+   }
+  },
+  "complaint-ack": {
+   "cases": [
+    "EC-QUAA-072"
+   ],
+   "buttons": {
+    "Record it": [
+     "EC-QUAA-072"
+    ]
+   }
+  },
+  "complaint-validity": {
+   "cases": [
+    "EC-QUAA-073"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-QUAA-073"
+    ]
+   }
+  },
+  "complaint-investigate": {
+   "cases": [
+    "EC-QUAA-074"
+   ],
+   "buttons": {
+    "Save findings": [
+     "EC-QUAA-074"
+    ]
+   }
+  },
+  "complaint-decide": {
+   "cases": [
+    "EC-QUAA-075",
+    "EC-QUAA-076",
+    "EC-QUAA-077",
+    "EC-QUAA-084"
+   ],
+   "buttons": {
+    "Record the decision": [
+     "EC-QUAA-075",
+     "EC-QUAA-076",
+     "EC-QUAA-077",
+     "EC-QUAA-084"
+    ]
+   }
+  },
+  "complaint-notify": {
+   "cases": [
+    "EC-QUAA-078"
+   ],
+   "buttons": {
+    "Record it": [
+     "EC-QUAA-078"
+    ]
+   }
+  },
+  "complaint-capa": {
+   "cases": [
+    "EC-QUAA-081",
+    "EC-QUAA-084"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-QUAA-081",
+     "EC-QUAA-084"
+    ]
+   }
+  },
+  "complaint-close": {
+   "cases": [
+    "EC-QUAA-082",
+    "EC-QUAA-086",
+    "EC-QUAA-087"
+   ],
+   "buttons": {
+    "Close CMP-…": [
+     "EC-QUAA-082",
+     "EC-QUAA-086",
+     "EC-QUAA-087"
+    ]
+   }
+  },
+  "complaint-reopen": {
+   "cases": [
+    "EC-QUAA-085"
+   ],
+   "buttons": {
+    "Reopen": [
+     "EC-QUAA-085"
+    ]
+   }
+  },
+  "complaint-settings": {
+   "cases": [
+    "EC-QUAA-089"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-QUAA-089"
+    ]
+   }
+  },
+  "impartiality": {
+   "cases": [
+    "EC-QUAA-092",
+    "EC-QUAA-093",
+    "EC-QUAA-096",
+    "EC-QUAA-095"
+   ],
+   "buttons": {
+    "Save (What kind of body is this?)": [
+     "EC-QUAA-092"
+    ],
+    "Person links (?i=)": "navigation only",
+    "Record declaration": [
+     "EC-QUAA-093"
+    ],
+    "Decide": [
+     "EC-QUAA-096"
+    ],
+    "Raise it": [
+     "EC-QUAA-095"
+    ]
+   }
+  },
+  "imp-type": {
+   "cases": [
+    "EC-QUAA-092"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-QUAA-092"
+    ]
+   }
+  },
+  "imp-declare": {
+   "cases": [
+    "EC-QUAA-093",
+    "EC-QUAA-094"
+   ],
+   "buttons": {
+    "Record declaration": [
+     "EC-QUAA-093",
+     "EC-QUAA-094"
+    ]
+   }
+  },
+  "imp-threat-add": {
+   "cases": [
+    "EC-QUAA-095"
+   ],
+   "buttons": {
+    "Raise it": [
+     "EC-QUAA-095"
+    ]
+   }
+  },
+  "imp-threat-decide": {
+   "cases": [
+    "EC-QUAA-096"
+   ],
+   "buttons": {
+    "Decide": [
+     "EC-QUAA-096"
+    ]
+   }
+  }
+ }
+}

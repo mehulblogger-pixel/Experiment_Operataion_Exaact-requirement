@@ -1,0 +1,369 @@
+<title>EXAACT Edge-Case Book</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one column field book — sticky header with progress, tabs, filter chips, then cards that open into numbered steps. */
+:root{
+  --bg:#f3f5f6; --card:#ffffff; --ink:#15212a; --muted:#5b6b76; --line:#d9e0e4; --soft:#e9eef1;
+  --accent:#1c5d8a; --accent-ink:#ffffff; --pass:#1d7348; --pass-bg:#e3f2ea; --fail:#b3261e; --fail-bg:#fbe7e5;
+  --skip:#8a5a00; --skip-bg:#fbf0d9; --q:#5a3e9a; --q-bg:#efe9fa;
+  --sans:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f161b; --card:#172129; --ink:#e3eaee; --muted:#93a3ad; --line:#2a3842; --soft:#1e2a33;
+  --accent:#6fb1e0; --accent-ink:#0b1720; --pass:#5fcf95; --pass-bg:#173527; --fail:#ff8a80; --fail-bg:#3b1a18;
+  --skip:#e9b44c; --skip-bg:#38290c; --q:#c3a8ff; --q-bg:#2a2140; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f161b; --card:#172129; --ink:#e3eaee; --muted:#93a3ad; --line:#2a3842; --soft:#1e2a33;
+  --accent:#6fb1e0; --accent-ink:#0b1720; --pass:#5fcf95; --pass-bg:#173527; --fail:#ff8a80; --fail-bg:#3b1a18;
+  --skip:#e9b44c; --skip-bg:#38290c; --q:#c3a8ff; --q-bg:#2a2140; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--card)}
+.wrap{max-width:920px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--card);border-bottom:1px solid var(--line)}
+header .wrap{padding-block:12px 0}
+.top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-size:19px;margin:0;letter-spacing:-.01em;text-wrap:balance}
+.sub{color:var(--muted);font-size:12.5px}
+.bar{display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--soft);margin:10px 0 6px}
+.bar i{display:block;height:100%}
+.counts{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.counts b{color:var(--ink)}
+nav.tabs{display:flex;gap:4px;margin-top:8px}
+nav.tabs a{padding:8px 12px;border-radius:8px 8px 0 0;color:var(--muted);text-decoration:none;font-weight:600;font-size:14px;border-bottom:2px solid transparent}
+nav.tabs a[aria-current="page"]{color:var(--accent);border-bottom-color:var(--accent)}
+main .wrap{padding-block:14px 60px}
+.filters{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+input[type=search],select{font:inherit;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);min-width:0}
+input[type=search]{flex:1 1 220px}
+select{flex:0 1 auto;max-width:100%}
+.chip{font:inherit;font-size:13px;padding:6px 11px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.chip:focus-visible,button:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.grp{margin:18px 0 6px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+details.case{background:var(--card);border:1px solid var(--line);border-radius:10px;margin-bottom:8px}
+details.case[data-s="pass"]{border-left:4px solid var(--pass)}
+details.case[data-s="fail"]{border-left:4px solid var(--fail)}
+details.case[data-s="skip"]{border-left:4px solid var(--skip)}
+summary{list-style:none;cursor:pointer;padding:11px 13px;display:grid;grid-template-columns:1fr auto;gap:4px 10px}
+summary::-webkit-details-marker{display:none}
+.t{font-weight:600;min-width:0}
+.meta{grid-column:1/-1;display:flex;gap:6px 10px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+.id{font-family:var(--mono);font-size:12px}
+.pill{align-self:start;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--soft);color:var(--muted);white-space:nowrap}
+.pill.pass{background:var(--pass-bg);color:var(--pass)} .pill.fail{background:var(--fail-bg);color:var(--fail)} .pill.skip{background:var(--skip-bg);color:var(--skip)}
+.body{padding:0 13px 14px;display:flex;flex-direction:column;gap:12px}
+.lab{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:2px}
+.box{background:var(--soft);border-radius:8px;padding:10px 12px;white-space:pre-wrap;overflow-wrap:anywhere}
+ol.steps{margin:0;padding:0;list-style:none;counter-reset:s;display:flex;flex-direction:column;gap:8px}
+ol.steps li{counter-increment:s;display:grid;grid-template-columns:28px 1fr;gap:4px 10px}
+ol.steps li::before{content:counter(s);font-family:var(--mono);font-weight:600;font-size:13px;width:26px;height:26px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;grid-row:span 2}
+.do{overflow-wrap:anywhere}
+.ex{overflow-wrap:anywhere;border-left:3px solid var(--pass);padding-left:9px;color:var(--ink)}
+.ex::before{content:"You should see: ";font-weight:600;color:var(--pass)}
+.note-q{background:var(--q-bg);color:var(--q);border-radius:8px;padding:10px 12px;overflow-wrap:anywhere}
+.ran{font-size:12.5px;color:var(--muted);overflow-wrap:anywhere;white-space:pre-wrap}
+.act{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{font:inherit;font-weight:600;padding:9px 14px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
+.btn.pass[aria-pressed="true"]{background:var(--pass);color:#fff;border-color:var(--pass)}
+.btn.fail[aria-pressed="true"]{background:var(--fail);color:#fff;border-color:var(--fail)}
+.btn.skip[aria-pressed="true"]{background:var(--skip);color:#fff;border-color:var(--skip)}
+textarea{font:inherit;width:100%;min-height:64px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);resize:vertical}
+.saved{font-size:12.5px;color:var(--muted)}
+.empty{padding:28px;text-align:center;color:var(--muted);background:var(--card);border:1px dashed var(--line);border-radius:10px}
+.tbl{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:13.5px;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--muted);font-weight:600}
+.f{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:11px 13px;margin-bottom:8px;display:flex;flex-direction:column;gap:4px}
+.f .w{overflow-wrap:anywhere}
+.sev{align-self:flex-start}
+.sev.high{background:var(--fail-bg);color:var(--fail)} .sev.medium{background:var(--skip-bg);color:var(--skip)}
+.intro{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:12px;font-size:14px}
+.intro p{margin:0 0 6px} .intro p:last-child{margin:0}
+.warn{color:var(--skip);font-size:12.5px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<header>
+  <div class="wrap">
+    <div class="top">
+      <h1>EXAACT Edge-Case Book</h1>
+      <span class="sub" id="relLine">Test copy · opstest.mghaiapps.com</span>
+    </div>
+    <div class="bar" aria-hidden="true"><i id="bPass" style="background:var(--pass)"></i><i id="bFail" style="background:var(--fail)"></i><i id="bSkip" style="background:var(--skip)"></i></div>
+    <div class="counts" id="counts">Loading the tests…</div>
+    <nav class="tabs" aria-label="Sections">
+      <a href="#tests" id="tab-tests">Tests</a>
+      <a href="#faults" id="tab-faults">Faults found</a>
+      <a href="#coverage" id="tab-coverage">Coverage</a>
+    </nav>
+  </div>
+</header>
+
+<main><div class="wrap">
+  <section id="v-tests">
+    <div class="intro">
+      <p><b>How to use:</b> sign in on <b>opstest</b> as the person named on the test, follow the steps, and compare with "You should see". Then tap <b>Passed</b>, <b>Failed</b> or <b>Can't test</b>. Add a note when something differs; it is saved for Claude to read.</p>
+      <p>Records you create start with <b>EC-</b>, so they never mix with older test data. Every expected figure was first checked on a private copy of release 74a263f, unless the test says "not run".</p>
+      <p class="warn" id="dbNote" hidden></p>
+    </div>
+    <div class="filters">
+      <div class="row">
+        <input type="search" id="q" placeholder="Search tests, e.g. GST, voucher, EC-MON-012" aria-label="Search tests">
+        <select id="part" aria-label="Area"><option value="">All areas</option></select>
+        <select id="who" aria-label="Sign in as"><option value="">Anyone signed in</option></select>
+      </div>
+      <div class="row" id="stChips" role="group" aria-label="Result">
+        <button class="chip" data-st="" aria-pressed="true">All</button>
+        <button class="chip" data-st="todo" aria-pressed="false">Not done</button>
+        <button class="chip" data-st="fail" aria-pressed="false">Failed</button>
+        <button class="chip" data-st="pass" aria-pressed="false">Passed</button>
+        <button class="chip" data-st="skip" aria-pressed="false">Can't test</button>
+        <button class="chip" data-st="q" aria-pressed="false">Has a question for you</button>
+      </div>
+      <div class="row" id="kindChips" role="group" aria-label="Kind of test"></div>
+    </div>
+    <div id="list"><div class="empty">Loading the tests…</div></div>
+  </section>
+
+  <section id="v-faults" hidden>
+    <div class="intro"><p>Faults the helpers found while checking each test on the private copy. <b>Nothing has been fixed yet.</b> I will bring them to you as a decision list, grouped and explained, before changing any code.</p></div>
+    <div class="row" style="margin-bottom:10px"><select id="fPart" aria-label="Area"><option value="">All areas</option></select>
+      <select id="fSev" aria-label="Severity"><option value="">All severities</option><option>high</option><option>medium</option><option>low</option></select></div>
+    <div id="flist"></div>
+  </section>
+
+  <section id="v-coverage" hidden>
+    <div class="intro"><p>Every screen in each area, and every button on it, is either covered by a test, marked as plain navigation, or listed with the reason it cannot be tested (for example a real card payment).</p></div>
+    <div class="tbl"><table><thead><tr><th>Area</th><th>Tests</th><th>Screens covered</th><th>Buttons with a test</th><th>Navigation only</th><th>Other (reason given)</th></tr></thead><tbody id="cov"></tbody></table></div>
+    <p class="sub" id="covBuilt"></p>
+  </section>
+</div></main>
+
+<script>
+(function(){
+  const $ = (s, r=document) => r.querySelector(s);
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const KIND = {NUMBERS:'Numbers',BOUNDARY:'Limits & dates',VALIDATION:'Wrong input',PERMISSION:'Who may',STATE:'Wrong moment',FLOW:'Data flow',BUTTON:'Button does what it says'};
+  const ST = {pass:'Passed',fail:'Failed',skip:"Can't test"};
+  let cases = [], findings = [], cov = null, results = {}, db = null, user = null, canWrite = true;
+  const f = { q:'', part:'', who:'', st:'', kind:'' };
+  try { const saved = JSON.parse(localStorage.getItem('ecb-filters') || '{}'); Object.assign(f, saved); } catch(e) {}
+  const keep = () => { try { localStorage.setItem('ecb-filters', JSON.stringify(f)); } catch(e) {} };
+
+  // ---- views --------------------------------------------------------------
+  function route(){
+    const v = (location.hash || '#tests').slice(1);
+    const name = ['tests','faults','coverage'].includes(v) ? v : 'tests';
+    for (const n of ['tests','faults','coverage']) {
+      $('#v-'+n).hidden = n !== name;
+      const a = $('#tab-'+n); if (n === name) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current');
+    }
+  }
+  addEventListener('hashchange', route); route();
+
+  // ---- load the book --------------------------------------------------------
+  Promise.all(['cases.json','findings.json','coverage.json'].map(u => fetch(u).then(r => { if (!r.ok) throw new Error(u); return r.json(); })))
+    .then(([c, fi, co]) => { cases = c; findings = fi; cov = co; setup(); render(); renderFaults(); renderCov(); counts(); })
+    .catch(() => { $('#list').innerHTML = ''; $('#list').append(el('div','empty','The tests could not be loaded. Reload the page.')); });
+
+  function setup(){
+    const parts = []; const seen = new Set();
+    for (const c of cases) if (!seen.has(c.part)) { seen.add(c.part); parts.push([c.part, c.partName]); }
+    for (const [p, n] of parts) { $('#part').append(new Option(n, p)); }
+    for (const [p, n] of cov.parts.map(x => [x.part, x.partName])) $('#fPart').append(new Option(n, p));
+    const whos = [...new Set(cases.map(c => c.who))].sort();
+    for (const w of whos) $('#who').append(new Option(w, w));
+    const kc = $('#kindChips');
+    const all = el('button','chip','Every kind'); all.dataset.k = ''; kc.append(all);
+    for (const k of Object.keys(KIND)) { const b = el('button','chip',KIND[k]); b.dataset.k = k; kc.append(b); }
+    $('#q').value = f.q; $('#part').value = f.part; $('#who').value = f.who;
+    if ($('#part').value !== f.part) f.part = ''; if ($('#who').value !== f.who) f.who = '';
+    syncChips();
+    let t; $('#q').addEventListener('input', e => { clearTimeout(t); t = setTimeout(() => { f.q = e.target.value; keep(); render(); }, 150); });
+    $('#part').addEventListener('change', e => { f.part = e.target.value; keep(); render(); });
+    $('#who').addEventListener('change', e => { f.who = e.target.value; keep(); render(); });
+    $('#stChips').addEventListener('click', e => { const b = e.target.closest('.chip'); if (!b) return; f.st = b.dataset.st; keep(); syncChips(); render(); });
+    kc.addEventListener('click', e => { const b = e.target.closest('.chip'); if (!b) return; f.kind = b.dataset.k; keep(); syncChips(); render(); });
+    $('#fPart').addEventListener('change', renderFaults); $('#fSev').addEventListener('change', renderFaults);
+    $('#relLine').textContent = 'Test copy · opstest.mghaiapps.com · release ' + (cov.release || '');
+  }
+  function syncChips(){
+    for (const b of document.querySelectorAll('#stChips .chip')) b.setAttribute('aria-pressed', String(b.dataset.st === f.st));
+    for (const b of document.querySelectorAll('#kindChips .chip')) b.setAttribute('aria-pressed', String(b.dataset.k === f.kind));
+  }
+
+  // ---- results (shared, saved for Claude) ------------------------------------
+  const stOf = (id) => (results[id] && results[id].s) || '';
+  function counts(){
+    const n = cases.length; let p = 0, fl = 0, s = 0;
+    for (const c of cases) { const x = stOf(c.id); if (x === 'pass') p++; else if (x === 'fail') fl++; else if (x === 'skip') s++; }
+    const pct = v => n ? (v * 100 / n) + '%' : '0';
+    $('#bPass').style.width = pct(p); $('#bFail').style.width = pct(fl); $('#bSkip').style.width = pct(s);
+    const c = $('#counts'); c.textContent = '';
+    for (const [lab, v] of [['tests', n], ['passed', p], ['failed', fl], ["can't test", s], ['left', n - p - fl - s]]) {
+      const span = el('span'); const b = el('b', null, v.toLocaleString('en-IN')); span.append(b, document.createTextNode(' ' + lab)); c.append(span);
+    }
+  }
+  (async () => {
+    if (!window.claude || !window.claude.use) { note('Results can be saved only when the book is opened in Claude. You can still read every test.'); canWrite = false; return; }
+    try { user = await window.claude.use('user'); } catch(e) {}
+    try { db = await window.claude.use('db'); } catch(e) {}
+    if (!db) { note('Results cannot be saved in this view. You can still read every test.'); canWrite = false; refreshButtons(); return; }
+    if (user && user.can) { try { const w = await user.can('data.write'); if (w === false) { canWrite = false; note('You can read this book; only people with Contributor access can save results.'); } } catch(e) {} }
+    let first = true;
+    const timer = setTimeout(() => note('Saved results are not reachable yet; they will appear when the connection returns.'), 10000);
+    db.collection('results').onSnapshot(snap => {
+      if (!snap.metadata.fromCache) { clearTimeout(timer); hideNote(); }
+      const next = {}; for (const d of snap.docs) next[d.id] = d.data();
+      results = next; counts(); refreshCases(); if (first && f.st) render(); first = false;
+    }, () => { clearTimeout(timer); note('Saved results could not be loaded. Reload the page to try again.'); });
+    refreshButtons();
+  })();
+  function note(t){ const n = $('#dbNote'); n.textContent = t; n.hidden = false; }
+  function hideNote(){ $('#dbNote').hidden = true; }
+  const writing = new Map();
+  async function save(id, patch){
+    if (!db || !canWrite) return;
+    const cur = Object.assign({ s:'', note:'' }, results[id] || {}, patch);
+    cur.at = new Date().toISOString();
+    try { const uid = user && user.id ? await user.id() : null; if (uid) cur.by = uid; } catch(e) {}
+    results[id] = cur; counts(); refreshCase(id);
+    const prev = writing.get(id) || Promise.resolve();
+    const p = prev.then(() => db.collection('results').doc(id).set(cur)).catch(err => {
+      if (err && err.code === 'invalid_argument') { canWrite = false; note('Your access lets you read this book but not save results.'); refreshButtons(); }
+      else note('That result was not saved. Check your connection and tap it again.');
+    });
+    writing.set(id, p); return p;
+  }
+
+  // ---- the test list -------------------------------------------------------
+  function match(c){
+    if (f.part && c.part !== f.part) return false;
+    if (f.who && c.who !== f.who) return false;
+    if (f.kind && c.kind !== f.kind) return false;
+    const s = stOf(c.id);
+    if (f.st === 'todo' && s) return false;
+    if (['pass','fail','skip'].includes(f.st) && s !== f.st) return false;
+    if (f.st === 'q' && !c.question) return false;
+    if (f.q) {
+      const q = f.q.toLowerCase();
+      const hay = (c.id + ' ' + c.title + ' ' + c.module + ' ' + c.screen + ' ' + c.before + ' ' + c.steps.map(x => x.do + ' ' + x.expect).join(' ')).toLowerCase();
+      if (!q.split(/\s+/).filter(Boolean).every(w => hay.includes(w))) return false;
+    }
+    return true;
+  }
+  const nodes = new Map();
+  function render(){
+    const list = $('#list'); list.textContent = ''; nodes.clear();
+    const shown = cases.filter(match);
+    if (!shown.length) { list.append(el('div','empty', cases.length ? 'No test matches these filters.' : 'No tests yet.')); return; }
+    let grp = '';
+    const frag = document.createDocumentFragment();
+    for (const c of shown) {
+      const g = c.partName + ' · ' + c.module;
+      if (g !== grp) { grp = g; frag.append(el('div','grp', g)); }
+      frag.append(card(c));
+    }
+    list.append(frag);
+  }
+  function card(c){
+    const d = el('details','case'); d.dataset.id = c.id; d.dataset.s = stOf(c.id);
+    const sm = el('summary');
+    const t = el('div','t', c.title);
+    const pill = el('span','pill'); setPill(pill, c.id);
+    const meta = el('div','meta');
+    meta.append(el('span','id', c.id), el('span', null, KIND[c.kind] || c.kind), el('span', null, 'Sign in as ' + c.who));
+    if (c.question) meta.append(el('span', null, '❓ question for you'));
+    sm.append(t, pill, meta); d.append(sm);
+    d.addEventListener('toggle', () => { if (d.open && !d.querySelector('.body')) d.append(body(c)); });
+    nodes.set(c.id, d); return d;
+  }
+  function setPill(p, id){ const s = stOf(id); p.className = 'pill' + (s ? ' ' + s : ''); p.textContent = s ? ST[s] : 'Not done'; }
+  function block(label, text, cls){ if (!text) return null; const w = el('div'); w.append(el('div','lab',label), el('div', cls || 'box', text)); return w; }
+  function body(c){
+    const b = el('div','body');
+    const parts = [
+      block('Why it matters', c.why, 'do'),
+      block('Before you start (set this up first)', c.before),
+    ];
+    for (const p of parts) if (p) b.append(p);
+    const sw = el('div'); sw.append(el('div','lab','Steps'));
+    const ol = el('ol','steps');
+    for (const s of c.steps) { const li = el('li'); li.append(el('div','do', s.do)); if (s.expect) li.append(el('div','ex', s.expect)); ol.append(li); }
+    sw.append(ol); b.append(sw);
+    const fl = block('Then check the data flowed on', c.flow); if (fl) b.append(fl);
+    if (c.question) { const q = el('div'); q.append(el('div','lab','Question for you'), el('div','note-q', c.question)); b.append(q); }
+    const scr = c.screen ? 'Screen: ' + c.screen + (c.buttons.length ? ' · Buttons: ' + c.buttons.join(', ') : '') : '';
+    b.append(el('div','ran', (c.ran ? '✓ Checked on a private copy of this release. Seen: ' + (c.saw || '—') : '⚠ Not run on the copy (needs the real world, e.g. e-mail or a real payment) — based on reading the program.') + (scr ? '\n' + scr : '')));
+    if (c.finding) b.append(block('Already known to fail on the copy', c.finding, 'note-q'));
+    // result controls
+    const act = el('div','act');
+    for (const s of ['pass','fail','skip']) {
+      const btn = el('button','btn ' + s, ST[s]); btn.type = 'button'; btn.dataset.s = s;
+      btn.addEventListener('click', () => save(c.id, { s: stOf(c.id) === s ? '' : s }));
+      act.append(btn);
+    }
+    const ta = el('textarea'); ta.id = 'note-' + c.id; ta.placeholder = 'What did you see? (saved for Claude to read)';
+    ta.value = (results[c.id] && results[c.id].note) || '';
+    const saveNote = el('button','btn','Save note'); saveNote.type = 'button';
+    const saved = el('span','saved');
+    saveNote.addEventListener('click', async () => { await save(c.id, { note: ta.value.trim() }); saved.textContent = 'Note saved'; });
+    const nw = el('div'); nw.append(el('div','lab','Your result'), act);
+    const nn = el('div'); nn.append(ta); const row = el('div','act'); row.append(saveNote, saved); nn.append(row);
+    b.append(nw, nn);
+    syncButtons(b, c.id);
+    return b;
+  }
+  function syncButtons(b, id){
+    const s = stOf(id);
+    for (const btn of b.querySelectorAll('.btn[data-s]')) { btn.setAttribute('aria-pressed', String(btn.dataset.s === s)); btn.disabled = !canWrite; }
+    const ta = b.querySelector('textarea'); if (ta) ta.disabled = !canWrite;
+    const r = results[id]; const saved = b.querySelector('.saved');
+    if (saved && r && r.at && !saved.textContent) saved.textContent = 'Last saved ' + new Date(r.at).toLocaleString('en-IN', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+  }
+  function refreshCase(id){
+    const d = nodes.get(id); if (!d) return;
+    d.dataset.s = stOf(id); setPill(d.querySelector('summary .pill'), id);
+    const b = d.querySelector('.body'); if (b) {
+      syncButtons(b, id);
+      const ta = b.querySelector('textarea'); const r = results[id];
+      if (ta && document.activeElement !== ta && r && typeof r.note === 'string' && ta.value !== r.note) ta.value = r.note;
+    }
+  }
+  function refreshCases(){ for (const id of nodes.keys()) refreshCase(id); }
+  function refreshButtons(){ refreshCases(); }
+
+  // ---- faults & coverage -----------------------------------------------------
+  function renderFaults(){
+    const L = $('#flist'); L.textContent = '';
+    const p = $('#fPart').value, sv = $('#fSev').value;
+    const rows = findings.filter(x => (!p || x.part === p) && (!sv || x.severity === sv));
+    if (!rows.length) { L.append(el('div','empty','No faults for this choice.')); return; }
+    for (const x of rows) {
+      const box = el('div','f');
+      box.append(el('span','pill sev ' + x.severity, x.severity === 'high' ? 'Serious' : x.severity === 'medium' ? 'Medium' : 'Minor'));
+      box.append(el('div','w', x.what));
+      if (x.rule) box.append(el('div','ran', 'Rule: ' + x.rule));
+      box.append(el('div','ran', x.partName + (x.case ? ' · test ' + x.case : '') + (x.screen ? ' · ' + x.screen : '')));
+      L.append(box);
+    }
+  }
+  function renderCov(){
+    const tb = $('#cov'); tb.textContent = '';
+    for (const x of cov.parts) {
+      const tr = el('tr');
+      const cell = v => el('td', null, v);
+      tr.append(cell(x.partName), cell(String(x.cases)),
+        cell(x.done ? x.routesCovered + ' of ' + x.routes : 'in progress'),
+        cell(x.done ? x.buttonsCovered + ' of ' + x.buttons : '—'), cell(x.done ? String(x.nav) : '—'), cell(x.done ? String(x.other) : '—'));
+      tb.append(tr);
+    }
+    $('#covBuilt').textContent = 'Built ' + new Date(cov.built).toLocaleString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) + ' (India time on your phone).';
+  }
+})();
+</script>

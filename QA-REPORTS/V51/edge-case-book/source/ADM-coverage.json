@@ -1,0 +1,974 @@
+{
+ "routes": {
+  "/industry": {
+   "cases": [
+    "EC-ADM-086"
+   ],
+   "buttons": {
+    "Inspection, testing & certification … General B2B (template preview buttons)": [
+     "EC-ADM-086"
+    ],
+    "Add these pipelines": [
+     "EC-ADM-086"
+    ]
+   }
+  },
+  "/industry-apply": {
+   "cases": [
+    "EC-ADM-086"
+   ],
+   "buttons": {
+    "Add these pipelines (POST)": [
+     "EC-ADM-086"
+    ],
+    "Set company industry (confirm tick)": [
+     "EC-ADM-086"
+    ]
+   }
+  },
+  "/notifications": {
+   "cases": [
+    "EC-ADM-088"
+   ],
+   "buttons": {
+    "Filter": [
+     "EC-ADM-088"
+    ],
+    "Failed only": [
+     "EC-ADM-088"
+    ]
+   }
+  },
+  "/integrations": {
+   "cases": [
+    "EC-ADM-089"
+   ],
+   "buttons": {}
+  },
+  "/system-status": {
+   "cases": [
+    "EC-ADM-089"
+   ],
+   "buttons": {
+    "Open →": [
+     "EC-ADM-089"
+    ]
+   }
+  },
+  "/mis": {
+   "cases": [
+    "EC-ADM-099",
+    "EC-ADM-100",
+    "EC-ADM-101",
+    "EC-ADM-102"
+   ],
+   "buttons": {
+    "Apply": [
+     "EC-ADM-099",
+     "EC-ADM-100"
+    ],
+    "Clear": [
+     "EC-ADM-101"
+    ],
+    "⬇ Download as CSV": [
+     "EC-ADM-101"
+    ]
+   }
+  },
+  "/reports": {
+   "cases": [
+    "EC-ADM-103"
+   ],
+   "buttons": {
+    "Reset": [
+     "EC-ADM-103"
+    ],
+    "Job register": [
+     "EC-ADM-103"
+    ],
+    "Call register": [
+     "EC-ADM-103"
+    ],
+    "Invoicing & payments": [
+     "EC-ADM-103"
+    ],
+    "Profitability by Contract Number": [
+     "EC-ADM-103"
+    ]
+   }
+  },
+  "/analytics": {
+   "cases": [
+    "EC-ADM-104",
+    "EC-ADM-110"
+   ],
+   "buttons": {
+    "Executive / Operations / Quality / Service / Vendor / Client & portal": [
+     "EC-ADM-104"
+    ],
+    "Scorecard": [
+     "EC-ADM-109"
+    ],
+    "Review": [
+     "EC-ADM-109"
+    ],
+    "Alerts": [
+     "EC-ADM-108"
+    ],
+    "Periods": [
+     "EC-ADM-107"
+    ],
+    "KPI library": [
+     "EC-ADM-105"
+    ],
+    "Data quality": [
+     "EC-ADM-109"
+    ],
+    "Apply": [
+     "EC-ADM-104"
+    ]
+   }
+  },
+  "/analytics-kpis": {
+   "cases": [
+    "EC-ADM-105",
+    "EC-ADM-106"
+   ],
+   "buttons": {
+    "+ New KPI": [
+     "EC-ADM-106"
+    ],
+    "Edit": [
+     "EC-ADM-105"
+    ]
+   }
+  },
+  "/analytics-kpi-edit": {
+   "cases": [
+    "EC-ADM-105",
+    "EC-ADM-106"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-ADM-105",
+     "EC-ADM-106"
+    ],
+    "Cancel": "navigation only"
+   }
+  },
+  "/analytics-quality": {
+   "cases": [
+    "EC-ADM-109"
+   ],
+   "buttons": {
+    "Re-run checks": [
+     "EC-ADM-109"
+    ]
+   }
+  },
+  "/analytics-drill": {
+   "cases": [
+    "EC-ADM-109"
+   ],
+   "buttons": {}
+  },
+  "/analytics-scorecard": {
+   "cases": [
+    "EC-ADM-109"
+   ],
+   "buttons": {}
+  },
+  "/analytics-alerts": {
+   "cases": [
+    "EC-ADM-108"
+   ],
+   "buttons": {
+    "Save rule": [
+     "EC-ADM-108"
+    ]
+   }
+  },
+  "/analytics-export": {
+   "cases": [
+    "EC-ADM-109"
+   ],
+   "buttons": {
+    "(download link)": [
+     "EC-ADM-109"
+    ]
+   }
+  },
+  "/analytics-review": {
+   "cases": [
+    "EC-ADM-109"
+   ],
+   "buttons": {
+    "Export XLSX": [
+     "EC-ADM-109"
+    ],
+    "CSV": [
+     "EC-ADM-109"
+    ],
+    "Print / PDF": [
+     "EC-ADM-109"
+    ]
+   }
+  },
+  "/analytics-snapshot": {
+   "cases": [
+    "EC-ADM-107",
+    "EC-ADM-105"
+   ],
+   "buttons": {
+    "Take snapshot": [
+     "EC-ADM-107",
+     "EC-ADM-105"
+    ]
+   }
+  },
+  "/users": {
+   "cases": [
+    "EC-ADM-020",
+    "EC-ADM-029",
+    "EC-ADM-030",
+    "EC-ADM-033",
+    "EC-ADM-036",
+    "EC-ADM-031",
+    "EC-ADM-032"
+   ],
+   "buttons": {
+    "+ Add a person": [
+     "EC-ADM-020"
+    ],
+    "Bulk (Excel)": [
+     "EC-ADM-040"
+    ],
+    "Print": "navigation only",
+    "Edit": [
+     "EC-ADM-033",
+     "EC-ADM-034"
+    ],
+    "Deactivate": [
+     "EC-ADM-035",
+     "EC-ADM-031",
+     "EC-ADM-029"
+    ],
+    "Reactivate": [
+     "EC-ADM-030"
+    ],
+    "Remove sign-in": [
+     "EC-ADM-032"
+    ],
+    "Release now": [
+     "EC-ADM-004"
+    ],
+    "Reset two-step": [
+     "EC-ADM-019"
+    ],
+    "← Back": "navigation only",
+    "Chart / Offices / People / Login accounts / Excel upload / Gaps tabs": "navigation only"
+   }
+  },
+  "/user-new": {
+   "cases": [
+    "EC-ADM-020",
+    "EC-ADM-021",
+    "EC-ADM-022",
+    "EC-ADM-023",
+    "EC-ADM-024",
+    "EC-ADM-025",
+    "EC-ADM-026",
+    "EC-ADM-027",
+    "EC-ADM-028",
+    "EC-ADM-047",
+    "EC-ADM-048",
+    "EC-ADM-049"
+   ],
+   "buttons": {
+    "Who they are / Data scope / Position & pay / Permissions (step tabs)": [
+     "EC-ADM-020"
+    ],
+    "Next →": [
+     "EC-ADM-020"
+    ],
+    "Save user": [
+     "EC-ADM-020",
+     "EC-ADM-021",
+     "EC-ADM-022",
+     "EC-ADM-027"
+    ],
+    "+ Add a role": [
+     "EC-ADM-047",
+     "EC-ADM-048",
+     "EC-ADM-049"
+    ],
+    "+ Add an office": "not shown to any test user as a separate screen: inline on the form; same save path as Save user (code reading)",
+    "← Users & access": "navigation only"
+   }
+  },
+  "/user-edit": {
+   "cases": [
+    "EC-ADM-034",
+    "EC-ADM-037",
+    "EC-ADM-033"
+   ],
+   "buttons": {
+    "Save user": [
+     "EC-ADM-034",
+     "EC-ADM-037"
+    ],
+    "Next →": [
+     "EC-ADM-034"
+    ],
+    "Use the <role>'s access": [
+     "EC-ADM-034"
+    ],
+    "Undo": [
+     "EC-ADM-044"
+    ],
+    "Deactivate": [
+     "EC-ADM-035"
+    ],
+    "All people": "navigation only"
+   }
+  },
+  "/hierarchy": {
+   "cases": [
+    "EC-ADM-038",
+    "EC-ADM-039"
+   ],
+   "buttons": {
+    "Print": [
+     "EC-ADM-038"
+    ],
+    "Expand all": [
+     "EC-ADM-038"
+    ],
+    "Collapse all": [
+     "EC-ADM-038"
+    ],
+    "− / +": [
+     "EC-ADM-038"
+    ],
+    "Fit to screen": [
+     "EC-ADM-038"
+    ],
+    "100%": [
+     "EC-ADM-038"
+    ],
+    "Open offices / Open the master / Add a person / Open People / Open the chart": "navigation only"
+   }
+  },
+  "/org-template": {
+   "cases": [
+    "EC-ADM-040"
+   ],
+   "buttons": {
+    "(template download)": [
+     "EC-ADM-040"
+    ]
+   }
+  },
+  "/user-unlock": {
+   "cases": [
+    "EC-ADM-004"
+   ],
+   "buttons": {
+    "Release now": [
+     "EC-ADM-004"
+    ]
+   }
+  },
+  "/user-2fa-reset": {
+   "cases": [
+    "EC-ADM-019"
+   ],
+   "buttons": {
+    "Reset two-step": [
+     "EC-ADM-019"
+    ]
+   }
+  },
+  "/user-retire": {
+   "cases": [
+    "EC-ADM-035",
+    "EC-ADM-031",
+    "EC-ADM-032",
+    "EC-ADM-030",
+    "EC-ADM-006"
+   ],
+   "buttons": {
+    "Deactivate": [
+     "EC-ADM-035",
+     "EC-ADM-006"
+    ],
+    "Reactivate": [
+     "EC-ADM-030"
+    ],
+    "Remove sign-in": [
+     "EC-ADM-032"
+    ]
+   }
+  },
+  "/settings": {
+   "cases": [
+    "EC-ADM-064",
+    "EC-ADM-065",
+    "EC-ADM-066",
+    "EC-ADM-067",
+    "EC-ADM-068",
+    "EC-ADM-069",
+    "EC-ADM-070",
+    "EC-ADM-071"
+   ],
+   "buttons": {
+    "Branding & theme / Financial & norms / Display & terms / Numbering & reports / Security": [
+     "EC-ADM-064"
+    ],
+    "Save settings": [
+     "EC-ADM-064",
+     "EC-ADM-065",
+     "EC-ADM-067",
+     "EC-ADM-069"
+    ],
+    "Save modules": "covered by existing ADM-030 (Master Admin module switches)",
+    "Corporate Blue … Midnight (dark)": [
+     "EC-ADM-070"
+    ],
+    "🔒 Require it for the money roles": [
+     "EC-ADM-066"
+    ],
+    "Clear all": [
+     "EC-ADM-066"
+    ],
+    "Show": "navigation only",
+    "✉️ Save & send test email": "not shown to any test user working: needs a real SMTP server (no e-mail leaves the test copy)",
+    "Load demo data / Load DEMO-S01…S06": [
+     "EC-ADM-071"
+    ],
+    "Apply (install mode)": [
+     "EC-ADM-071"
+    ],
+    "Build & check the thread": [
+     "EC-ADM-072"
+    ],
+    "Build & check the audit thread": [
+     "EC-ADM-072"
+    ]
+   }
+  },
+  "/access": {
+   "cases": [
+    "EC-ADM-041",
+    "EC-ADM-042",
+    "EC-ADM-043",
+    "EC-ADM-044",
+    "EC-ADM-045",
+    "EC-ADM-046"
+   ],
+   "buttons": {
+    "✨ Apply recommended set": [
+     "EC-ADM-042"
+    ],
+    "Reset to default": [
+     "EC-ADM-043"
+    ],
+    "Save access for <role>": [
+     "EC-ADM-041",
+     "EC-ADM-045"
+    ],
+    "Cancel changes": [
+     "EC-ADM-044"
+    ],
+    "role list (left)": "navigation only",
+    "← Settings": "navigation only"
+   }
+  },
+  "/ai-settings": {
+   "cases": [
+    "EC-ADM-077"
+   ],
+   "buttons": {
+    "↻ Refresh models": [
+     "EC-ADM-077"
+    ],
+    "Save all providers": [
+     "EC-ADM-077"
+    ],
+    "← Settings": "navigation only"
+   }
+  },
+  "/terminology": {
+   "cases": [
+    "EC-ADM-075",
+    "EC-ADM-076"
+   ],
+   "buttons": {
+    "Use this wording": [
+     "EC-ADM-075"
+    ],
+    "Apply again": [
+     "EC-ADM-075"
+    ],
+    "Save terminology": [
+     "EC-ADM-075"
+    ],
+    "Reset to standard wording": [
+     "EC-ADM-075"
+    ],
+    "Back to settings": "navigation only"
+   }
+  },
+  "/form-designer": {
+   "cases": [
+    "EC-ADM-078",
+    "EC-ADM-081",
+    "EC-ADM-080",
+    "EC-ADM-079"
+   ],
+   "buttons": {
+    "form tiles (Requisitions, Candidates, …)": "navigation only",
+    "▲ / ▼": [
+     "EC-ADM-081"
+    ],
+    "Save standard fields": [
+     "EC-ADM-081"
+    ],
+    "Add field": [
+     "EC-ADM-078"
+    ]
+   }
+  },
+  "/form-designer-save": {
+   "cases": [
+    "EC-ADM-081"
+   ],
+   "buttons": {
+    "Save standard fields": [
+     "EC-ADM-081"
+    ]
+   }
+  },
+  "/form-designer-field-add": {
+   "cases": [
+    "EC-ADM-078"
+   ],
+   "buttons": {
+    "Add field": [
+     "EC-ADM-078"
+    ]
+   }
+  },
+  "/form-designer-field-edit": {
+   "cases": [
+    "EC-ADM-080"
+   ],
+   "buttons": {
+    "Edit / Save": [
+     "EC-ADM-080"
+    ]
+   }
+  },
+  "/form-designer-field-del": {
+   "cases": [
+    "EC-ADM-080"
+   ],
+   "buttons": {
+    "Delete": [
+     "EC-ADM-080"
+    ]
+   }
+  },
+  "/form-designer-option-add": {
+   "cases": [
+    "EC-ADM-079"
+   ],
+   "buttons": {
+    "Add option": [
+     "EC-ADM-079"
+    ]
+   }
+  },
+  "/form-designer-option-del": {
+   "cases": [
+    "EC-ADM-079"
+   ],
+   "buttons": {
+    "Remove option": [
+     "EC-ADM-079"
+    ]
+   }
+  },
+  "/connect-capabilities": {
+   "cases": [
+    "EC-ADM-082"
+   ],
+   "buttons": {
+    "Make this the operating company": [
+     "EC-ADM-082"
+    ],
+    "Save capabilities": [
+     "EC-ADM-082"
+    ],
+    "Company picker": [
+     "EC-ADM-082"
+    ]
+   }
+  },
+  "/service-scope": {
+   "cases": [
+    "EC-ADM-083"
+   ],
+   "buttons": {
+    "Save services offered": [
+     "EC-ADM-083"
+    ],
+    "Add dependency": [
+     "EC-ADM-083"
+    ]
+   }
+  },
+  "/service-formats": {
+   "cases": [
+    "EC-ADM-084"
+   ],
+   "buttons": {
+    "Save report formats": [
+     "EC-ADM-084"
+    ],
+    "Back to service scope": "navigation only"
+   }
+  },
+  "/sla-targets": {
+   "cases": [
+    "EC-ADM-085"
+   ],
+   "buttons": {
+    "Save target": [
+     "EC-ADM-085"
+    ],
+    "Delete (row)": "not shown on an empty copy; same handler as Save target (code reading lib/tosrm.php:1871)"
+   }
+  },
+  "/preflight": {
+   "cases": [
+    "EC-ADM-087"
+   ],
+   "buttons": {
+    "← Settings": "navigation only"
+   }
+  },
+  "/trace-thread": {
+   "cases": [
+    "EC-ADM-072"
+   ],
+   "buttons": {
+    "Build & check the thread": [
+     "EC-ADM-072"
+    ]
+   }
+  },
+  "/trace-thread-remove": {
+   "cases": [
+    "EC-ADM-072"
+   ],
+   "buttons": {
+    "Remove this thread": [
+     "EC-ADM-072"
+    ]
+   }
+  },
+  "/trace-audit": {
+   "cases": [
+    "EC-ADM-072"
+   ],
+   "buttons": {
+    "Build & check the audit thread": [
+     "EC-ADM-072"
+    ]
+   }
+  },
+  "/trace-audit-remove": {
+   "cases": [
+    "EC-ADM-072"
+   ],
+   "buttons": {
+    "Remove (audit thread)": [
+     "EC-ADM-072"
+    ]
+   }
+  },
+  "/packs-save": {
+   "cases": [
+    "EC-ADM-073"
+   ],
+   "buttons": {
+    "Save (industry packs)": [
+     "EC-ADM-073"
+    ]
+   }
+  },
+  "/reset-data": {
+   "cases": [
+    "EC-ADM-074"
+   ],
+   "buttons": {
+    "Tick them all": [
+     "EC-ADM-074"
+    ],
+    "Delete the ticked records": [
+     "EC-ADM-074"
+    ],
+    "Cancel": [
+     "EC-ADM-074"
+    ],
+    "Back to settings": "navigation only"
+   }
+  }
+ },
+ "extra_screens_also_covered": {
+  "/login": {
+   "cases": [
+    "EC-ADM-001",
+    "EC-ADM-002",
+    "EC-ADM-003",
+    "EC-ADM-005",
+    "EC-ADM-006",
+    "EC-ADM-007",
+    "EC-ADM-008",
+    "EC-ADM-018"
+   ],
+   "buttons": {
+    "Sign in": [
+     "EC-ADM-001",
+     "EC-ADM-002",
+     "EC-ADM-003"
+    ]
+   }
+  },
+  "/logout": {
+   "cases": [
+    "EC-ADM-012"
+   ],
+   "buttons": {
+    "Logout": [
+     "EC-ADM-012"
+    ]
+   }
+  },
+  "(session timeout)": {
+   "cases": [
+    "EC-ADM-009",
+    "EC-ADM-010",
+    "EC-ADM-011"
+   ],
+   "buttons": {}
+  },
+  "/forgot": {
+   "cases": [
+    "EC-ADM-013"
+   ],
+   "buttons": {
+    "Send reset link →": [
+     "EC-ADM-013"
+    ],
+    "← Back to sign in": "navigation only"
+   }
+  },
+  "/reset": {
+   "cases": [
+    "EC-ADM-014",
+    "EC-ADM-015",
+    "EC-ADM-016"
+   ],
+   "buttons": {
+    "Save new password →": [
+     "EC-ADM-014",
+     "EC-ADM-015"
+    ],
+    "Show": "navigation only",
+    "Request a new link →": [
+     "EC-ADM-014"
+    ]
+   }
+  },
+  "/change-password": {
+   "cases": [
+    "EC-ADM-017"
+   ],
+   "buttons": {
+    "Update password": [
+     "EC-ADM-017"
+    ],
+    "Show": "navigation only",
+    "Cancel": [
+     "EC-ADM-017"
+    ]
+   }
+  },
+  "/two-factor": {
+   "cases": [
+    "EC-ADM-018",
+    "EC-ADM-066"
+   ],
+   "buttons": {}
+  },
+  "/approvals-setup": {
+   "cases": [
+    "EC-ADM-061"
+   ],
+   "buttons": {
+    "tiles": [
+     "EC-ADM-061"
+    ]
+   }
+  },
+  "/voucher-approvals": {
+   "cases": [
+    "EC-ADM-050",
+    "EC-ADM-051",
+    "EC-ADM-052",
+    "EC-ADM-053",
+    "EC-ADM-054",
+    "EC-ADM-055",
+    "EC-ADM-056",
+    "EC-ADM-057",
+    "EC-ADM-058"
+   ],
+   "buttons": {
+    "↑ / ↓": [
+     "EC-ADM-054",
+     "EC-ADM-051"
+    ],
+    "Save the levels": [
+     "EC-ADM-051",
+     "EC-ADM-054",
+     "EC-ADM-055"
+    ],
+    "Add a level by role": [
+     "EC-ADM-051"
+    ]
+   }
+  },
+  "/voucher-delegations": {
+   "cases": [
+    "EC-ADM-059",
+    "EC-ADM-058"
+   ],
+   "buttons": {
+    "Add delegation": [
+     "EC-ADM-059"
+    ],
+    "Revoke": [
+     "EC-ADM-060"
+    ]
+   }
+  },
+  "/approval-delegations": {
+   "cases": [
+    "EC-ADM-060"
+   ],
+   "buttons": {
+    "Add delegation": [
+     "EC-ADM-060"
+    ],
+    "Revoke": [
+     "EC-ADM-060"
+    ]
+   }
+  },
+  "/sales-approvals": {
+   "cases": [
+    "EC-ADM-062"
+   ],
+   "buttons": {
+    "Save / Remove / Add this level / Save this rule": [
+     "EC-ADM-062"
+    ]
+   }
+  },
+  "/recruit-approvals": {
+   "cases": [
+    "EC-ADM-063"
+   ],
+   "buttons": {
+    "＋ New rule / Save policy / Save triggers": [
+     "EC-ADM-063"
+    ]
+   }
+  },
+  "/backup": {
+   "cases": [
+    "EC-ADM-090",
+    "EC-ADM-091",
+    "EC-ADM-092",
+    "EC-ADM-093",
+    "EC-ADM-094"
+   ],
+   "buttons": {
+    "💾 Back up now": [
+     "EC-ADM-090"
+    ],
+    "⬇️ Download": [
+     "EC-ADM-090"
+    ],
+    "↺ Restore": [
+     "EC-ADM-091",
+     "EC-ADM-092"
+    ],
+    "↺ Upload & restore": [
+     "EC-ADM-093"
+    ]
+   }
+  },
+  "/audit-log": {
+   "cases": [
+    "EC-ADM-095",
+    "EC-ADM-096"
+   ],
+   "buttons": {
+    "Filter": [
+     "EC-ADM-095"
+    ],
+    "Clear": [
+     "EC-ADM-095"
+    ],
+    "⭳ Export CSV": [
+     "EC-ADM-095"
+    ]
+   }
+  },
+  "/licence": {
+   "cases": [
+    "EC-ADM-097"
+   ],
+   "buttons": {
+    "Apply the key": [
+     "EC-ADM-097"
+    ],
+    "Licence console →": "navigation only"
+   }
+  },
+  "/subscription": {
+   "cases": [
+    "EC-ADM-098"
+   ],
+   "buttons": {}
+  },
+  "/voucher (approve / send back)": {
+   "cases": [
+    "EC-ADM-052",
+    "EC-ADM-053",
+    "EC-ADM-056"
+   ],
+   "buttons": {
+    "Approve": [
+     "EC-ADM-052"
+    ],
+    "Send back": [
+     "EC-ADM-053"
+    ]
+   }
+  }
+ }
+}

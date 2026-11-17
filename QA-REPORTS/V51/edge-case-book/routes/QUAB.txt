@@ -1,0 +1,46 @@
+site-docs	identity	Quality & Accreditation	Site docs
+site-docs-add	identity	Quality & Accreditation	New
+site-docs-delete	identity	Quality & Accreditation	Site docs delete
+internal-audits	audits	Quality & Accreditation	Internal audits
+internal-audit	audits	Quality & Accreditation	Internal audit
+internal-audit-new	audits	Quality & Accreditation	New
+audit-record	audits	Quality & Accreditation	Audit record
+audit-finding-add	audits	Quality & Accreditation	New
+audit-finding-delete	audits	Quality & Accreditation	Audit finding delete
+audit-finding-capa	audits	Quality & Accreditation	Audit finding capa
+audit-close	audits	Quality & Accreditation	Audit close
+audit-settings	audits	Quality & Accreditation	Audit settings
+management-reviews	audits	Quality & Accreditation	Management reviews
+management-review	audits	Quality & Accreditation	Management review
+management-review-new	audits	Quality & Accreditation	New
+review-refresh	audits	Quality & Accreditation	Review refresh
+review-header	audits	Quality & Accreditation	Review header
+review-input	audits	Quality & Accreditation	Review input
+review-action-add	audits	Quality & Accreditation	New
+review-action-done	audits	Quality & Accreditation	Review action done
+review-complete	audits	Quality & Accreditation	Review complete
+review-action-capa	audits	Quality & Accreditation	Review action capa
+identity	identity	Quality & Accreditation	Identity
+iddoc-add	identity	Quality & Accreditation	New
+iddoc-file	identity	Quality & Accreditation	Iddoc file
+agency-staff	identity	Quality & Accreditation	Agency staff
+iddoc-reveal	identity	Quality & Accreditation	Iddoc reveal
+iddoc-share	identity	Quality & Accreditation	Iddoc share
+iddoc-redact	identity	Quality & Accreditation	Iddoc redact
+iddoc-retention	identity	Quality & Accreditation	Iddoc retention
+iddoc-access	identity	Quality & Accreditation	Iddoc access
+competence	competence	Quality & Accreditation	Competence
+auth-add	competence	Quality & Accreditation	New
+auth-status	competence	Quality & Accreditation	Auth status
+auth-enforce	competence	Quality & Accreditation	Auth enforce
+witness-add	competence	Quality & Accreditation	New
+cert-verify	competence	Quality & Accreditation	Cert verify
+credential-req-init	competence	Quality & Accreditation	Credential req init
+equipment	equipment	Quality & Accreditation	Equipment
+equip-new	equipment	Quality & Accreditation	New
+equip-edit	equipment	Quality & Accreditation	Edit
+equip-cal-add	equipment	Quality & Accreditation	New
+equip-cal-del	equipment	Quality & Accreditation	Equip cal del
+equip-cert	equipment	Quality & Accreditation	Equip cert
+report-equip-add	equipment	Quality & Accreditation	New
+report-equip-del	equipment	Quality & Accreditation	Report equip del

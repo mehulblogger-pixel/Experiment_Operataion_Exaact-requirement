@@ -1,0 +1,61 @@
+customer	clients	Directory	Customer
+customer-parent	clients	Directory	Customer parent
+candidates	hiring	Recruitment	Candidates
+candidate	hiring	Recruitment	Candidate
+candidate-new	hiring	Recruitment	New
+candidate-edit	hiring	Recruitment	Edit
+candidate-stage	hiring	Recruitment	Candidate stage
+candidate-joined	hiring	Recruitment	Candidate joined
+candidate-cv	hiring	Recruitment	Candidate cv
+candidate-client	hiring	Recruitment	Candidate client
+candidate-credential	hiring	Recruitment	Candidate credential
+candidate-erase	hiring	Recruitment	Candidate erase
+candidate-commercial	hiring	Recruitment	Candidate commercial
+candidate-link-person	hiring	Recruitment	Candidate link person
+candidate-link-pro	hiring	Recruitment	Candidate link pro
+candidate-unlink-pro	hiring	Recruitment	Candidate unlink pro
+hiring-requests	hiring	Recruitment	Hiring requests
+hiring-request	hiring	Recruitment	Hiring request
+approval-delegations	hiring	Recruitment	Approval delegations
+requisitions	hiring	Recruitment	Requisitions
+requisition	hiring	Recruitment	Requisition
+requisition-new	hiring	Recruitment	New
+requisition-edit	hiring	Recruitment	Edit
+requisition-allocations	hiring	Recruitment	Requisition allocations
+recruitment	hiring	Recruitment	Recruitment
+recruitment-cc	hiring	Recruitment	Command centre
+candidate-pool	hiring	Recruitment	Candidate pool
+req-ai-extract	hiring	Recruitment	Req ai extract
+recruit-config	hiring	Recruitment	Recruit config
+client-contacts	hiring	Recruitment	Client contacts
+recruit-export	hiring	Recruitment	Recruit export
+careers-admin	hiring	Recruitment	Careers admin
+jd-generate	hiring	Recruitment	Jd generate
+cert-add	hiring	Recruitment	New
+positions-import	hiring	Recruitment	Positions import
+portal-users	portal	Directory	Client portal users
+portal-user-toggle	portal	Directory	Portal user toggle
+portal-user-reinvite	portal	Directory	Portal user reinvite
+portal-user-perms	portal	Directory	Portal user perms
+vendor-users	portal	Directory	Vendor users
+vendor-user-toggle	portal	Directory	Vendor user toggle
+vendor-user-reinvite	portal	Directory	Vendor user reinvite
+vendor-settings	portal	Directory	Vendor settings
+vendor-share	portal	Directory	Vendor share
+portal-settings	portal	Directory	Portal settings
+portal-request	portal	Directory	Portal request
+masters	masters	Directory	Masters
+work-norms	masters	Directory	Work norms
+activities	clients	Directory	Activities
+activity-add	clients	Directory	New
+partner-import	clients	Directory	Partner import
+partner-template	clients	Directory	Partner template
+duplicates	clients	Directory	Duplicates
+partner-contact	clients	Directory	Partner contact
+partner-address	clients	Directory	Partner address
+partner-sites	clients	Directory	Partner sites
+partner-meta	clients	Directory	Partner meta
+partner-pos	clients	Directory	Partner pos
+partner-gaps	clients	Directory	Partner gaps
+po-lines	clients	Directory	Po lines
+contract-no-check	clients	Directory	Contract no check

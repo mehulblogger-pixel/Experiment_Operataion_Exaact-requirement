@@ -1,0 +1,71 @@
+documents	idems	Reporting	Documents
+document	idems	Reporting	Document
+document-new	idems	Reporting	New
+document-edit	idems	Reporting	Edit
+document-submit	idems	Reporting	Document submit
+document-finalize	idems	Reporting	Document finalize
+document-delete	idems	Reporting	Document delete
+document-fill	idems	Reporting	Document fill
+release-notes	idems	Reporting	Release notes
+document-ai-review	idems	Reporting	Document ai review
+document-rn-flag	idems	Reporting	Document rn flag
+document-scope-from-qap	idems	Reporting	Document scope from qap
+document-polish-text	idems	Reporting	Document polish text
+vendors	idems	Reporting	Vendors
+vendor-profile	idems	Reporting	Vendor profile
+vendor-profile-save	idems	Reporting	Vendor profile save
+expediting	idems	Reporting	Expediting
+expediting-projects	idems	Reporting	Expediting projects
+report-types	idems	Reporting	Report types
+report-type-edit	idems	Reporting	Edit
+report-builder	idems	Reporting	Report builder
+report-preview	idems	Reporting	Report preview
+report-field-edit	idems	Reporting	Edit
+report-file	idems	Reporting	Report file
+irn-rules	idems	Reporting	Irn rules
+audit-log	idems	Reporting	Audit log
+document-approve	idems	Reporting	Document approve
+document-vet	idems	Reporting	Document vet
+document-vet-review	idems	Reporting	Document vet review
+vetting-checklist	idems	Reporting	Review & issue rules
+approver-map	idems	Reporting	Approver map
+idems-approval-rules	idems	Reporting	Report approval rules
+idems-approval-rule-edit	idems	Reporting	Edit
+document-pdf	idems	Reporting	Document pdf
+document-timestamp	idems	Reporting	Document timestamp
+document-docx	idems	Reporting	Document docx
+report-type-preview	idems	Reporting	Report type preview
+report-template-preview	idems	Reporting	Report template preview
+report-templates	idems	Reporting	Report templates
+report-template-edit	idems	Reporting	Edit
+report-template-download	idems	Reporting	Report template download
+report-form-from-template	idems	Reporting	Report form from template
+report-autoform	idems	Reporting	Report autoform
+endorsements	idems	Reporting	Endorsements
+endorsement	idems	Reporting	Endorsement
+endorsement-new	idems	Reporting	New
+endorsement-edit	idems	Reporting	Edit
+endorsement-submit	idems	Reporting	Endorsement submit
+endorsement-approve	idems	Reporting	Endorsement approve
+endorsement-delete	idems	Reporting	Endorsement delete
+endorsement-file	idems	Reporting	Endorsement file
+endorsement-cert	idems	Reporting	Endorsement cert
+phrase-library	idems	Reporting	Phrase library
+phrase-edit	idems	Reporting	Edit
+learning	idems	Reporting	Learning
+document-smart	idems	Reporting	Document smart
+document-release-note	idems	Reporting	Document release note
+document-review	idems	Reporting	Document review
+document-evidence	idems	Reporting	Document evidence
+evidence-review	idems	Reporting	Evidence review
+evidence-reviewed	idems	Reporting	Evidence reviewed
+checkin-settings	idems	Reporting	Checkin settings
+report-reviews	idems	Reporting	Report reviews
+report-ack	idems	Reporting	Report ack
+hold-points	hold-points		Hold points
+hw-point-new	hold-points		New
+hw-point-clear	hold-points		Hw point clear
+hw-point-waive	hold-points		Hw point waive
+hw-point-cancel	hold-points		Hw point cancel
+hw-point-reopen	hold-points		Hw point reopen
+hw-point-derive	hold-points		Hw point derive

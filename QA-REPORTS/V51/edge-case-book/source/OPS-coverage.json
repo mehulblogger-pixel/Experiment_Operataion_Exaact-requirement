@@ -1,0 +1,980 @@
+{
+ "routes": {
+  "calls": {
+   "cases": [
+    "EC-OPS-082",
+    "EC-OPS-031",
+    "EC-OPS-058"
+   ],
+   "buttons": {
+    "Search": [
+     "EC-OPS-082"
+    ],
+    "⬇ CSV": [
+     "EC-OPS-082"
+    ],
+    "➕ New inspection call": [
+     "EC-OPS-024"
+    ],
+    "Open": "navigation only",
+    "Edit": [
+     "EC-OPS-031",
+     "EC-OPS-089"
+    ]
+   }
+  },
+  "call": {
+   "cases": [
+    "EC-OPS-038",
+    "EC-OPS-031",
+    "EC-OPS-030"
+   ],
+   "buttons": {
+    "Edit call": [
+     "EC-OPS-089"
+    ],
+    "+ Allocate another job": [
+     "EC-OPS-030",
+     "EC-OPS-040"
+    ],
+    "📑 New report": "navigation only",
+    "Complete details": "navigation only",
+    "Jobs": "navigation only",
+    "Open": "navigation only"
+   }
+  },
+  "call-new": {
+   "cases": [
+    "EC-OPS-024",
+    "EC-OPS-025",
+    "EC-OPS-026",
+    "EC-OPS-027",
+    "EC-OPS-028",
+    "EC-OPS-029",
+    "EC-OPS-086",
+    "EC-OPS-087",
+    "EC-OPS-088"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-OPS-024",
+     "EC-OPS-025",
+     "EC-OPS-026",
+     "EC-OPS-028",
+     "EC-OPS-086",
+     "EC-OPS-087",
+     "EC-OPS-088"
+    ],
+    "+ Add new (activity code)": "navigation only",
+    "Date 1 / add date": [
+     "EC-OPS-024"
+    ]
+   }
+  },
+  "call-edit": {
+   "cases": [
+    "EC-OPS-031",
+    "EC-OPS-089"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-OPS-031",
+     "EC-OPS-089"
+    ]
+   }
+  },
+  "call-delete": {
+   "cases": [
+    "EC-OPS-033",
+    "EC-OPS-034"
+   ],
+   "buttons": {
+    "Delete": [
+     "EC-OPS-033",
+     "EC-OPS-034"
+    ]
+   }
+  },
+  "jobs": {
+   "cases": [
+    "EC-OPS-058"
+   ],
+   "buttons": {
+    "Search": [
+     "EC-OPS-058"
+    ],
+    "⬇ Download CSV": [
+     "EC-OPS-058"
+    ],
+    "Open": "navigation only",
+    "Close": [
+     "EC-OPS-046"
+    ]
+   }
+  },
+  "job": {
+   "cases": [
+    "EC-OPS-046",
+    "EC-OPS-050",
+    "EC-OPS-051",
+    "EC-OPS-052",
+    "EC-OPS-053",
+    "EC-OPS-055"
+   ],
+   "buttons": {
+    "Close job": [
+     "EC-OPS-046",
+     "EC-OPS-047"
+    ],
+    "Edit": [
+     "EC-OPS-059"
+    ],
+    "View call": "navigation only",
+    "🔎 Source manpower": "not in OPS scope: Marketplace sourcing (other helper)",
+    "+ Raise a nonconformity": "not in OPS scope: Quality module (other helper)",
+    "Add point / ↻ Re-scan issued reports": "not in OPS scope: hold & witness points (Quality helper)",
+    "📍 Record this": [
+     "EC-OPS-060"
+    ],
+    "Save invoice / payment": [
+     "EC-OPS-055"
+    ]
+   }
+  },
+  "job-new": {
+   "cases": [
+    "EC-OPS-030",
+    "EC-OPS-032",
+    "EC-OPS-040",
+    "EC-OPS-041",
+    "EC-OPS-056",
+    "EC-OPS-057"
+   ],
+   "buttons": {
+    "Allocate": [
+     "EC-OPS-030",
+     "EC-OPS-040",
+     "EC-OPS-041",
+     "EC-OPS-056",
+     "EC-OPS-057"
+    ],
+    "inspector pick buttons": [
+     "EC-OPS-030"
+    ],
+    "+ Add another date": [
+     "EC-OPS-041"
+    ]
+   }
+  },
+  "job-edit": {
+   "cases": [
+    "EC-OPS-059"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-OPS-059"
+    ]
+   }
+  },
+  "job-close": {
+   "cases": [
+    "EC-OPS-046",
+    "EC-OPS-047"
+   ],
+   "buttons": {
+    "Close": [
+     "EC-OPS-046",
+     "EC-OPS-047"
+    ]
+   }
+  },
+  "job-unlock": {
+   "cases": [
+    "EC-OPS-048"
+   ],
+   "buttons": {
+    "Reopen": [
+     "EC-OPS-048"
+    ]
+   }
+  },
+  "job-advance": {
+   "cases": [
+    "EC-OPS-055"
+   ],
+   "buttons": {
+    "Advance received": [
+     "EC-OPS-055"
+    ]
+   }
+  },
+  "job-reassign": {
+   "cases": [
+    "EC-OPS-052"
+   ],
+   "buttons": {
+    "Update day-by-day plan": [
+     "EC-OPS-052"
+    ]
+   }
+  },
+  "job-visit-close": {
+   "cases": [
+    "EC-OPS-052"
+   ],
+   "buttons": {
+    "Close day": [
+     "EC-OPS-052"
+    ]
+   }
+  },
+  "job-qap-upload": {
+   "cases": [
+    "EC-OPS-053"
+   ],
+   "buttons": {
+    "Attach QAP": [
+     "EC-OPS-053"
+    ]
+   }
+  },
+  "job-qap": {
+   "cases": [
+    "EC-OPS-053"
+   ],
+   "buttons": {
+    "QAP file link (download)": [
+     "EC-OPS-053"
+    ]
+   }
+  },
+  "job-qap-del": {
+   "cases": [
+    "EC-OPS-053"
+   ],
+   "buttons": {
+    "✕": [
+     "EC-OPS-053"
+    ]
+   }
+  },
+  "job-forward-report": {
+   "cases": [
+    "EC-OPS-053"
+   ],
+   "buttons": {
+    "Forward / Clear": [
+     "EC-OPS-053"
+    ]
+   }
+  },
+  "report-approve": {
+   "cases": [
+    "EC-OPS-053"
+   ],
+   "buttons": {
+    "Approve now": [
+     "EC-OPS-053"
+    ],
+    "Send back": [
+     "EC-OPS-053"
+    ]
+   }
+  },
+  "expense-delete": {
+   "cases": [
+    "EC-OPS-049"
+   ],
+   "buttons": {
+    "✕ (remove expense)": [
+     "EC-OPS-049"
+    ]
+   }
+  },
+  "bill-add": {
+   "cases": [
+    "EC-OPS-054"
+   ],
+   "buttons": {
+    "Upload bill": [
+     "EC-OPS-054"
+    ]
+   }
+  },
+  "bill-delete": {
+   "cases": [
+    "EC-OPS-054"
+   ],
+   "buttons": {
+    "Remove bill": [
+     "EC-OPS-054"
+    ]
+   }
+  },
+  "bill-file": {
+   "cases": [
+    "EC-OPS-054"
+   ],
+   "buttons": {
+    "bill link (open)": [
+     "EC-OPS-054"
+    ]
+   }
+  },
+  "client-quotes": {
+   "cases": [
+    "EC-OPS-039"
+   ],
+   "buttons": {
+    "(quotation picker data, no button)": [
+     "EC-OPS-039"
+    ]
+   }
+  },
+  "quote-context": {
+   "cases": [
+    "EC-OPS-039"
+   ],
+   "buttons": {
+    "(quote line picker data, no button)": [
+     "EC-OPS-039"
+    ]
+   }
+  },
+  "attendance-recon": {
+   "cases": [
+    "EC-OPS-071",
+    "EC-OPS-072"
+   ],
+   "buttons": {
+    "Reconcile": [
+     "EC-OPS-071",
+     "EC-OPS-072"
+    ]
+   }
+  },
+  "availability": {
+   "cases": [
+    "EC-OPS-073"
+   ],
+   "buttons": {
+    "Apply": [
+     "EC-OPS-073"
+    ],
+    "Check": [
+     "EC-OPS-073"
+    ],
+    "‹": "navigation only",
+    "›": "navigation only",
+    "status pick": [
+     "EC-OPS-073"
+    ]
+   }
+  },
+  "schedule": {
+   "cases": [
+    "EC-OPS-074"
+   ],
+   "buttons": {
+    "Find": [
+     "EC-OPS-074"
+    ],
+    "‹ Earlier": [
+     "EC-OPS-074"
+    ],
+    "Today": [
+     "EC-OPS-074"
+    ],
+    "Later ›": [
+     "EC-OPS-074"
+    ]
+   }
+  },
+  "contract-overrides": {
+   "cases": [
+    "EC-OPS-042",
+    "EC-OPS-043",
+    "EC-OPS-044"
+   ],
+   "buttons": {
+    "Endorse": [
+     "EC-OPS-042",
+     "EC-OPS-043"
+    ],
+    "Grant": [
+     "EC-OPS-042",
+     "EC-OPS-045"
+    ],
+    "Refuse": [
+     "EC-OPS-044"
+    ],
+    "← Inspection calls": "navigation only"
+   }
+  },
+  "contract-override": {
+   "cases": [
+    "EC-OPS-042",
+    "EC-OPS-045"
+   ],
+   "buttons": {
+    "Request exception": [
+     "EC-OPS-042",
+     "EC-OPS-045"
+    ]
+   }
+  },
+  "contract-open": {
+   "cases": [
+    "EC-OPS-085"
+   ],
+   "buttons": {
+    "First signature": [
+     "EC-OPS-085"
+    ],
+    "Approve": [
+     "EC-OPS-085"
+    ],
+    "Reject": [
+     "EC-OPS-085"
+    ],
+    "Re-open": [
+     "EC-OPS-085"
+    ]
+   }
+  },
+  "deputations": {
+   "cases": [
+    "EC-OPS-066",
+    "EC-OPS-067"
+   ],
+   "buttons": {
+    "Add position": [
+     "EC-OPS-066"
+    ],
+    "Deputation reports": "navigation only",
+    "status filter": [
+     "EC-OPS-067"
+    ]
+   }
+  },
+  "call-status": {
+   "cases": [
+    "EC-OPS-035",
+    "EC-OPS-036",
+    "EC-OPS-037"
+   ],
+   "buttons": {
+    "Set": [
+     "EC-OPS-035",
+     "EC-OPS-036",
+     "EC-OPS-037"
+    ]
+   }
+  },
+  "call-attrs": {
+   "cases": [
+    "EC-OPS-037"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-OPS-037"
+    ]
+   }
+  },
+  "call-override": {
+   "cases": [
+    "EC-OPS-038"
+   ],
+   "buttons": {
+    "Override & proceed": [
+     "EC-OPS-038"
+    ]
+   }
+  },
+  "call-clar-new": {
+   "cases": [
+    "EC-OPS-038"
+   ],
+   "buttons": {
+    "Raise": [
+     "EC-OPS-038"
+    ]
+   }
+  },
+  "call-clar-respond": {
+   "cases": [
+    "EC-OPS-038"
+   ],
+   "buttons": {
+    "Respond": [
+     "EC-OPS-038"
+    ]
+   }
+  },
+  "call-clar-status": {
+   "cases": [
+    "EC-OPS-038"
+   ],
+   "buttons": {
+    "Status (Close)": [
+     "EC-OPS-038"
+    ]
+   }
+  },
+  "assign-hold": {
+   "cases": [
+    "EC-OPS-050"
+   ],
+   "buttons": {
+    "Set": [
+     "EC-OPS-050"
+    ]
+   }
+  },
+  "assign-accept": {
+   "cases": [
+    "EC-OPS-050"
+   ],
+   "buttons": {
+    "Record decision": [
+     "EC-OPS-050"
+    ]
+   }
+  },
+  "assign-reassign": {
+   "cases": [
+    "EC-OPS-050"
+   ],
+   "buttons": {
+    "Reassign": [
+     "EC-OPS-050"
+    ]
+   }
+  },
+  "assign-reschedule": {
+   "cases": [
+    "EC-OPS-050"
+   ],
+   "buttons": {
+    "Reschedule": [
+     "EC-OPS-050"
+    ]
+   }
+  },
+  "assign-cancel": {
+   "cases": [
+    "EC-OPS-050"
+   ],
+   "buttons": {
+    "Cancel": [
+     "EC-OPS-050"
+    ]
+   }
+  },
+  "assign-noshow": {
+   "cases": [
+    "EC-OPS-050"
+   ],
+   "buttons": {
+    "Record": [
+     "EC-OPS-050"
+    ]
+   }
+  },
+  "job-ready-seed": {
+   "cases": [
+    "EC-OPS-051"
+   ],
+   "buttons": {
+    "Add readiness checklist": [
+     "EC-OPS-051"
+    ]
+   }
+  },
+  "job-ready-set": {
+   "cases": [
+    "EC-OPS-051"
+   ],
+   "buttons": {
+    "item status": [
+     "EC-OPS-051"
+    ]
+   }
+  },
+  "job-confirm": {
+   "cases": [
+    "EC-OPS-051"
+   ],
+   "buttons": {
+    "Mark confirmed": [
+     "EC-OPS-051"
+    ]
+   }
+  },
+  "job-confirm-req": {
+   "cases": [
+    "EC-OPS-051"
+   ],
+   "buttons": {
+    "Require client confirmation": [
+     "EC-OPS-051"
+    ]
+   }
+  },
+  "delay-add": {
+   "cases": [
+    "EC-OPS-084",
+    "EC-OPS-038"
+   ],
+   "buttons": {
+    "Record delay": [
+     "EC-OPS-084"
+    ]
+   }
+  },
+  "recurring": {
+   "cases": [
+    "EC-OPS-076",
+    "EC-OPS-077"
+   ],
+   "buttons": {
+    "Create schedule": [
+     "EC-OPS-076",
+     "EC-OPS-077"
+    ],
+    "Generate due now": [
+     "EC-OPS-076",
+     "EC-OPS-077"
+    ],
+    "toggle (pause/resume)": [
+     "EC-OPS-076"
+    ]
+   }
+  },
+  "capacity-outlook": {
+   "cases": [
+    "EC-OPS-075"
+   ],
+   "buttons": {
+    "Show": [
+     "EC-OPS-075"
+    ]
+   }
+  },
+  "ops-desk": {
+   "cases": [
+    "EC-OPS-080"
+   ],
+   "buttons": {
+    "(redirects to Operations home)": [
+     "EC-OPS-080"
+    ]
+   }
+  },
+  "comm-add": {
+   "cases": [
+    "EC-OPS-038"
+   ],
+   "buttons": {
+    "Log": [
+     "EC-OPS-038"
+    ]
+   }
+  },
+  "assign-issue": {
+   "cases": [
+    "EC-OPS-051"
+   ],
+   "buttons": {
+    "Raise issue": [
+     "EC-OPS-051"
+    ]
+   }
+  },
+  "xo-nudge": {
+   "cases": [
+    "EC-OPS-083"
+   ],
+   "buttons": {
+    "Chase executing office": [
+     "EC-OPS-083"
+    ]
+   }
+  },
+  "dep-status": {
+   "cases": [
+    "EC-OPS-061",
+    "EC-OPS-062"
+   ],
+   "buttons": {
+    "Update status": [
+     "EC-OPS-061",
+     "EC-OPS-062"
+    ]
+   }
+  },
+  "dep-check-seed": {
+   "cases": [
+    "EC-OPS-065"
+   ],
+   "buttons": {
+    "Add a mobilization checklist": [
+     "EC-OPS-065"
+    ]
+   }
+  },
+  "dep-check-set": {
+   "cases": [
+    "EC-OPS-065"
+   ],
+   "buttons": {
+    "item status": [
+     "EC-OPS-065"
+    ]
+   }
+  },
+  "dep-site-log": {
+   "cases": [
+    "EC-OPS-065"
+   ],
+   "buttons": {
+    "Add entry": [
+     "EC-OPS-065"
+    ]
+   }
+  },
+  "dep-site-log-close": {
+   "cases": [
+    "EC-OPS-065"
+   ],
+   "buttons": {
+    "Close": [
+     "EC-OPS-065"
+    ]
+   }
+  },
+  "dep-timesheet": {
+   "cases": [
+    "EC-OPS-063",
+    "EC-OPS-061"
+   ],
+   "buttons": {
+    "Add entry": [
+     "EC-OPS-063"
+    ]
+   }
+  },
+  "dep-approval": {
+   "cases": [
+    "EC-OPS-064"
+   ],
+   "buttons": {
+    "Submit for approval": [
+     "EC-OPS-064"
+    ]
+   }
+  },
+  "dep-approval-status": {
+   "cases": [
+    "EC-OPS-064"
+   ],
+   "buttons": {
+    "Approve / Return / Lock": [
+     "EC-OPS-064"
+    ]
+   }
+  },
+  "dep-manpower-add": {
+   "cases": [
+    "EC-OPS-066"
+   ],
+   "buttons": {
+    "Add position": [
+     "EC-OPS-066"
+    ]
+   }
+  },
+  "dep-manpower-update": {
+   "cases": [
+    "EC-OPS-066"
+   ],
+   "buttons": {
+    "Update": [
+     "EC-OPS-066"
+    ]
+   }
+  },
+  "dep-manpower-del": {
+   "cases": [
+    "EC-OPS-066"
+   ],
+   "buttons": {
+    "Remove": [
+     "EC-OPS-066"
+    ]
+   }
+  },
+  "checkin-photo": {
+   "cases": [
+    "EC-OPS-060"
+   ],
+   "buttons": {
+    "photo link": [
+     "EC-OPS-060"
+    ]
+   }
+  },
+  "vouchers (extra, batch-2 chain)": {
+   "cases": [
+    "EC-OPS-008",
+    "EC-OPS-021",
+    "EC-OPS-022"
+   ],
+   "buttons": {}
+  },
+  "voucher (extra)": {
+   "cases": [
+    "EC-OPS-001",
+    "EC-OPS-002",
+    "EC-OPS-003",
+    "EC-OPS-004",
+    "EC-OPS-005",
+    "EC-OPS-006",
+    "EC-OPS-007",
+    "EC-OPS-009",
+    "EC-OPS-010",
+    "EC-OPS-011",
+    "EC-OPS-012",
+    "EC-OPS-013",
+    "EC-OPS-016",
+    "EC-OPS-017",
+    "EC-OPS-018",
+    "EC-OPS-019",
+    "EC-OPS-020",
+    "EC-OPS-023"
+   ],
+   "buttons": {
+    "Add expense": [
+     "EC-OPS-001",
+     "EC-OPS-019"
+    ],
+    "↻ Pull working days from jobs": "code reading only — not run (needs a month of jobs); idempotent per job",
+    "Add day": [
+     "EC-OPS-019"
+    ],
+    "💾 Save all rows & totals": [
+     "EC-OPS-018"
+    ],
+    "✕ (row)": "covered by EC-OPS-018 setup; not separately run",
+    "🖨 Print / Save PDF": [
+     "EC-OPS-023"
+    ],
+    "⬇ Download (Excel/CSV)": [
+     "EC-OPS-017",
+     "EC-OPS-023"
+    ],
+    "Save details / upload": [
+     "EC-OPS-017",
+     "EC-OPS-020"
+    ],
+    "Submit for approval": [
+     "EC-OPS-001",
+     "EC-OPS-007",
+     "EC-OPS-020"
+    ],
+    "Approve": [
+     "EC-OPS-002",
+     "EC-OPS-005",
+     "EC-OPS-011"
+    ],
+    "Approve for …": [
+     "EC-OPS-016"
+    ],
+    "Send back": [
+     "EC-OPS-007"
+    ],
+    "Mark paid": [
+     "EC-OPS-009"
+    ],
+    "Reopen": [
+     "EC-OPS-009",
+     "EC-OPS-010"
+    ]
+   }
+  },
+  "voucher-approvals (extra)": {
+   "cases": [
+    "EC-OPS-014",
+    "EC-OPS-015"
+   ],
+   "buttons": {
+    "Save the levels": [
+     "EC-OPS-014",
+     "EC-OPS-015"
+    ],
+    "Back to the default": [
+     "EC-OPS-014"
+    ],
+    "↑ / ↓ order": [
+     "EC-OPS-014"
+    ],
+    "Add a level by role": [
+     "EC-OPS-004",
+     "EC-OPS-015"
+    ]
+   }
+  },
+  "voucher-delegations (extra)": {
+   "cases": [
+    "EC-OPS-016"
+   ],
+   "buttons": {
+    "Save delegation": [
+     "EC-OPS-016"
+    ],
+    "Revoke": "code reading only — not run"
+   }
+  },
+  "attend-mark (extra: Mark IN / OUT on home)": {
+   "cases": [
+    "EC-OPS-068",
+    "EC-OPS-069",
+    "EC-OPS-070"
+   ],
+   "buttons": {
+    "Mark IN": [
+     "EC-OPS-068",
+     "EC-OPS-070"
+    ],
+    "Mark OUT": [
+     "EC-OPS-068",
+     "EC-OPS-069"
+    ]
+   }
+  },
+  "ratings (extra)": {
+   "cases": [
+    "EC-OPS-078",
+    "EC-OPS-079"
+   ],
+   "buttons": {
+    "Save (rating settings)": [
+     "EC-OPS-079"
+    ]
+   }
+  },
+  "operations (extra: Operations home)": {
+   "cases": [
+    "EC-OPS-021",
+    "EC-OPS-080",
+    "EC-OPS-081"
+   ],
+   "buttons": {
+    "＋ New inspection call": "navigation only",
+    "Scheduling board": "navigation only",
+    "Recurring": "navigation only",
+    "SLA targets": "not in OPS route list"
+   }
+  }
+ }
+}

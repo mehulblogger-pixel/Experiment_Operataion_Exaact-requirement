@@ -1,0 +1,635 @@
+{
+ "routes": {
+  "opportunity-contract": {
+   "cases": [
+    "EC-SALB-067",
+    "EC-SALB-068"
+   ],
+   "buttons": {
+    "✓ Register the contract — next number (deal row)": [
+     "EC-SALB-068"
+    ],
+    "Register with these details (deal row)": [
+     "EC-SALB-068"
+    ],
+    "typed POST by a sales role": [
+     "EC-SALB-067"
+    ]
+   }
+  },
+  "contracts-to-register": {
+   "cases": [
+    "EC-SALB-067",
+    "EC-SALB-068"
+   ],
+   "buttons": {
+    "Open & register": "navigation only",
+    "✓ Register the contract — next number": [
+     "EC-SALB-068"
+    ],
+    "Register with these details": [
+     "EC-SALB-068"
+    ]
+   }
+  },
+  "quotes": {
+   "cases": [
+    "EC-SALB-001",
+    "EC-SALB-002",
+    "EC-SALB-003",
+    "EC-SALB-004",
+    "EC-SALB-006",
+    "EC-SALB-007"
+   ],
+   "buttons": {
+    "All / Open / Pending / Closed (won) / Lost / Expired": [
+     "EC-SALB-001"
+    ],
+    "Search": [
+     "EC-SALB-002"
+    ],
+    "Financial year box": [
+     "EC-SALB-003"
+    ],
+    "Open (row)": "navigation only",
+    "+ New quote": "navigation only",
+    "+ External": "navigation only",
+    "⬇ Export": [
+     "EC-SALB-005"
+    ],
+    "Awaiting my approval (mine=approve)": [
+     "EC-SALB-007"
+    ],
+    "Awaiting a contract number (mine=contract)": [
+     "EC-SALB-053"
+    ]
+   }
+  },
+  "quote": {
+   "cases": [
+    "EC-SALB-006",
+    "EC-SALB-008",
+    "EC-SALB-016",
+    "EC-SALB-020",
+    "EC-SALB-029",
+    "EC-SALB-052",
+    "EC-SALB-056"
+   ],
+   "buttons": {
+    "Overview / History / Sites & docs / Jobs & order tabs": "navigation only",
+    "Edit / Edit first / Edit the quote": [
+     "EC-SALB-021",
+     "EC-SALB-047"
+    ],
+    "Submit for approval": [
+     "EC-SALB-022",
+     "EC-SALB-023",
+     "EC-SALB-024",
+     "EC-SALB-025",
+     "EC-SALB-026"
+    ],
+    "↻ Submit for approval again": [
+     "EC-SALB-030"
+    ],
+    "Approve": [
+     "EC-SALB-027",
+     "EC-SALB-028"
+    ],
+    "Reject": [
+     "EC-SALB-030"
+    ],
+    "Take my approval back": [
+     "EC-SALB-029"
+    ],
+    "✉ Send to client": [
+     "EC-SALB-041",
+     "EC-SALB-042"
+    ],
+    "✓ I have sent it — mark sent": [
+     "EC-SALB-043"
+    ],
+    "✉️ Open in Gmail": [
+     "EC-SALB-043"
+    ],
+    "📨 Outlook (.eml)": [
+     "EC-SALB-043"
+    ],
+    "Mark accepted (won)": [
+     "EC-SALB-051"
+    ],
+    "Mark accepted (after expiry)": [
+     "EC-SALB-049"
+    ],
+    "Yes — same company, mark accepted / No — a different company": "not shown to any test user here: needs a typed customer name close to one on file — covered by SAL-092",
+    "Mark lost / Confirm lost / Cancel": [
+     "EC-SALB-050",
+     "EC-SALB-052"
+    ],
+    "Raise a revision / Revise (new rev) / Create revision / Cancel": [
+     "EC-SALB-053",
+     "EC-SALB-054",
+     "EC-SALB-055"
+    ],
+    "Save checklist": [
+     "EC-SALB-040",
+     "EC-SALB-047"
+    ],
+    "Waive": [
+     "EC-SALB-040"
+    ],
+    "Request re-edit / Grant / Refuse": [
+     "EC-SALB-061"
+    ],
+    "+ Add (follow-up) / Save follow-ups / ✉️ Chase": [
+     "EC-SALB-045",
+     "EC-SALB-046",
+     "EC-SALB-047"
+    ],
+    "Attach / ✕ (file)": [
+     "EC-SALB-058",
+     "EC-SALB-060"
+    ],
+    "＋ Create costing for this quotation / Unlink / ✎ Change the costing for this revision": "other helper's area (Project costing, SAL-050…SAL-200); read-only Costing tab pieces covered in EC-SALB-075",
+    "Register the contract (both buttons)": [
+     "EC-SALB-062",
+     "EC-SALB-064"
+    ],
+    "Re-send to operations": [
+     "EC-SALB-066"
+    ],
+    "Register group contract": [
+     "EC-SALB-081"
+    ],
+    "⬇ PDF / Word": [
+     "EC-SALB-056",
+     "EC-SALB-057"
+    ]
+   }
+  },
+  "quote-new": {
+   "cases": [
+    "EC-SALB-009",
+    "EC-SALB-010",
+    "EC-SALB-011",
+    "EC-SALB-013",
+    "EC-SALB-014",
+    "EC-SALB-015",
+    "EC-SALB-017",
+    "EC-SALB-019"
+   ],
+   "buttons": {
+    "Create quote": [
+     "EC-SALB-009",
+     "EC-SALB-010",
+     "EC-SALB-011",
+     "EC-SALB-019"
+    ],
+    "+ Add line": [
+     "EC-SALB-013",
+     "EC-SALB-014"
+    ],
+    "+ Add site / ✕": "covered by SAL-064 (sites and lines pair correctly)",
+    "Save it as a separate quote": [
+     "EC-SALB-019"
+    ],
+    "Cancel": "navigation only",
+    "Tabs (header, Offices, Sites, Commercials, Line items, Terms)": "navigation only"
+   }
+  },
+  "quote-edit": {
+   "cases": [
+    "EC-SALB-020",
+    "EC-SALB-021"
+   ],
+   "buttons": {
+    "Save quote": [
+     "EC-SALB-020"
+    ],
+    "Cancel": "navigation only",
+    "⇣ Take the costing's prices into the line items": "other helper's area (costing; SAL-195)"
+   }
+  },
+  "quote-revise": {
+   "cases": [
+    "EC-SALB-053",
+    "EC-SALB-054",
+    "EC-SALB-055"
+   ],
+   "buttons": {
+    "Create revision": [
+     "EC-SALB-053",
+     "EC-SALB-054",
+     "EC-SALB-055"
+    ]
+   }
+  },
+  "quote-status": {
+   "cases": [
+    "EC-SALB-016",
+    "EC-SALB-022",
+    "EC-SALB-031",
+    "EC-SALB-033",
+    "EC-SALB-041",
+    "EC-SALB-042",
+    "EC-SALB-049",
+    "EC-SALB-050",
+    "EC-SALB-051",
+    "EC-SALB-052"
+   ],
+   "buttons": {
+    "to=PENDING_APPROVAL": [
+     "EC-SALB-016",
+     "EC-SALB-022",
+     "EC-SALB-033"
+    ],
+    "to=APPROVED (typed)": [
+     "EC-SALB-031"
+    ],
+    "to=SENT": [
+     "EC-SALB-041",
+     "EC-SALB-042",
+     "EC-SALB-043"
+    ],
+    "to=ACCEPTED": [
+     "EC-SALB-049",
+     "EC-SALB-051"
+    ],
+    "to=LOST": [
+     "EC-SALB-050",
+     "EC-SALB-052"
+    ],
+    "typed EXPIRED/REJECTED/DRAFT/unknown": [
+     "EC-SALB-031"
+    ]
+   }
+  },
+  "quote-doc": {
+   "cases": [
+    "EC-SALB-057"
+   ],
+   "buttons": {
+    "Word (editable) / Re-download Word / ⬇ Word": [
+     "EC-SALB-057"
+    ]
+   }
+  },
+  "quote-pdf": {
+   "cases": [
+    "EC-SALB-008",
+    "EC-SALB-012",
+    "EC-SALB-018",
+    "EC-SALB-056",
+    "EC-SALB-072"
+   ],
+   "buttons": {
+    "⬇ PDF (for client) / ⬇ PDF": [
+     "EC-SALB-012",
+     "EC-SALB-018",
+     "EC-SALB-056",
+     "EC-SALB-072"
+    ]
+   }
+  },
+  "quote-approve": {
+   "cases": [
+    "EC-SALB-027",
+    "EC-SALB-028",
+    "EC-SALB-030",
+    "EC-SALB-040"
+   ],
+   "buttons": {
+    "Approve": [
+     "EC-SALB-027",
+     "EC-SALB-028"
+    ],
+    "Reject": [
+     "EC-SALB-030"
+    ]
+   }
+  },
+  "quote-unapprove": {
+   "cases": [
+    "EC-SALB-029"
+   ],
+   "buttons": {
+    "Take my approval back": [
+     "EC-SALB-029"
+    ]
+   }
+  },
+  "quote-approval-rules": {
+   "cases": [
+    "EC-SALB-032",
+    "EC-SALB-034",
+    "EC-SALB-035",
+    "EC-SALB-080"
+   ],
+   "buttons": {
+    "+ Add rule / Add rule": [
+     "EC-SALB-035"
+    ],
+    "Edit / Save rule": [
+     "EC-SALB-032"
+    ],
+    "✕ (remove level)": [
+     "EC-SALB-034"
+    ]
+   }
+  },
+  "quote-contract": {
+   "cases": [
+    "EC-SALB-062",
+    "EC-SALB-063",
+    "EC-SALB-064",
+    "EC-SALB-065"
+   ],
+   "buttons": {
+    "✓ Register the contract — next number": [
+     "EC-SALB-063"
+    ],
+    "✓ Register the contract & request opening": [
+     "EC-SALB-062",
+     "EC-SALB-064"
+    ],
+    "Register & request opening (entered differently)": [
+     "EC-SALB-064",
+     "EC-SALB-065"
+    ]
+   }
+  },
+  "quote-add-contract": {
+   "cases": [
+    "EC-SALB-081"
+   ],
+   "buttons": {
+    "Register group contract": [
+     "EC-SALB-081"
+    ]
+   }
+  },
+  "quote-float": {
+   "cases": [
+    "EC-SALB-066"
+   ],
+   "buttons": {
+    "Re-send to operations": [
+     "EC-SALB-066"
+    ]
+   }
+  },
+  "quote-client": {
+   "cases": [
+    "EC-SALB-078"
+   ],
+   "buttons": {
+    "(customer picked on the form)": [
+     "EC-SALB-078"
+    ]
+   }
+  },
+  "quote-files": {
+   "cases": [
+    "EC-SALB-058",
+    "EC-SALB-060"
+   ],
+   "buttons": {
+    "Attach": [
+     "EC-SALB-058",
+     "EC-SALB-060"
+    ]
+   }
+  },
+  "quote-file": {
+   "cases": [
+    "EC-SALB-059"
+   ],
+   "buttons": {
+    "⬇ (file name)": [
+     "EC-SALB-059"
+    ]
+   }
+  },
+  "quote-file-delete": {
+   "cases": [
+    "EC-SALB-060"
+   ],
+   "buttons": {
+    "✕": [
+     "EC-SALB-060"
+    ]
+   }
+  },
+  "quote-unlock": {
+   "cases": [
+    "EC-SALB-061"
+   ],
+   "buttons": {
+    "Request re-edit": [
+     "EC-SALB-061"
+    ],
+    "Grant": [
+     "EC-SALB-061"
+    ],
+    "Refuse": [
+     "EC-SALB-061"
+    ]
+   }
+  },
+  "quote-followup": {
+   "cases": [
+    "EC-SALB-045",
+    "EC-SALB-047"
+   ],
+   "buttons": {
+    "+ Add": [
+     "EC-SALB-045",
+     "EC-SALB-047"
+    ],
+    "Save follow-ups": [
+     "EC-SALB-045"
+    ],
+    "Remove": [
+     "EC-SALB-047"
+    ]
+   }
+  },
+  "quote-external": {
+   "cases": [
+    "EC-SALB-076",
+    "EC-SALB-077"
+   ],
+   "buttons": {
+    "Register it": [
+     "EC-SALB-076",
+     "EC-SALB-077"
+    ],
+    "+ Add line": [
+     "EC-SALB-076"
+    ],
+    "✕": [
+     "EC-SALB-076"
+    ],
+    "Cancel / ← CRM — Quotations": "navigation only"
+   }
+  },
+  "quotes-export": {
+   "cases": [
+    "EC-SALB-005"
+   ],
+   "buttons": {
+    "⬇ Export": [
+     "EC-SALB-005"
+    ]
+   }
+  },
+  "quote-final": {
+   "cases": [],
+   "buttons": {
+    "(no screen)": "not shown to any test user: listed in the router but ops_crm_quotes() has no handler for it (lib/crm.php:2308-3612) — it falls through and does nothing"
+   }
+  },
+  "quote-compose": {
+   "cases": [
+    "EC-SALB-043",
+    "EC-SALB-044"
+   ],
+   "buttons": {
+    "✉️ Open in Gmail": [
+     "EC-SALB-043"
+    ],
+    "📨 Outlook (.eml)": [
+     "EC-SALB-043"
+    ],
+    "mode=mailto / mode=owa": [
+     "EC-SALB-043"
+    ]
+   }
+  },
+  "quote-costing-card": {
+   "cases": [
+    "EC-SALB-075"
+   ],
+   "buttons": {
+    "Costing tab (card)": [
+     "EC-SALB-075"
+    ]
+   }
+  },
+  "quote-costing-lines": {
+   "cases": [
+    "EC-SALB-075"
+   ],
+   "buttons": {
+    "Costing tab (prices)": [
+     "EC-SALB-075"
+    ]
+   }
+  },
+  "followup-compose": {
+   "cases": [
+    "EC-SALB-045",
+    "EC-SALB-046"
+   ],
+   "buttons": {
+    "✉️ Chase": [
+     "EC-SALB-045",
+     "EC-SALB-046"
+    ]
+   }
+  },
+  "quote-preorder-save": {
+   "cases": [
+    "EC-SALB-040",
+    "EC-SALB-047"
+   ],
+   "buttons": {
+    "Save checklist": [
+     "EC-SALB-040"
+    ],
+    "Waive": [
+     "EC-SALB-040"
+    ]
+   }
+  },
+  "quote-milestones": {
+   "cases": [
+    "EC-SALB-069",
+    "EC-SALB-070",
+    "EC-SALB-071",
+    "EC-SALB-072",
+    "EC-SALB-073",
+    "EC-SALB-074"
+   ],
+   "buttons": {
+    "Save the schedule": [
+     "EC-SALB-069",
+     "EC-SALB-070",
+     "EC-SALB-071",
+     "EC-SALB-073",
+     "EC-SALB-074"
+    ],
+    "+ Add a milestone / ✕": [
+     "EC-SALB-069"
+    ],
+    "Fill a common example": "covered by SAL-158 step 1",
+    "Remove milestones": [
+     "EC-SALB-071"
+    ]
+   }
+  },
+  "preorder-checklist": {
+   "cases": [
+    "EC-SALB-038",
+    "EC-SALB-039",
+    "EC-SALB-080"
+   ],
+   "buttons": {
+    "Save pre-order checklist": [
+     "EC-SALB-038",
+     "EC-SALB-039"
+    ],
+    "Back to Quotes": [
+     "EC-SALB-039"
+    ]
+   }
+  },
+  "sales-setup": {
+   "cases": [
+    "EC-SALB-033",
+    "EC-SALB-079"
+   ],
+   "buttons": {
+    "Save (level card)": [
+     "EC-SALB-079"
+    ],
+    "Remove (level card)": [
+     "EC-SALB-079"
+    ],
+    "Add this level": "covered by SAL-003 (levels) — not repeated",
+    "Save these answers": [
+     "EC-SALB-033",
+     "EC-SALB-079"
+    ],
+    "Back to Sales": [
+     "EC-SALB-079"
+    ]
+   }
+  },
+  "quote-delegations": {
+   "cases": [
+    "EC-SALB-036",
+    "EC-SALB-037",
+    "EC-SALB-080"
+   ],
+   "buttons": {
+    "Add delegation": [
+     "EC-SALB-036",
+     "EC-SALB-037"
+    ],
+    "Revoke": [
+     "EC-SALB-037"
+    ]
+   }
+  }
+ }
+}

@@ -1,0 +1,67 @@
+calls	calls	Operations	Calls
+call	calls	Operations	Call
+call-new	calls	Operations	New
+call-edit	calls	Operations	Edit
+call-delete	calls	Operations	Call delete
+jobs	jobs	Operations	Jobs
+job	jobs	Operations	Job
+job-new	jobs	Operations	New
+job-edit	jobs	Operations	Edit
+job-close	jobs	Operations	Job close
+job-unlock	jobs	Operations	Job unlock
+job-advance	jobs	Operations	Job advance
+job-reassign	jobs	Operations	Job reassign
+job-visit-close	jobs	Operations	Job visit close
+job-qap-upload	jobs	Operations	Job qap upload
+job-qap	jobs	Operations	Job qap
+job-qap-del	jobs	Operations	Job qap del
+job-forward-report	jobs	Operations	Job forward report
+report-approve	jobs	Operations	Report approve
+expense-delete	jobs	Operations	Expense delete
+bill-add	jobs	Operations	New
+bill-delete	jobs	Operations	Bill delete
+bill-file	jobs	Operations	Bill file
+client-quotes	calls	Operations	Client quotes
+quote-context	calls	Operations	Quote context
+attendance-recon	reconcile	Operations	Attendance reconcile
+availability	jobs	Operations	Availability
+schedule	jobs	Operations	Schedule
+contract-overrides	calls	Operations	Contract overrides
+contract-override	calls	Operations	Contract override
+contract-open	calls	Operations	Contract open
+deputations	jobs	Operations	Deputations
+call-status	calls	Operations	Call status
+call-attrs	calls	Operations	Call attrs
+call-override	calls	Operations	Call override
+call-clar-new	calls	Operations	New
+call-clar-respond	calls	Operations	Call clar respond
+call-clar-status	calls	Operations	Call clar status
+assign-hold	jobs	Operations	Assign hold
+assign-accept	jobs	Operations	Assign accept
+assign-reassign	jobs	Operations	Assign reassign
+assign-reschedule	jobs	Operations	Assign reschedule
+assign-cancel	jobs	Operations	Assign cancel
+assign-noshow	jobs	Operations	Assign noshow
+job-ready-seed	jobs	Operations	Job ready seed
+job-ready-set	jobs	Operations	Job ready set
+job-confirm	jobs	Operations	Job confirm
+job-confirm-req	jobs	Operations	Job confirm req
+delay-add	jobs	Operations	New
+recurring	calls	Operations	Recurring
+capacity-outlook	jobs	Operations	Capacity outlook
+ops-desk	jobs	Operations	Ops desk
+comm-add	jobs	Operations	New
+assign-issue	jobs	Operations	Assign issue
+xo-nudge	calls	Operations	Xo nudge
+dep-status	jobs	Operations	Dep status
+dep-check-seed	jobs	Operations	Dep check seed
+dep-check-set	jobs	Operations	Dep check set
+dep-site-log	jobs	Operations	Dep site log
+dep-site-log-close	jobs	Operations	Dep site log close
+dep-timesheet	jobs	Operations	Dep timesheet
+dep-approval	jobs	Operations	Dep approval
+dep-approval-status	jobs	Operations	Dep approval status
+dep-manpower-add	jobs	Operations	New
+dep-manpower-update	jobs	Operations	Dep manpower update
+dep-manpower-del	jobs	Operations	Dep manpower del
+checkin-photo	jobs	Operations	Checkin photo

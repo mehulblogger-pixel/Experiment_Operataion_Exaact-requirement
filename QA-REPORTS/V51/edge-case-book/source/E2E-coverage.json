@@ -1,0 +1,741 @@
+{
+ "routes": {
+  "/lead-new": {
+   "cases": [
+    "EC-E2E-001"
+   ],
+   "buttons": {
+    "Create it": [
+     "EC-E2E-001"
+    ]
+   }
+  },
+  "/lead": {
+   "cases": [
+    "EC-E2E-001"
+   ],
+   "buttons": {
+    "More — change stage, mark lost…": "navigation only",
+    "Move to Qualified": [
+     "EC-E2E-001"
+    ],
+    "Work this as a deal →": [
+     "EC-E2E-001"
+    ]
+   }
+  },
+  "/opportunity": {
+   "cases": [
+    "EC-E2E-001"
+   ],
+   "buttons": {
+    "See the lead": "navigation only",
+    "＋ Create costing for this deal": [
+     "EC-E2E-001"
+    ]
+   }
+  },
+  "/inquiry-new": {
+   "cases": [
+    "EC-E2E-001",
+    "EC-E2E-010"
+   ],
+   "buttons": {
+    "Create inquiry": [
+     "EC-E2E-001",
+     "EC-E2E-010"
+    ]
+   }
+  },
+  "/project-costings": {
+   "cases": [
+    "EC-E2E-001",
+    "EC-E2E-006",
+    "EC-E2E-010"
+   ],
+   "buttons": {
+    "Create costing": [
+     "EC-E2E-001",
+     "EC-E2E-006",
+     "EC-E2E-010"
+    ]
+   }
+  },
+  "/project-costing": {
+   "cases": [
+    "EC-E2E-001",
+    "EC-E2E-010"
+   ],
+   "buttons": {
+    "Add role": [
+     "EC-E2E-001",
+     "EC-E2E-010"
+    ],
+    "Submit for approval": [
+     "EC-E2E-001",
+     "EC-E2E-010"
+    ],
+    "Approve": [
+     "EC-E2E-001",
+     "EC-E2E-010"
+    ],
+    "📝 Create quotation": [
+     "EC-E2E-001",
+     "EC-E2E-010"
+    ],
+    "→ Hiring request (1)": [
+     "EC-E2E-010"
+    ]
+   }
+  },
+  "/quote": {
+   "cases": [
+    "EC-E2E-001",
+    "EC-E2E-002",
+    "EC-E2E-010"
+   ],
+   "buttons": {
+    "Save checklist": [
+     "EC-E2E-001",
+     "EC-E2E-010"
+    ],
+    "✉ Send to client": [
+     "EC-E2E-001",
+     "EC-E2E-010"
+    ],
+    "Mark accepted (won)": [
+     "EC-E2E-001",
+     "EC-E2E-010"
+    ],
+    "✓ Register the contract & request opening": [
+     "EC-E2E-001"
+    ],
+    "Approve & open the contract": [
+     "EC-E2E-001"
+    ],
+    "Revise (new rev)": [
+     "EC-E2E-002"
+    ],
+    "Create revision": [
+     "EC-E2E-002"
+    ],
+    "Submit for approval": [
+     "EC-E2E-002"
+    ]
+   }
+  },
+  "/quote-edit": {
+   "cases": [
+    "EC-E2E-002"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-E2E-002"
+    ]
+   }
+  },
+  "/contract-openings": {
+   "cases": [
+    "EC-E2E-001",
+    "EC-E2E-005"
+   ],
+   "buttons": {
+    "Give the first signature": [
+     "EC-E2E-001",
+     "EC-E2E-005"
+    ],
+    "Approve & open the contract": [
+     "EC-E2E-005"
+    ],
+    "Reject": "not pressed in a chain: covered by the Sales area helper"
+   }
+  },
+  "/call-new": {
+   "cases": [
+    "EC-E2E-001"
+   ],
+   "buttons": {
+    "Save inspection call": [
+     "EC-E2E-001"
+    ]
+   }
+  },
+  "/call": {
+   "cases": [
+    "EC-E2E-001",
+    "EC-E2E-003"
+   ],
+   "buttons": {
+    "+ Allocate Job": [
+     "EC-E2E-001"
+    ],
+    "Edit call": "navigation only",
+    "Set (status)": [
+     "EC-E2E-003"
+    ],
+    "📑 New report": "navigation only"
+   }
+  },
+  "/job-new": {
+   "cases": [
+    "EC-E2E-001",
+    "EC-E2E-010"
+   ],
+   "buttons": {
+    "Allocate": [
+     "EC-E2E-001",
+     "EC-E2E-010"
+    ]
+   }
+  },
+  "/my-jobs": {
+   "cases": [
+    "EC-E2E-001"
+   ],
+   "buttons": {
+    "Open": "navigation only",
+    "Upload & Close": [
+     "EC-E2E-001"
+    ]
+   }
+  },
+  "/job": {
+   "cases": [
+    "EC-E2E-001"
+   ],
+   "buttons": {
+    "New report": [
+     "EC-E2E-001"
+    ],
+    "Clear (hold / witness point)": [
+     "EC-E2E-001"
+    ],
+    "Close day": [
+     "EC-E2E-001"
+    ],
+    "⏭ Start next stage report": [
+     "EC-E2E-001"
+    ]
+   }
+  },
+  "/document-new": {
+   "cases": [
+    "EC-E2E-001"
+   ],
+   "buttons": {
+    "Generate report": [
+     "EC-E2E-001"
+    ]
+   }
+  },
+  "/document-fill": {
+   "cases": [
+    "EC-E2E-001"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-E2E-001"
+    ]
+   }
+  },
+  "/document-edit": {
+   "cases": [
+    "EC-E2E-001"
+   ],
+   "buttons": {
+    "Save (Edit details)": [
+     "EC-E2E-001"
+    ]
+   }
+  },
+  "/document": {
+   "cases": [
+    "EC-E2E-001"
+   ],
+   "buttons": {
+    "Submit for review": [
+     "EC-E2E-001"
+    ],
+    "✓ Approve": [
+     "EC-E2E-001"
+    ],
+    "Finalize & issue": [
+     "EC-E2E-001"
+    ],
+    "⏭ Start next stage report": [
+     "EC-E2E-001"
+    ],
+    "Reissue as a new revision": "not pressed in a chain: Reporting helper (pack 30 Point 4)"
+   }
+  },
+  "/tally": {
+   "cases": [
+    "EC-E2E-001",
+    "EC-E2E-007"
+   ],
+   "buttons": {
+    "Save (Ledger names & tax defaults)": [
+     "EC-E2E-001",
+     "EC-E2E-007"
+    ]
+   }
+  },
+  "/billable-events": {
+   "cases": [
+    "EC-E2E-001",
+    "EC-E2E-003",
+    "EC-E2E-008"
+   ],
+   "buttons": {
+    "⟳ Sync from closed work": [
+     "EC-E2E-001",
+     "EC-E2E-003"
+    ],
+    "🧾 Raise one invoice for the ticked units": [
+     "EC-E2E-008"
+    ]
+   }
+  },
+  "/to-bill": {
+   "cases": [
+    "EC-E2E-001",
+    "EC-E2E-007"
+   ],
+   "buttons": {
+    "Draft invoice for the ticked work": [
+     "EC-E2E-001",
+     "EC-E2E-007"
+    ]
+   }
+  },
+  "/invoice": {
+   "cases": [
+    "EC-E2E-001",
+    "EC-E2E-004",
+    "EC-E2E-007",
+    "EC-E2E-008"
+   ],
+   "buttons": {
+    "Issue this invoice": [
+     "EC-E2E-001",
+     "EC-E2E-007",
+     "EC-E2E-008"
+    ],
+    "Raise the credit note": [
+     "EC-E2E-004"
+    ],
+    "Record money received": "navigation only"
+   }
+  },
+  "/receipts": {
+   "cases": [
+    "EC-E2E-001"
+   ],
+   "buttons": {
+    "+ Record money received": [
+     "EC-E2E-001"
+    ],
+    "Record it": [
+     "EC-E2E-001"
+    ]
+   }
+  },
+  "/receipt": {
+   "cases": [
+    "EC-E2E-001",
+    "EC-E2E-004"
+   ],
+   "buttons": {
+    "Match it": [
+     "EC-E2E-001",
+     "EC-E2E-004"
+    ],
+    "Unmatch": [
+     "EC-E2E-004"
+    ]
+   }
+  },
+  "/receivables": {
+   "cases": [
+    "EC-E2E-001",
+    "EC-E2E-004"
+   ],
+   "buttons": {
+    "(read only)": [
+     "EC-E2E-001",
+     "EC-E2E-004"
+    ]
+   }
+  },
+  "/invoices": {
+   "cases": [
+    "EC-E2E-001"
+   ],
+   "buttons": {
+    "(register, read only)": [
+     "EC-E2E-001"
+    ]
+   }
+  },
+  "/call-profit": {
+   "cases": [
+    "EC-E2E-001",
+    "EC-E2E-020"
+   ],
+   "buttons": {
+    "Show": [
+     "EC-E2E-001",
+     "EC-E2E-020"
+    ]
+   }
+  },
+  "/profitability": {
+   "cases": [
+    "EC-E2E-001",
+    "EC-E2E-020"
+   ],
+   "buttons": {
+    "(register, read only)": [
+     "EC-E2E-001",
+     "EC-E2E-020"
+    ]
+   }
+  },
+  "/mis": {
+   "cases": [
+    "EC-E2E-001"
+   ],
+   "buttons": {
+    "Apply": [
+     "EC-E2E-001"
+    ]
+   }
+  },
+  "/": {
+   "cases": [
+    "EC-E2E-001",
+    "EC-E2E-015",
+    "EC-E2E-020"
+   ],
+   "buttons": {
+    "(dashboard tiles read)": [
+     "EC-E2E-001",
+     "EC-E2E-015",
+     "EC-E2E-020"
+    ]
+   }
+  },
+  "/voucher-approvals": {
+   "cases": [
+    "EC-E2E-020"
+   ],
+   "buttons": {
+    "Save the levels": [
+     "EC-E2E-020"
+    ],
+    "↑ / ↓": "order kept as shown; not reordered in the chain"
+   }
+  },
+  "/vouchers": {
+   "cases": [
+    "EC-E2E-020"
+   ],
+   "buttons": {
+    "Open / create": [
+     "EC-E2E-020"
+    ]
+   }
+  },
+  "/voucher": {
+   "cases": [
+    "EC-E2E-020",
+    "EC-E2E-021"
+   ],
+   "buttons": {
+    "Add expense": [
+     "EC-E2E-020"
+    ],
+    "Submit for approval": [
+     "EC-E2E-020",
+     "EC-E2E-021"
+    ],
+    "Approve": [
+     "EC-E2E-020"
+    ],
+    "Mark paid": [
+     "EC-E2E-020"
+    ],
+    "Send back": [
+     "EC-E2E-021"
+    ]
+   }
+  },
+  "/hiring-request": {
+   "cases": [
+    "EC-E2E-010"
+   ],
+   "buttons": {
+    "Submit for approval": [
+     "EC-E2E-010"
+    ],
+    "Approve": [
+     "EC-E2E-010"
+    ],
+    "Start recruiting": [
+     "EC-E2E-010"
+    ]
+   }
+  },
+  "/requisition": {
+   "cases": [
+    "EC-E2E-010",
+    "EC-E2E-025"
+   ],
+   "buttons": {
+    "Add candidates →": [
+     "EC-E2E-010"
+    ],
+    "🧑‍🏭 Post this to the Marketplace": [
+     "EC-E2E-025"
+    ]
+   }
+  },
+  "/candidate-new": {
+   "cases": [
+    "EC-E2E-010"
+   ],
+   "buttons": {
+    "Add candidate": [
+     "EC-E2E-010"
+    ]
+   }
+  },
+  "/candidates": {
+   "cases": [
+    "EC-E2E-010",
+    "EC-E2E-011"
+   ],
+   "buttons": {
+    "(register; lock badge read)": [
+     "EC-E2E-010",
+     "EC-E2E-011"
+    ]
+   }
+  },
+  "/candidate": {
+   "cases": [
+    "EC-E2E-010",
+    "EC-E2E-011"
+   ],
+   "buttons": {
+    "Schedule (interview)": [
+     "EC-E2E-010"
+    ],
+    "Save structure": [
+     "EC-E2E-010"
+    ],
+    "Draft offer": [
+     "EC-E2E-010"
+    ],
+    "Submit for approval (offer)": [
+     "EC-E2E-010",
+     "EC-E2E-011"
+    ],
+    "Approve (offer)": [
+     "EC-E2E-010",
+     "EC-E2E-011"
+    ],
+    "Issue offer": [
+     "EC-E2E-010",
+     "EC-E2E-011"
+    ],
+    "Mark accepted": [
+     "EC-E2E-010"
+    ],
+    "Mark declined": [
+     "EC-E2E-011"
+    ],
+    "Update stage": [
+     "EC-E2E-010",
+     "EC-E2E-011"
+    ],
+    "Mark as joined": [
+     "EC-E2E-010"
+    ]
+   }
+  },
+  "/availability": {
+   "cases": [
+    "EC-E2E-010"
+   ],
+   "buttons": {
+    "(board read)": [
+     "EC-E2E-010"
+    ]
+   }
+  },
+  "/schedule": {
+   "cases": [
+    "EC-E2E-010"
+   ],
+   "buttons": {
+    "(board read)": [
+     "EC-E2E-010"
+    ]
+   }
+  },
+  "/connect-requirement": {
+   "cases": [
+    "EC-E2E-025"
+   ],
+   "buttons": {
+    "✎ Change the details": [
+     "EC-E2E-025"
+    ],
+    "Open for applications": [
+     "EC-E2E-025"
+    ],
+    "Award": [
+     "EC-E2E-025"
+    ],
+    "💷 Send to billing": [
+     "EC-E2E-025"
+    ]
+   }
+  },
+  "/pro/jobs": {
+   "cases": [
+    "EC-E2E-025"
+   ],
+   "buttons": {
+    "Apply": [
+     "EC-E2E-025"
+    ]
+   }
+  },
+  "/ncr-new": {
+   "cases": [
+    "EC-E2E-015"
+   ],
+   "buttons": {
+    "Raise it": [
+     "EC-E2E-015"
+    ]
+   }
+  },
+  "/ncr-item": {
+   "cases": [
+    "EC-E2E-015"
+   ],
+   "buttons": {
+    "Save (containment)": [
+     "EC-E2E-015"
+    ],
+    "Record it (disposition)": [
+     "EC-E2E-015"
+    ],
+    "Open a corrective action from this": [
+     "EC-E2E-015"
+    ],
+    "Close": [
+     "EC-E2E-015"
+    ]
+   }
+  },
+  "/capa-item": {
+   "cases": [
+    "EC-E2E-015"
+   ],
+   "buttons": {
+    "Save (root cause)": [
+     "EC-E2E-015"
+    ],
+    "Save plan": [
+     "EC-E2E-015"
+    ],
+    "Record it (done)": [
+     "EC-E2E-015"
+    ],
+    "Record the check": [
+     "EC-E2E-015"
+    ],
+    "Close": [
+     "EC-E2E-015"
+    ]
+   }
+  },
+  "/analytics": {
+   "cases": [
+    "EC-E2E-015"
+   ],
+   "buttons": {
+    "Quality (tab)": [
+     "EC-E2E-015"
+    ]
+   }
+  },
+  "/portal": {
+   "cases": [
+    "EC-E2E-030"
+   ],
+   "buttons": {
+    "(overview read)": [
+     "EC-E2E-030"
+    ]
+   }
+  },
+  "/portal/reports": {
+   "cases": [
+    "EC-E2E-030"
+   ],
+   "buttons": {
+    "Accept or reject →": [
+     "EC-E2E-030"
+    ]
+   }
+  },
+  "/portal/report-decision": {
+   "cases": [
+    "EC-E2E-030"
+   ],
+   "buttons": {
+    "Accept": [
+     "EC-E2E-030"
+    ],
+    "Reject": [
+     "EC-E2E-030"
+    ]
+   }
+  },
+  "/portal/request": {
+   "cases": [
+    "EC-E2E-030"
+   ],
+   "buttons": {
+    "Send it": [
+     "EC-E2E-030"
+    ]
+   }
+  },
+  "/portal-users": {
+   "cases": [
+    "EC-E2E-030"
+   ],
+   "buttons": {
+    "Accept & raise the call": [
+     "EC-E2E-030"
+    ]
+   }
+  },
+  "/report-reviews": {
+   "cases": [
+    "EC-E2E-030"
+   ],
+   "buttons": {
+    "(register read)": [
+     "EC-E2E-030"
+    ]
+   }
+  }
+ }
+}

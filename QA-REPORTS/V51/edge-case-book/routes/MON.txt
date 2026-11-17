@@ -1,0 +1,39 @@
+job-invoice	invoicing	Money	Job invoice
+job-bill	invoicing	Money	Job bill
+invoicing	invoicing	Money	Invoicing
+tally	invoicing	Money	Tally
+tally-export	invoicing	Money	Tally export
+tally-settings	invoicing	Money	Tally settings
+tally-undo	invoicing	Money	Tally undo
+receivables	invoicing	Money	Receivables
+invoices	invoicing	Money	Invoices
+invoice	invoicing	Money	Invoice
+invoice-new	invoicing	Money	New
+invoice-line-add	invoicing	Money	New
+invoice-line-delete	invoicing	Money	Invoice line delete
+invoice-issue	invoicing	Money	Invoice issue
+invoice-cancel	invoicing	Money	Invoice cancel
+to-bill	invoicing	Money	To bill
+receipts	invoicing	Money	Receipts
+receipt	invoicing	Money	Receipt
+receipt-new	invoicing	Money	New
+receipt-allocate	invoicing	Money	Receipt allocate
+receipt-unallocate	invoicing	Money	Receipt unallocate
+credit-note-new	invoicing	Money	New
+ledger	invoicing	Money	Ledger
+profitability	profitability	Money	Profitability
+boss-renew	profitability	Money	Boss renew
+office-finance	overheads	Money	Office finance
+cost-run	overheads	Money	Cost run
+sbu-pl	profitability	Money	Sbu pl
+call-profit	profitability	Money	Call profit
+billable-events	invoicing	Money	Billable events
+billable-sync	invoicing	Money	Billable sync
+billable-approve	invoicing	Money	Billable approve
+billable-invoice	invoicing	Money	Billable invoice
+job-billing	invoicing	Money	Job billing
+contract-billing	invoicing	Money	Contract billing
+billable-cancel	invoicing	Money	Billable cancel
+billable-dispute	invoicing	Money	Billable dispute
+billable-bill	invoicing	Money	Billable bill
+billable-bill-partial	invoicing	Money	Billable bill partial

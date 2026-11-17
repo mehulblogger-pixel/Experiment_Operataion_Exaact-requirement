@@ -1,0 +1,63 @@
+issues	ncr	Quality & Accreditation	Issues
+departures	ncr	Quality & Accreditation	Departures
+issue-classify	ncr	Quality & Accreditation	Issue classify
+departure-new	ncr	Quality & Accreditation	New
+departure-status	ncr	Quality & Accreditation	Departure status
+dispute-new	ncr	Quality & Accreditation	New
+dispute-decide	ncr	Quality & Accreditation	Dispute decide
+issue-extend	ncr	Quality & Accreditation	Issue extend
+extension-approve	ncr	Quality & Accreditation	Extension approve
+data-control	datacontrol	Quality & Accreditation	Data & information control
+data-check-run	datacontrol	Quality & Accreditation	Data check run
+sw-validation-add	datacontrol	Quality & Accreditation	New
+failure-add	datacontrol	Quality & Accreditation	New
+failure-update	datacontrol	Quality & Accreditation	Failure update
+failure-resolve	datacontrol	Quality & Accreditation	Failure resolve
+failure-capa	datacontrol	Quality & Accreditation	Failure capa
+confidentiality	confidentiality	Quality & Accreditation	Confidentiality
+conf-undertaking-add	confidentiality	Quality & Accreditation	New
+conf-nda-add	confidentiality	Quality & Accreditation	New
+conf-breach	confidentiality	Quality & Accreditation	Conf breach
+conf-breach-add	confidentiality	Quality & Accreditation	New
+conf-breach-close	confidentiality	Quality & Accreditation	Conf breach close
+ncr	ncr	Quality & Accreditation	Ncr
+ncr-item	ncr	Quality & Accreditation	Ncr item
+ncr-new	ncr	Quality & Accreditation	New
+ncr-contain	ncr	Quality & Accreditation	Ncr contain
+ncr-disposition	ncr	Quality & Accreditation	Ncr disposition
+ncr-capa	ncr	Quality & Accreditation	Ncr capa
+ncr-assign	ncr	Quality & Accreditation	Ncr assign
+ncr-close	ncr	Quality & Accreditation	Ncr close
+ncr-reopen	ncr	Quality & Accreditation	Ncr reopen
+capa	capa	Quality & Accreditation	Capa
+capa-item	capa	Quality & Accreditation	Capa item
+capa-new	capa	Quality & Accreditation	New
+capa-cause	capa	Quality & Accreditation	Capa cause
+capa-plan	capa	Quality & Accreditation	Capa plan
+capa-done	capa	Quality & Accreditation	Capa done
+capa-verify	capa	Quality & Accreditation	Capa verify
+capa-close	capa	Quality & Accreditation	Capa close
+capa-escalate	capa	Quality & Accreditation	Capa escalate
+capa-settings	capa	Quality & Accreditation	Capa settings
+capa-from-complaint	capa	Quality & Accreditation	Capa from complaint
+capa-action-add	capa	Quality & Accreditation	New
+capa-action-done	capa	Quality & Accreditation	Capa action done
+capa-action-cancel	capa	Quality & Accreditation	Capa action cancel
+capa-action-reopen	capa	Quality & Accreditation	Capa action reopen
+complaints	complaints	Quality & Accreditation	Complaints
+complaint	complaints	Quality & Accreditation	Complaint
+complaint-new	complaints	Quality & Accreditation	New
+complaint-ack	complaints	Quality & Accreditation	Complaint ack
+complaint-validity	complaints	Quality & Accreditation	Complaint validity
+complaint-investigate	complaints	Quality & Accreditation	Complaint investigate
+complaint-decide	complaints	Quality & Accreditation	Complaint decide
+complaint-notify	complaints	Quality & Accreditation	Complaint notify
+complaint-capa	complaints	Quality & Accreditation	Complaint capa
+complaint-close	complaints	Quality & Accreditation	Complaint close
+complaint-reopen	complaints	Quality & Accreditation	Complaint reopen
+complaint-settings	complaints	Quality & Accreditation	Complaint settings
+impartiality	impartiality	Quality & Accreditation	Impartiality
+imp-type	impartiality	Quality & Accreditation	Imp type
+imp-declare	impartiality	Quality & Accreditation	Imp declare
+imp-threat-add	impartiality	Quality & Accreditation	New
+imp-threat-decide	impartiality	Quality & Accreditation	Imp threat decide

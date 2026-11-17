@@ -1,0 +1,923 @@
+{
+ "routes": {
+  "customer": {
+   "cases": [
+    "EC-DIR-011",
+    "EC-DIR-012"
+   ],
+   "buttons": {
+    "Save branch": [
+     "EC-DIR-011"
+    ],
+    "Create branch company": [
+     "EC-DIR-011"
+    ],
+    "Save location": [
+     "EC-DIR-012"
+    ],
+    "📍 Use my current location": "not shown to any test user: needs a real phone GPS (code path same as Save location; DIR-007)",
+    "Timeline CSV": [
+     "EC-DIR-012"
+    ],
+    "➕ Raise inspection call": "navigation only",
+    "✎ Edit / add address": "navigation only"
+   }
+  },
+  "customer-parent": {
+   "cases": [
+    "EC-DIR-010"
+   ],
+   "buttons": {
+    "Save group": [
+     "EC-DIR-010"
+    ]
+   }
+  },
+  "candidates": {
+   "cases": [
+    "EC-REC-032",
+    "EC-REC-013",
+    "EC-REC-014"
+   ],
+   "buttons": {
+    "Search": [
+     "EC-REC-032"
+    ],
+    "tabs (All, CV received, … Withdrawn)": [
+     "EC-REC-032"
+    ],
+    "+ Add candidate CV": "navigation only",
+    "Open": "navigation only",
+    "Edit": "navigation only"
+   }
+  },
+  "candidate": {
+   "cases": [
+    "EC-REC-013",
+    "EC-REC-014",
+    "EC-REC-021",
+    "EC-REC-022",
+    "EC-REC-062"
+   ],
+   "buttons": {
+    "Schedule": [
+     "EC-REC-021",
+     "EC-REC-022"
+    ],
+    "Save scorecard": [
+     "EC-REC-022"
+    ],
+    "Save this interviewer's score": [
+     "EC-REC-062"
+    ],
+    "Delete booking": [
+     "EC-REC-062"
+    ],
+    "Advance →": [
+     "EC-REC-062"
+    ],
+    "Move candidate here →": [
+     "EC-REC-062"
+    ],
+    "← Back / ← Move back here": [
+     "EC-REC-062"
+    ],
+    "Apply (workflow)": "not shown to any test user: switching workflow is pack 23 C5 (open question) — existing REC-038",
+    "Save notes": [
+     "EC-REC-062"
+    ],
+    "Upload to this stage": "not shown to any test user: needs a real file upload from a phone/PC (existing REC-112 area)",
+    "Add to checklist": [
+     "EC-REC-062",
+     "EC-REC-051"
+    ],
+    "Upload": "not shown to any test user: real file upload (existing REC-108)",
+    "Documents to issue (letters)": [
+     "EC-REC-026"
+    ],
+    "Edit": "navigation only"
+   }
+  },
+  "candidate-new": {
+   "cases": [
+    "EC-REC-016",
+    "EC-REC-017",
+    "EC-REC-033",
+    "EC-REC-034"
+   ],
+   "buttons": {
+    "Add candidate": [
+     "EC-REC-016",
+     "EC-REC-033",
+     "EC-REC-034"
+    ],
+    "Save anyway — this is a new person": [
+     "EC-REC-017"
+    ],
+    "Extract →": [
+     "EC-REC-057"
+    ],
+    "Cancel": [
+     "EC-REC-017"
+    ]
+   }
+  },
+  "candidate-edit": {
+   "cases": [
+    "EC-REC-019",
+    "EC-REC-020"
+   ],
+   "buttons": {
+    "Save candidate": [
+     "EC-REC-019",
+     "EC-REC-020"
+    ]
+   }
+  },
+  "candidate-stage": {
+   "cases": [
+    "EC-REC-018",
+    "EC-REC-030",
+    "EC-REC-061",
+    "EC-REC-015"
+   ],
+   "buttons": {
+    "Update stage": [
+     "EC-REC-018",
+     "EC-REC-030",
+     "EC-REC-061",
+     "EC-REC-015"
+    ]
+   }
+  },
+  "candidate-joined": {
+   "cases": [
+    "EC-REC-030",
+    "EC-REC-031",
+    "EC-REC-061"
+   ],
+   "buttons": {
+    "Mark joined": [
+     "EC-REC-030",
+     "EC-REC-031"
+    ],
+    "Not joined after all": [
+     "EC-REC-031",
+     "EC-REC-061"
+    ]
+   }
+  },
+  "candidate-cv": {
+   "cases": [
+    "EC-REC-049",
+    "EC-REC-051"
+   ],
+   "buttons": {
+    "Analyse & save keywords": [
+     "EC-REC-049",
+     "EC-REC-051"
+    ]
+   }
+  },
+  "candidate-client": {
+   "cases": [
+    "EC-REC-049",
+    "EC-REC-051"
+   ],
+   "buttons": {
+    "Save tracking": [
+     "EC-REC-049",
+     "EC-REC-051"
+    ]
+   }
+  },
+  "candidate-credential": {
+   "cases": [
+    "EC-REC-049",
+    "EC-REC-051"
+   ],
+   "buttons": {
+    "Send credential request": [
+     "EC-REC-049",
+     "EC-REC-051"
+    ]
+   }
+  },
+  "candidate-erase": {
+   "cases": [
+    "EC-REC-052"
+   ],
+   "buttons": {
+    "Erase personal details": [
+     "EC-REC-052"
+    ]
+   }
+  },
+  "candidate-commercial": {
+   "cases": [
+    "EC-REC-049",
+    "EC-REC-050",
+    "EC-REC-051"
+   ],
+   "buttons": {
+    "Approve commercials": [
+     "EC-REC-049",
+     "EC-REC-050"
+    ],
+    "Revise approved commercials": [
+     "EC-REC-049"
+    ],
+    "Record actual (mode actual)": "not shown to any test user: needs a billed and paid placement (Money data)"
+   }
+  },
+  "candidate-link-person": {
+   "cases": [
+    "EC-REC-054"
+   ],
+   "buttons": {
+    "Link as the same person": [
+     "EC-REC-054"
+    ]
+   }
+  },
+  "candidate-link-pro": {
+   "cases": [
+    "EC-REC-054"
+   ],
+   "buttons": {
+    "Confirm marketplace match": [
+     "EC-REC-054"
+    ]
+   }
+  },
+  "candidate-unlink-pro": {
+   "cases": [
+    "EC-REC-054"
+   ],
+   "buttons": {
+    "Remove match": [
+     "EC-REC-054"
+    ]
+   }
+  },
+  "hiring-requests": {
+   "cases": [
+    "EC-REC-001",
+    "EC-REC-009",
+    "EC-REC-059"
+   ],
+   "buttons": {
+    "+ New request": [
+     "EC-REC-001"
+    ],
+    "Requisitions →": "navigation only",
+    "(row)": "navigation only"
+   }
+  },
+  "hiring-request": {
+   "cases": [
+    "EC-REC-001",
+    "EC-REC-002",
+    "EC-REC-003",
+    "EC-REC-004",
+    "EC-REC-005",
+    "EC-REC-006",
+    "EC-REC-007",
+    "EC-REC-008",
+    "EC-REC-010"
+   ],
+   "buttons": {
+    "Create request / Save draft": [
+     "EC-REC-001",
+     "EC-REC-006"
+    ],
+    "Submit for approval →": [
+     "EC-REC-001",
+     "EC-REC-005"
+    ],
+    "Approve": [
+     "EC-REC-001",
+     "EC-REC-003",
+     "EC-REC-004"
+    ],
+    "Reject": [
+     "EC-REC-004"
+    ],
+    "Reopen": [
+     "EC-REC-005"
+    ],
+    "Cancel this request": [
+     "EC-REC-005"
+    ],
+    "Start recruiting": [
+     "EC-REC-007",
+     "EC-REC-010"
+    ],
+    "Propose this change": [
+     "EC-REC-008"
+    ],
+    "+ Add another line / ×": "navigation only (adds a row on the form)",
+    "→ Hiring request (from costing)": [
+     "EC-REC-010"
+    ]
+   }
+  },
+  "approval-delegations": {
+   "cases": [
+    "EC-REC-042",
+    "EC-REC-043"
+   ],
+   "buttons": {
+    "Add delegation": [
+     "EC-REC-042",
+     "EC-REC-043"
+    ],
+    "Revoke": [
+     "EC-REC-042"
+    ],
+    "tabs (Recruitment, Sales, Expense vouchers …)": "navigation only"
+   }
+  },
+  "requisitions": {
+   "cases": [
+    "EC-REC-039"
+   ],
+   "buttons": {
+    "Search": [
+     "EC-REC-039"
+    ],
+    "➕ New requisition": [
+     "EC-REC-038"
+    ],
+    "Open": "navigation only"
+   }
+  },
+  "requisition": {
+   "cases": [
+    "EC-REC-011",
+    "EC-REC-012",
+    "EC-REC-035",
+    "EC-REC-036",
+    "EC-REC-039"
+   ],
+   "buttons": {
+    "No longer needed": [
+     "EC-REC-036"
+    ],
+    "Add source": [
+     "EC-REC-035"
+    ],
+    "Link position": "not shown to any test user with positions linked to this requisition — positions created later (EC-REC-048); existing SCR-requisition",
+    "🧑‍🏭 Post this to the Marketplace": "not shown to any test user: Marketplace off on the copy (Marketplace helper area)",
+    "Edit": [
+     "EC-REC-037"
+    ],
+    "Add candidates →": "navigation only",
+    "Best matches → Open": [
+     "EC-REC-013",
+     "EC-REC-018"
+    ]
+   }
+  },
+  "requisition-new": {
+   "cases": [
+    "EC-REC-038"
+   ],
+   "buttons": {
+    "➕ New requisition": [
+     "EC-REC-038"
+    ]
+   }
+  },
+  "requisition-edit": {
+   "cases": [
+    "EC-REC-037"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-REC-037"
+    ],
+    "Step 1–5 tabs": "navigation only",
+    "+ Add group": [
+     "EC-REC-037"
+    ]
+   }
+  },
+  "requisition-allocations": {
+   "cases": [
+    "EC-REC-035"
+   ],
+   "buttons": {
+    "Add source": [
+     "EC-REC-035"
+    ],
+    "Change": [
+     "EC-REC-035"
+    ],
+    "Give back": [
+     "EC-REC-035"
+    ]
+   }
+  },
+  "recruitment": {
+   "cases": [
+    "EC-REC-040",
+    "EC-REC-041"
+   ],
+   "buttons": {
+    "Financial year": [
+     "EC-REC-040"
+    ],
+    "Month": [
+     "EC-REC-040"
+    ],
+    "Department": [
+     "EC-REC-040"
+    ],
+    "Source type": [
+     "EC-REC-040"
+    ],
+    "Hiring manager / recruiter": [
+     "EC-REC-040"
+    ],
+    "＋ New hiring request": [
+     "EC-REC-001"
+    ],
+    "＋ Add candidate": "navigation only",
+    "⬇️ Export ▾": [
+     "EC-REC-041"
+    ],
+    "Requisitions / Hiring requests / Candidates / 🧮 Project costing": "navigation only"
+   }
+  },
+  "recruitment-cc": {
+   "cases": [
+    "EC-REC-040"
+   ],
+   "buttons": {
+    "filters (same as Recruitment home)": [
+     "EC-REC-040"
+    ]
+   }
+  },
+  "candidate-pool": {
+   "cases": [
+    "EC-REC-053"
+   ],
+   "buttons": {
+    "(read-only page)": [
+     "EC-REC-053"
+    ]
+   }
+  },
+  "req-ai-extract": {
+   "cases": [
+    "EC-REC-057"
+   ],
+   "buttons": {
+    "Read with AI": [
+     "EC-REC-057"
+    ]
+   }
+  },
+  "recruit-config": {
+   "cases": [
+    "EC-REC-055"
+   ],
+   "buttons": {
+    "Save engagement mode": [
+     "EC-REC-055"
+    ]
+   }
+  },
+  "client-contacts": {
+   "cases": [
+    "EC-REC-056"
+   ],
+   "buttons": {
+    "(Reports-to picker fill)": [
+     "EC-REC-056"
+    ]
+   }
+  },
+  "recruit-export": {
+   "cases": [
+    "EC-REC-041",
+    "EC-REC-032"
+   ],
+   "buttons": {
+    "Candidates": [
+     "EC-REC-041",
+     "EC-REC-032"
+    ],
+    "Requisitions": [
+     "EC-REC-041"
+    ],
+    "Offers": [
+     "EC-REC-041"
+    ],
+    "Funnel & KPI summary": [
+     "EC-REC-041"
+    ]
+   }
+  },
+  "careers-admin": {
+   "cases": [
+    "EC-REC-044",
+    "EC-REC-045",
+    "EC-REC-047"
+   ],
+   "buttons": {
+    "Save settings": [
+     "EC-REC-044"
+    ],
+    "Save posting defaults": [
+     "EC-REC-044"
+    ],
+    "Save (opening)": [
+     "EC-REC-044"
+    ],
+    "✨ Generate": [
+     "EC-REC-045"
+    ],
+    "Open public page ↗": "navigation only"
+   }
+  },
+  "jd-generate": {
+   "cases": [
+    "EC-REC-045",
+    "EC-REC-046"
+   ],
+   "buttons": {
+    "✨ Generate": [
+     "EC-REC-045",
+     "EC-REC-046"
+    ]
+   }
+  },
+  "cert-add": {
+   "cases": [
+    "EC-REC-058"
+   ],
+   "buttons": {
+    "+ Add certificate": [
+     "EC-REC-058"
+    ]
+   }
+  },
+  "positions-import": {
+   "cases": [
+    "EC-REC-048"
+   ],
+   "buttons": {
+    "Read & preview": [
+     "EC-REC-048"
+    ],
+    "✓ Confirm & import": [
+     "EC-REC-048"
+    ],
+    "Download the template": "navigation only"
+   }
+  },
+  "portal-users": {
+   "cases": [
+    "EC-DIR-001",
+    "EC-DIR-002",
+    "EC-DIR-003",
+    "EC-DIR-006"
+   ],
+   "buttons": {
+    "Switch it on": [
+     "EC-DIR-001"
+    ],
+    "Switch it off": [
+     "EC-DIR-009"
+    ],
+    "Create the invitation": [
+     "EC-DIR-001",
+     "EC-DIR-002"
+    ],
+    "Change": [
+     "EC-DIR-004"
+    ],
+    "Withdraw": [
+     "EC-DIR-005"
+    ],
+    "New link": [
+     "EC-DIR-003"
+    ],
+    "Accept & raise the call / Just acknowledge / Decline": [
+     "EC-DIR-006"
+    ]
+   }
+  },
+  "portal-user-toggle": {
+   "cases": [
+    "EC-DIR-005",
+    "EC-DIR-003"
+   ],
+   "buttons": {
+    "Withdraw": [
+     "EC-DIR-005"
+    ],
+    "Restore": [
+     "EC-DIR-005"
+    ]
+   }
+  },
+  "portal-user-reinvite": {
+   "cases": [
+    "EC-DIR-003"
+   ],
+   "buttons": {
+    "New link": [
+     "EC-DIR-003"
+    ]
+   }
+  },
+  "portal-user-perms": {
+   "cases": [
+    "EC-DIR-004"
+   ],
+   "buttons": {
+    "Full access — a main contact": [
+     "EC-DIR-004"
+    ],
+    "Quality / technical": [
+     "EC-DIR-004"
+    ],
+    "Commercial / purchasing": [
+     "EC-DIR-004"
+    ],
+    "Accounts — invoices only": [
+     "EC-DIR-004"
+    ],
+    "Read only": [
+     "EC-DIR-004"
+    ],
+    "Save": [
+     "EC-DIR-004"
+    ],
+    "Cancel": [
+     "EC-DIR-004"
+    ]
+   }
+  },
+  "vendor-users": {
+   "cases": [
+    "EC-DIR-007"
+   ],
+   "buttons": {
+    "Create the invitation": [
+     "EC-DIR-007"
+    ],
+    "Withdraw": [
+     "EC-DIR-007"
+    ],
+    "New link": [
+     "EC-DIR-007"
+    ]
+   }
+  },
+  "vendor-user-toggle": {
+   "cases": [
+    "EC-DIR-007"
+   ],
+   "buttons": {
+    "Withdraw": [
+     "EC-DIR-007"
+    ],
+    "Restore": [
+     "EC-DIR-007"
+    ]
+   }
+  },
+  "vendor-user-reinvite": {
+   "cases": [
+    "EC-DIR-007"
+   ],
+   "buttons": {
+    "New link": [
+     "EC-DIR-007"
+    ]
+   }
+  },
+  "vendor-settings": {
+   "cases": [
+    "EC-DIR-009"
+   ],
+   "buttons": {
+    "Switch it on": [
+     "EC-DIR-009"
+    ],
+    "Switch it off": [
+     "EC-DIR-009"
+    ]
+   }
+  },
+  "vendor-share": {
+   "cases": [
+    "EC-DIR-008"
+   ],
+   "buttons": {
+    "Share": [
+     "EC-DIR-008"
+    ],
+    "Stop sharing": [
+     "EC-DIR-008"
+    ]
+   }
+  },
+  "portal-settings": {
+   "cases": [
+    "EC-DIR-001",
+    "EC-DIR-009"
+   ],
+   "buttons": {
+    "Switch it on": [
+     "EC-DIR-001"
+    ],
+    "Switch it off": [
+     "EC-DIR-009"
+    ]
+   }
+  },
+  "portal-request": {
+   "cases": [
+    "EC-DIR-006"
+   ],
+   "buttons": {
+    "Accept & raise the call": [
+     "EC-DIR-006"
+    ],
+    "Just acknowledge": [
+     "EC-DIR-006"
+    ],
+    "Decline": [
+     "EC-DIR-006"
+    ]
+   }
+  },
+  "masters": {
+   "cases": [
+    "EC-DIR-015"
+   ],
+   "buttons": {
+    "tiles (Records, Dropdown lists, Extra fields)": "navigation only"
+   }
+  },
+  "work-norms": {
+   "cases": [
+    "EC-DIR-014"
+   ],
+   "buttons": {
+    "Save norm": [
+     "EC-DIR-014"
+    ],
+    "Remove": [
+     "EC-DIR-014"
+    ]
+   }
+  },
+  "activities": {
+   "cases": [
+    "EC-DIR-016"
+   ],
+   "buttons": {
+    "Find": [
+     "EC-DIR-016"
+    ],
+    "Apply (columns)": [
+     "EC-DIR-016"
+    ],
+    "Record it": [
+     "EC-DIR-016"
+    ]
+   }
+  },
+  "activity-add": {
+   "cases": [
+    "EC-DIR-016"
+   ],
+   "buttons": {
+    "Record it": [
+     "EC-DIR-016"
+    ]
+   }
+  },
+  "partner-import": {
+   "cases": [
+    "EC-DIR-017"
+   ],
+   "buttons": {
+    "Read the file": [
+     "EC-DIR-017"
+    ],
+    "Download the format": [
+     "EC-DIR-017"
+    ]
+   }
+  },
+  "partner-template": {
+   "cases": [
+    "EC-DIR-017"
+   ],
+   "buttons": {
+    "Download the format": [
+     "EC-DIR-017"
+    ]
+   }
+  },
+  "duplicates": {
+   "cases": [
+    "EC-DIR-018"
+   ],
+   "buttons": {
+    "Merge": [
+     "EC-DIR-018"
+    ]
+   }
+  },
+  "partner-contact": {
+   "cases": [
+    "EC-DIR-013",
+    "EC-REC-056"
+   ],
+   "buttons": {
+    "(automatic form fill)": [
+     "EC-DIR-013"
+    ]
+   }
+  },
+  "partner-address": {
+   "cases": [
+    "EC-DIR-013"
+   ],
+   "buttons": {
+    "(automatic form fill)": [
+     "EC-DIR-013"
+    ]
+   }
+  },
+  "partner-sites": {
+   "cases": [
+    "EC-DIR-013"
+   ],
+   "buttons": {
+    "(automatic form fill)": [
+     "EC-DIR-013"
+    ]
+   }
+  },
+  "partner-meta": {
+   "cases": [
+    "EC-DIR-013"
+   ],
+   "buttons": {
+    "(automatic form fill)": [
+     "EC-DIR-013"
+    ]
+   }
+  },
+  "partner-pos": {
+   "cases": [
+    "EC-DIR-013"
+   ],
+   "buttons": {
+    "(automatic form fill)": [
+     "EC-DIR-013"
+    ]
+   }
+  },
+  "partner-gaps": {
+   "cases": [
+    "EC-DIR-013"
+   ],
+   "buttons": {
+    "(automatic form fill)": [
+     "EC-DIR-013"
+    ]
+   }
+  },
+  "po-lines": {
+   "cases": [
+    "EC-DIR-013"
+   ],
+   "buttons": {
+    "(automatic form fill)": [
+     "EC-DIR-013"
+    ]
+   }
+  },
+  "contract-no-check": {
+   "cases": [
+    "EC-DIR-013"
+   ],
+   "buttons": {
+    "(contract number check)": [
+     "EC-DIR-013"
+    ]
+   }
+  }
+ }
+}

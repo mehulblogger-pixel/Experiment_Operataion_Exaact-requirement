@@ -1,0 +1,652 @@
+{
+ "routes": {
+  "site-docs": {
+   "cases": [
+    "EC-QUAB-067",
+    "EC-QUAB-075",
+    "EC-QUAB-076",
+    "EC-QUAB-073"
+   ],
+   "buttons": {
+    "+ Add new (client quick-add)": [
+     "EC-QUAB-075"
+    ],
+    "Running out list (display)": [
+     "EC-QUAB-067"
+    ]
+   }
+  },
+  "site-docs-add": {
+   "cases": [
+    "EC-QUAB-070",
+    "EC-QUAB-071",
+    "EC-QUAB-072",
+    "EC-QUAB-073"
+   ],
+   "buttons": {
+    "Add it": [
+     "EC-QUAB-070",
+     "EC-QUAB-071",
+     "EC-QUAB-072",
+     "EC-QUAB-073"
+    ],
+    "blocks the allocation (tick)": [
+     "EC-QUAB-071",
+     "EC-QUAB-073"
+    ]
+   }
+  },
+  "site-docs-delete": {
+   "cases": [
+    "EC-QUAB-074"
+   ],
+   "buttons": {
+    "Remove": [
+     "EC-QUAB-074"
+    ]
+   }
+  },
+  "internal-audits": {
+   "cases": [
+    "EC-QUAB-001",
+    "EC-QUAB-007",
+    "EC-QUAB-011",
+    "EC-QUAB-015",
+    "EC-QUAB-019",
+    "EC-QUAB-020",
+    "EC-QUAB-023",
+    "EC-QUAB-024"
+   ],
+   "buttons": {
+    "Plan one": [
+     "EC-QUAB-006",
+     "EC-QUAB-023"
+    ],
+    "Management reviews": [
+     "EC-QUAB-001"
+    ],
+    "Audit ref link": "navigation only",
+    "Clause pills (display)": [
+     "EC-QUAB-020"
+    ],
+    "Save (The cycle)": [
+     "EC-QUAB-021",
+     "EC-QUAB-022"
+    ]
+   }
+  },
+  "internal-audit": {
+   "cases": [
+    "EC-QUAB-006",
+    "EC-QUAB-012",
+    "EC-QUAB-015",
+    "EC-QUAB-016",
+    "EC-QUAB-023"
+   ],
+   "buttons": {
+    "← Back": "navigation only",
+    "CAPA link": "navigation only"
+   }
+  },
+  "internal-audit-new": {
+   "cases": [
+    "EC-QUAB-002",
+    "EC-QUAB-003",
+    "EC-QUAB-004",
+    "EC-QUAB-005",
+    "EC-QUAB-006",
+    "EC-QUAB-023",
+    "EC-QUAB-025"
+   ],
+   "buttons": {
+    "Plan it": [
+     "EC-QUAB-002",
+     "EC-QUAB-003",
+     "EC-QUAB-004",
+     "EC-QUAB-005",
+     "EC-QUAB-006",
+     "EC-QUAB-025"
+    ],
+    "Cancel": [
+     "EC-QUAB-006"
+    ],
+    "← Back": "navigation only"
+   }
+  },
+  "audit-record": {
+   "cases": [
+    "EC-QUAB-007",
+    "EC-QUAB-008",
+    "EC-QUAB-009",
+    "EC-QUAB-017",
+    "EC-QUAB-020"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-QUAB-007",
+     "EC-QUAB-008",
+     "EC-QUAB-009",
+     "EC-QUAB-017",
+     "EC-QUAB-020"
+    ]
+   }
+  },
+  "audit-finding-add": {
+   "cases": [
+    "EC-QUAB-010",
+    "EC-QUAB-011",
+    "EC-QUAB-016"
+   ],
+   "buttons": {
+    "Add": [
+     "EC-QUAB-010",
+     "EC-QUAB-011",
+     "EC-QUAB-016"
+    ]
+   }
+  },
+  "audit-finding-delete": {
+   "cases": [
+    "EC-QUAB-018",
+    "EC-QUAB-019"
+   ],
+   "buttons": {
+    "Remove": [
+     "EC-QUAB-018",
+     "EC-QUAB-019"
+    ]
+   }
+  },
+  "audit-finding-capa": {
+   "cases": [
+    "EC-QUAB-013",
+    "EC-QUAB-014"
+   ],
+   "buttons": {
+    "Raise a corrective action": [
+     "EC-QUAB-013",
+     "EC-QUAB-014"
+    ]
+   }
+  },
+  "audit-close": {
+   "cases": [
+    "EC-QUAB-012",
+    "EC-QUAB-015"
+   ],
+   "buttons": {
+    "Close IA-…": [
+     "EC-QUAB-012",
+     "EC-QUAB-015"
+    ]
+   }
+  },
+  "audit-settings": {
+   "cases": [
+    "EC-QUAB-021",
+    "EC-QUAB-022"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-QUAB-021",
+     "EC-QUAB-022"
+    ]
+   }
+  },
+  "management-reviews": {
+   "cases": [
+    "EC-QUAB-030",
+    "EC-QUAB-039",
+    "EC-QUAB-042",
+    "EC-QUAB-043"
+   ],
+   "buttons": {
+    "← Internal audits": "navigation only",
+    "Review ref link": "navigation only"
+   }
+  },
+  "management-review": {
+   "cases": [
+    "EC-QUAB-032",
+    "EC-QUAB-033",
+    "EC-QUAB-040"
+   ],
+   "buttons": {
+    "← Back": "navigation only",
+    "CAPA link": "navigation only"
+   }
+  },
+  "management-review-new": {
+   "cases": [
+    "EC-QUAB-031",
+    "EC-QUAB-043",
+    "EC-QUAB-044"
+   ],
+   "buttons": {
+    "Open it": [
+     "EC-QUAB-031",
+     "EC-QUAB-043",
+     "EC-QUAB-044"
+    ]
+   }
+  },
+  "review-refresh": {
+   "cases": [
+    "EC-QUAB-034"
+   ],
+   "buttons": {
+    "Re-count from the system": [
+     "EC-QUAB-034"
+    ]
+   }
+  },
+  "review-header": {
+   "cases": [
+    "EC-QUAB-041"
+   ],
+   "buttons": {
+    "Save & re-count": [
+     "EC-QUAB-041"
+    ]
+   }
+  },
+  "review-input": {
+   "cases": [
+    "EC-QUAB-035"
+   ],
+   "buttons": {
+    "Save (per input)": [
+     "EC-QUAB-035"
+    ]
+   }
+  },
+  "review-action-add": {
+   "cases": [
+    "EC-QUAB-036",
+    "EC-QUAB-038"
+   ],
+   "buttons": {
+    "Record it": [
+     "EC-QUAB-036"
+    ]
+   }
+  },
+  "review-action-done": {
+   "cases": [
+    "EC-QUAB-040",
+    "EC-QUAB-045"
+   ],
+   "buttons": {
+    "Done": [
+     "EC-QUAB-040",
+     "EC-QUAB-045"
+    ]
+   }
+  },
+  "review-complete": {
+   "cases": [
+    "EC-QUAB-037",
+    "EC-QUAB-039"
+   ],
+   "buttons": {
+    "Record MR-… as complete": [
+     "EC-QUAB-037",
+     "EC-QUAB-039"
+    ]
+   }
+  },
+  "review-action-capa": {
+   "cases": [
+    "EC-QUAB-038"
+   ],
+   "buttons": {
+    "🛠 Raise CAPA": [
+     "EC-QUAB-038"
+    ]
+   }
+  },
+  "identity": {
+   "cases": [
+    "EC-QUAB-050",
+    "EC-QUAB-051",
+    "EC-QUAB-066"
+   ],
+   "buttons": {
+    "🔎 Access review (DPO)": [
+     "EC-QUAB-063"
+    ],
+    "Agency-staff roster →": [
+     "EC-QUAB-064"
+    ],
+    "Person name (opens register, logged)": [
+     "EC-QUAB-051",
+     "EC-QUAB-057"
+    ],
+    "← Back": "navigation only"
+   }
+  },
+  "iddoc-add": {
+   "cases": [
+    "EC-QUAB-051",
+    "EC-QUAB-052",
+    "EC-QUAB-053",
+    "EC-QUAB-054",
+    "EC-QUAB-055",
+    "EC-QUAB-056"
+   ],
+   "buttons": {
+    "File it": [
+     "EC-QUAB-051",
+     "EC-QUAB-052",
+     "EC-QUAB-053",
+     "EC-QUAB-054",
+     "EC-QUAB-055",
+     "EC-QUAB-056"
+    ]
+   }
+  },
+  "iddoc-file": {
+   "cases": [
+    "EC-QUAB-059",
+    "EC-QUAB-060"
+   ],
+   "buttons": {
+    "File name link (download)": [
+     "EC-QUAB-059",
+     "EC-QUAB-060"
+    ]
+   }
+  },
+  "agency-staff": {
+   "cases": [
+    "EC-QUAB-064",
+    "EC-QUAB-065",
+    "EC-QUAB-066"
+   ],
+   "buttons": {
+    "Agency filter": [
+     "EC-QUAB-065"
+    ],
+    "Only those with papers missing": [
+     "EC-QUAB-064",
+     "EC-QUAB-065"
+    ],
+    "Clear": [
+     "EC-QUAB-064"
+    ],
+    "+ Add a person": "navigation only",
+    "Agencies →": "navigation only",
+    "change →": "navigation only",
+    "Documents": "navigation only",
+    "Name link": "navigation only"
+   }
+  },
+  "iddoc-reveal": {
+   "cases": [
+    "EC-QUAB-057",
+    "EC-QUAB-060"
+   ],
+   "buttons": {
+    "Reveal": [
+     "EC-QUAB-057",
+     "EC-QUAB-060"
+    ]
+   }
+  },
+  "iddoc-share": {
+   "cases": [
+    "EC-QUAB-058",
+    "EC-QUAB-060"
+   ],
+   "buttons": {
+    "Log it": [
+     "EC-QUAB-058",
+     "EC-QUAB-060"
+    ]
+   }
+  },
+  "iddoc-redact": {
+   "cases": [
+    "EC-QUAB-060"
+   ],
+   "buttons": {
+    "Redact now": [
+     "EC-QUAB-060"
+    ]
+   }
+  },
+  "iddoc-retention": {
+   "cases": [
+    "EC-QUAB-061",
+    "EC-QUAB-062"
+   ],
+   "buttons": {
+    "Save & sweep": [
+     "EC-QUAB-061",
+     "EC-QUAB-062"
+    ]
+   }
+  },
+  "iddoc-access": {
+   "cases": [
+    "EC-QUAB-063"
+   ],
+   "buttons": {
+    "Filter": [
+     "EC-QUAB-063"
+    ],
+    "← Register": "navigation only"
+   }
+  },
+  "competence": {
+   "cases": [
+    "EC-QUAB-080",
+    "EC-QUAB-090",
+    "EC-QUAB-096",
+    "EC-QUAB-086",
+    "EC-QUAB-087",
+    "EC-QUAB-088",
+    "EC-QUAB-084",
+    "EC-QUAB-085"
+   ],
+   "buttons": {
+    "Training watch name link": [
+     "EC-QUAB-090"
+    ],
+    "Matrix name link": [
+     "EC-QUAB-082"
+    ],
+    "Their record →": "navigation only",
+    "← Back": "navigation only"
+   }
+  },
+  "auth-add": {
+   "cases": [
+    "EC-QUAB-082",
+    "EC-QUAB-091"
+   ],
+   "buttons": {
+    "Grant": [
+     "EC-QUAB-082",
+     "EC-QUAB-091"
+    ]
+   }
+  },
+  "auth-status": {
+   "cases": [
+    "EC-QUAB-083"
+   ],
+   "buttons": {
+    "Apply": [
+     "EC-QUAB-083"
+    ]
+   }
+  },
+  "auth-enforce": {
+   "cases": [
+    "EC-QUAB-081",
+    "EC-QUAB-082",
+    "EC-QUAB-084",
+    "EC-QUAB-085",
+    "EC-QUAB-096"
+   ],
+   "buttons": {
+    "Switch enforcement on": [
+     "EC-QUAB-081",
+     "EC-QUAB-082",
+     "EC-QUAB-096"
+    ],
+    "Switch enforcement off": [
+     "EC-QUAB-096"
+    ]
+   }
+  },
+  "witness-add": {
+   "cases": [
+    "EC-QUAB-089",
+    "EC-QUAB-092"
+   ],
+   "buttons": {
+    "Record assessment": [
+     "EC-QUAB-089",
+     "EC-QUAB-092"
+    ],
+    "Grant an authorisation from this assessment (tick)": [
+     "EC-QUAB-089"
+    ]
+   }
+  },
+  "cert-verify": {
+   "cases": [
+    "EC-QUAB-093",
+    "EC-QUAB-094",
+    "EC-QUAB-096"
+   ],
+   "buttons": {
+    "Save (credential vault, Inspector 360)": [
+     "EC-QUAB-093",
+     "EC-QUAB-094"
+    ]
+   }
+  },
+  "credential-req-init": {
+   "cases": [
+    "EC-QUAB-095"
+   ],
+   "buttons": {
+    "Create the requirement register": [
+     "EC-QUAB-095"
+    ]
+   }
+  },
+  "equipment": {
+   "cases": [
+    "EC-QUAB-100",
+    "EC-QUAB-101",
+    "EC-QUAB-105",
+    "EC-QUAB-112"
+   ],
+   "buttons": {
+    "+ Add an instrument": [
+     "EC-QUAB-100",
+     "EC-QUAB-112"
+    ],
+    "Show retired": [
+     "EC-QUAB-105"
+    ],
+    "Hide retired": [
+     "EC-QUAB-105"
+    ],
+    "Code link": "navigation only"
+   }
+  },
+  "equip-new": {
+   "cases": [
+    "EC-QUAB-100",
+    "EC-QUAB-112"
+   ],
+   "buttons": {
+    "Add instrument": [
+     "EC-QUAB-100",
+     "EC-QUAB-112"
+    ],
+    "← Back": "navigation only"
+   }
+  },
+  "equip-edit": {
+   "cases": [
+    "EC-QUAB-105",
+    "EC-QUAB-109"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-QUAB-105",
+     "EC-QUAB-109"
+    ],
+    "Report / job links": "navigation only"
+   }
+  },
+  "equip-cal-add": {
+   "cases": [
+    "EC-QUAB-101",
+    "EC-QUAB-102",
+    "EC-QUAB-103",
+    "EC-QUAB-104"
+   ],
+   "buttons": {
+    "File certificate": [
+     "EC-QUAB-101",
+     "EC-QUAB-102",
+     "EC-QUAB-103",
+     "EC-QUAB-104"
+    ]
+   }
+  },
+  "equip-cal-del": {
+   "cases": [
+    "EC-QUAB-110"
+   ],
+   "buttons": {
+    "Remove (certificate)": [
+     "EC-QUAB-110"
+    ]
+   }
+  },
+  "equip-cert": {
+   "cases": [
+    "EC-QUAB-104"
+   ],
+   "buttons": {
+    "Certificate file link": [
+     "EC-QUAB-104"
+    ]
+   }
+  },
+  "report-equip-add": {
+   "cases": [
+    "EC-QUAB-106",
+    "EC-QUAB-107",
+    "EC-QUAB-108",
+    "EC-QUAB-111"
+   ],
+   "buttons": {
+    "Add (report page)": [
+     "EC-QUAB-106",
+     "EC-QUAB-107",
+     "EC-QUAB-108",
+     "EC-QUAB-111"
+    ]
+   }
+  },
+  "report-equip-del": {
+   "cases": [
+    "EC-QUAB-108"
+   ],
+   "buttons": {
+    "Remove (report page)": [
+     "EC-QUAB-108"
+    ]
+   }
+  }
+ }
+}

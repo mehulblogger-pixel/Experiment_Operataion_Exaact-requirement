@@ -1,0 +1,47 @@
+industry	settings	Admin	Industry
+industry-apply	settings	Admin	Industry apply
+notifications	admin		Notifications
+integrations	admin		Integrations
+system-status	admin		System status
+mis	reports	Insights	Mis
+reports	reports	Insights	Reports
+analytics	reports	Insights	Analytics
+analytics-kpis	reports	Insights	Analytics kpis
+analytics-kpi-edit	reports	Insights	Edit
+analytics-quality	reports	Insights	Analytics quality
+analytics-drill	reports	Insights	Analytics drill
+analytics-scorecard	reports	Insights	Analytics scorecard
+analytics-alerts	reports	Insights	Analytics alerts
+analytics-export	reports	Insights	Analytics export
+analytics-review	reports	Insights	Analytics review
+analytics-snapshot	reports	Insights	Analytics snapshot
+users	users	Admin	Users
+user-new	users	Admin	New
+user-edit	users	Admin	Edit
+hierarchy	users	Admin	Hierarchy
+org-template	users	Admin	Org template
+user-unlock	users	Admin	User unlock
+user-2fa-reset	users	Admin	User 2fa reset
+user-retire	users	Admin	User retire
+settings	settings	Admin	Settings
+access	settings	Admin	Access
+ai-settings	settings	Admin	Ai settings
+terminology	settings	Admin	Terminology
+form-designer	settings	Admin	Form designer
+form-designer-save	settings	Admin	Form designer save
+form-designer-field-add	settings	Admin	New
+form-designer-field-edit	settings	Admin	Edit
+form-designer-field-del	settings	Admin	Form designer field del
+form-designer-option-add	settings	Admin	New
+form-designer-option-del	settings	Admin	Form designer option del
+connect-capabilities	settings	Admin	Connect capabilities
+service-scope	settings	Admin	Service scope
+service-formats	settings	Admin	Service formats
+sla-targets	settings	Admin	Sla targets
+preflight	settings	Admin	Preflight
+trace-thread	settings	Admin	Trace thread
+trace-thread-remove	settings	Admin	Trace thread remove
+trace-audit	settings	Admin	Trace audit
+trace-audit-remove	settings	Admin	Trace audit remove
+packs-save	settings	Admin	Packs save
+reset-data	settings	Admin	Reset data
