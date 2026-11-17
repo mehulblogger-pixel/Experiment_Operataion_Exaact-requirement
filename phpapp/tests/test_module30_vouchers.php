@@ -14,12 +14,17 @@ t_ok(strpos($src, "\$route === 'voucher-quick-add'") !== false && strpos($src, "
     'the quick-add and receipt routes are dispatched');
 t_ok(strpos($src, "ensure_column('voucher_entries', 'receipt_data'") !== false,
     'per-line receipt storage is added (additive column)');
-t_ok(strpos($src, 'if (!can_edit_voucher($v)) { flash(voucher_lock_reason($v) ?: \'This month') !== false,
+// Expenses Phase 1 — quick-add now goes through exp_add_line(), which asks the
+// same lock (DRAFT-only, the claimant only, month freeze) plus the deadlines.
+$exl = file_get_contents(__DIR__ . '/../lib/expenses.php');
+t_ok(strpos($src, '[$ok, $msg, $cv] = exp_add_line($insId') !== false
+     && strpos($exl, "if ((\$p = exp_line_change_problem(\$v, \$date)) !== '') return [false, \$p, \$v];") !== false
+     && strpos($exl, "if (voucher_month_frozen(\$v)) return voucher_lock_reason(\$v);") !== false,
     'quick-add is gated by the edit lock (DRAFT-only / owner / not frozen)');
 t_ok(strpos($vv, '/voucher-quick-add') !== false && strpos($vv, 'name="receipt"') !== false,
     'the voucher screen shows the quick-add form with a receipt field');
 t_ok(strpos($vv, '/voucher-line-receipt?id=') !== false, 'lines with a receipt link to it');
-t_ok(strpos($jv, '/voucher?addjob=') !== false && strpos($jv, 'Log my expense') !== false,
+t_ok(strpos($jv, '/voucher-day?job=') !== false && strpos($jv, 'My expenses for this day') !== false,   // Expenses Phase 1 — on a closed day (V1)
     'the job screen bridges the assigned inspector to log an expense for that job');
 
 // Behavioural: replay the quick-add insert against a real DRAFT voucher.

@@ -57,7 +57,8 @@ $help = function ($r) {
 <div class="master-head">
   <div>
     <h1><?= e(ucfirst($vw)) ?> approvals</h1>
-    <p class="sub" style="margin:2px 0 0;max-width:760px">Who approves an expense <?= e($vw) ?> before it can be paid: the claimant's reporting line ("Reports to"), any role you add — a Business Director above a certain amount, for example — and Finance last. Each level has its own amount.</p>
+    <p class="sub" style="margin:2px 0 0;max-width:760px">Who approves an expense <?= e($vw) ?> before it can be paid: the claimant's reporting line ("Reports to"), any role you add — a Business Director above a certain amount, for example — and Finance last. Each level has its own amount.
+      <a href="/voucher-rules">Claim period, deadlines, expense types and bands →</a></p>
   </div>
 </div>
 

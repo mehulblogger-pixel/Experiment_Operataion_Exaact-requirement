@@ -540,8 +540,8 @@ function exp_day_plan($insId, $job, $date) {
         'km' => $prevTravel ? (float) $prevTravel['km'] : ($usual['km'] ?? 0),
         'mode_code' => $prevTravel ? (string) $prevTravel['mode_code'] : ($mode['code'] ?? ''),
         'reason' => $prevTravel ? (string) $prevTravel['km_reason'] : '',
-        'auto' => array_values(array_filter($per, fn($h) => exp_add_mode($h) === 'AUTO' && $h['_rate'] > 0)),
-        'tick' => array_values(array_filter($per, fn($h) => exp_add_mode($h) === 'TICK' && $h['_rate'] > 0)),
+        'auto' => array_values(array_filter($per, fn($h) => exp_add_mode($h) === 'AUTO' && $h['_rate'] > 0 && !exp_is_duplicate_day_allowance($insId, $date, $h['code'], (int) $job['id']))),
+        'tick' => array_values(array_filter($per, fn($h) => exp_add_mode($h) === 'TICK' && $h['_rate'] > 0 && !exp_is_duplicate_day_allowance($insId, $date, $h['code'], (int) $job['id']))),
         'ticked' => $prevTicks,
         'bills' => exp_allowed_heads($insId, $date, ['BILL', 'NOBILL'], 'JOB'),
         'claim' => $v, 'existing' => $existing, 'confirmed' => (bool) $existing,
@@ -571,15 +571,14 @@ function exp_day_check($insId, $job, $date, array $post) {
     foreach ($plan['auto'] as $h) $allow[] = ['code' => $h['code'], 'amount' => (float) $h['_rate'], 'source' => 'DAY', 'limit' => $h['_limit']];
     foreach ($plan['tick'] as $h)
         if (!empty($post['tick'][$h['code']])) $allow[] = ['code' => $h['code'], 'amount' => (float) $h['_rate'], 'source' => 'DAY', 'ticked' => 1, 'limit' => $h['_limit']];
-    foreach ($allow as $a)
-        if (exp_is_duplicate_day_allowance($insId, $date, $a['code'], (int) $job['id']))
-            return [exp_head($a['code'])['label'] . ' is already claimed for ' . fdate($date) . ' on another ' . Tl('job') . ' — one allowance per day.', null, []];
+    // One allowance per day: on a second job the same day it is not added again.
+    $allow = array_values(array_filter($allow, fn($a) => !exp_is_duplicate_day_allowance($insId, $date, $a['code'], (int) $job['id'])));
     return ['', $travel, $allow];
 }
 //  One allowance per day: a per-day allowance already on another job that day.
 function exp_is_duplicate_day_allowance($insId, $date, $code, $jobId) {
     return (int) ops_val("SELECT COUNT(*) FROM voucher_entries e JOIN vouchers v ON v.id=e.voucher_id
-                          WHERE v.inspector_id=? AND e.entry_date=? AND e.head_code=? AND COALESCE(e.job_id,0)<>?", [(int) $insId, $date, $code, (int) $jobId]) > 0;
+                          WHERE v.inspector_id=? AND e.entry_date=? AND e.head_code=? AND COALESCE(e.job_id,0)<>CAST(? AS SIGNED)", [(int) $insId, $date, $code, (int) $jobId]) > 0;
 }
 //  Confirm (or change) the day's expenses: travel + allowances, written to the
 //  claim's lines — never to `expenses`. Bills stay as they are. [ok, message, voucher].

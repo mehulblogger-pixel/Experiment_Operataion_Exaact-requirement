@@ -27,6 +27,6 @@ $ops = file_get_contents(__DIR__ . '/../lib/ops.php');
 t_ok(strpos($ops, 'already billed on invoice') !== false, 'the job-bill handler opens the existing invoice instead of a blank new one');
 
 // --- (b) voucher note field ---------------------------------------------------
-$vd = file_get_contents(__DIR__ . '/../views/ops/voucher_detail.php');
+$vd = file_get_contents(__DIR__ . '/../views/ops/voucher_detail.php') . file_get_contents(__DIR__ . '/../views/ops/voucher_grid.php');   // Expenses Phase 1 — the month sheet is a partial
 t_ok(preg_match('/name="[^"]*\[note\]"/', $vd) === 1, 'each voucher line has a note input');
 t_ok(strpos($ops, 'notes=?') !== false && strpos($ops, "\$r['note']") !== false, 'the voucher save persists the per-line note');

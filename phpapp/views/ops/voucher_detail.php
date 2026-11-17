@@ -174,7 +174,7 @@
 <?php // ---- The one action for this viewer ---- ?>
 <div class="panel vc-act-panel">
   <?php if ($v['status'] === 'SUBMITTED' && $curIdx !== null): ?>
-    <p class="vchain-wait"><strong><?= $iWaiting ? 'Waiting for you' : 'Waiting for' ?>:</strong> <?= e(vappr_waiting_text($progress)) ?></p>
+    <p class="vchain-wait"><strong>Waiting for:</strong> <?= e(vappr_waiting_text($progress)) ?><?= $iWaiting ? ' <span class="pill p-warn">your turn</span>' : '' ?></p>
     <?php if (($lv[$curIdx]['problem'] ?? '') !== ''): ?><div class="vchain-note warn" role="status">⚠ <?= e($lv[$curIdx]['problem']) ?></div><?php endif; ?>
   <?php elseif ($v['status'] === 'DRAFT' && $lv): ?>
     <p class="vchain-wait">It will go to: <strong><?= e($chainTxt) ?></strong></p>

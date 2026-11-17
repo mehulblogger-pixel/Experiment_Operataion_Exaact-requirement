@@ -8529,6 +8529,7 @@ function ops_vouchers($route, $method) {
                 }
             $bandDates = array_column(ops_all("SELECT DISTINCT COALESCE(effective_from,'') ef FROM inspector_allowances WHERE band_id=? ORDER BY ef DESC", [$bandId]) ?: [], 'ef');
         }
+        if (function_exists('nav_under')) nav_under('voucher-rules', 'admin', ['label' => 'Expense vouchers', 'url' => '/voucher-approvals']);
         view('ops/voucher_rules', ['rules' => exp_rules(), 'bands' => exp_bands(), 'band' => $band, 'bandRows' => $bandRows, 'bandDates' => $bandDates, 'asOf' => $asOf,
             'heads' => ops_all("SELECT * FROM expense_heads ORDER BY sort_order, id") ?: [], 'modes' => ops_all("SELECT * FROM travel_modes ORDER BY id") ?: [],
             'bandCount' => array_column(ops_all("SELECT band_id, COUNT(*) n FROM inspectors WHERE band_id IS NOT NULL GROUP BY band_id") ?: [], 'n', 'band_id')]);
