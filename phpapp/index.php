@@ -234,6 +234,7 @@ try {
     require __DIR__ . '/lib/areas.php';
     require __DIR__ . '/lib/navindex.php';
     require __DIR__ . '/lib/voucher_approval.php'; // branch batch R5 — expense voucher approval chain
+    require __DIR__ . '/lib/expenses.php';        // Expenses Phase 1 (owner, 17 Nov 2026) — periods, day close, bands, deadlines
     require __DIR__ . '/lib/approvals_hub.php';   // R-27 — one answer to "what needs me?"
     require __DIR__ . '/lib/approvals_setup.php'; // UAT 1.7.3 — and one answer to "where are the rules?"
     require __DIR__ . '/lib/nav.php';            // R-24 — where each screen sits (breadcrumbs, Back)

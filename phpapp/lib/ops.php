@@ -87,7 +87,10 @@ const CAND_AGENCY_SOURCES = ['SUBCON','HR_AGENCY'];
 // ---- Expense / voucher module (P1: masters & codes) ------------------------
 // How an expense head behaves. PER_KM = km × rate (rate from the travel mode /
 // inspector); BILL = actual amount from a receipt; ALLOWANCE = fixed/daily amount.
-const EXP_HEAD_TYPES = ['PER_KM'=>'Per-km (km × rate)','BILL'=>'Actual bill','ALLOWANCE'=>'Fixed allowance'];
+// Expenses Phase 1 (owner, 17 Nov 2026): five kinds. ALLOWANCE is the stored
+// value of the existing "fixed allowance" heads and reads as "per day".
+const EXP_HEAD_TYPES = ['PER_KM'=>'Per km (own vehicle — km × rate)','BILL'=>'Bill (amount + photo)','NOBILL'=>'No bill (amount + note, daily limit)',
+                        'PER_DAY'=>'Per day allowance','ALLOWANCE'=>'Per day allowance (older type)','MONTHLY'=>'Fixed per month'];
 const TRAVEL_BASIS = ['PER_KM'=>'Per km','ACTUAL'=>'Actual (ticket / bill)'];
 // Seed rows for the monthly "Statement of Travelling Expenses" columns.
 const EXPENSE_HEADS_SEED = [
@@ -3234,14 +3237,18 @@ function ops_masters() {
             'fields' => [
                 ['code','Code','text',['req'=>1]],
                 ['label','Heading (column title)','text',['req'=>1]],
-                ['head_type','Type','select',['opts'=>EXP_HEAD_TYPES]],
-                ['default_rate','Default rate / amount (₹)','money',[]],
-                ['needs_receipt','Needs a receipt / bill','check',[]],
+                ['head_type','Kind','select',['opts'=>EXP_HEAD_TYPES]],
+                // Expenses Phase 1 — "job days" or "not for a job" (switched on per band / person), and
+                // for a per-day allowance: added by itself on every closed day, or when he ticks it.
+                ['scope','For','select',['opts'=>EXP_SCOPES]],
+                ['add_mode','Per day: how it is added','select',['opts'=>[''=>'— not a per-day type / when he ticks it —'] + EXP_ADDMODES]],
+                ['default_rate','Default rate / amount (₹) — leave 0 and set amounts per band','money',[]],
+                ['needs_receipt','Photo of the bill needed before submit','check',[]],
                 ['sort_order','Column order','number',[]],
                 ['active','Active','check',[]],
             ],
-            'list' => ['code'=>'Code','label'=>'Heading','head_type'=>'Type','default_rate'=>'Rate','needs_receipt'=>'Receipt?','sort_order'=>'Order'],
-            'list_labels' => ['head_type'=>EXP_HEAD_TYPES],
+            'list' => ['code'=>'Code','label'=>'Heading','head_type'=>'Kind','scope'=>'For','add_mode'=>'Per day','needs_receipt'=>'Photo?','active'=>'On','sort_order'=>'Order'],
+            'list_labels' => ['head_type'=>EXP_HEAD_TYPES,'scope'=>EXP_SCOPES,'add_mode'=>['AUTO'=>'by itself','TICK'=>'when ticked',''=>'']],
             'money_cols' => ['default_rate'],
         ],
         'travel-modes' => [
@@ -3992,7 +3999,7 @@ function ops_dispatch($route, $method) {
             ops_require(is_coordinator_level());
             if ($method === 'POST' && function_exists('recruit_ai_extract')) { recruit_ai_extract(); return true; }
             header('Content-Type: application/json'); echo json_encode(['ok' => false, 'error' => 'POST only']); return true;
-        case $route === 'vouchers' || $route === 'voucher' || $route === 'voucher-generate' || $route === 'voucher-entry' || $route === 'voucher-save' || $route === 'voucher-header' || $route === 'voucher-status' || $route === 'voucher-print' || $route === 'voucher-file' || $route === 'voucher-csv' || $route === 'voucher-quick-add' || $route === 'voucher-line-receipt':
+        case $route === 'vouchers' || $route === 'voucher' || $route === 'voucher-generate' || $route === 'voucher-entry' || $route === 'voucher-save' || $route === 'voucher-header' || $route === 'voucher-status' || $route === 'voucher-print' || $route === 'voucher-file' || $route === 'voucher-csv' || $route === 'voucher-quick-add' || $route === 'voucher-line-receipt' || $route === 'voucher-day' || $route === 'voucher-line' || $route === 'voucher-rules':
             ops_vouchers($route, $method); return true;
         case $route === 'my-jobs':
             ops_my_jobs(); return true;
@@ -5394,18 +5401,24 @@ function ops_inspectors($action, $method) {
 }
 // ---- Inspector entitlements (P2) — Super-Admin only ------------------------
 // Effective map of what an inspector may claim: ['HEAD'=>[code=>['allowed','rate']], 'MODE'=>[...]]
-function inspector_allow_map($insId) {
+// Expenses Phase 1: the person's own rows that apply on $date (the latest
+// effective-from on or before it, per code) — 'allowed' is 1 yes, 0 no,
+// -1 follows the band; plus their own limit.
+function inspector_allow_map($insId, $date = null) {
     $out = ['HEAD' => [], 'MODE' => []];
     if (!$insId) return $out;
-    foreach (ops_all("SELECT kind, code, allowed, rate_override FROM inspector_allowances WHERE inspector_id=?", [$insId]) as $r) {
-        $out[$r['kind']][$r['code']] = ['allowed' => (int)$r['allowed'], 'rate' => $r['rate_override']];
+    $date = $date ?: date('Y-m-d');
+    foreach (ops_all("SELECT kind, code, allowed, rate_override, limit_amount FROM inspector_allowances
+                      WHERE inspector_id=? AND (band_id IS NULL OR band_id=0) AND COALESCE(effective_from,'')<=?
+                      ORDER BY COALESCE(effective_from,''), id", [$insId, $date]) as $r) {
+        $out[$r['kind']][$r['code']] = ['allowed' => (int)$r['allowed'], 'rate' => $r['rate_override'], 'limit' => $r['limit_amount'] ?? null];
     }
     return $out;
 }
-// Effective per-km rate for a mode: the inspector's override, else the mode default.
-function inspector_mode_rate($insId, $modeCode) {
-    $ov = ops_val("SELECT rate_override FROM inspector_allowances WHERE inspector_id=? AND kind='MODE' AND code=? AND rate_override IS NOT NULL", [$insId, $modeCode]);
-    if ($ov !== null && $ov !== false && $ov !== '') return (float)$ov;
+// Effective per-km rate for a mode on a date: the person's row, else their
+// band's, else the mode's default rate (data in travel_modes, never code).
+function inspector_mode_rate($insId, $modeCode, $date = null) {
+    if (function_exists('exp_entitlement')) return (float)exp_entitlement($insId, 'MODE', $modeCode, $date)['rate'];
     return (float)(ops_val("SELECT default_rate FROM travel_modes WHERE code=?", [$modeCode]) ?: 0);
 }
 function inspector_head_allowed($insId, $code) {
@@ -5416,23 +5429,16 @@ function inspector_mode_allowed($insId, $code) {
 }
 // Save the entitlement grid (Super Admin only). Stores a row when allowed OR a
 // rate override is given; clears the inspector's set first so unticks are honoured.
+// Expenses Phase 1: the person's band and their own amounts, from an
+// "applies from" date. Rows saved for an earlier date stay, so an older claim
+// keeps the rate of its day (never overwrite history); the same date saved
+// twice is a correction of that date.
 function save_inspector_allowances($insId, $b) {
     if (!is_master() || !$insId) return;
-    $pdo = db();
-    $pdo->prepare("DELETE FROM inspector_allowances WHERE inspector_id=?")->execute([$insId]);
-    $ins = $pdo->prepare("INSERT INTO inspector_allowances (inspector_id,kind,code,allowed,rate_override) VALUES (?,?,?,?,?)");
-    foreach (ops_all("SELECT code FROM expense_heads") as $h) {
-        $code = $h['code'];
-        $allowed = !empty($b['allow_head'][$code]) ? 1 : 0;
-        $rate = (($b['head_rate'][$code] ?? '') !== '') ? (float)$b['head_rate'][$code] : null;
-        if ($allowed || $rate !== null) $ins->execute([$insId, 'HEAD', $code, $allowed, $rate]);
-    }
-    foreach (ops_all("SELECT code FROM travel_modes") as $m) {
-        $code = $m['code'];
-        $allowed = !empty($b['allow_mode'][$code]) ? 1 : 0;
-        $rate = (($b['mode_rate'][$code] ?? '') !== '') ? (float)$b['mode_rate'][$code] : null;
-        if ($allowed || $rate !== null) $ins->execute([$insId, 'MODE', $code, $allowed, $rate]);
-    }
+    if (array_key_exists('band_id', $b))
+        db()->prepare("UPDATE inspectors SET band_id=? WHERE id=?")->execute([(int)$b['band_id'] ?: null, $insId]);
+    $ef = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($b['allow_from'] ?? '')) ? $b['allow_from'] : date('Y-m-d');
+    exp_save_rows('person', $insId, $ef, exp_rows_from_post($b, false));
 }
 
 // Human labels for an inspector's stored Business Unit codes / skill ids / trade.
@@ -7810,7 +7816,10 @@ function voucher_finance_sees($v) {
 }
 function can_view_voucher($v) {
     return voucher_owner_is_me($v) || voucher_sees_all() || voucher_finance_sees($v)
-        || (function_exists('vappr_is_participant') && vappr_is_participant($v));
+        || (function_exists('vappr_is_participant') && vappr_is_participant($v))
+        // Expenses Phase 1 — a claim locked by a deadline, whose claimant asked
+        // their N+1 to reopen it, is waiting for that N+1 to act on it now.
+        || (function_exists('exp_reopen_waits_for_me') && exp_reopen_waits_for_me($v));
 }
 // "Pending" on the Operations home voucher tile (owner, 17 Nov 2026 — plan 29 A
 // and Q3: strictly own + chain). Master Admin / Admin: every draft or waiting
@@ -7828,8 +7837,13 @@ function voucher_pending_count_for_me() {
         return $n;
     } catch (Throwable $e) { return null; }
 }
+// Expenses Phase 1 — V2 (owner, 17 Nov 2026): "nobody edits someone else's
+// voucher". Only the claimant submits their own draft, and only before the
+// claim deadline (or within a reopen by their N+1). Administrators approve or
+// send back; they no longer submit somebody else's draft.
 function can_submit_voucher($v) {
-    return ($v['status'] ?? '') === 'DRAFT' && (voucher_owner_is_me($v) || voucher_sees_all());
+    if (($v['status'] ?? '') !== 'DRAFT' || !voucher_owner_is_me($v)) return false;
+    return !function_exists('exp_claim_lock') || exp_claim_lock($v) === '';
 }
 // C3 (owner, 16 Nov 2026) — Finance approves last and makes the payment, so
 // Finance marks an APPROVED voucher Paid; the Master Admin and an Admin may too.
@@ -7860,7 +7874,8 @@ function can_reopen_voucher($v) {
 // can_view_voucher() / can_edit_voucher() on the record itself.
 function voucher_route_owner_safe($route) {
     return in_array((string)$route, ['vouchers','voucher','voucher-generate','voucher-entry','voucher-save','voucher-header',
-        'voucher-status','voucher-print','voucher-file','voucher-csv','voucher-quick-add','voucher-line-receipt'], true);
+        'voucher-status','voucher-print','voucher-file','voucher-csv','voucher-quick-add','voucher-line-receipt',
+        'voucher-day','voucher-line'], true);   // Expenses Phase 1 — the day close and a claimant's own line
 }
 // A voucher is the timesheet the whole cost run is built on. Once the month has
 // been calculated and closed, changing a day behind it would make the stored
@@ -7882,9 +7897,14 @@ function voucher_lock_reason($v) {
          . 'and the costs already allocated were worked out from these days. '
          . 'Reopen the month first if a day really has to be corrected.';
 }
+// V2 (owner, 17 Nov 2026): only the claimant changes their own DRAFT — the
+// Master Admin and an Admin view every voucher, approve and send back, but no
+// longer edit somebody else's lines. The month freeze and the claim deadline
+// (Expenses Phase 1, E4) also lock it.
 function can_edit_voucher($v) {
     if (voucher_month_frozen($v)) return false;
-    return ($v['status'] === 'DRAFT') && (voucher_owner_is_me($v) || voucher_sees_all());
+    if (($v['status'] ?? '') !== 'DRAFT' || !voucher_owner_is_me($v)) return false;
+    return !function_exists('exp_claim_lock') || exp_claim_lock($v) === '';
 }
 
 // Build the month's day rows from the inspector's jobs (idempotent — skips days
@@ -7950,14 +7970,19 @@ function voucher_generate($v) {
 
 // Travel modes / expense heads this inspector may use (entitlement-limited; if
 // the Super Admin hasn't configured any, default to all active — usable out of the box).
-function voucher_modes_for($insId) {
-    if ((int)ops_val("SELECT COUNT(*) FROM inspector_allowances WHERE inspector_id=? AND kind='MODE'", [$insId]))
-        return ops_all("SELECT tm.* FROM travel_modes tm JOIN inspector_allowances a ON a.code=tm.code AND a.kind='MODE' AND a.allowed=1 WHERE a.inspector_id=? AND tm.active=1 ORDER BY tm.id", [$insId]);
+//  Expenses Phase 1 — read through exp_entitlement(): the person's own row for
+//  the date, else their band's, else (no band) today's rule — every active
+//  type until the person has ticked some, then only those.
+function voucher_modes_for($insId, $date = null) {
+    if (function_exists('exp_allowed_modes')) return array_map(fn($m) => array_diff_key($m, ['_rate' => 1, '_src' => 1]), exp_allowed_modes($insId, $date));
     return ops_all("SELECT * FROM travel_modes WHERE active=1 ORDER BY id");
 }
-function voucher_heads_for($insId) {
-    if ((int)ops_val("SELECT COUNT(*) FROM inspector_allowances WHERE inspector_id=? AND kind='HEAD'", [$insId])) {
-        $rows = ops_all("SELECT eh.* FROM expense_heads eh JOIN inspector_allowances a ON a.code=eh.code AND a.kind='HEAD' AND a.allowed=1 WHERE a.inspector_id=? AND eh.active=1 ORDER BY eh.sort_order, eh.id", [$insId]);
+function voucher_heads_for($insId, $date = null) {
+    $restrictive = function_exists('exp_person_restrictive') && !exp_person_band($insId) && exp_person_restrictive($insId, 'HEAD', $date ?: date('Y-m-d'));
+    if (function_exists('exp_allowed_heads')) {
+        $rows = array_map(fn($h) => array_diff_key($h, ['_rate' => 1, '_limit' => 1, '_src' => 1]), exp_allowed_heads($insId, $date));
+    } else $rows = ops_all("SELECT * FROM expense_heads WHERE active=1 ORDER BY sort_order, id");
+    if ($restrictive) {
         // Even under a narrow entitlement, every inspector needs somewhere to record
         // a genuine one-off — an incidental / miscellaneous expense the entitlement
         // list did not foresee. Always offer the catch-all "Others (specify)" head so
@@ -7967,14 +7992,12 @@ function voucher_heads_for($insId) {
             $other = ops_one("SELECT * FROM expense_heads WHERE code='OTHER' AND active=1");
             if ($other) $rows[] = $other;
         }
-    } else {
-        $rows = ops_all("SELECT * FROM expense_heads WHERE active=1 ORDER BY sort_order, id");
     }
     return array_values(array_filter($rows, fn($h) => $h['code'] !== 'KMTRAVEL')); // travel is computed from mode × km
 }
-function voucher_mode_rates($insId) {
+function voucher_mode_rates($insId, $date = null) {
     $out = [];
-    foreach (voucher_modes_for($insId) as $m) if ($m['basis'] === 'PER_KM') $out[$m['code']] = inspector_mode_rate($insId, $m['code']);
+    foreach (voucher_modes_for($insId, $date) as $m) if ($m['basis'] === 'PER_KM') $out[$m['code']] = inspector_mode_rate($insId, $m['code'], $date);
     return $out;
 }
 function vendor_km_lookup($insId, $vendorId) {
@@ -7985,6 +8008,9 @@ function vendor_km_remember($insId, $vendorId, $mode, $km) {
     if (!$insId || !$vendorId || $km <= 0) return;
     $pdo = db();
     $ex = ops_val("SELECT id FROM vendor_km_memory WHERE inspector_id=? AND vendor_id=?", [$insId, $vendorId]);
+    // Expenses Phase 1 — an APPROVED usual distance is changed only by the next
+    // approved claim (exp_on_approved), never by a draft being typed.
+    if ($ex && (int)ops_val("SELECT COALESCE(approved,0) FROM vendor_km_memory WHERE id=?", [$ex]) === 1) return;
     if ($ex) $pdo->prepare("UPDATE vendor_km_memory SET mode_code=?, km=? WHERE id=?")->execute([$mode, $km, $ex]);
     else $pdo->prepare("INSERT INTO vendor_km_memory (inspector_id,vendor_id,mode_code,km) VALUES (?,?,?,?)")->execute([$insId, $vendorId, $mode, $km]);
 }
@@ -8053,10 +8079,14 @@ function ops_vouchers($route, $method) {
         $waitIds = function_exists('voucher_waiting_on_me') ? array_map(fn($w) => (int)$w['id'], voucher_waiting_on_me()) : [];
         // An inspector who signs nobody's voucher keeps the short "My vouchers" page.
         $mine = is_field_inspector() && !$others;
-        $canCreate = voucher_sees_all();                  // a month's voucher FOR someone else
-        view('ops/voucher_list', ['rows' => $rows, 'mine' => $mine, 'waitIds' => $waitIds, 'canCreate' => $canCreate,
+        // V2 (owner, 17 Nov 2026): nobody opens a claim FOR someone else any more —
+        // every individual raises their own; administrators view, approve, send back.
+        // Expenses Phase 1 — a deadline reopen waiting for this N+1 is "your turn" too.
+        foreach ($rows as $r) if (function_exists('exp_reopen_waits_for_me') && exp_reopen_waits_for_me($r)) $waitIds[] = (int)$r['id'];
+        $nonJob = $myIns && function_exists('exp_allowed_heads') ? exp_allowed_heads($myIns, date('Y-m-d'), ['BILL', 'NOBILL'], 'NONJOB') : [];
+        view('ops/voucher_list', ['rows' => $rows, 'mine' => $mine, 'waitIds' => array_values(array_unique($waitIds)), 'canCreate' => false,
             'canOwn' => $myIns > 0, 'seesAll' => voucher_sees_all(), 'isFinance' => user_role() === 'FINANCE',
-            'inspectors' => $canCreate ? inspectors_list(false) : []]);
+            'inspectors' => [], 'nonJob' => $nonJob, 'myIns' => $myIns]);
         return;
     }
 
@@ -8066,19 +8096,21 @@ function ops_vouchers($route, $method) {
             // Your own month always (anyone linked to a team-member record);
             // somebody else's only for the Master Admin or an Admin (batch 2,
             // owner 17 Nov 2026: every individual raises their own).
-            $insId = (int)($_GET['ins'] ?? 0) ?: (int)my_inspector_id();
-            $month = preg_match('/^\d{4}-\d{2}$/', $_GET['month'] ?? '') ? $_GET['month'] : date('Y-m');
-            if (!$insId) { flash('Pick a ' . Tl('engineer') . ' first.', 'error'); redirect('/vouchers'); }
-            $forOther = $insId !== (int)my_inspector_id();
-            if ($forOther) ops_require(voucher_sees_all(), 'You can open only your own voucher.');
-            $v = ops_one("SELECT * FROM vouchers WHERE inspector_id=? AND month=?", [$insId, $month]);
-            if (!$v) {
-                // Raised for someone else, it belongs to the claimant's own office.
-                $vOffice = $forOther ? (ops_val("SELECT home_office_id FROM inspectors WHERE id=?", [$insId]) ?: null) : (current_user()['home_office_id'] ?? null);
-                $pdo->prepare("INSERT INTO vouchers (inspector_id,office_id,month,status,created_by,created_at) VALUES (?,?,?, 'DRAFT', ?,?)")
-                    ->execute([$insId, $vOffice, $month, user_name(current_user()), date('c')]);
-                $id = $pdo->lastInsertId();
-            } else { $id = $v['id']; }
+            // V2 (owner, 17 Nov 2026): your OWN claim only — nobody, the Master
+            // Admin included, opens one FOR someone else any more.
+            $insId = (int)my_inspector_id();
+            if (!$insId) { flash(inspector_link_msg(), 'error'); redirect('/vouchers'); }
+            if ((int)($_GET['ins'] ?? 0) && (int)$_GET['ins'] !== $insId) { flash('You can open only your own claim. Every person raises their own.', 'error'); redirect('/vouchers'); }
+            // Expenses Phase 1 — the claim holding a DATE (its period: weekly,
+            // fortnightly or monthly). ?month=YYYY-MM opens that month's claim
+            // (today's, in the current month).
+            $date = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['date'] ?? '')) ? $_GET['date'] : '';
+            if ($date === '') {
+                $month = preg_match('/^\d{4}-\d{2}$/', $_GET['month'] ?? '') ? $_GET['month'] : date('Y-m');
+                $date = $month === date('Y-m') ? date('Y-m-d') : $month . '-01';
+            }
+            $v = exp_claim_for($insId, $date, true);
+            $id = (int)$v['id'];
             // Module 30 — carry a job through so "log my expense for this job" lands on the
             // right month's voucher with the job pre-selected in the quick-add form.
             redirect('/voucher?id=' . $id . (isset($_GET['addjob']) ? '&addjob=' . (int)$_GET['addjob'] : ''));
@@ -8093,6 +8125,8 @@ function ops_vouchers($route, $method) {
         $v = ops_one("SELECT v.*, i.name inspector_name, i.emp_code, i.sbu FROM vouchers v LEFT JOIN inspectors i ON i.id=v.inspector_id WHERE v.id=?", [$id]);
         if (!$v) { http_response_code(404); view('notfound'); return; }
         ops_require(can_view_voucher($v), 'You cannot view this voucher.');
+        // Expenses Phase 1 — the claimant's own draft picks up the fixed-per-month types.
+        if (voucher_owner_is_me($v) && can_edit_voucher($v)) { exp_claim_refresh($v); $v = ops_one("SELECT v.*, i.name inspector_name, i.emp_code, i.sbu FROM vouchers v LEFT JOIN inspectors i ON i.id=v.inspector_id WHERE v.id=?", [$id]); }
         $entries = ops_all("SELECT * FROM voucher_entries WHERE voucher_id=? ORDER BY entry_date, id", [$id]);
         // Branch batch R5 — the chain decides who approves (lib/voucher_approval.php);
         // the buttons ask exactly the questions the server asks.
@@ -8103,7 +8137,29 @@ function ops_vouchers($route, $method) {
         $qaJobs = ops_all("SELECT j.id, j.job_code, bp.display_name client_name, bp.legal_name legal
                            FROM jobs j LEFT JOIN calls c ON c.id=j.call_id LEFT JOIN business_partners bp ON bp.id=c.client_id
                            WHERE j.inspector_id=? ORDER BY j.id DESC LIMIT 40", [(int)$v['inspector_id']]);
+        [$vps, $vpe] = voucher_period($v);
+        // Days of this period the claimant closed on their own jobs but has not yet
+        // confirmed (a coordinator closed the job, say) — offered on the claim.
+        $openDays = [];
+        if (can_edit_voucher($v)) {
+            $mine = (int)$v['inspector_id'];
+            $seen = []; foreach ($entries as $e) if ((int)$e['job_id']) $seen[$e['entry_date'] . '|' . (int)$e['job_id']] = 1;
+            foreach (ops_all("SELECT DISTINCT j.id FROM jobs j LEFT JOIN job_visits jv ON jv.job_id=j.id WHERE j.inspector_id=? OR jv.inspector_id=?", [$mine, $mine]) ?: [] as $jr) {
+                $jj = exp_job((int)$jr['id']); if (!$jj) continue;
+                foreach (exp_job_days($mine, $jj) as $d)
+                    if ($d >= $vps && $d <= $vpe && $d <= date('Y-m-d') && !isset($seen[$d . '|' . (int)$jj['id']]) && exp_day_problem($mine, $jj, $d) === '')
+                        $openDays[] = ['date' => $d, 'job' => $jj];
+            }
+        }
+        $nonJob = can_edit_voucher($v) ? exp_allowed_heads((int)$v['inspector_id'], $vps, ['BILL', 'NOBILL'], 'NONJOB') : [];
+        $legacyMonth = exp_is_legacy($v);
         view('ops/voucher_detail', ['v' => $v, 'entries' => $entries, 'canEdit' => can_edit_voucher($v),
+            'period' => [$vps, $vpe], 'legacyMonth' => $legacyMonth, 'openDays' => $openDays, 'nonJob' => $nonJob,
+            'warnings' => exp_warnings($v), 'groups' => exp_claim_groups($entries),
+            'submitProblems' => $v['status'] === 'DRAFT' ? exp_submit_problems($v) : [],
+            'claimLock' => $v['status'] === 'DRAFT' ? exp_claim_lock($v) : '', 'canAskReopen' => exp_can_ask_reopen($v),
+            'canDeadlineReopen' => exp_can_deadline_reopen($v), 'n1' => vappr_user(exp_n1_uid($v)),
+            'isOwner' => voucher_owner_is_me($v), 'rules' => exp_rules(),
             'leaveOpts' => lk_options_or('leave_type', LEAVE_TYPES), 'dayOpts' => lk_options_or('day_code', DAY_CODES),
             'heads' => voucher_heads_for($v['inspector_id']), 'modes' => voucher_modes_for($v['inspector_id']),
             'rates' => voucher_mode_rates($v['inspector_id']), 'sum' => voucher_summary($v['id']),
@@ -8119,8 +8175,11 @@ function ops_vouchers($route, $method) {
         $v = ops_one("SELECT * FROM vouchers WHERE id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$v) { http_response_code(404); view('notfound'); return; }
         ops_require(can_edit_voucher($v), voucher_lock_reason($v) ?: 'This voucher can no longer be edited.');
-        $pdo->prepare("UPDATE vouchers SET nature=?, advance=?, office_incurred=? WHERE id=?")
-            ->execute([$_POST['nature'] ?? '', (float)($_POST['advance'] ?? 0), (float)($_POST['office_incurred'] ?? 0), $v['id']]);
+        // E6 (owner, 17 Nov 2026): the advance is entered by Finance when it marks
+        // the claim paid — the claimant no longer types it, and the value already
+        // on the voucher is kept as it is.
+        $pdo->prepare("UPDATE vouchers SET nature=?, office_incurred=? WHERE id=?")
+            ->execute([$_POST['nature'] ?? '', (float)($_POST['office_incurred'] ?? 0), $v['id']]);
         if (!empty($_FILES['support']['tmp_name']) && (int)$_FILES['support']['error'] === 0) {
             if ((int)$_FILES['support']['size'] <= 6 * 1024 * 1024) {
                 $data = base64_encode(file_get_contents($_FILES['support']['tmp_name']));
@@ -8139,53 +8198,19 @@ function ops_vouchers($route, $method) {
     if ($route === 'voucher-quick-add' && $method === 'POST') {
         $insId = (int)($_POST['inspector_id'] ?? 0) ?: (int)my_inspector_id();
         $forOther = $insId !== (int)my_inspector_id();
-        if ($forOther) ops_require(voucher_sees_all(), 'You can add expenses only to your own voucher.');
-        if (!$insId) { flash('No inspector to log the expense against.', 'error'); redirect('/vouchers'); }
-        $month = preg_match('/^\d{4}-\d{2}$/', (string)($_POST['month'] ?? '')) ? $_POST['month'] : date('Y-m');
-        $v = ops_one("SELECT * FROM vouchers WHERE inspector_id=? AND month=?", [$insId, $month]);
-        if (!$v) {
-            $vOffice = $forOther ? (ops_val("SELECT home_office_id FROM inspectors WHERE id=?", [$insId]) ?: null) : (current_user()['home_office_id'] ?? null);
-            $pdo->prepare("INSERT INTO vouchers (inspector_id,office_id,month,status,created_by,created_at) VALUES (?,?,?, 'DRAFT', ?,?)")
-                ->execute([$insId, $vOffice, $month, user_name(current_user()), date('c')]);
-            $v = ops_one("SELECT * FROM vouchers WHERE id=?", [(int)$pdo->lastInsertId()]);
-        }
-        if (!can_edit_voucher($v)) { flash(voucher_lock_reason($v) ?: 'This month\'s voucher can no longer be edited — reopen it to add more.', 'error'); redirect('/voucher?id=' . $v['id']); }
-
-        $amount = round((float)($_POST['amount'] ?? 0), 2);
-        if ($amount <= 0) { flash('Enter the amount of the expense.', 'error'); redirect('/voucher?id=' . $v['id']); }
-        // Categorise: the chosen head if valid, else the "Others (specify)" catch-all every
-        // inspector always has, so a line is never uncategorised.
-        $heads = voucher_heads_for($insId); $headCodes = array_map(fn($h) => $h['code'], $heads);
-        $head = (string)($_POST['head'] ?? '');
-        if (!in_array($head, $headCodes, true)) { $head = in_array('OTHERS', $headCodes, true) ? 'OTHERS' : (string)($headCodes[count($headCodes) - 1] ?? 'OTHERS'); }
+        // V2 — your own claim only, whoever you are.
+        if ($forOther || !$insId) { flash('You can add expenses only to your own claim.', 'error'); redirect('/vouchers'); }
+        // Expenses Phase 1 — one line, through the same rules as the day close:
+        // a type your band / profile allows; on a job, only a day you closed on
+        // your own job; not for a job, only a type switched on for you (V1, E5);
+        // no repeat (date + type + amount) and no photo used twice.
         $date = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['entry_date'] ?? '')) ? $_POST['entry_date'] : date('Y-m-d');
-        $note = substr(trim((string)($_POST['note'] ?? '')), 0, 255);
-
-        // Optional job: pull its client/site/SBU so the line is tied to the work.
-        $jobId = (int)($_POST['job_id'] ?? 0); $sbu = ''; $site = '';
-        if ($jobId) {
-            $jr = ops_one("SELECT j.sbu, j.call_id, c.client_id, bp.display_name client_name FROM jobs j LEFT JOIN calls c ON c.id=j.call_id LEFT JOIN business_partners bp ON bp.id=c.client_id WHERE j.id=?", [$jobId]);
-            if ($jr) { $sbu = (string)($jr['sbu'] ?? ''); $site = (string)($jr['client_name'] ?? ''); }
-        }
-        // Optional receipt photo.
-        $rData = null; $rMime = ''; $rName = '';
-        if (!empty($_FILES['receipt']['tmp_name']) && (int)$_FILES['receipt']['error'] === 0) {
-            if ((int)$_FILES['receipt']['size'] > 6 * 1024 * 1024) { flash('The receipt is larger than 6 MB — please compress it.', 'error'); redirect('/voucher?id=' . $v['id']); }
-            $mime = (string)($_FILES['receipt']['type'] ?: 'application/octet-stream');
-            if (!in_array($mime, ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'], true)) { flash('Attach the receipt as a JPG, PNG, WebP or PDF.', 'error'); redirect('/voucher?id=' . $v['id']); }
-            $rData = base64_encode(file_get_contents($_FILES['receipt']['tmp_name'])); $rMime = $mime; $rName = substr((string)$_FILES['receipt']['name'], 0, 200);
-        }
-
-        $pdo->prepare("INSERT INTO voucher_entries (voucher_id,entry_date,day_type,job_id,sbu,site_label,amounts,row_total,notes,receipt_data,receipt_mime,receipt_name,is_auto)
-                       VALUES (?,?, 'WORK', ?,?,?,?,?,?,?,?,?,0)")
-            ->execute([$v['id'], $date, $jobId ?: null, $sbu, $site, json_encode([$head => $amount]), $amount, $note, $rData, $rMime, $rName]);
-        // Roll up the voucher total from ALL its lines (consistent with voucher-save).
-        $grand = (float)ops_val("SELECT COALESCE(SUM(row_total),0) FROM voucher_entries WHERE voucher_id=?", [$v['id']]);
-        $pdo->prepare("UPDATE vouchers SET total=? WHERE id=?")->execute([$grand, $v['id']]);
-        flash('Expense added to your ' . $month . ' ' . Tl('voucher') . ($rData ? ' with its receipt' : '') . '.');
-        redirect('/voucher?id=' . $v['id']);
+        [$ok, $msg, $cv] = exp_add_line($insId, (string)($_POST['head'] ?? ''), $_POST['amount'] ?? 0, $date, (int)($_POST['job_id'] ?? 0),
+                                        (string)($_POST['note'] ?? ''), $_FILES['receipt'] ?? null);
+        flash($msg, $ok ? 'success' : 'error');
+        if (!empty($_POST['back']) && preg_match('#^/voucher-day\?#', (string)$_POST['back'])) redirect((string)$_POST['back']);
+        redirect($cv ? '/voucher?id=' . (int)$cv['id'] : '/vouchers');
     }
-
     // Module 30 — serve a line's receipt to a permitted viewer only.
     if ($route === 'voucher-line-receipt') {
         $e = ops_one("SELECT * FROM voucher_entries WHERE id=?", [(int)($_GET['id'] ?? 0)]);
@@ -8251,7 +8276,10 @@ function ops_vouchers($route, $method) {
         ops_require(can_view_voucher($v), 'You cannot view this voucher.');
         $act = $_POST['action'] ?? '';
         if ($act === 'submit') {
-            ops_require(can_submit_voucher($v), 'Cannot submit this voucher.');
+            ops_require(can_submit_voucher($v), exp_claim_lock($v) ?: 'Only the person claiming submits their own claim.');
+            // Expenses Phase 1 — a bill needs its photo, a no-bill line its note.
+            $probs = exp_submit_problems($v);
+            if ($probs) { flash('Not submitted yet — ' . implode(' ', $probs), 'error'); redirect('/voucher?id=' . $v['id']); }
             // R5 — the submitter is recorded so approval can enforce maker != checker,
             // and a new round starts: every level approves again.
             $v = vappr_submit($v);
@@ -8261,6 +8289,9 @@ function ops_vouchers($route, $method) {
             ops_require($v['status'] === 'SUBMITTED', 'Only a submitted voucher can be approved.');
             // Maker != checker, the chain's order and delegation: vappr_can_act().
             [$ok, $msg] = vappr_approve($v, (string)($_POST['note'] ?? ''));
+            // Expenses Phase 1 — once the whole chain has approved, its distances
+            // become the usual distance for each site.
+            if ($ok && (string)ops_val("SELECT status FROM vouchers WHERE id=?", [(int)$v['id']]) === 'APPROVED') exp_on_approved($v);
             flash($msg, $ok ? 'success' : 'error');
         } elseif ($act === 'sendback') {
             ops_require($v['status'] === 'SUBMITTED', 'Only a submitted voucher can be sent back.');
@@ -8268,9 +8299,34 @@ function ops_vouchers($route, $method) {
             flash($msg, $ok ? 'success' : 'error');
         } elseif ($act === 'paid') {
             ops_require(can_mark_voucher_paid($v), 'Only Finance (or an administrator) marks an approved voucher paid.');
-            $pdo->prepare("UPDATE vouchers SET status='PAID' WHERE id=? AND status='APPROVED'")->execute([$v['id']]);
-            vappr_log($v, 'PAID');
-            flash('Voucher marked as paid.');
+            // E6 (owner, 17 Nov 2026) — Finance enters the advance already paid to the
+            // claimant when it marks the claim paid. Left blank, the advance on the
+            // voucher (an older one typed by the claimant) is kept as it is.
+            $adv = trim((string)($_POST['advance'] ?? ''));
+            if ($adv !== '' && (!is_numeric($adv) || (float)$adv < 0)) { flash('The advance must be an amount of 0 or more.', 'error'); redirect('/voucher?id=' . $v['id']); }
+            $advance = $adv === '' ? (float)$v['advance'] : round((float)$adv, 2);
+            $pdo->prepare("UPDATE vouchers SET status='PAID', advance=? WHERE id=? AND status='APPROVED'")->execute([$advance, $v['id']]);
+            vappr_log($v, 'PAID', '', '', 'Advance ' . cur_sym() . nf($advance, 2) . ' · paid ' . cur_sym() . nf((float)$v['total'] - $advance - (float)$v['office_incurred'], 2));
+            flash('Claim marked as paid.' . ($advance > 0 ? ' Advance of ' . cur_sym() . nf($advance, 0) . ' taken off.' : ''));
+        } elseif ($act === 'ask_reopen') {
+            // Expenses Phase 1 (E4) — past a deadline the claimant asks their N+1.
+            ops_require(exp_can_ask_reopen($v), 'There is nothing to reopen on this claim.');
+            $n1 = exp_n1_uid($v);
+            if (!$n1) { flash('You have no "Reports to" on your record, so nobody can reopen this claim. Ask an administrator to fill in "Reports to".', 'error'); redirect('/voucher?id=' . $v['id']); }
+            $pdo->prepare("UPDATE vouchers SET reopen_asked_at=? WHERE id=?")->execute([date('c'), $v['id']]);
+            vappr_log($v, 'REOPEN_ASKED', 'DEADLINE', 'asked ' . vappr_name(vappr_user($n1)) . ' (N+1) to reopen after a deadline', trim((string)($_POST['reason'] ?? '')));
+            flash('Asked ' . vappr_name(vappr_user($n1)) . ' to reopen your claim. You will be able to change it once they do.');
+        } elseif ($act === 'deadline_reopen') {
+            // Only the claimant's N+1, with a reason; logged. The existing reopen to
+            // DRAFT (no new status): the claim stays a DRAFT and is open again for
+            // the claim-deadline number of days from today.
+            ops_require(exp_can_deadline_reopen($v), 'Only the claimant\'s N+1 can reopen a claim after its deadline.');
+            $why = trim((string)($_POST['reason'] ?? ''));
+            if ($why === '') { flash('Say why you are reopening it — it is kept in the claim\'s history.', 'error'); redirect('/voucher?id=' . $v['id']); }
+            $r = exp_rules(); $until = exp_add_days(date('Y-m-d'), max(1, $r['claim_days']));
+            $pdo->prepare("UPDATE vouchers SET deadline_open_until=?, reopen_asked_at='' WHERE id=?")->execute([$until, $v['id']]);
+            vappr_log($v, 'REOPENED', 'DEADLINE', 'after a deadline, by N+1 — open until ' . fdate($until), $why);
+            flash('Reopened. ' . voucher_claimant_name($v) . ' can change and submit it until ' . fdate($until) . '.');
         } elseif ($act === 'reopen') {
             // Batch 2 (owner, 17 Nov 2026) — a PAID voucher is settled money: only the
             // Master Admin or an Admin reopens it. An APPROVED one: Finance (offices it
@@ -8341,7 +8397,16 @@ function ops_vouchers($route, $method) {
             $km = (float)($r['km'] ?? 0);
             $travel = round($km * (float)($rates[$mode] ?? 0), 2);
             $amounts = [];
-            foreach ($heads as $h) { $a = (float)($r['amt'][$h['code']] ?? 0); if ($a != 0) $amounts[$h['code']] = $a; }
+            // Fault found 17 Nov 2026: "Save all rows & totals" wiped an amount under
+            // a head that is not (or no longer) in this person's list — the form has
+            // no box for it, so it posted nothing. Keep every amount the form did not
+            // carry; replace only the ones it did.
+            $amounts = array_filter(expense_extra_decode($e['amounts'] ?? ''), fn($a) => (float)$a != 0);
+            foreach ($heads as $h) {
+                if (!array_key_exists($h['code'], (array)($r['amt'] ?? []))) continue;
+                $a = (float)($r['amt'][$h['code']] ?? 0);
+                if ($a != 0) $amounts[$h['code']] = $a; else unset($amounts[$h['code']]);
+            }
             $rowTotal = $travel + array_sum($amounts);
             $pdo->prepare("UPDATE voucher_entries SET hours=?, line_no=?, file_no=?, mode_code=?, km=?, travel_amount=?, amounts=?, row_total=?, notes=? WHERE id=? AND voucher_id=?")
                 ->execute([(float)($r['hours'] ?? 0), $r['line_no'] ?? '', $r['file_no'] ?? '', $mode, $km, $travel,
@@ -8352,6 +8417,117 @@ function ops_vouchers($route, $method) {
         $pdo->prepare("UPDATE vouchers SET total=? WHERE id=?")->execute([$grand, $v['id']]);
         flash('Voucher saved. Total ₹' . nf($grand, 0) . '.');
         redirect('/voucher?id=' . $v['id']);
+    }
+
+    // ---- Expenses Phase 1 — screen 1, "Today's expenses" -----------------------
+    //  GET shows the day: travel at the usual distance × his rate, the per-day
+    //  allowances (by themselves, or tick boxes), "Add a bill", the total. POST
+    //  confirms (or changes) it. Only the claimant, only his own allocated job,
+    //  only a day already closed (the job page / visit close bring him here).
+    if ($route === 'voucher-day') {
+        $insId = (int)my_inspector_id();
+        $jobId = (int)($_GET['job'] ?? $_POST['job'] ?? 0);
+        $date = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['date'] ?? $_POST['date'] ?? '')) ? ($_GET['date'] ?? $_POST['date']) : date('Y-m-d');
+        $job = exp_job($jobId);
+        if (!$job) { http_response_code(404); view('notfound'); return; }
+        ops_require($insId && exp_job_is_mine($insId, $job), 'Expenses go only on your own ' . Tlp('job') . ' — this one is not allocated to you.');
+        if ($method === 'POST') {
+            [$ok, $msg, $cv] = exp_day_confirm($insId, $jobId, $date, $_POST);
+            flash($msg, $ok ? 'success' : 'error');
+            redirect($ok && $cv ? '/voucher?id=' . (int)$cv['id'] : '/voucher-day?job=' . $jobId . '&date=' . $date);
+        }
+        $problem = exp_day_problem($insId, $job, $date);
+        $cv = exp_claim_for($insId, $date, false);
+        view('ops/voucher_day', ['job' => $job, 'date' => $date, 'plan' => exp_day_plan($insId, $job, $date), 'problem' => $problem,
+            'lock' => $cv ? exp_line_change_problem($cv, $date) : (exp_day_lock(['status' => 'DRAFT'], $date)),
+            'claim' => $cv, 'days' => exp_job_days($insId, $job), 'headLabels' => expense_head_label_map()]);
+        return;
+    }
+    // A claimant's own line: change the amount / note / photo of a bill line, or remove a line.
+    if ($route === 'voucher-line' && $method === 'POST') {
+        $e = ops_one("SELECT * FROM voucher_entries WHERE id=?", [(int)($_POST['id'] ?? $_GET['id'] ?? 0)]);
+        if (!$e) { http_response_code(404); view('notfound'); return; }
+        $v = ops_one("SELECT * FROM vouchers WHERE id=?", [(int)$e['voucher_id']]);
+        ops_require($v && can_view_voucher($v), 'You cannot view this claim.');
+        $back = '/voucher?id=' . (int)$v['id'];
+        if (($why = exp_line_change_problem($v, $e['entry_date'])) !== '') { flash($why, 'error'); redirect($back); }
+        $do = (string)($_POST['_do'] ?? '');
+        if ($do === 'del') {
+            $pdo->prepare("DELETE FROM voucher_entries WHERE id=? AND voucher_id=?")->execute([(int)$e['id'], (int)$v['id']]);
+            exp_recalc_total((int)$v['id']);
+            flash('Line removed.');
+        } elseif ($do === 'update') {
+            $h = exp_head((string)$e['head_code']);
+            if (!$h || !in_array(exp_kind($h), ['BILL', 'NOBILL'], true)) { flash('Change this day with "Change the day" — travel and allowances come from your band or profile.', 'error'); redirect($back); }
+            $amt = round((float)($_POST['amount'] ?? 0), 2); $note = trim((string)($_POST['note'] ?? ''));
+            if ($amt <= 0) { flash('Enter the amount.', 'error'); redirect($back); }
+            if (exp_kind($h) === 'NOBILL' && $note === '') { flash('A "no bill" expense needs a short note.', 'error'); redirect($back); }
+            if (exp_is_duplicate((int)$v['inspector_id'], $e['entry_date'], $h['code'], $amt, (int)$e['id'])) { flash('The same expense (date, type and amount) is already in your claim.', 'error'); redirect($back); }
+            [$d, $mime, $name, $hash, $prob] = exp_read_photo($_FILES['receipt'] ?? []);
+            if ($prob !== '') { flash($prob, 'error'); redirect($back); }
+            if ($d !== null && exp_photo_used($hash, (int)$e['id'])) { flash('This photo has already been used for another bill — each bill is claimed once.', 'error'); redirect($back); }
+            $pdo->prepare("UPDATE voucher_entries SET amounts=?, row_total=?, notes=? WHERE id=?")->execute([json_encode([$h['code'] => $amt]), $amt, substr($note, 0, 255), (int)$e['id']]);
+            if ($d !== null) $pdo->prepare("UPDATE voucher_entries SET receipt_data=?, receipt_mime=?, receipt_name=?, photo_hash=? WHERE id=?")->execute([$d, $mime, $name, $hash, (int)$e['id']]);
+            exp_recalc_total((int)$v['id']);
+            flash('Line updated.');
+        }
+        redirect($back);
+    }
+    // ---- Expenses Phase 1 — screens 6 and 7 (Master Admin): bands and claim rules
+    if ($route === 'voucher-rules') {
+        ops_require(exp_settings_can(), 'Only the Master Admin sets the expense rules and bands.');
+        $do = (string)($_POST['_do'] ?? '');
+        if ($method === 'POST' && $do === 'rules') {
+            $per = strtoupper((string)($_POST['period'] ?? 'MONTHLY'));
+            $nums = [['day_days', 'A day\'s deadline'], ['claim_days', 'The claim deadline'], ['km_tol', 'The distance tolerance']];
+            foreach ($nums as [$k, $lab]) {
+                $x = trim((string)($_POST[$k] ?? ''));
+                if ($x === '' || !is_numeric($x) || (float)$x < 0) { flash($lab . ' must be a number of 0 or more.', 'error'); redirect('/voucher-rules'); }
+            }
+            if (!isset(EXP_PERIODS[$per])) $per = 'MONTHLY';
+            setting_set('exp_claim_period', $per);
+            setting_set('exp_day_deadline_days', (string)(int)$_POST['day_days']);
+            setting_set('exp_claim_deadline_days', (string)(int)$_POST['claim_days']);
+            setting_set('exp_km_tolerance_pct', (string)round((float)$_POST['km_tol'], 2));
+            flash('Claim rules saved. New claims follow them; a claim already open keeps its own dates.');
+            redirect('/voucher-rules');
+        }
+        if ($method === 'POST' && $do === 'band_add') {
+            $name = trim((string)($_POST['name'] ?? ''));
+            if ($name === '') { flash('Give the band a name, e.g. "Field Inspector".', 'error'); redirect('/voucher-rules'); }
+            $pdo->prepare("INSERT INTO expense_bands (name, notes, sort_order, active, created_at) VALUES (?,?,?,1,?)")
+                ->execute([substr($name, 0, 100), substr(trim((string)($_POST['notes'] ?? '')), 0, 255), 100, date('c')]);
+            flash('Band "' . $name . '" added. Now set what it may claim.');
+            redirect('/voucher-rules?band=' . (int)$pdo->lastInsertId());
+        }
+        if ($method === 'POST' && $do === 'band_save') {
+            $bid = (int)($_POST['band_id'] ?? 0);
+            $band = ops_one("SELECT * FROM expense_bands WHERE id=?", [$bid]);
+            if (!$band) { flash('That band no longer exists.', 'error'); redirect('/voucher-rules'); }
+            $name = trim((string)($_POST['name'] ?? '')) ?: $band['name'];
+            $pdo->prepare("UPDATE expense_bands SET name=?, notes=?, active=? WHERE id=?")
+                ->execute([substr($name, 0, 100), substr(trim((string)($_POST['notes'] ?? '')), 0, 255), !empty($_POST['active']) ? 1 : 0, $bid]);
+            $ef = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['allow_from'] ?? '')) ? $_POST['allow_from'] : date('Y-m-d');
+            exp_save_rows('band', $bid, $ef, exp_rows_from_post($_POST, true));
+            flash('Band "' . $name . '" saved — these amounts apply from ' . fdate($ef) . '. Lines already confirmed keep their amounts.');
+            redirect('/voucher-rules?band=' . $bid);
+        }
+        $bandId = (int)($_GET['band'] ?? 0);
+        $band = $bandId ? ops_one("SELECT * FROM expense_bands WHERE id=?", [$bandId]) : null;
+        $asOf = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['on'] ?? '')) ? $_GET['on'] : date('Y-m-d');
+        $bandRows = ['HEAD' => [], 'MODE' => []]; $bandDates = [];
+        if ($band) {
+            foreach (['HEAD', 'MODE'] as $k)
+                foreach (ops_all("SELECT code FROM " . ($k === 'HEAD' ? 'expense_heads' : 'travel_modes')) ?: [] as $c) {
+                    $r = exp_ent_latest('band', $bandId, $k, $c['code'], $asOf);
+                    if ($r) $bandRows[$k][$c['code']] = $r;
+                }
+            $bandDates = array_column(ops_all("SELECT DISTINCT COALESCE(effective_from,'') ef FROM inspector_allowances WHERE band_id=? ORDER BY ef DESC", [$bandId]) ?: [], 'ef');
+        }
+        view('ops/voucher_rules', ['rules' => exp_rules(), 'bands' => exp_bands(), 'band' => $band, 'bandRows' => $bandRows, 'bandDates' => $bandDates, 'asOf' => $asOf,
+            'heads' => ops_all("SELECT * FROM expense_heads ORDER BY sort_order, id") ?: [], 'modes' => ops_all("SELECT * FROM travel_modes ORDER BY id") ?: [],
+            'bandCount' => array_column(ops_all("SELECT band_id, COUNT(*) n FROM inspectors WHERE band_id IS NOT NULL GROUP BY band_id") ?: [], 'n', 'band_id')]);
+        return;
     }
 
     if ($route === 'voucher-generate' && $method === 'POST') {
@@ -8408,7 +8584,10 @@ function ops_vouchers($route, $method) {
                     (float)($b['hours'] ?? 0), $dt === 'LEAVE' ? ($b['leave_code'] ?? '') : '', $dt === 'OFFICE' ? ($b['office_code'] ?? '') : '']);
             flash('Day added.');
         } elseif ($do === 'del') {
+            $ent = ops_one("SELECT entry_date FROM voucher_entries WHERE id=? AND voucher_id=?", [(int)$b['entry_id'], $v['id']]);
+            if ($ent && ($why = exp_day_lock($v, $ent['entry_date'])) !== '') { flash($why, 'error'); redirect('/voucher?id=' . $v['id']); }
             $pdo->prepare("DELETE FROM voucher_entries WHERE id=? AND voucher_id=?")->execute([(int)$b['entry_id'], $v['id']]);
+            exp_recalc_total((int)$v['id']);
             flash('Row removed.');
         }
         redirect('/voucher?id=' . $v['id']);
@@ -9006,31 +9185,26 @@ function ops_jobs($route, $method) {
                     return;
                 }
             }
-            // The day's expenses are real money the engineer is paid back: none may be
-            // negative or anything but a number (GAP-046).
-            $expF = [];
-            foreach (['travel', 'local', 'food', 'lodging', 'misc'] as $k) $expF[] = [$b[$k] ?? '', ucfirst($k) . ' expense', 0, null];
-            foreach ((array)($_POST['extra'] ?? []) as $code => $a) $expF[] = [$a, 'An expense', 0, null];
-            if (($p = figures_problem($expF)) !== '') { view('ops/job_close', ['job' => $job, 'error' => $p]); return; }
-            // collect any configurable (extra) headings into JSON {code:amount}
-            $extra = [];
-            foreach (expense_extra_headings() as $code=>$label) {
-                $amt = num($_POST['extra'][$code] ?? 0);
-                if ($amt != 0) $extra[$code] = $amt;
-            }
-            // save expenses row (same-day at closure).
-            // Field-finding #21 — record the day's closure expenses EXACTLY ONCE per job. The UI can no
-            // longer re-show the close form for a closed job (#24), and the close is refused once closed;
-            // this is the data-layer belt: if a closure-expense row already exists for this job we do not
-            // add a second (so no path — a race, a re-submit that slipped the UI guard — can double the
-            // engineer's claim). To change what was recorded, the expenses are edited on the job below.
-            $hasExp = (int) ops_val("SELECT COUNT(*) FROM expenses WHERE job_id=?", [$job['id']]);
-            if (!$hasExp) {
-                $pdo->prepare("INSERT INTO expenses (job_id,inspector_id,sbu,travel,local,food,lodging,misc,extra,exp_date,notes,created_at)
-                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")->execute([
-                    $job['id'], $job['inspector_id'], $b['sbu'] ?: $job['sbu'],
-                    num($b['travel']), num($b['local']), num($b['food']), num($b['lodging']), num($b['misc']),
-                    $extra ? json_encode($extra) : '', $reportDate ?: date('Y-m-d'), $b['exp_notes'] ?? '', date('c')]);
+            // Expenses Phase 1 (owner, 17 Nov 2026) — "Close the day": the claimant
+            // confirms the day's expenses here, on his own job, and they land in his
+            // claim for the period. They are written ONLY to the claim's lines
+            // (voucher_entries), never to `expenses` as well, so profit counts the
+            // cost once (doc 36; Money M3). Checked BEFORE the job closes, so a
+            // missing reason for a different distance never leaves a half-closed day.
+            // Field-finding #21 still holds: the day's lines are replaced, never
+            // added twice, and a closed job is refused above (#24).
+            $expIns = (int)my_inspector_id();
+            $expMine = $expIns && exp_job_is_mine($expIns, $job);
+            $expDate = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($b['exp_date'] ?? '')) ? $b['exp_date'] : exp_close_default_date($expIns, $job);
+            $expNote = '';
+            if ($expMine) {
+                if (($p = exp_day_problem($expIns, exp_job((int)$job['id']), $expDate, true)) !== '') { view('ops/job_close', ['job' => $job, 'error' => $p]); return; }
+                $cv = exp_claim_for($expIns, $expDate, false);
+                $lock = $cv ? exp_line_change_problem($cv, $expDate) : exp_day_lock(['status' => 'DRAFT'], $expDate);
+                if ($lock === '') {
+                    [$p] = exp_day_check($expIns, exp_job((int)$job['id']), $expDate, $b);
+                    if ($p !== '') { view('ops/job_close', ['job' => $job, 'error' => $p]); return; }
+                } else $expNote = ' The day\'s expenses were not added: ' . $lock;
             }
             $tat = days_between($job['inspection_end_date'], $reportDate);
             // If a report was produced, route it to the inspector's reporting manager for sign-off.
@@ -9046,7 +9220,13 @@ function ops_jobs($route, $method) {
             if (function_exists('billable_on_job_closed')) billable_on_job_closed((int)$job['id']);
             send_closure_email($job['id']);
             if ($needsApproval === 'PENDING') report_approval_notify($job['id']);
-            flash("Job {$job['job_code']} closed. TAT " . ($tat === null ? '—' : $tat) . " day(s). Closure email sent.");
+            if ($expMine && $expNote === '') {
+                [$eok, $emsg, $ecv] = exp_day_confirm($expIns, (int)$job['id'], $expDate, $b, true);
+                flash("Job {$job['job_code']} closed. " . $emsg, $eok ? 'success' : 'warning');
+                redirect($eok && $ecv ? '/voucher?id=' . (int)$ecv['id'] : '/job?id=' . $job['id']);
+            }
+            flash("Job {$job['job_code']} closed. TAT " . ($tat === null ? '—' : $tat) . " day(s). Closure email sent."
+                . ($expMine ? $expNote : ' The ' . Tl('engineer') . ' confirms the day\'s expenses on their own claim.'));
             redirect('/job?id=' . $job['id']);
         }
         view('ops/job_close', ['job'=>$job,'error'=>null]); return;
@@ -9057,13 +9237,19 @@ function ops_jobs($route, $method) {
     // the job's main inspector, so everything else the job carries is untouched.
     if ($route === 'job-visit-close' && $method === 'POST') {
         // §WO-8 — close one day of a multi-day job, with its report.
-        ops_require(is_coordinator_level() || is_master(), 'You cannot close a visit day.');
+        // Expenses Phase 1 — the engineer allocated to THAT day closes it too (Jobs
+        // "Close own", docs/02 fn 2): it is his own day on his own job, and closing
+        // it is where he confirms the day's expenses (the next screen).
         $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$job) { http_response_code(404); view('notfound'); return; }
+        $vDate = substr((string)($_POST['date'] ?? ''), 0, 10);
+        $ownDay = exp_visit_is_mine((int)my_inspector_id(), $job, $vDate);
+        ops_require(is_coordinator_level() || is_master() || $ownDay, 'You cannot close a visit day.');
         if (!empty($job['closed_flag'])) { flash('This ' . Tl('job') . ' is already closed.', 'warning'); redirect('/job?id=' . $job['id'] . '#visits'); }
         $err = function_exists('job_visit_close') ? job_visit_close($job['id'], $_POST['date'] ?? '', $_POST['report_link'] ?? '', 0) : 'Per-day close is unavailable.';
         if ($err === '' && function_exists('billunit_on_job_changed')) billunit_on_job_changed((int)$job['id']);   // the closed day is an earned man-day
-        flash($err !== '' ? $err : ('Visit of ' . fdate($_POST['date'] ?? '') . ' closed.'), $err !== '' ? 'error' : 'success');
+        flash($err !== '' ? $err : ('Visit of ' . fdate($_POST['date'] ?? '') . ' closed.' . ($ownDay ? ' Now confirm the day\'s expenses.' : '')), $err !== '' ? 'error' : 'success');
+        if ($err === '' && $ownDay) redirect('/voucher-day?job=' . (int)$job['id'] . '&date=' . $vDate);
         redirect('/job?id=' . $job['id'] . '#visits');
     }
     if ($route === 'job-reassign' && $method === 'POST') {
