@@ -102,28 +102,40 @@ runs *inside* SUBMITTED, and a send-back returns to DRAFT.
 
 ```mermaid
 stateDiagram-v2
-  [*] --> DRAFT : voucher find-or-create — own month, or Vouchers Edit in the office
-  DRAFT --> SUBMITTED : submit · the claimant OR Vouchers Edit in the office; starts a new approval round
-  SUBMITTED --> SUBMITTED : approve one level · the person (or delegate) at the current level of the chain
+  [*] --> DRAFT : voucher find-or-create — your OWN month (anyone linked to a team member); for someone else, Master Admin / Admin only
+  DRAFT --> SUBMITTED : submit · the claimant (own) OR Master Admin / Admin; starts a new approval round
+  SUBMITTED --> SUBMITTED : approve one level · the person (or delegate) at the current level · a level whose signer already signed an earlier one counts as signed
   SUBMITTED --> APPROVED : approve the LAST level · Finance (always last)
   SUBMITTED --> DRAFT : send back · whoever may sign the current level, reason REQUIRED
   APPROVED --> PAID : paid · Finance (offices it covers), Master Admin, Admin — never the claimant
-  PAID --> DRAFT : reopen · is_admin_level ONLY, not the Business Director
-  APPROVED --> DRAFT : reopen · is_coordinator_level, not the Business Director
-  SUBMITTED --> DRAFT : reopen · is_coordinator_level, not the Business Director
+  PAID --> DRAFT : reopen · Master Admin / Admin ONLY
+  APPROVED --> DRAFT : reopen · Finance (offices it covers), Master Admin, Admin
+  SUBMITTED --> DRAFT : reopen · Master Admin / Admin (approvers send back instead)
 ```
 
-- **The chain (SUBMITTED → APPROVED)** — `lib/voucher_approval.php`. The levels come from
-  Admin → Approvals → Expense vouchers (Master Admin): reporting line **N+1 … N+4** (the
-  claimant's "Reports to", then that person's, …), **Office Finance**, **Central Finance**,
-  each needed above an amount the Master Admin sets (blank = always). Nothing is set when
-  shipped; the default is **N+1, then Finance** (office Finance, else central Finance). The
-  reporting levels sign in order up to the highest level the total needs; Finance signs
-  last (office, then central). A shorter line stops at its highest person; no "Reports to"
-  (or a level nobody can sign) is signed by an administrator, who is warned. Each level
-  signed is a row in `voucher_approval_log` for the current round (`vouchers.appr_round`);
-  the voucher becomes APPROVED when the last required level signs. Who may sign each level
-  is in `docs/02` footnote 3.
+- **Actors (batch 2, owner 17 Nov 2026 — plan 29 Change 2, points 1–3, A, Q3).** Every
+  individual raises, edits and submits **their own** voucher. Approving is the chain only.
+  Reopen: an **approved** voucher by Finance (its offices) or the Master Admin / Admin; a
+  **paid** one by the Master Admin / Admin only; nobody else — the Business Director and the
+  Business Unit Head never reopen, and the claimant never reopens their own. **No status or
+  transition was added**; only who may take the existing ones changed. Who may *see* a
+  voucher (own + chain; Finance at its step; MA/AD all) is in `docs/02` footnote 3.
+- **The chain (SUBMITTED → APPROVED)** — `lib/voucher_approval.php`. The levels and their
+  **order** come from Admin → Approvals → Expense vouchers (Master Admin): reporting line
+  **N+1 … N+4** (the claimant's "Reports to", then that person's, …), **role levels**
+  (Business Director, Business Unit Head, Branch Manager, any custom role — any active holder
+  covering the voucher's office signs, the first to approve), **Office Finance**, **Central
+  Finance**, each needed above an amount the Master Admin sets (blank = always; never
+  preset). Nothing is set when shipped; the default is **N+1, then Finance** (office
+  Finance, else central Finance). Levels sign in the order set — the reporting line upwards,
+  role levels wherever placed — and Finance signs last (office, then central). A shorter line
+  stops at its highest person; no "Reports to", a role nobody holds for that office, or any
+  level nobody can sign is signed by an administrator, who is warned. **No double signing:**
+  a reporting-line or role level whose signer already signed an earlier level of this round
+  counts as signed (an `ALREADY_SIGNED` row, "already signed at N+2"); never a Finance level.
+  Each level signed is a row in `voucher_approval_log` for the current round
+  (`vouchers.appr_round`); the voucher becomes APPROVED when the last required level signs.
+  Who may sign each level is in `docs/02` footnote 3.
 - **Send back (SUBMITTED → DRAFT)** — the owner's Q3: no "Rejected" status. The reason is
   mandatory, kept on the voucher (`sent_back_reason/_by/_at`, shown to the claimant until
   they resubmit) and in History. Resubmitting opens a new round, so **every level signs
@@ -132,7 +144,8 @@ stateDiagram-v2
   first level of the chain on their next action, with no conversion. A voucher with no
   recorded submitter (legacy) can be signed by anyone at the level except the claimant.
 - **R5 fixed (earlier):** `reopen` checks the source status — a **PAID** voucher reopens only
-  for a real manager (`is_admin_level`); SUBMITTED/APPROVED reopen by coordinator level.
+  for the Master Admin / an Admin (batch 2; before: `is_admin_level`); APPROVED for Finance
+  or an administrator; SUBMITTED for an administrator (before: coordinator level).
   **Segregation of duties** — the claimant and the submitter (`vouchers.submitted_by`) never
   sign a level, and one person signs one level of a voucher. Reopening clears the submitter
   and is recorded in History.

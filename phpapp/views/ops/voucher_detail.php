@@ -302,7 +302,8 @@
           <li class="<?= $d ? 'done' : ($i === $curIdx ? 'now' : '') ?>">
             <span class="vchain-dot" aria-hidden="true"><?= $d ? '✓' : ($i === $curIdx ? '●' : '○') ?></span>
             <span><strong><?= e($l['label']) ?></strong>
-              <?php if ($d): ?> — <?= e($d['user_name']) ?><?= ($d['on_behalf_name'] ?? '') !== '' ? ' for ' . e($d['on_behalf_name']) : '' ?>, <?= e(fdate(substr((string)$d['created_at'], 0, 10))) ?>
+              <?php if ($d && !empty($l['auto'])): ?> — <?= e($d['user_name']) ?>, <span class="muted">already signed<?= ($d['via'] ?? '') !== '' ? ' at ' . e($d['via']) : ' at an earlier level' ?> — not asked twice</span>
+              <?php elseif ($d): ?> — <?= e($d['user_name']) ?><?= ($d['on_behalf_name'] ?? '') !== '' ? ' for ' . e($d['on_behalf_name']) : '' ?>, <?= e(fdate(substr((string)$d['created_at'], 0, 10))) ?>
               <?php elseif ($l['approvers']): ?> — <?= e(implode(', ', array_slice(array_map('vappr_name', $l['approvers']), 0, 4))) ?><?= count($l['approvers']) > 4 ? ' …' : '' ?>
               <?php else: ?> — <span class="muted">an administrator</span><?php endif; ?></span>
           </li>
@@ -342,7 +343,7 @@
   <?php if (empty($history)): ?>
     <p class="muted" style="margin:0">Nothing yet. Each submission, approval, send-back and payment is recorded here — who, at which level, when and why.</p>
   <?php else: ?>
-    <?php $verb = ['SUBMITTED' => 'Submitted', 'APPROVED' => 'Approved', 'SENT_BACK' => 'Sent back', 'REOPENED' => 'Reopened', 'PAID' => 'Marked paid']; ?>
+    <?php $verb = ['SUBMITTED' => 'Submitted', 'APPROVED' => 'Approved', 'SENT_BACK' => 'Sent back', 'REOPENED' => 'Reopened', 'PAID' => 'Marked paid', 'ALREADY_SIGNED' => 'Counted as signed']; ?>
     <ul class="vhist">
       <?php foreach (array_reverse($history) as $h): ?>
         <li><span class="muted"><?= e(fdate(substr((string)$h['created_at'], 0, 10))) ?> <?= e(substr((string)$h['created_at'], 11, 5)) ?></span>

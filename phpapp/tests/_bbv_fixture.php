@@ -84,14 +84,14 @@ if (!function_exists('bbv_fixture')) {
     }
 
     // Drive the REAL route in a second process (see _bbv_worker.php).
-    function bbv_route($route, $method, $uid, $vid, array $post = []) {
+    function bbv_route($route, $method, $uid, $vid, array $post = [], array $get = []) {
         $root = dirname(__DIR__);
         $env = (getenv('DB_DRIVER') === 'mysql')
             ? 'DB_DRIVER=mysql DB_HOST=' . escapeshellarg((string) getenv('DB_HOST')) . ' DB_NAME=' . escapeshellarg((string) getenv('DB_NAME'))
               . ' DB_USER=' . escapeshellarg((string) getenv('DB_USER')) . ' DB_PASS=' . escapeshellarg((string) getenv('DB_PASS'))
             : 'DB_DRIVER=sqlite SQLITE_PATH=' . escapeshellarg((string) getenv('SQLITE_PATH'));
         $cmd = $env . ' php ' . escapeshellarg($root . '/tests/_bbv_worker.php') . ' ' . escapeshellarg($route) . ' ' . $method
-             . ' ' . (int) $uid . ' ' . (int) $vid . ' ' . escapeshellarg(json_encode($post)) . ' 2>/dev/null';
+             . ' ' . (int) $uid . ' ' . (int) $vid . ' ' . escapeshellarg(json_encode($post)) . ' ' . escapeshellarg(json_encode((object) $get)) . ' 2>/dev/null';
         $raw = (string) shell_exec($cmd);
         foreach (array_reverse(explode("\n", trim($raw))) as $l) { $d = json_decode(trim($l), true); if (is_array($d)) return $d; }
         return ['code' => 0, 'flash' => [], 'status' => '', 'restricted' => false, 'rendered' => false, 'raw' => substr($raw, -300)];
@@ -100,8 +100,13 @@ if (!function_exists('bbv_fixture')) {
     function bbv_cleanup(array $f) {
         $pdo = db();
         bbv_nobody();
+        // Vouchers the real routes created for a fixture claimant are removed too.
+        try {
+            $ins = array_map('intval', array_column(ops_all("SELECT id FROM inspectors WHERE name LIKE ?", ['% ' . $f['tag']]) ?: [], 'id'));
+            if ($ins) foreach (ops_all("SELECT id FROM vouchers WHERE inspector_id IN (" . implode(',', $ins) . ")") ?: [] as $r) $f['vids'][] = (int) $r['id'];
+        } catch (Throwable $e) {}
         if ($f['vids']) {
-            $in = implode(',', array_map('intval', $f['vids']));
+            $in = implode(',', array_map('intval', array_unique($f['vids'])));
             $pdo->exec("DELETE FROM vouchers WHERE id IN ($in)");
             try { $pdo->exec("DELETE FROM voucher_approval_log WHERE voucher_id IN ($in)"); } catch (Throwable $e) {}
         }

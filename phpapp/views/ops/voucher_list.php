@@ -18,10 +18,16 @@
   }
   $awaiting = $cDraft + $cSubmitted;
   $waitIds = $waitIds ?? []; $canCreate = $canCreate ?? false;
+  $canOwn = $canOwn ?? $mine; $seesAll = $seesAll ?? false; $isFinance = $isFinance ?? false;
+  //  Batch 2 (owner, 17 Nov 2026): say exactly what this list holds for THIS person.
+  if ($mine)          $whatShown = ' — only your own claims are shown.';
+  elseif ($seesAll)   $whatShown = ' — every voucher in the company (administrator).';
+  else                $whatShown = ' — your own, those waiting for your approval, and those you have approved or sent back'
+                               . ($isFinance ? ', plus those at or past the Finance step in the offices you cover.' : '.');
 ?>
 <div class="master-head">
-  <div><h1><?= $mine ? 'My travelling-expense vouchers' : 'Inspector vouchers' ?></h1>
-    <p class="sub" style="margin:2px 0 0">Monthly "Statement of Travelling Expenses"<?= $mine ? ' — only your own claims are shown.' : ' — the offices you cover, your own, and those waiting for your approval.' ?></p></div>
+  <div><h1><?= $mine ? 'My travelling-expense vouchers' : 'Expense vouchers' ?></h1>
+    <p class="sub" style="margin:2px 0 0">Monthly "Statement of Travelling Expenses"<?= e($whatShown) ?></p></div>
 </div>
 
 <div class="kpi-row">
@@ -45,15 +51,16 @@
     <span class="muted"> — marked "Your turn" below. Open one to approve it or send it back with a reason.</span>
   </div>
 <?php endif; ?>
-<?php if ($mine): ?>
+<?php if ($canOwn): ?>
   <form method="get" action="/voucher" class="filter-bar">
-    <label class="muted" style="align-self:center">Open a month:</label>
+    <label class="muted" style="align-self:center"><?= $mine ? 'Open a month:' : 'Your own voucher — open a month:' ?></label>
     <input class="form-control" type="month" name="month" value="<?= e($curMonth) ?>" required>
     <button class="btn" type="submit">Open / create</button>
   </form>
-<?php elseif ($canCreate): ?>
+<?php endif; ?>
+<?php if (!$mine && $canCreate): ?>
   <form method="get" action="/voucher" class="filter-bar">
-    <label class="muted" style="align-self:center">Open a voucher:</label>
+    <label class="muted" style="align-self:center">Open a voucher for someone:</label>
     <select class="form-control searchable" name="ins" required style="min-width:220px"><option value="">— inspector —</option>
       <?php foreach ($inspectors as $i): ?><option value="<?= (int)$i['id'] ?>"><?= e($i['name']) ?><?= $i['emp_code']?' ('.e($i['emp_code']).')':'' ?></option><?php endforeach; ?>
     </select>

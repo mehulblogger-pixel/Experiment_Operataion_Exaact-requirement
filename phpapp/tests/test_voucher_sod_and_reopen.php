@@ -17,8 +17,11 @@ t_ok(strpos($va, "You cannot approve your own expense voucher") !== false,
     'the claimant cannot approve their own voucher');
 t_ok(strpos($va, '$me === (int) ($v[\'submitted_by\'] ?? 0)') !== false,
     'the approver must differ from the submitter (maker != checker)');
-t_ok(strpos($ops, "if (\$v['status'] === 'PAID') {") !== false && strpos($ops, "if ((\$v['status'] ?? '') === 'PAID') return is_admin_level();") !== false,
-    'a PAID voucher reopens only for a manager');
+// Batch 2 (owner, 17 Nov 2026): PAID reopens for the Master Admin / an Admin
+// only; APPROVED also for Finance in its offices; nobody else reopens.
+t_ok(strpos($ops, "if (\$v['status'] === 'PAID') {") !== false && strpos($ops, "if (voucher_sees_all()) return true;") !== false
+    && strpos($ops, "if (\$st === 'APPROVED') return user_role() === 'FINANCE' && voucher_in_scope(\$v);") !== false,
+    'a PAID voucher reopens only for the Master Admin or an Admin; an APPROVED one also for Finance');
 
 $pdo = db();
 $office = (int) (ops_val("SELECT id FROM offices ORDER BY id LIMIT 1") ?: 0);
@@ -63,15 +66,32 @@ $vLegacy = ['id'=>0, 'inspector_id'=>$insId, 'office_id'=>$office, 'status'=>'SU
 $_SESSION['uid'] = $co2Uid; current_user(true); ua(true);
 t_ok($canApprove($vLegacy) === true, 'a legacy voucher with no recorded submitter is still approvable');
 
-// --- Reopen guard by status/role ---------------------------------------------
+// --- Reopen guard by status/role (batch 2, owner 17 Nov 2026) ----------------
+// Before: a coordinator reopened SUBMITTED / APPROVED vouchers and a branch
+// manager PAID ones. Now approvers send back instead; APPROVED → Finance or an
+// administrator; PAID → the Master Admin or an Admin only.
+$pdo->prepare("INSERT INTO users (username, first_name, role, is_active, home_office_id, scope_offices) VALUES ('r5_fin','Fin','FINANCE',1,?,'ALL')")->execute([$office]);
+$finUid = (int)$pdo->lastInsertId();
+$pdo->prepare("INSERT INTO users (username, first_name, role, is_active, home_office_id, scope_offices) VALUES ('r5_adm','Adm','ADMIN',1,?,'ALL')")->execute([$office]);
+$admUid = (int)$pdo->lastInsertId();
 $paid = ['status'=>'PAID']; $approved = ['status'=>'APPROVED']; $submitted = ['status'=>'SUBMITTED'];
+try {
+    $_SESSION['uid'] = $coUid; current_user(true); ua(true);
+    t_ok($canReopen($paid) === false, 'a coordinator cannot reopen a PAID voucher');
+    t_ok($canReopen($approved) === false, 'a coordinator no longer reopens an APPROVED voucher');
+    t_ok($canReopen($submitted) === false, 'a coordinator no longer reopens a SUBMITTED voucher (approvers send back)');
 
-$_SESSION['uid'] = $coUid; current_user(true); ua(true);
-t_ok($canReopen($paid) === false, 'a coordinator cannot reopen a PAID voucher');
-t_ok($canReopen($approved) === true, 'a coordinator can reopen an APPROVED voucher');
-t_ok($canReopen($submitted) === true, 'a coordinator can reopen a SUBMITTED voucher');
+    $_SESSION['uid'] = $bmUid; current_user(true); ua(true);
+    t_ok($canReopen($paid) === false, 'a branch manager no longer reopens a PAID voucher');
 
-$_SESSION['uid'] = $bmUid; current_user(true); ua(true);
-t_ok($canReopen($paid) === true, 'a branch manager can reopen a PAID voucher');
+    $_SESSION['uid'] = $finUid; current_user(true); ua(true);
+    t_ok($canReopen($approved) === true && $canReopen($paid) === false, 'Finance reopens an APPROVED voucher, not a PAID one');
 
-unset($_SESSION['uid']); current_user(true); ua(true);
+    $_SESSION['uid'] = $admUid; current_user(true); ua(true);
+    t_ok($canReopen($paid) === true && $canReopen($approved) === true, 'an Admin reopens a PAID or APPROVED voucher');
+} finally {
+    // This file committed its people and never removed them; it does now.
+    unset($_SESSION['uid']); current_user(true); ua(true);
+    $pdo->exec("DELETE FROM users WHERE username IN ('r5_co','r5_co2','r5_bm','r5_insp','r5_fin','r5_adm')");
+    $pdo->exec("DELETE FROM inspectors WHERE name='R5 Asha'");
+}
