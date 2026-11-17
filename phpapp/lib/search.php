@@ -424,8 +424,12 @@ function search_sources() {
     $add('candidates', THP('candidate'), '🧑‍💼', function_exists('is_coordinator_level') && is_coordinator_level(),
         function ($q, $n) use ($like) {
             $l = $like($q);
-            [$sw, $sa] = function_exists('rasg_cand_scope') ? rasg_cand_scope('c') : ['1=1', []];
-            return array_map(fn($r) => [
+            //  Batch 2 — the shared pool (= rasg_cand_scope('c') with the switch
+            //  OFF); a candidate locked elsewhere = name + badge, opens nothing.
+            [$sw, $sa] = function_exists('rpool_list_clause') ? rpool_list_clause('c')
+                       : (function_exists('rasg_cand_scope') ? rasg_cand_scope('c') : ['1=1', []]);
+            $lockMap = function_exists('rpool_lock_map') ? rpool_lock_map() : null;
+            return array_map(fn($r) => (function_exists('rpool_search_locked_row') ? rpool_search_locked_row($r, $lockMap) : null) ?? [
                 'title'    => trim(($r['first_name'] ?? '') . ' ' . ($r['last_name'] ?? '')) ?: ($r['cand_code'] ?: '—'),
                 'subtitle' => trim(($r['designation'] ? (DESIGNATIONS[$r['designation']] ?? $r['designation']) : '')
                               . ($r['cand_code'] ? ' · ' . $r['cand_code'] : '')),
@@ -434,8 +438,10 @@ function search_sources() {
                 'url'      => '/candidate?id=' . (int)$r['id'],
             ], ops_all(
                 "SELECT c.id, c.cand_code, c.first_name, c.last_name, c.designation, c.stage, c.proposed_site,
+                        c.requisition_id, c.pipeline_stage_id, c.joined_at, c.sbu, c.mobile, c.email,
                         r.req_code
-                 FROM candidates c LEFT JOIN requisitions r ON r.id = c.requisition_id
+                 FROM candidates c LEFT JOIN requisitions r ON r.id = c.requisition_id"
+                 . (function_exists('reqf_class_join') ? reqf_class_join('c') : '') . "
                  WHERE $sw AND (c.first_name LIKE ? OR c.last_name LIKE ? OR c.cand_code LIKE ?
                                 OR c.email LIKE ? OR c.mobile LIKE ?
                                 OR (c.first_name || ' ' || c.last_name) LIKE ?)

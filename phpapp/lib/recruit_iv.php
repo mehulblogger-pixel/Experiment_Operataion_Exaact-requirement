@@ -98,6 +98,20 @@ function recruit_iv_migrate() {
         //  Owner, 9 Nov 2026 — why a re-interview, an out-of-order level or a
         //  changed result was allowed: written down, never left to memory.
         ensure_column('interviews', 'reason', "VARCHAR(300) DEFAULT ''");
+        //  Batch 2 (owner, 17 Nov 2026 — Q2) — the candidate is LOCKED for other
+        //  offices from the first interview scheduled, and the lock belongs to the
+        //  office of the requisition the interview was scheduled AGAINST. So the
+        //  interview keeps that requisition. Rows written before this column
+        //  existed take the candidate's requisition at the moment it is added —
+        //  once, the only time that question can be answered at all.
+        $ivHadReq = true;
+        try { db()->query("SELECT requisition_id FROM interviews WHERE 1=0"); } catch (Throwable $e) { $ivHadReq = false; }
+        if (!$ivHadReq) {
+            ensure_column('interviews', 'requisition_id', 'INT DEFAULT 0');
+            try { db()->exec("UPDATE interviews SET requisition_id = COALESCE((SELECT c.requisition_id FROM candidates c
+                              WHERE c.id = interviews.candidate_id), 0) WHERE COALESCE(requisition_id, 0) = 0"); }
+            catch (Throwable $e) {}
+        }
         db()->exec("CREATE TABLE IF NOT EXISTS candidate_docs (
             id $pk,
             candidate_id INT,
@@ -306,11 +320,14 @@ function iv_schedule($candidateId, $post) {
         }
     }
 
-    db()->prepare("INSERT INTO interviews (candidate_id,round,attempt,mode,location,scheduled_at,panel,panel_user_ids,competencies,result,created_by,created_at,reason)
-                   VALUES (?,?,?,?,?,?,?,?,?,'SCHEDULED',?,?,?)")
+    //  Batch 2 — the requisition this interview is scheduled against: the one the
+    //  candidate is worked against now. It decides which office holds the lock.
+    $ivReq = (int) ops_val("SELECT COALESCE(requisition_id,0) FROM candidates WHERE id=?", [(int)$candidateId]);
+    db()->prepare("INSERT INTO interviews (candidate_id,round,attempt,mode,location,scheduled_at,panel,panel_user_ids,competencies,result,created_by,created_at,reason,requisition_id)
+                   VALUES (?,?,?,?,?,?,?,?,?,'SCHEDULED',?,?,?,?)")
         ->execute([(int)$candidateId, $round, $attempt, $mode, $where,
             $whenStored, $panelTxt, $panelIds,
-            trim((string)($post['competencies'] ?? '')), _iv_actor(), _iv_now(), $reason]);
+            trim((string)($post['competencies'] ?? '')), _iv_actor(), _iv_now(), $reason, $ivReq]);
     $newId = (int)db()->lastInsertId();
     if (function_exists('act_log')) try { act_log('CANDIDATE', (int)$candidateId, 'INTERVIEW',
         $round . ($attempt > 1 ? ' re-interview ' . $attempt : '') . ' scheduled for ' . $when . ' — panel: ' . $panelTxt . ($reason !== '' ? ' — reason: ' . $reason : '')); } catch (Throwable $e) {}
@@ -611,6 +628,9 @@ function ops_candidate_interview($route, $method) {
     $id = (int)($_GET['id'] ?? 0);
     $cand = ops_one("SELECT * FROM candidates WHERE id=?", [$id]);
     if (!$cand) { http_response_code(404); view('notfound'); return true; }
+    //  Batch 2 — a candidate locked with another office cannot be opened or used
+    //  on any route, by any method.
+    if (function_exists('cand_lock_require')) cand_lock_require($cand);
     //  B6 — no other office starts anything with a candidate in process elsewhere
     //  (scheduling, recording, scoring); refused naming the office.
     if ($method === 'POST' && function_exists('cand_other_office_require')) cand_other_office_require($cand);
@@ -626,7 +646,7 @@ function ops_candidate_interview($route, $method) {
         //  person then acts on a meeting that does not exist.
         if ($do === 'schedule') {
             $ivNew = iv_schedule($id, $_POST);
-            if ((int) $ivNew > 0) { flash('Interview scheduled.'); if (iv_last_notice() !== '') flash(iv_last_notice(), 'warning'); }
+            if ((int) $ivNew > 0) { flash('Interview scheduled.' . (function_exists('cand_lock_note') ? cand_lock_note($id) : '')); if (iv_last_notice() !== '') flash(iv_last_notice(), 'warning'); }
             else {
                 //  iv_schedule()'s own reason first — it is the specific one
                 //  ("L1 is already scheduled for ...") and the only one that
@@ -653,6 +673,7 @@ function ops_candidate_doc($route, $method) {
     $id = (int)($_GET['id'] ?? 0);
     $cand = ops_one("SELECT * FROM candidates WHERE id=?", [$id]);
     if (!$cand) { http_response_code(404); view('notfound'); return true; }
+    if (function_exists('cand_lock_require')) cand_lock_require($cand);   // Batch 2 — locked elsewhere: no access
     if ($method === 'POST' && function_exists('cand_other_office_require')) cand_other_office_require($cand);   // B6
     if ($method === 'POST') {
         $do = (string)($_POST['do'] ?? '');

@@ -279,6 +279,7 @@ function ops_candidate_letter($route, $method) {
     $id = (int)($_GET['id'] ?? 0);
     $cand = ops_one("SELECT * FROM candidates WHERE id=?", [$id]);
     if (!$cand) { http_response_code(404); view('notfound'); return true; }
+    if (function_exists('cand_lock_require')) cand_lock_require($cand);   // Batch 2 — locked elsewhere: no access
     $tpl = null;
     if (!empty($_GET['template'])) $tpl = doc_tpl_by_code((string)$_GET['template']);
     if (!$tpl && !empty($_GET['tid'])) $tpl = doc_tpl_get((int)$_GET['tid']);

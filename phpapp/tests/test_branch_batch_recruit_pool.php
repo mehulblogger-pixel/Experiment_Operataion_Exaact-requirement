@@ -19,6 +19,16 @@
 //       whose process is with another office — and the refusal names the office.
 //   E · when the process ends the candidate is back in the pool for everyone.
 //   F · onboarding: "Onboarding in process — <office>".
+//
+//  BATCH 2 (owner, 17 Nov 2026 — QA-REPORTS/V51/29 C, points 7–9, Q2) changed
+//  these expectations, and only these: the badge now reads "Locked — in
+//  recruitment with <office>" / "Locked — onboarding with <office>"; a locked
+//  candidate can no longer be OPENED by another office (E1, G3 — was "can open
+//  and see the badge"); the refusal reads "<Name> is locked — in recruitment
+//  with the <office> office …"; in the pool list another office sees only the
+//  name and the badge (H1). The lock itself — from the first interview, not
+//  on a link — is proved in tests/test_batch2_recruit_lock.php. This file also
+//  now removes every row it commits.
 // ============================================================================
 t_section('Branch batch B6 — the shared candidate pool, the in-process badge and the other-office block');
 
@@ -124,14 +134,14 @@ t_ok(function_exists('rpool_shared') && rpool_shared() === true, 'B1 · with not
 
 // ---- C · Best matches + the badge ---------------------------------------------------------
 t_section('C · "Best matches from the pool" is central and shows the in-process badge');
-$pg = $drive($uAhm, 'requisition', 'GET', ['id' => $rAhm], [], ['Bbsix Mumactive', 'Bbsix Unattached', 'Recruitment in process — BB6 Mumbai', 'Bbsix Mumjoined', 'Best matches from the pool']);
+$pg = $drive($uAhm, 'requisition', 'GET', ['id' => $rAhm], [], ['Bbsix Mumactive', 'Bbsix Unattached', 'Locked — in recruitment with BB6 Mumbai', 'Bbsix Mumjoined', 'Best matches from the pool']);
 t_ok($has($pg, 'Best matches from the pool'), 'C1 · arranged: the Ahmedabad requisition shows its pool panel (' . ($pg['error'] ?? $pg['done']) . ')');
 t_ok($has($pg, 'Bbsix Mumactive'), 'C2 · a Mumbai candidate who fits is offered to Ahmedabad (switch ON)');
-t_ok($has($pg, 'Recruitment in process — BB6 Mumbai'), 'C3 · *** …with the badge "Recruitment in process — BB6 Mumbai" ***');
+t_ok($has($pg, 'Locked — in recruitment with BB6 Mumbai'), 'C3 · *** …with the badge "Locked — in recruitment with BB6 Mumbai" ***');
 t_ok($has($pg, 'Bbsix Unattached'), 'C4 · an unattached candidate is offered to every office');
 t_ok(!$has($pg, 'Bbsix Mumjoined'), 'C5 · a person who has joined is not a pool candidate');
 $badge = function_exists('cand_process_badge') ? cand_process_badge($cMumIv) : '';
-t_ok(strpos($badge, 'Recruitment in process — BB6 Mumbai (') === 0, 'C6 · the badge names the office and the stage: "' . $badge . '"');
+t_eq($badge, 'Locked — in recruitment with BB6 Mumbai', 'C6 · the badge names the office (batch 2: the owner\'s words, no stage)');
 t_eq(function_exists('cand_process_badge') ? cand_process_badge($cMumLost) : 'x', '', 'C7 · a closed-out candidate carries no badge');
 t_eq(function_exists('cand_process_badge') ? cand_process_badge($cFree) : 'x', '', 'C8 · an unattached candidate carries no badge');
 
@@ -148,10 +158,10 @@ setting_set('recruit_pool_shared', '1');
 
 // ---- E · the candidate page and the hard block ---------------------------------------------
 t_section('E · the hard block — no other office can start anything');
-$pg = $drive($uAhm, 'candidate', 'GET', ['id' => $cMumIv], [], ['Bbsix Mumactive', 'Recruitment in process — BB6 Mumbai']);
-t_ok($has($pg, 'Bbsix Mumactive') && $has($pg, 'Recruitment in process — BB6 Mumbai'),
-     'E1 · *** Ahmedabad can open the Mumbai candidate and sees the badge *** (' . $said($pg) . ')');
-$msg = 'Bbsix Mumactive is in recruitment with the BB6 Mumbai office — only that office can work on this';
+$msg = 'Bbsix Mumactive is locked — in recruitment with the BB6 Mumbai office. Only that office can open or work on this';
+$pg = $drive($uAhm, 'candidate', 'GET', ['id' => $cMumIv], [], ['9000000102']);
+t_ok(!$has($pg, '9000000102') && strpos($said($pg), $msg) !== false,
+     'E1 · *** batch 2: Ahmedabad can NOT open the locked Mumbai candidate — refused naming the office *** (' . $said($pg) . ')');
 
 $r = $drive($uAhm, 'candidate-interview', 'POST', ['id' => $cMumIv],
             ['do' => 'schedule', 'round' => 'L1', 'scheduled_at' => $tomorrow . 'T10:00', 'mode' => 'In person', 'location' => 'Office', 'panel_extra' => 'Outside Panel']);
@@ -223,12 +233,12 @@ $as($uAhm);
 t_eq(function_exists('cand_other_office_block') ? cand_other_office_block($cMumLost) : 'x', '', 'F5 · it is now Ahmedabad\'s to work on');
 
 // ---- G · onboarding ------------------------------------------------------------------------
-t_section('G · onboarding — "Onboarding in process — <office>"');
-t_eq(function_exists('cand_process_badge') ? cand_process_badge($cMumOnb) : '', 'Onboarding in process — BB6 Mumbai', 'G1 · the onboarding badge');
+t_section('G · onboarding — "Locked — onboarding with <office>"');
+t_eq(function_exists('cand_process_badge') ? cand_process_badge($cMumOnb) : '', 'Locked — onboarding with BB6 Mumbai', 'G1 · the onboarding badge');
 $as($uAhm);
-t_ok(function_exists('cand_other_office_block') && strpos(cand_other_office_block($cMumOnb), 'is in onboarding with the BB6 Mumbai office') !== false,
+t_ok(function_exists('cand_other_office_block') && strpos(cand_other_office_block($cMumOnb), 'is locked — onboarding with the BB6 Mumbai office') !== false,
      'G2 · and other offices are refused, naming the office');
-t_ok(function_exists('cand_pool_may_view') && cand_pool_may_view($cMumOnb), 'G3 · other offices may open them, to see the badge');
+t_ok(function_exists('cand_pool_may_view') && !cand_pool_may_view($cMumOnb), 'G3 · batch 2: other offices can NOT open them (they see the name and the badge in lists)');
 t_ok(function_exists('cand_pool_may_view') && !cand_pool_may_view($cMumJoin), 'G4 · a person who has JOINED Mumbai stays Mumbai\'s record');
 t_eq(function_exists('cand_process_badge') ? cand_process_badge($cMumJoin) : 'x', '', 'G5 · and carries no pool badge');
 
@@ -239,12 +249,12 @@ try {
         $pdo->prepare("INSERT INTO cx_professionals (name, email, mobile, verification_tier, is_active, created_at) VALUES (?,?,?,?,1,?)")
             ->execute([$pn, $pe, $pm, 'BASIC', date('c')]);
 } catch (Throwable $e) {}
-$pg = $drive($uAhm, 'candidate-pool', 'GET', [], [], ['BB6-MUMACTIVE', 'BB6-AHMWAIT', 'Recruitment in process — BB6 Mumbai']);
-t_ok($has($pg, 'BB6-MUMACTIVE') && $has($pg, 'BB6-AHMWAIT'), 'H1 · ON: the pool lists both offices\' candidates (' . ($pg['error'] ?? $pg['done']) . ')');
-t_ok($has($pg, 'Recruitment in process — BB6 Mumbai'), 'H2 · *** with the in-process badge ***');
+$pg = $drive($uAhm, 'candidate-pool', 'GET', [], [], ['Bbsix Mumactive', 'BB6-MUMACTIVE', 'BB6-AHMWAIT', 'Locked — in recruitment with BB6 Mumbai']);
+t_ok($has($pg, 'Bbsix Mumactive') && $has($pg, 'BB6-AHMWAIT'), 'H1 · ON: the pool lists both offices\' candidates (' . ($pg['error'] ?? $pg['done']) . ')');
+t_ok($has($pg, 'Locked — in recruitment with BB6 Mumbai') && !$has($pg, 'BB6-MUMACTIVE'), 'H2 · *** with the lock badge — and, batch 2, only the name and the badge ***');
 setting_set('recruit_pool_shared', '0');
-$pg = $drive($uAhm, 'candidate-pool', 'GET', [], [], ['BB6-MUMACTIVE', 'BB6-AHMWAIT']);
-t_ok(!$has($pg, 'BB6-MUMACTIVE') && $has($pg, 'BB6-AHMWAIT'), 'H3 · *** OFF: the pool lists only the office\'s own ***');
+$pg = $drive($uAhm, 'candidate-pool', 'GET', [], [], ['Bbsix Mumactive', 'BB6-AHMWAIT']);
+t_ok(!$has($pg, 'Bbsix Mumactive') && $has($pg, 'BB6-AHMWAIT'), 'H3 · *** OFF: the pool lists only the office\'s own ***');
 setting_set('recruit_pool_shared', '1');
 
 // ---- I · the switch belongs to the Master Admin --------------------------------------------
@@ -266,7 +276,23 @@ $doc = (string) @file_get_contents(dirname($root) . '/docs/02-permission-matrix.
 t_ok(strpos($doc, "Offices can see each other's candidate pool") !== false && strpos($doc, 'cand_other_office_block') !== false,
      'J1 · docs/02 Hiring footnote 8 describes the switch and the guard');
 
-// ---- tidy ----------------------------------------------------------------------------------
-if (function_exists('settings_cache')) { /* cache is updated by setting_set */ }
+// ---- tidy: every row this file committed (batch 2 — leftover rows broke other tests) ----------
+$b6del = function ($sql, array $a = []) use ($pdo) { try { $pdo->prepare($sql)->execute($a); } catch (Throwable $e) {} };
+$b6ids = array_map('intval', array_column(ops_all("SELECT id FROM candidates WHERE cand_code LIKE 'BB6-%'") ?: [], 'id'));
+if ($b6ids) {
+    $ph = implode(',', array_fill(0, count($b6ids), '?'));
+    foreach (['interviews', 'candidate_events', 'candidate_docs', 'job_offers', 'salary_structures', 'hr_discussions', 'candidate_stage_data', 'cx_identity_link']
+             as $t) $b6del("DELETE FROM $t WHERE candidate_id IN ($ph)", $b6ids);
+    $b6del("DELETE FROM recruiter_assignments WHERE entity_id IN ($ph) AND subject LIKE 'CAND%'", $b6ids);
+    $b6del("DELETE FROM activities WHERE entity_kind='CANDIDATE' AND entity_id IN ($ph)", $b6ids);
+    $b6del("DELETE FROM candidates WHERE id IN ($ph)", $b6ids);
+}
+foreach (ops_all("SELECT id FROM cx_professionals WHERE name IN ('BB6 Pro One','BB6 Pro Two')") ?: [] as $p) {
+    $b6del("DELETE FROM cx_identity_link WHERE professional_id=?", [(int) $p['id']]);
+    $b6del("DELETE FROM cx_professionals WHERE id=?", [(int) $p['id']]);
+}
+foreach ([$rAhm, $rMum] as $q) { $b6del("DELETE FROM recruiter_assignments WHERE entity_id=? AND subject LIKE 'REQ%'", [$q]); $b6del("DELETE FROM requisitions WHERE id=?", [$q]); }
+foreach ([$uAhm, $uMum, $uAdmin, $uMaster] as $u) $b6del("DELETE FROM users WHERE id=?", [$u]);
+foreach ([$AHM, $MUM] as $o) $b6del("DELETE FROM offices WHERE id=?", [$o]);
 setting_set('recruit_pool_shared', $b6poolWas === null ? '1' : (string) $b6poolWas);
 $_SESSION = $b6orig; current_user(true); ua(true);

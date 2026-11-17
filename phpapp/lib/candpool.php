@@ -205,6 +205,8 @@ function candpool_scan($limit = 200) {
     catch (Throwable $e) {}
     $rank = ['mobile' => 3, 'email' => 2, 'name' => 1];
     $out = [];
+    //  Batch 2 — every lock at once, so a long list asks one question, not one per row.
+    $lockMap = function_exists('rpool_lock_map') ? rpool_lock_map() : null;
     foreach ($cands as $c) {
         $m = candpool_pro_matches($c, 20);
         if (!$m) continue;
@@ -221,8 +223,10 @@ function candpool_scan($limit = 200) {
             'verification_tier' => (string)$best['verification_tier'], 'availability' => (string)$best['availability'],
             'reason' => (string)$best['reason'], 'match_count' => count($m),
             'confirmed' => $linkedPro > 0,
-            //  B6 — whose process this person is in, for every office to see.
-            'in_process' => function_exists('cand_process_badge') ? cand_process_badge($c) : '',
+            //  B6 / batch 2 — who this person is locked with, for every office to
+            //  see; an office kept out by the lock is shown only name and badge.
+            'in_process' => function_exists('cand_process_badge') ? cand_process_badge($c, $lockMap) : '',
+            'locked_out' => function_exists('cand_locked_for_me') && cand_locked_for_me($c, $lockMap) !== null,
         ];
         if (count($out) >= $limit) break;
     }

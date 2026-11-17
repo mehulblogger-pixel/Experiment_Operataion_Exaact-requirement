@@ -1236,14 +1236,20 @@ candidate's, else the requirement's or its position's) is written onto their tea
 record (`inspectors.department`) and their login if it has none, and the Department
 hub counts them.
 
-**"In process with an office" (Branch batch B6, owner 16 Nov 2026) — derived, not a
-stage.** A candidate linked to a requisition whose classification is not closed out
-(`reqf_classify()` ≠ LOST) is *in recruitment* with that requisition's office; FILLED
-with no `joined_at` is *in onboarding*. Every office sees it as a badge
-("Recruitment in process — <office> (<stage>)" / "Onboarding in process — <office>"),
-and no office outside that one may move, close or otherwise work on the candidate
-(`cand_other_office_block()`, see docs/02 footnote 8). A move to REJECTED, WITHDRAWN or
-OFFER_DECLINED ends the process and the candidate is back in the shared pool. **Adds no
+**"Locked with an office" (Branch batch B6, owner 16 Nov 2026; lock rule of batch 2,
+owner 17 Nov 2026) — derived, not a stage.** A candidate is *locked* with an office from
+the **first interview scheduled** against that office's requisition (an interview that is
+not cancelled — `interviews.requisition_id` records the requisition it was scheduled
+for — or the candidate standing at an interview, offer or final stage), through offer,
+onboarding and joining, until the process ends. Merely being **linked** to a requisition
+does **not** lock: until the first interview every office sees the full candidate and may
+take them on by linking them to its own requisition. Every office sees the badge
+("Locked — in recruitment with <office>" / "Locked — onboarding with <office>"); no office
+outside that one may open the candidate or work on them, and a second record of the same
+person cannot be created there (`cand_other_office_block()`, `cand_lock_require()`,
+`cand_duplicate_lock_block()`, see docs/02 footnote 8). A move to REJECTED, WITHDRAWN or
+OFFER_DECLINED (including hired → WITHDRAWN, "did not join") ends the process: the lock is
+lifted and the candidate is back in every office's pool and "Best matches". **Adds no
 stage and no transition.**
 
 **Public entry point (Phase 7 — additive).** Besides staff creation, a candidate

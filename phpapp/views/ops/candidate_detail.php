@@ -18,7 +18,7 @@
 
 <?php if ($poolBlock !== ''): ?>
 <div class="panel" role="status" style="border-left:4px solid var(--amber,#d97706);background:#fffdf5;padding:12px 15px">
-  <b style="color:#92400e"><?= $poolLocked ? 'You can view this ' . e(Tl('candidate')) . ', not work on them.' : 'Back in the pool.' ?></b>
+  <b style="color:#92400e"><?= $poolLocked ? 'You can view this ' . e(Tl('candidate')) . ', not work on them.' : (!empty($poolEnded) ? 'Back in the pool.' : 'Open to every office — no interview yet.') ?></b>
   <span><?= e($poolBlock) ?></span>
 </div>
 <?php if ($poolLocked): ?>

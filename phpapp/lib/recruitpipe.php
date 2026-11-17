@@ -1115,6 +1115,7 @@ function ops_recruit_candidate_flow($route, $method) {
     $id = (int)($_GET['id'] ?? 0);
     $cand = ops_one("SELECT * FROM candidates WHERE id=?", [$id]);
     if (!$cand) { http_response_code(404); view('notfound'); return true; }
+    if (function_exists('cand_lock_require')) cand_lock_require($cand);   // Batch 2 — locked elsewhere: no access
     if ($method !== 'POST') { redirect('/candidate?id=' . $id); return true; }
     if (function_exists('cand_other_office_require')) cand_other_office_require($cand);   // B6 — the other-office block
 
@@ -1363,6 +1364,7 @@ function ops_recruit_candidate_stage($route, $method) {
     $id = (int)($_GET['id'] ?? 0);
     $cand = ops_one("SELECT * FROM candidates WHERE id=?", [$id]);
     if (!$cand) { http_response_code(404); view('notfound'); return true; }
+    if (function_exists('cand_lock_require')) cand_lock_require($cand);   // Batch 2 — locked elsewhere: no access
     if ($method === 'POST' && function_exists('cand_other_office_require')) cand_other_office_require($cand);   // B6
     if ($method === 'POST') {
         $do = (string)($_POST['do'] ?? '');

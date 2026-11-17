@@ -77,7 +77,9 @@
       <ul style="list-style:none;margin:0;padding:0">
         <?php foreach ($g['rows'] as $r): ?>
           <li style="border-bottom:1px solid var(--line)">
-            <a href="<?= e($r['url']) ?>" style="display:block;padding:11px 16px;text-decoration:none<?= !empty($r['dim']) ? ';opacity:.62' : '' ?>">
+            <?php // Batch 2 — a candidate locked with another office opens nothing: a plain line, not a link.
+              $rTag = ($r['url'] ?? '') !== '' ? 'a' : 'div'; ?>
+            <<?= $rTag ?><?= $rTag === 'a' ? ' href="' . e($r['url']) . '"' : '' ?> style="display:block;padding:11px 16px;text-decoration:none<?= !empty($r['dim']) ? ';opacity:.62' : '' ?>">
               <b style="font-size:13.5px"><?= e($r['title']) ?></b>
               <?php if (trim((string)($r['subtitle'] ?? '')) !== ''): ?>
                 <span class="muted" style="font-size:12.5px"> — <?= e($r['subtitle']) ?></span>
@@ -85,7 +87,7 @@
               <?php if (trim((string)($r['meta'] ?? '')) !== ''): ?>
                 <div class="muted" style="font-size:12px;margin-top:2px"><?= e($r['meta']) ?></div>
               <?php endif; ?>
-            </a>
+            </<?= $rTag ?>>
           </li>
         <?php endforeach; ?>
       </ul>

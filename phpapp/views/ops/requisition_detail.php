@@ -354,10 +354,18 @@ if (!empty($pool)): ?>
   <table class="dt"><thead><tr><th>Candidate</th><th>Designation</th><th>Fit</th><th>Why</th><th></th></tr></thead><tbody>
     <?php foreach ($pool as $pc): [$fl, $ftone] = recruit_fit_band($pc['fit']['score']);
       $why = implode(' · ', array_map(fn($x) => $x['label'], array_filter($pc['fit']['factors'], fn($x) => $x['state'] === 'ok'))); ?>
+    <?php // Batch 2 — locked with an office this person does not cover: the name and the badge, nothing else.
+      if (!empty($pc['locked_out'])): ?>
+    <tr>
+      <td><b><?= e(candidate_name($pc)) ?></b>
+        <br><span class="pill p-warn" style="font-size:11px;white-space:normal" title="Only that office can open or work on this <?= e(Tl('candidate')) ?> until their process ends.">🔒 <?= e($pc['in_process']) ?></span></td>
+      <td colspan="4" class="muted" style="font-size:12px">Only that office can open this <?= e(Tl('candidate')) ?> until their process ends.</td>
+    </tr>
+    <?php continue; endif; ?>
     <tr>
       <td><b><?= e(candidate_name($pc)) ?></b> <span class="muted"><?= e($pc['cand_code']) ?></span>
         <?php // B6 — already in process with an office: every office sees it, and with whom. ?>
-        <?php if (!empty($pc['in_process'])): ?><br><span class="pill p-warn" style="font-size:11px;white-space:normal" title="Only that office can work on this <?= e(Tl('candidate')) ?> until their process ends.">🔒 <?= e($pc['in_process']) ?></span><?php endif; ?></td>
+        <?php if (!empty($pc['in_process'])): ?><br><span class="pill p-warn" style="font-size:11px;white-space:normal" title="Only that office can open or work on this <?= e(Tl('candidate')) ?> until their process ends.">🔒 <?= e($pc['in_process']) ?></span><?php endif; ?></td>
       <td><?= e(lk_options_or('designation', DESIGNATIONS)[$pc['designation']] ?? ($pc['designation'] ?: '—')) ?></td>
       <td><span class="pill <?= e($ftone) ?>"><?= (int)$pc['fit']['score'] ?>% <?= e($fl) ?></span></td>
       <td class="muted" style="font-size:12px"><?= e($why ?: '—') ?></td>

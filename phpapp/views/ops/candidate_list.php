@@ -24,6 +24,15 @@
 <table class="grid">
   <tr><th>CV</th><th>Candidate</th><th>Trade</th><th>Client</th><th>Proposed site</th><th>Exp (yrs)</th><th>Source</th><th>Stage</th><th>Actions</th></tr>
   <?php foreach ($rows as $c): ?>
+  <?php // Batch 2 — locked with an office this person does not cover: the name and the badge, nothing else.
+    if (!empty($c['locked_out'])): ?>
+  <tr>
+    <td class="muted">—</td>
+    <td><strong><?= e(candidate_name($c)) ?></strong>
+      <br><span class="pill p-warn" style="font-size:11px;white-space:normal" title="Only that office can open or work on this <?= e(Tl('candidate')) ?> until their process ends.">🔒 <?= e($c['locked_out']) ?></span></td>
+    <td colspan="7" class="muted" style="font-size:12px">Only that office can open this <?= e(Tl('candidate')) ?> until their process ends.</td>
+  </tr>
+  <?php continue; endif; ?>
   <tr>
     <td><a href="/candidate?id=<?= (int)$c['id'] ?>"><?= e($c['cand_code'] ?: ('#'.$c['id'])) ?></a></td>
     <td><strong><?= e(candidate_name($c)) ?></strong></td>

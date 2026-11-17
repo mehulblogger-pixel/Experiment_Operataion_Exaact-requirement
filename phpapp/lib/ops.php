@@ -6615,17 +6615,29 @@ function ops_requisitions($route, $method) {
             //  joined; OFF, only its own office's (and unattached) candidates.
             //  rpool_list_clause() is the one definition; it needs the class join.
             [$poolW, $poolA] = function_exists('rpool_list_clause') ? rpool_list_clause('c') : ['1=1', []];
+            //  BATCH 2 · point 9 (owner, 17 Nov 2026) — a candidate whose process
+            //  ENDED (rejected, withdrawn, offer declined, did not join) is back in
+            //  every office's Best matches. Only a person who was HIRED is left
+            //  out — asked of the classification as well as the legacy stage.
+            $hiredOut = function_exists('reqf_class_expr') ? "COALESCE(" . reqf_class_expr('c') . ",'') <> 'FILLED'" : '1=1';
             $others = ops_all("SELECT c.*, t.label trade_label, s.label skill_label FROM candidates c
                                LEFT JOIN lookup_values t ON t.id=c.trade_id LEFT JOIN lookup_values s ON s.id=c.skill_id"
                                . (function_exists('reqf_class_join') ? reqf_class_join('c') : '') . "
                                WHERE (c.requisition_id IS NULL OR c.requisition_id<>?)
-                                 AND c.stage NOT IN ('ACCEPTED','REJECTED','WITHDRAWN','OFFER_DECLINED')
+                                 AND c.stage <> 'ACCEPTED' AND $hiredOut
                                  AND $poolW
                                ORDER BY c.id DESC LIMIT 80", array_merge([$req['id']], $poolA)) ?: [];
             foreach ($others as $o) { $f = recruit_fit_score($o, $req); if ($f['score'] >= 55) { $o['fit'] = $f; $pool[] = $o; } }
             usort($pool, fn($a, $b) => $b['fit']['score'] <=> $a['fit']['score']); $pool = array_slice($pool, 0, 5);
-            //  B6 — every office sees who is already in process, and with whom.
-            if (function_exists('cand_process_badge')) { foreach ($pool as &$pc) { $pc['in_process'] = cand_process_badge($pc); } unset($pc); }
+            //  B6 / batch 2 — every office sees who is locked, and with whom; an
+            //  office kept out by the lock sees only the name and the badge.
+            if (function_exists('cand_process_badge')) {
+                $lockMap = function_exists('rpool_lock_map') ? rpool_lock_map() : null;
+                foreach ($pool as &$pc) {
+                    $pc['in_process'] = cand_process_badge($pc, $lockMap);
+                    $pc['locked_out'] = function_exists('cand_locked_for_me') && cand_locked_for_me($pc, $lockMap) !== null;
+                } unset($pc);
+            }
         }
         // P1b — the same ranked shortlist, but from the MARKETPLACE professional bench.
         $proPool = function_exists('recruit_pro_pool') ? recruit_pro_pool($req) : [];
@@ -6662,16 +6674,19 @@ function nzc_cand($f, $v) {
 //     branch-A user could push work onto branch B, and (since M3) write a status
 //     change to a requisition they cannot even see.
 //
-// BRANCH BATCH B6 (owner, 16 Nov 2026) — the candidate pool is the company's own,
-// so the first direction now has two halves:
-//   · READING (the candidate page itself): another office's candidate who has
-//     not joined may be opened while "Offices can see each other's candidate
-//     pool" is ON — the page shows "Recruitment in process — <office>" and every
-//     action on it is refused (cand_pool_may_view()).
+// BRANCH BATCH B6 (owner, 16 Nov 2026), LOCK RULE OF BATCH 2 (owner, 17 Nov 2026)
+// — the candidate pool is the company's own, so the first direction has three
+// parts:
+//   · LOCKED (an office scheduled the first interview, through offer and
+//     onboarding until the process ends): nobody whose scope does not cover that
+//     office may open the page or use ANY candidate route, by any method —
+//     refused naming the office (cand_lock_require()).
+//   · READING (the candidate page itself): another office's candidate who is not
+//     locked may be opened IN FULL while "Offices can see each other's candidate
+//     pool" is ON (cand_pool_may_view()).
 //   · WORKING (every other candidate route): asked of the one guard,
-//     cand_other_office_block(). A candidate in process with an office you do
-//     not cover is refused, naming the office; a candidate whose process ended is
-//     back in the pool and is started by linking them to your own requisition.
+//     cand_other_office_block(). A candidate who is not locked but is on another
+//     office's requisition is taken on by linking them to your own requisition.
 function cand_scope_gate($route = '', $method = '') {
     if (!function_exists('scope_allows')) return;
     $reqOffice = function ($reqId) {
@@ -6685,6 +6700,7 @@ function cand_scope_gate($route = '', $method = '') {
     if ($id > 0) {
         $isPost = strtoupper((string) $method) === 'POST';
         if (function_exists('cand_other_office_block')) {
+            if (function_exists('cand_lock_require')) cand_lock_require($id);
             if ($route === 'candidate' && !$isPost) {
                 ops_require(cand_pool_may_view($id), 'This candidate belongs to a requisition outside your office / branch scope.');
             } else {
@@ -7266,6 +7282,15 @@ function ops_candidates($route, $method) {
         $rows = ops_all("SELECT c.*, bp.legal_name client_name, bp.display_name client_disp, t.label trade_label
             FROM candidates c LEFT JOIN business_partners bp ON bp.id=c.client_id
             LEFT JOIN lookup_values t ON t.id=c.trade_id WHERE $where ORDER BY c.id DESC", $args);
+        //  Batch 2 — a candidate locked with an office this person does not cover
+        //  shows ONLY the name and the badge; the row opens nothing.
+        if (function_exists('rpool_lock_map') && $rows) {
+            $lockMap = rpool_lock_map();
+            foreach ($rows as &$lr) {
+                $lk = cand_locked_for_me($lr, $lockMap);
+                $lr['locked_out'] = $lk ? (cand_lock_label($lk) ?: ('Joined — ' . ($lk['office'] ?: 'another office'))) : '';
+            } unset($lr);
+        }
         $counts = [];
         foreach (ops_all("SELECT stage, COUNT(*) n FROM candidates GROUP BY stage") as $r) $counts[$r['stage']] = (int)$r['n'];
         view('ops/candidate_list', ['rows' => $rows, 'q' => $q, 'stage' => $stage, 'counts' => $counts]);
@@ -7345,11 +7370,18 @@ function ops_candidates($route, $method) {
             // §11 duplicate guard — on a NEW candidate, stop and show look-alikes
             // (same mobile / email / name) before creating a second record for the
             // same person. "Save anyway" (dup_ack) proceeds.
-            if (!$cand && empty($b['dup_ack']) && function_exists('cand_find_duplicates')) {
+            //  BATCH 2 · point 8 (owner, 17 Nov 2026) — but the same person (same
+            //  mobile or e-mail) LOCKED with another office is not a question: a
+            //  second record is refused, naming the office, "Save anyway" or not.
+            $lockDup = (!$cand && function_exists('cand_duplicate_lock_block')) ? cand_duplicate_lock_block($b) : '';
+            if ($lockDup !== '') { flash($lockDup, 'error'); $prefill = $b; }
+            if ($lockDup === '' && !$cand && empty($b['dup_ack']) && function_exists('cand_find_duplicates')) {
                 $dupBlock = cand_find_duplicates($b);
                 if ($dupBlock) $prefill = $b;
             }
-            if (!$dupBlock && $cand) {
+            if ($lockDup !== '') {
+                // nothing is written; the form is drawn again with what was typed
+            } elseif (!$dupBlock && $cand) {
                 //  M5 — ownership before the rest of the save, refused as a whole.
                 //  M5 (adversarial audit) — THE DESTINATION, NOT THE ORIGIN.
                 //
@@ -7390,6 +7422,17 @@ function ops_candidates($route, $method) {
                 $set = implode(',', array_map(fn($f) => "$f=?", $fields));
                 $vals = array_map(fn($f) => nzc_cand($f, $b[$f] ?? ''), $fields); $vals[] = $cand['id'];
                 $pdo->prepare("UPDATE candidates SET $set WHERE id=?")->execute($vals);
+                //  Batch 2 — another office TOOK ON a candidate who was not locked:
+                //  written on the candidate's history, so the office they left can
+                //  see who has them now.
+                $toReq = (int) ($b['requisition_id'] ?? 0); $fromReq = (int) ($cand['requisition_id'] ?? 0);
+                if ($toReq > 0 && $fromReq > 0 && $toReq !== $fromReq && function_exists('rpool_req') && function_exists('act_log')) {
+                    $rf = rpool_req($fromReq); $rt = rpool_req($toReq);
+                    if ($rf && $rt && (int) $rf['office_id'] !== (int) $rt['office_id'])
+                        try { act_log('CANDIDATE', (int) $cand['id'], 'NOTE', 'Taken on by the ' . ($rt['office_name'] ?: 'other') . ' office: moved from '
+                              . $rf['req_code'] . ' (' . ($rf['office_name'] ?: '—') . ') to ' . $rt['req_code'] . ' (' . ($rt['office_name'] ?: '—') . ')'); }
+                        catch (Throwable $e) {}
+                }
                 //  M5 — defence in depth, exactly as on the requisition save.
                 if (function_exists('rasg_enforce_table'))
                     foreach (rasg_enforce_table('candidates', (int) $cand['id'], $m5auth) as $m5rev) flash($m5rev, 'error');
@@ -7680,8 +7723,9 @@ function ops_candidates($route, $method) {
         $poolBadge = function_exists('cand_process_badge') ? cand_process_badge($cand) : '';
         $poolBlock  = function_exists('cand_other_office_block') ? cand_other_office_block($cand) : '';
         $poolLocked = function_exists('cand_other_office_block') && cand_other_office_block($cand, ['process_only' => true]) !== '';
+        $poolEnded  = function_exists('reqf_classify') && reqf_classify($cand) === 'LOST';
         view('ops/candidate_detail', ['cand' => $cand, 'events' => $events, 'dupes' => $dupes, 'subDupes' => $subDupes,
-            'poolBadge' => $poolBadge, 'poolBlock' => $poolBlock, 'poolLocked' => $poolLocked,
+            'poolBadge' => $poolBadge, 'poolBlock' => $poolBlock, 'poolLocked' => $poolLocked, 'poolEnded' => $poolEnded,
             'wfMatches' => $wfMatches, 'wfStrong' => $wfStrong, 'wfAckTok' => $wfAckTok,
             'fit' => $fit, 'readiness' => $readiness, 'linkReq' => $linkReq, 'asgComm' => $asgComm, 'asgPacket' => $asgPacket,
             'personApps' => $personApps, 'proMatches' => $proMatches, 'proLink' => $proLink, 'person' => $person,
