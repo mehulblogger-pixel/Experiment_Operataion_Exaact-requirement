@@ -8230,9 +8230,14 @@ function ops_vouchers($route, $method) {
         ops_require(can_view_voucher($v), 'You cannot download this voucher.');
         $heads = voucher_heads_for($v['inspector_id']);
         $entries = ops_all("SELECT * FROM voucher_entries WHERE voucher_id=? ORDER BY entry_date, id", [$v['id']]);
+        // Expenses Phase 1 — every head a line carries gets its column, even one
+        // that is no longer in the person's list, so the sheet adds up to the claim.
+        $have = array_column($heads, 'code');
+        foreach ($entries as $e) foreach (array_keys(expense_extra_decode($e['amounts'] ?? '')) as $c)
+            if (!in_array($c, $have, true)) { $hr = ops_one("SELECT * FROM expense_heads WHERE code=?", [$c]) ?: ['code' => $c, 'label' => $c]; $heads[] = $hr; $have[] = $c; }
         $rows = [];
         $rows[] = ['Statement of Travelling Expenses'];
-        $rows[] = ['Inspector', $v['inspector_name'], 'Emp code', $v['emp_code'], 'Month', $v['month'], 'Status', $v['status']];
+        $rows[] = ['Inspector', $v['inspector_name'], 'Emp code', $v['emp_code'], 'Month', $v['month'], 'Status', $v['status'], 'Period', implode(' to ', voucher_period($v))];
         $rows[] = [];
         $hdr = ['Date','Attendance / Site','File No (' . T('boss') . ')','Line No','Hours','Mode','KM','Travel'];
         foreach ($heads as $h) $hdr[] = $h['label'];

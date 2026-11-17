@@ -41,7 +41,7 @@
         <?php if (!$j['closed_flag']): $ready = ($j['reporting_frequency']??'')==='NOREPORT' || (function_exists('job_has_issued_report') && job_has_issued_report((int)$j['id'])); ?>
           <button type="button" class="btn jobclose-open" data-job="<?= (int)$j['id'] ?>" data-code="<?= e($j['job_code']) ?>"
                   data-needsreport="<?= (($j['reporting_frequency']??'')!=='NOREPORT') ? '1' : '0' ?>">
-            <?= $ready ? 'Close &amp; record expenses' : 'Upload &amp; Close' ?>
+            <?= $ready ? 'Close the day' : 'Upload &amp; Close' ?>
           </button>
         <?php endif; ?>
       </div>
@@ -188,26 +188,18 @@
               : ['travel'=>'Travel','local'=>'Local','food'=>'Food','lodging'=>'Lodging','misc'=>'Misc']; ?>
 <div class="jcx-overlay" id="jcxOverlay">
   <div class="jcx-modal" role="dialog" aria-modal="true" aria-labelledby="jcxTitle">
-    <h3 id="jcxTitle">Close <span id="jcxCode"></span> &amp; record expenses</h3>
-    <p class="muted" style="margin:0;font-size:12.5px">Enter the day's expenses (they lock to this <?= e(Tl('job')) ?> automatically), then close.</p>
-    <form method="post" id="jcxForm" action="">
-      <input type="hidden" name="sbu" value=""><?php /* blank → the close uses the job's own SBU */ ?>
-      <div class="jcx-grid">
-        <div id="jcxReportWrap"><label>Report upload date *</label>
-          <input class="form-control" type="date" name="report_upload_date" id="jcxReportDate" value="<?= e($today) ?>"></div>
-        <div><label><?= e($eLbl['travel'] ?? 'Travel') ?> (<?= e($curSym) ?>)</label><input class="form-control" type="number" step="0.01" min="0" name="travel" value="0"></div>
-        <div><label><?= e($eLbl['local'] ?? 'Local') ?> (<?= e($curSym) ?>)</label><input class="form-control" type="number" step="0.01" min="0" name="local" value="0"></div>
-        <div><label><?= e($eLbl['food'] ?? 'Food') ?> (<?= e($curSym) ?>)</label><input class="form-control" type="number" step="0.01" min="0" name="food" value="0"></div>
-        <div><label><?= e($eLbl['lodging'] ?? 'Lodging') ?> (<?= e($curSym) ?>)</label><input class="form-control" type="number" step="0.01" min="0" name="lodging" value="0"></div>
-        <div><label><?= e($eLbl['misc'] ?? 'Misc') ?> (<?= e($curSym) ?>)</label><input class="form-control" type="number" step="0.01" min="0" name="misc" value="0"></div>
-        <div class="full"><label>Expense notes</label><input class="form-control" name="exp_notes" placeholder="optional"></div>
-      </div>
+    <h3 id="jcxTitle">Close the day on <span id="jcxCode"></span></h3>
+    <p class="muted" style="margin:0;font-size:12.5px">Next you see the day's expenses — travel and allowances filled in from your band or profile — and confirm them. They go into your <?= e(Tl('voucher')) ?> by themselves.</p>
+    <?php // Expenses Phase 1 — the day's expenses are confirmed on the close screen
+          // itself (screen 1, filled in for him), so this popup only leads there. ?>
+    <form method="get" id="jcxForm" action="">
+      <input type="hidden" name="id" id="jcxJobId" value="">
       <div class="jcx-actions">
-        <button class="btn" type="submit">Close job &amp; record expenses</button>
+        <button class="btn" type="submit">Next: the day's expenses</button>
         <button class="btn secondary" type="button" id="jcxCancel">Cancel</button>
         <a class="btn secondary" id="jcxFull" href="#" style="margin-left:auto">Full close screen →</a>
       </div>
-      <p class="muted" style="margin:10px 0 0;font-size:11.5px">If a chargeable bill or a site check-in is still outstanding, closing here will take you to the full close screen to settle it first.</p>
+
     </form>
   </div>
 </div>
@@ -219,6 +211,7 @@
   function open(job,codeTxt,needsReport){
     form.action='/job-close?id='+encodeURIComponent(job);
     full.href='/job-close?id='+encodeURIComponent(job);
+    var jid=document.getElementById('jcxJobId'); if(jid) jid.value=job;
     code.textContent=codeTxt||('#'+job);
     if(rw){ rw.style.display=needsReport?'':'none'; if(rd) rd.required=!!needsReport; }
     ov.classList.add('open');

@@ -291,16 +291,30 @@
 <?php if ($isEdit && is_master()): ?>
 <div class="panel" data-tab="Allowances &amp; rates" style="border:1px solid #d9b38c;background:#fffaf3">
   <h3 class="tab-sub" style="margin-top:0">Allowances &amp; rates <span class="muted">— Super Admin only. Not visible to anyone else.</span></h3>
-  <p class="sub">Tick what this <?= e(Tl('engineer')) ?> is entitled to claim on the monthly voucher, and set their personal rate where it differs from the default. Blank rate = use the master default.</p>
+  <?php // Expenses Phase 1 (screen 6) — the person's band, and their own amount or an
+        // extra type where it differs. "Follows band" leaves it to the band; with
+        // no band, the old rule: nothing set = every job-day type, else only "Yes". ?>
+  <?php $bandsList = function_exists('exp_bands') ? exp_bands(true) : []; $myBand = (int)($ins['band_id'] ?? 0);
+        $follow = $myBand ? 'Follows band' : 'Standard'; ?>
+  <p class="sub">Give this <?= e(Tl('engineer')) ?> a band — it says which expense types they may claim and the amounts. Set their own amount, or an extra type, only where it differs. Blank = follows the band<?= $myBand ? '' : ' (no band: the standard rates)' ?>.</p>
   <form method="post" action="/m/inspectors/edit?id=<?= (int)$ins['id'] ?>">
     <input type="hidden" name="_do" value="allow_save">
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="ff"><label>Band / level</label>
+        <select class="form-control" name="band_id"><option value="">— no band —</option>
+          <?php foreach ($bandsList as $bd): ?><option value="<?= (int)$bd['id'] ?>" <?= $myBand === (int)$bd['id'] ? 'selected' : '' ?>><?= e($bd['name']) ?></option><?php endforeach; ?></select>
+        <small class="muted"><a href="/voucher-rules">Bands and their amounts</a></small></div>
+      <div class="ff"><label>His own amounts apply from</label><input class="form-control" type="date" name="allow_from" value="<?= e(date('Y-m-d')) ?>" required>
+        <small class="muted">Older claims keep the amounts of their day.</small></div>
+    </div>
 
     <h4 class="tab-sub" style="margin-top:6px">Travel modes (per-km)</h4>
     <table class="grid">
       <tr><th>Allowed</th><th>Mode</th><th>Basis</th><th>Default</th><th>This <?= e(Tl('engineer')) ?>'s rate (<?= e(cur_sym()) ?>/km)</th></tr>
-      <?php foreach ($travelModes as $m): $a = $allowMap['MODE'][$m['code']] ?? null; ?>
+      <?php foreach ($travelModes as $m): $a = $allowMap['MODE'][$m['code']] ?? null; $av = $a ? (int)$a['allowed'] : -1; ?>
       <tr>
-        <td><label class="chk"><input type="checkbox" name="allow_mode[<?= e($m['code']) ?>]" value="1" <?= ($a && $a['allowed'])?'checked':'' ?>></label></td>
+        <td><select class="form-control" style="width:140px" name="allow_mode[<?= e($m['code']) ?>]" aria-label="<?= e($m['label']) ?> allowed">
+          <option value=""><?= e($follow) ?></option><option value="1" <?= $av === 1 ? 'selected' : '' ?>>Yes, his own</option><option value="0" <?= $av === 0 ? 'selected' : '' ?>>No</option></select></td>
         <td><strong><?= e($m['label']) ?></strong> <span class="muted">(<?= e($m['code']) ?>)</span></td>
         <td><?= e(lk_options_or('travel_basis', TRAVEL_BASIS)[$m['basis']] ?? $m['basis']) ?></td>
         <td><?= $m['basis']==='PER_KM' ? cur_sym().e($m['default_rate']).'/km' : '—' ?></td>
@@ -311,13 +325,16 @@
 
     <h4 class="tab-sub" style="margin-top:14px">Expense heads</h4>
     <table class="grid">
-      <tr><th>Allowed</th><th>Head</th><th>Type</th><th>Override amount/rate (<?= e(cur_sym()) ?>)</th></tr>
-      <?php foreach ($expHeads as $h): $a = $allowMap['HEAD'][$h['code']] ?? null; ?>
+      <tr><th>Allowed</th><th>Head</th><th>Type</th><th>His own amount/rate (<?= e(cur_sym()) ?>)</th><th>His own limit (<?= e(cur_sym()) ?>)</th></tr>
+      <?php foreach ($expHeads as $h): $a = $allowMap['HEAD'][$h['code']] ?? null; $av = $a ? (int)$a['allowed'] : -1;
+            $hk = function_exists('exp_kind') ? exp_kind($h) : $h['head_type']; ?>
       <tr>
-        <td><label class="chk"><input type="checkbox" name="allow_head[<?= e($h['code']) ?>]" value="1" <?= ($a && $a['allowed'])?'checked':'' ?>></label></td>
+        <td><select class="form-control" style="width:140px" name="allow_head[<?= e($h['code']) ?>]" aria-label="<?= e($h['label']) ?> allowed">
+          <option value=""><?= e($follow) ?></option><option value="1" <?= $av === 1 ? 'selected' : '' ?>>Yes, his own</option><option value="0" <?= $av === 0 ? 'selected' : '' ?>>No</option></select></td>
         <td><strong><?= e($h['label']) ?></strong> <span class="muted">(<?= e($h['code']) ?>)</span></td>
-        <td><?= e(lk_options_or('expense_head_type', EXP_HEAD_TYPES)[$h['head_type']] ?? $h['head_type']) ?></td>
-        <td><?php if ($h['head_type']!=='BILL'): ?><input class="form-control" style="width:130px" type="number" step="0.01" name="head_rate[<?= e($h['code']) ?>]" value="<?= e($a['rate'] ?? '') ?>" placeholder="<?= e($h['default_rate']) ?>"><?php else: ?><span class="muted">actual bill</span><?php endif; ?></td>
+        <td><?= e(function_exists('exp_kind_label') ? exp_kind_label($h) : (EXP_HEAD_TYPES[$h['head_type']] ?? $h['head_type'])) ?></td>
+        <td><?php if (!in_array($hk, ['BILL', 'NOBILL'], true)): ?><input class="form-control" style="width:130px" type="number" step="0.01" min="0" name="head_rate[<?= e($h['code']) ?>]" value="<?= e($a['rate'] ?? '') ?>" placeholder="follows band"><?php else: ?><span class="muted">the bill amount</span><?php endif; ?></td>
+        <td><?php if (in_array($hk, ['BILL', 'NOBILL'], true)): ?><input class="form-control" style="width:120px" type="number" step="0.01" min="0" name="head_limit[<?= e($h['code']) ?>]" value="<?= e($a['limit'] ?? '') ?>" placeholder="follows band"><?php else: ?><span class="muted">—</span><?php endif; ?></td>
       </tr>
       <?php endforeach; ?>
     </table>

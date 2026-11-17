@@ -246,7 +246,7 @@
               <?php if (!empty($x['report_link'])): ?><a href="<?= e($x['report_link']) ?>" target="_blank" rel="noopener">report</a>
               <?php else: ?><span class="muted">report on file</span><?php endif; ?>
               <?php if (!empty($x['closed_by'] ?? '')): ?> <span class="muted" style="font-size:11px">by <?= e($x['closed_by']) ?></span><?php endif; ?>
-            <?php elseif ($x['working'] && is_coordinator_level()): ?>
+            <?php elseif ($x['working'] && (is_coordinator_level() || (function_exists('exp_visit_is_mine') && exp_visit_is_mine((int)my_inspector_id(), $job, $x['date'])))): /* Expenses Phase 1 — his own day too */ ?>
               <form method="post" action="/job-visit-close?id=<?= (int)$job['id'] ?>" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
                 <input type="hidden" name="date" value="<?= e($x['date']) ?>">
                 <input class="form-control" name="report_link" placeholder="report link — or leave blank to use a report already on this <?= e(Tl('job')) ?>" style="width:300px">

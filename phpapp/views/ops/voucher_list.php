@@ -26,8 +26,8 @@
                                . ($isFinance ? ', plus those at or past the Finance step in the offices you cover.' : '.');
 ?>
 <div class="master-head">
-  <div><h1><?= $mine ? 'My travelling-expense vouchers' : 'Expense vouchers' ?></h1>
-    <p class="sub" style="margin:2px 0 0">Monthly "Statement of Travelling Expenses"<?= e($whatShown) ?></p></div>
+  <div><h1><?= $mine ? 'My expenses' : 'Expense ' . e(Tlp('voucher')) ?></h1>
+    <p class="sub" style="margin:2px 0 0">One <?= e(Tl('voucher')) ?> per period (<?= e(strtolower(EXP_PERIODS[exp_rules()['period']] ?? 'monthly')) ?>)<?= e($whatShown) ?></p></div>
 </div>
 
 <div class="kpi-row">
@@ -52,11 +52,17 @@
   </div>
 <?php endif; ?>
 <?php if ($canOwn): ?>
-  <form method="get" action="/voucher" class="filter-bar">
-    <label class="muted" style="align-self:center"><?= $mine ? 'Open a month:' : 'Your own voucher — open a month:' ?></label>
-    <input class="form-control" type="month" name="month" value="<?= e($curMonth) ?>" required>
-    <button class="btn" type="submit">Open / create</button>
-  </form>
+  <?php // Expenses Phase 1 — the day's expenses land in the claim by themselves when
+        // the day is closed; this opens the claim for today's period. ?>
+  <div class="filter-bar" style="gap:8px;flex-wrap:wrap">
+    <a class="btn" href="/voucher?date=<?= e(date('Y-m-d')) ?>" style="min-height:44px;display:inline-flex;align-items:center">My <?= e(Tl('voucher')) ?> for this period</a>
+    <?php if (!empty($nonJob)): ?><a class="btn secondary" href="/voucher?date=<?= e(date('Y-m-d')) ?>#quick-add" style="min-height:44px;display:inline-flex;align-items:center">＋ Add expense</a><?php endif; ?>
+    <form method="get" action="/voucher" style="display:flex;gap:6px;align-items:center">
+      <label class="muted"><?= $mine ? 'Another month:' : 'Your own, another month:' ?></label>
+      <input class="form-control" type="month" name="month" value="<?= e($curMonth) ?>" required>
+      <button class="btn secondary" type="submit">Open</button>
+    </form>
+  </div>
 <?php endif; ?>
 <?php if (!$mine && $canCreate): ?>
   <form method="get" action="/voucher" class="filter-bar">
@@ -72,11 +78,11 @@
 <div class="panel" style="padding:0;overflow:hidden">
   <div class="tbl-scroll" style="overflow-x:auto">
   <table class="dt">
-    <thead><tr><th>Month</th><?php if (!$mine): ?><th>Inspector</th><?php endif; ?><th>Status</th><th class="num">Total claimed</th><th></th></tr></thead>
+    <thead><tr><th>Period</th><?php if (!$mine): ?><th>Inspector</th><?php endif; ?><th>Status</th><th class="num">Total claimed</th><th></th></tr></thead>
     <tbody>
     <?php foreach ($rows as $r): ?>
     <tr>
-      <td><strong><?= e($r['month']) ?></strong></td>
+      <td><strong><?= e(exp_period_label($r)) ?></strong></td>
       <?php if (!$mine): ?><td><?= e($r['inspector_name'] ?? '—') ?></td><?php endif; ?>
       <td><span class="pill <?= $statusPill[$r['status']] ?? 'p-mut' ?>"><?= e($r['status']) ?></span><?php if (in_array((int)$r['id'], $waitIds, true)): ?> <span class="pill p-warn">Your turn</span><?php endif; ?></td>
       <td class="num"><?= (float)($r['total'] ?? 0)>0 ? cur_sym().nf((float)$r['total'],0) : '—' ?></td>

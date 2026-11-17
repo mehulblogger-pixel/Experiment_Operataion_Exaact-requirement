@@ -1,349 +1,276 @@
 <?php
-  $statusBadge = ['DRAFT'=>'AMBER','SUBMITTED'=>'AMBER','APPROVED'=>'GREEN','PAID'=>'GREEN'];
-  $pillMap = ['DRAFT'=>['p-warn','Draft'],'SUBMITTED'=>['p-info','Submitted'],'APPROVED'=>['p-ok','Approved'],'PAID'=>['p-ok','Paid']];
+// Expenses Phase 1 (owner, 17 Nov 2026 — design v3, screens 3 and 4): the claim
+// for a period. Lines grouped by date and job (job no., client, site, amounts),
+// the total on top, what is unusual in amber, the chain preview, then ONE
+// primary action for whoever is looking: the claimant submits, an approver
+// approves or sends back, Finance marks it paid with the advance. Nobody but
+// the claimant changes a line (V2). An old month voucher shows exactly its own
+// figures, one card per day with each head as a line.
+  $cs = cur_sym();
+  $pillMap = ['DRAFT'=>['p-warn','Draft'],'SUBMITTED'=>['p-info','Waiting for approval'],'APPROVED'=>['p-ok','Approved'],'PAID'=>['p-ok','Paid']];
   $vpill = $pillMap[$v['status']] ?? ['p-warn', ucfirst(strtolower($v['status']))];
-  // group entries by date for per-day hour subtotals
   $byDate = [];
   foreach ($entries as $e) $byDate[$e['entry_date']][] = $e;
   ksort($byDate);
   $monthHours = 0;
-  // headline figures for the KPI strip
   $vGrand = (float)($sum['grand'] ?? 0);
   $vBal = $vGrand - (float)$v['advance'] - (float)$v['office_incurred'];
-  $vHours = 0; foreach ($entries as $e) $vHours += (float)$e['hours'];
-  $vHoursFmt = rtrim(rtrim(number_format($vHours, 1, '.', ''), '0'), '.') ?: '0';
-  $vDays = count($byDate);
+  $workDays = []; foreach ($entries as $e) if (($e['day_type'] ?? 'WORK') === 'WORK') $workDays[$e['entry_date']] = 1;
+  $lv = $progress['levels'] ?? []; $curIdx = $progress['current'] ?? null;
+  $isOwner = !empty($isOwner); $legacyMonth = !empty($legacyMonth);
+  $iWaiting = $v['status'] === 'SUBMITTED' && !empty($canApproveThis);
+  $periodTxt = exp_period_label($v);
+  $statusLine = $v['status'] === 'DRAFT' ? ($canSubmit ? 'Ready to submit' : 'Draft') : ($iWaiting ? 'Waiting for you' : $vpill[1]);
+  $chainTxt = implode(' → ', array_map(fn($l) => $l['short'], $lv));
+  $fmt1 = fn($n) => rtrim(rtrim(number_format((float)$n, 1, '.', ''), '0'), '.');
+  $warnIds = []; foreach (($warnings ?? []) as $w) $warnIds[(int)$w['eid']] = true;
 ?>
 <div class="master-head">
-  <div><h1>Statement of travelling expenses
-      <span class="pill <?= $vpill[0] ?>" style="vertical-align:middle;font-size:12px"><?= e($vpill[1]) ?></span></h1>
-    <p class="sub" style="margin:2px 0 0"><strong><?= e($v['inspector_name']) ?></strong><?= $v['emp_code']?' · '.e($v['emp_code']):'' ?> · Month <?= e($v['month']) ?> · <?= e(T("sbu")) ?> <?= e(lk_options_or('sbu',OPS_SBUS)[$v['sbu']] ?? $v['sbu'] ?: '—') ?></p></div>
+  <div><h1><?= e($periodTxt) ?> <span class="pill <?= $vpill[0] ?>" style="vertical-align:middle;font-size:12px"><?= e($vpill[1]) ?></span></h1>
+    <p class="sub" style="margin:2px 0 0"><strong><?= e($v['inspector_name']) ?></strong><?= $v['emp_code'] ? ' · ' . e($v['emp_code']) : '' ?>
+      · <?= count($workDays) ?> day<?= count($workDays) === 1 ? '' : 's' ?> worked · <?= e(exp_period_kind_label($v)) ?></p></div>
   <a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a>
 </div>
 
-<div class="kpi-row" style="margin:16px 0">
-  <div class="kpi"><span class="kic"><?= e(cur_sym()) ?></span><div class="k">Grand total</div><div class="v"><?= fmoney_short($vGrand) ?></div><div class="d"><?= $vDays ?> day(s) · <?= e($vHoursFmt) ?> hrs</div></div>
-  <div class="kpi"><span class="kic">💳</span><div class="k">Balance <?= $vBal < 0 ? '(recover)' : 'to pay' ?></div><div class="v"><?= fmoney_short(abs($vBal)) ?></div><div class="d">after advance &amp; office</div></div>
-  <div class="kpi"><span class="kic">🧾</span><div class="k">Travel</div><div class="v"><?= fmoney_short($sum['travel']) ?></div><div class="d">km × your rate</div></div>
-  <div class="kpi"><span class="kic">📌</span><div class="k">Status</div><div class="v" style="font-size:17px;margin-top:8px"><span class="pill <?= $vpill[0] ?>"><?= e($vpill[1]) ?></span></div><div class="d"><?= $v['approved_by'] ? 'by '.e($v['approved_by']) : 'not yet approved' ?></div></div>
+<div class="vc-top">
+  <div class="vc-total"><?= e($cs . nf($vGrand, 0)) ?></div>
+  <div class="vc-status"><?= e($statusLine) ?><?php if ((float)$v['advance'] > 0 || (float)$v['office_incurred'] > 0): ?> · <?= $vBal < 0 ? 'to recover' : 'to pay' ?> <?= e($cs . nf(abs($vBal), 0)) ?><?php endif; ?></div>
 </div>
 
-<div data-tabs data-tabs-key="voucher" data-tabs-order="Entries,Summary,History">
+<?php if ($v['status'] === 'DRAFT' && trim((string)($v['sent_back_reason'] ?? '')) !== ''): ?>
+  <div class="vchain-note bad" role="status">
+    <strong>Sent back<?= ($v['sent_back_by'] ?? '') !== '' ? ' by ' . e($v['sent_back_by']) : '' ?><?= ($v['sent_back_at'] ?? '') !== '' ? ' on ' . e(fdate(substr((string)$v['sent_back_at'], 0, 10))) : '' ?>:</strong>
+    <?= e($v['sent_back_reason']) ?><br><span class="muted">Correct it and submit again — it goes back to the first approver.</span>
+  </div>
+<?php endif; ?>
+
+<?php // Locks: the month freeze (existing) and the two deadlines (E4). ?>
+<?php if ($v['status'] === 'DRAFT' && ($lr = voucher_lock_reason($v)) !== ''): ?>
+  <div class="vchain-note warn" role="status">🔒 <?= e($lr) ?></div>
+<?php elseif (!empty($claimLock) && $isOwner): ?>
+  <div class="vchain-note warn" role="status">🔒 <?= e($claimLock) ?></div>
+<?php endif; ?>
+<?php if (!empty($canAskReopen)): ?>
+  <form method="post" action="/voucher-status?id=<?= (int)$v['id'] ?>" class="vchain-note warn" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+    <input type="hidden" name="action" value="ask_reopen">
+    <div style="flex:1;min-width:220px"><strong>A deadline has passed for <?= empty($claimLock) ? 'some days of ' : '' ?>this <?= e(Tl('voucher')) ?>.</strong>
+      <?= !empty($n1) ? 'Ask ' . e(vappr_name($n1)) . ' (your N+1) to reopen it.' : 'You have no "Reports to" on your record — ask an administrator to fill it in first.' ?>
+      <input class="form-control" name="reason" placeholder="why it is late (optional)" style="margin-top:6px"></div>
+    <?php if (!empty($n1)): ?><button class="btn secondary" type="submit">Ask to reopen</button><?php endif; ?>
+  </form>
+<?php elseif ($isOwner && trim((string)($v['reopen_asked_at'] ?? '')) !== '' && $v['status'] === 'DRAFT'): ?>
+  <div class="vchain-note warn" role="status">You asked <?= !empty($n1) ? e(vappr_name($n1)) : 'your N+1' ?> to reopen it on <?= e(fdate(substr((string)$v['reopen_asked_at'], 0, 10))) ?>.</div>
+<?php endif; ?>
+<?php if (!empty($canDeadlineReopen)): ?>
+  <form method="post" action="/voucher-status?id=<?= (int)$v['id'] ?>" class="vchain-note warn" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+    <input type="hidden" name="action" value="deadline_reopen">
+    <div style="flex:1;min-width:220px"><strong><?= e($v['inspector_name']) ?> missed a deadline on this <?= e(Tl('voucher')) ?><?= trim((string)($v['reopen_asked_at'] ?? '')) !== '' ? ' and asked you to reopen it' : '' ?>.</strong>
+      As their N+1 you may reopen it for <?= (int)max(1, $rules['claim_days']) ?> days. Your reason is kept in History.
+      <input class="form-control" name="reason" required placeholder="reason for reopening" style="margin-top:6px"></div>
+    <button class="btn secondary" type="submit">Reopen for <?= e($v['inspector_name']) ?></button>
+  </form>
+<?php endif; ?>
+
+<?php if (!empty($warnings)): ?>
+  <div class="vc-warn" role="status">
+    <?php foreach ($warnings as $w): ?><div>⚠ <?= e($w['text']) ?></div><?php endforeach; ?>
+  </div>
+<?php endif; ?>
+<?php if ($isOwner && !empty($submitProblems)): ?>
+  <div class="vc-warn" role="status"><strong>Before you submit:</strong>
+    <?php foreach ($submitProblems as $p): ?><div>• <?= e($p) ?></div><?php endforeach; ?></div>
+<?php endif; ?>
+<?php if (!empty($openDays)): ?>
+  <div class="panel vc-open">
+    <strong>Days you worked that still need their expenses confirmed</strong>
+    <?php foreach ($openDays as $od): ?>
+      <div class="vc-openrow"><span><?= e(date('j M', strtotime($od['date']))) ?> · <?= e($od['job']['job_code']) ?> · <?= e(exp_job_site($od['job'])) ?></span>
+        <a class="btn small" href="/voucher-day?job=<?= (int)$od['job']['id'] ?>&amp;date=<?= e($od['date']) ?>">Confirm expenses</a></div>
+    <?php endforeach; ?>
+  </div>
+<?php endif; ?>
+
+<div class="vc-days">
+<?php foreach ($groups as $g):
+  $gj = $g['job_id'] ? exp_job($g['job_id']) : null;
+  $dayLocked = $canEdit && exp_day_lock($v, $g['date']) !== '';
+  $mayChange = $canEdit && !$dayLocked;
+?>
+  <div class="vc-day">
+    <div class="vc-dayhead">
+      <span><strong><?= e(date('j M', strtotime($g['date']))) ?></strong>
+        <?php if ($gj): ?> · <strong><?= e($gj['job_code']) ?></strong>
+        <?php elseif (!$g['work']): ?> · <?= e($g['day_type'] === 'LEAVE' ? 'Leave' : ($g['day_type'] === 'OFFICE' ? 'In office' : ucfirst(strtolower($g['day_type'])))) ?>
+        <?php else: ?> · Other expenses<?php endif; ?></span>
+      <strong><?= e($cs . nf($g['total'], 0)) ?></strong>
+    </div>
+    <?php if ($gj): ?><div class="vc-daysub"><?= e(exp_job_client($gj) ?: '—') ?><?= exp_job_site($gj) !== exp_job_client($gj) ? ' · ' . e(exp_job_site($gj)) : '' ?></div><?php endif; ?>
+    <ul class="vc-lines">
+    <?php foreach ($g['lines'] as $e):
+      $parts = exp_line_parts($e, $headLabels);
+      $h = exp_head((string)($e['head_code'] ?? ''));
+      $nobill = $h && exp_kind($h) === 'NOBILL';
+      $isBill = $h && in_array(exp_kind($h), ['BILL', 'NOBILL'], true);
+      $monthHours += (float)$e['hours'];
+    ?>
+      <li class="<?= isset($warnIds[(int)$e['id']]) ? 'vc-amber' : '' ?>">
+        <span class="vc-what">
+          <?php if (!$parts): ?><span class="muted"><?= $g['work'] ? e(trim((string)$e['notes']) !== '' ? $e['notes'] : 'Day worked — no expenses') : e(trim((string)($e['leave_code'] ?: $e['office_code'] ?: '')) ?: 'No expenses') ?></span><?php endif; ?>
+          <?php foreach ($parts as $i => $pt): ?><?= $i ? ' · ' : '' ?><?= e($pt['label']) ?> <strong><?= e($cs . nf($pt['amount'], 0)) ?></strong><?php endforeach; ?>
+          <?php if ($nobill): ?> <span class="pill p-mut">no bill</span><?php endif; ?>
+          <?php if ((int)($e['ticked'] ?? 0) === 1): ?> <span class="pill p-mut">ticked</span><?php endif; ?>
+          <?php if (!empty($e['receipt_data'])): ?> <a href="/voucher-line-receipt?id=<?= (int)$e['id'] ?>" target="_blank" rel="noopener">📎 view</a><?php elseif ($h && exp_needs_photo($h)): ?> <span class="pill p-warn">no photo</span><?php endif; ?>
+          <?php if (trim((string)($e['km_reason'] ?? '')) !== ''): ?><br><span class="vc-note">Reason for the distance: “<?= e($e['km_reason']) ?>”</span><?php endif; ?>
+          <?php if ($parts && trim((string)$e['notes']) !== '' && $e['head_code'] !== 'KMTRAVEL'): ?><br><span class="vc-note"><?= e($e['notes']) ?></span><?php endif; ?>
+        </span>
+        <?php if ($mayChange): ?>
+          <span class="vc-act">
+            <?php if ($isBill): ?>
+              <details class="vc-edit"><summary class="btn small secondary">Change</summary>
+                <form method="post" action="/voucher-line" enctype="multipart/form-data" class="vc-editform">
+                  <input type="hidden" name="id" value="<?= (int)$e['id'] ?>"><input type="hidden" name="_do" value="update">
+                  <label>Amount (<?= e($cs) ?>)<input class="form-control" type="number" step="0.01" min="0" name="amount" value="<?= e((string)(float)$e['row_total']) ?>" required></label>
+                  <label>Note<input class="form-control" name="note" value="<?= e($e['notes']) ?>"></label>
+                  <?php if (!$nobill): ?><label>Photo of the bill<input class="form-control" type="file" name="receipt" accept="image/*,.pdf" capture="environment"></label><?php endif; ?>
+                  <button class="btn small" type="submit">Save</button>
+                </form></details>
+            <?php endif; ?>
+            <form method="post" action="/voucher-line" onsubmit="return confirm('Remove this line?')" style="display:inline"><input type="hidden" name="id" value="<?= (int)$e['id'] ?>"><input type="hidden" name="_do" value="del"><button class="btn small danger" type="submit" aria-label="Remove this line">✕</button></form>
+          </span>
+        <?php endif; ?>
+      </li>
+    <?php endforeach; ?>
+    </ul>
+    <?php if ($gj && $mayChange && $isOwner): ?>
+      <div class="vc-dayfoot"><a class="btn small secondary" href="/voucher-day?job=<?= (int)$gj['id'] ?>&amp;date=<?= e($g['date']) ?>">Change the day / ＋ add a bill</a></div>
+    <?php endif; ?>
+  </div>
+<?php endforeach; ?>
+<?php if (!$groups): ?>
+  <div class="panel muted" style="text-align:center;padding:24px">Nothing here yet. <?= $isOwner ? 'When you close a day on your ' . e(Tl('job')) . ', its expenses appear here by themselves.' : '' ?></div>
+<?php endif; ?>
+</div>
+
 <?php if ($canEdit): ?>
-<?php // ---- Module 30: quick add one expense (amount + type + optional job + receipt) ---- ?>
-<div class="panel" data-tab="Entries" id="quick-add" style="border-left:3px solid var(--accent,#2b6cff)">
-  <h3 class="tab-sub" style="margin-top:0">Add an expense</h3>
-  <p class="muted" style="margin:0 0 10px">Amount, what it was for, and a photo of the receipt — the date (<?= e(date('d M Y')) ?>), your name and the currency are filled in for you.</p>
-  <form method="post" action="/voucher-quick-add" enctype="multipart/form-data" class="inline-add" style="align-items:flex-end">
-    <input type="hidden" name="inspector_id" value="<?= (int)$v['inspector_id'] ?>">
-    <input type="hidden" name="month" value="<?= e($v['month']) ?>">
-    <div class="ff"><label>Amount (<?= e(cur_sym()) ?>) *</label><input class="form-control" style="width:120px" type="number" step="0.01" min="0" name="amount" required></div>
+<?php // "Not for a job" types (E5) — only those switched on for this person. ?>
+<details class="panel" id="quick-add" <?= !empty($nonJob) ? '' : 'style="opacity:.9"' ?>>
+  <summary style="font-weight:700;cursor:pointer;min-height:44px;display:flex;align-items:center">＋ Add an expense not for a <?= e(Tl('job')) ?></summary>
+  <?php if (!empty($nonJob)): ?>
+  <form method="post" action="/voucher-quick-add" enctype="multipart/form-data" class="inline-add" style="align-items:flex-end;margin-top:8px">
     <div class="ff"><label>What for *</label>
-      <select class="form-control" name="head"><?php foreach ($heads as $h): ?><option value="<?= e($h['code']) ?>"><?= e($h['label'] ?? $h['code']) ?></option><?php endforeach; ?></select></div>
-    <div class="ff"><label>Date</label><input class="form-control" type="date" name="entry_date" value="<?= e(date('Y-m-d')) ?>"></div>
-    <div class="ff"><label>Against a <?= e(Tl('job')) ?> <span class="muted">— optional</span></label>
-      <select class="form-control searchable" name="job_id"><option value="">— none —</option>
-        <?php foreach (($qaJobs ?? []) as $jb): ?><option value="<?= (int)$jb['id'] ?>" <?= (int)($addJob ?? 0) === (int)$jb['id'] ? 'selected' : '' ?>><?= e($jb['job_code']) ?><?= $jb['client_name'] ? ' · ' . e($jb['client_name']) : '' ?></option><?php endforeach; ?>
-      </select></div>
-    <div class="ff"><label>Receipt photo <span class="muted">— optional</span></label><input class="form-control" type="file" name="receipt" accept="image/*,.pdf" capture="environment"></div>
-    <div class="ff ff-wide"><label>Note <span class="muted">— optional</span></label><input class="form-control" name="note" placeholder="e.g. taxi from station to plant"></div>
+      <select class="form-control" name="head" required><?php foreach ($nonJob as $h): ?><option value="<?= e($h['code']) ?>"><?= e($h['label']) ?><?= exp_kind($h) === 'NOBILL' ? ' (no bill)' : '' ?><?= $h['_limit'] !== null ? ' — limit ' . e($cs . nf((float)$h['_limit'], 0)) : '' ?></option><?php endforeach; ?></select></div>
+    <div class="ff"><label>Amount (<?= e($cs) ?>) *</label><input class="form-control" style="width:120px" type="number" step="0.01" min="0" name="amount" required></div>
+    <div class="ff"><label>Date</label><input class="form-control" type="date" name="entry_date" value="<?= e(max($period[0], min($period[1], date('Y-m-d')))) ?>" min="<?= e($period[0]) ?>" max="<?= e($period[1]) ?>"></div>
+    <div class="ff"><label>Photo of the bill</label><input class="form-control" type="file" name="receipt" accept="image/*,.pdf" capture="environment"></div>
+    <div class="ff ff-wide"><label>Note <span class="muted">— needed for a "no bill" expense</span></label><input class="form-control" name="note" placeholder="what it was for"></div>
     <button class="btn" type="submit">Add expense</button>
   </form>
-</div>
-<div class="panel" data-tab="Entries" style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
-  <form method="post" action="/voucher-generate?id=<?= (int)$v['id'] ?>">
-    <button class="btn" type="submit">↻ Pull working days from jobs</button>
-    <p class="muted" style="margin:6px 2px 0;max-width:280px">Auto-fills each inspection day (date, site, File No / <?= e(Tl("boss")) ?>, <?= e(Tl("sbu")) ?>) from the jobs allotted to this inspector. Safe to click again — it won't duplicate.</p>
-  </form>
-  <form method="post" action="/voucher-entry?id=<?= (int)$v['id'] ?>" class="inline-add" style="align-items:flex-end">
-    <input type="hidden" name="_do" value="add">
-    <div class="ff"><label>Add a non-inspection day</label><input class="form-control" type="date" name="entry_date" required></div>
-    <div class="ff"><label>Type</label>
-      <select class="form-control" name="day_type" id="add_daytype">
-        <option value="OFFICE">In office</option><option value="LEAVE">Leave</option>
-        <option value="HOLIDAY">Holiday</option><option value="WEEKOFF">Week-off</option>
-      </select></div>
-    <div class="ff" id="add_office"><label>Office code</label>
-      <select class="form-control" name="office_code"><option value="">—</option><?php foreach ($dayOpts as $k=>$vv): ?><option value="<?= e($k) ?>"><?= e($vv) ?></option><?php endforeach; ?></select></div>
-    <div class="ff" id="add_leave" style="display:none"><label>Leave code</label>
-      <select class="form-control" name="leave_code"><option value="">—</option><?php foreach ($leaveOpts as $k=>$vv): ?><option value="<?= e($k) ?>"><?= e($vv) ?></option><?php endforeach; ?></select></div>
-    <div class="ff"><label>Hours</label><input class="form-control" style="width:90px" type="number" step="0.25" min="0" max="<?= e(hours_cap()) ?>" name="hours" value="0"></div>
-    <button class="btn small" type="submit">Add day</button>
-  </form>
-</div>
-<?php endif; ?>
-
-<?php
-  $fmt = fn($n) => rtrim(rtrim(number_format((float)$n, 2, '.', ''), '0'), '.') ?: '0';
-  // running column totals
-  $tTravel = 0; $tHead = []; foreach ($heads as $h) $tHead[$h['code']] = 0; $grand = 0;
-  $ncol = 8 + count($heads) + ($canEdit ? 2 : 1); // Date,Site,File,Line,Hrs,Mode,KM,Travel + heads + Row(+✕)
-?>
-<?php // Module 47 — draft-protect the expense lines an inspector types in the field. ?>
-<?php if ($canEdit): ?><form method="post" action="/voucher-save?id=<?= (int)$v['id'] ?>" id="vform" data-autosave="voucher-<?= (int)$v['id'] ?>"><?php endif; ?>
-<style>
-  <?php /* Sticky header: it must fully COVER the rows scrolling under it. var(--soft)
-           was not opaque, so the first rows bled through and read as an overlap.
-           Use the solid card background, lift the z-index above the inputs, and add
-           a divider so the header sits cleanly above the grid. */ ?>
-  #vgrid th{position:sticky;top:56px;background:var(--card);z-index:6;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);box-shadow:inset 0 -1px 0 var(--line),0 2px 4px rgba(0,0,0,.06)}
-  #vgrid td,#vgrid th{padding:7px 8px;white-space:nowrap}
-  #vgrid .form-control{padding:6px 8px;font-size:13px;background:var(--card)}
-  #vgrid .v-travel,#vgrid .v-rowtotal{font-variant-numeric:tabular-nums;text-align:right}
-  #vgrid tr[data-eid]:hover td{background:color-mix(in srgb,var(--brand) 4%,transparent)}
-  .tbl-scroll{border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-sm)}
-
-  <?php /* ---- Phone: the 12-column spreadsheet is unusable behind a sideways
-           scroll on a thumb, so below 720px the SAME grid (same inputs, same
-           names, same recalc JS — nothing about the data changes) reflows into
-           one card per day. Each cell becomes a "Label: value" line, the column
-           header row is dropped, and inputs go full-width. Desktop is untouched:
-           every rule here lives inside the media query. */ ?>
-  @media (max-width: 720px){
-    .tbl-scroll{overflow-x:visible;border:none;box-shadow:none;border-radius:0}
-    #vgrid, #vgrid tbody, #vgrid tr, #vgrid td{display:block;width:auto}
-    #vgrid .vgrid-head{display:none}                       /* column headers make no sense stacked */
-    #vgrid td{white-space:normal}
-    /* each entry is a card */
-    #vgrid tr[data-eid]:not(.v-noterow){border:1px solid var(--line);border-radius:var(--radius);
-      background:var(--card);box-shadow:var(--shadow-sm);margin:0 0 12px;padding:4px 0 6px;overflow:hidden}
-    #vgrid tr[data-eid]:hover td{background:transparent}   /* no hover paint on touch cards */
-    /* the Date cell is the card's title bar */
-    #vgrid td.v-date{background:var(--soft);font-weight:700;padding:9px 12px;margin-bottom:4px;
-      border-bottom:1px solid var(--line)}
-    /* every other cell: label left, value/input right. The label is emitted only
-       when data-label is present AND non-empty, so action/spacer cells get no
-       stray empty label column. */
-    #vgrid tr[data-eid] td:not(.v-date){display:flex;justify-content:space-between;align-items:center;
-      gap:12px;padding:6px 12px;border:none}
-    #vgrid tr[data-eid] td[data-label]:not([data-label=""])::before{content:attr(data-label);font-size:11px;
-      font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);flex:0 0 40%}
-    #vgrid td:empty{display:none}                          /* drop the spacer cells */
-    #vgrid tr[data-eid] .form-control{width:100% !important;flex:1 1 auto;max-width:60%}
-    #vgrid td.v-travel,#vgrid td.v-rowtotal{justify-content:space-between}
-    #vgrid td.v-rowtotal{background:var(--soft);border-top:1px solid var(--line);padding-top:8px;padding-bottom:8px}
-    #vgrid td.row-actions{justify-content:flex-end}
-    /* the per-day note: sits attached under its card */
-    #vgrid tr.v-noterow{border:1px solid var(--line);border-top:none;border-radius:0 0 var(--radius) var(--radius);
-      background:var(--card);margin:-12px 0 12px;padding:6px 12px 10px}
-    #vgrid tr.v-noterow td{display:block;padding:2px 0;border:none;white-space:normal}
-    #vgrid tr.v-noterow td::before{content:none}
-    #vgrid tr[data-eid]:not(.v-noterow):has(+ .v-noterow){margin-bottom:0;border-bottom:none;
-      border-radius:var(--radius) var(--radius) 0 0}
-    /* running per-day + grand totals read as plain lines, not a broken table row */
-    #vgrid tr.v-daytot,#vgrid tr.v-totalrow,#vgrid tr.v-grandrow{background:transparent}
-    #vgrid tr.v-totalrow,#vgrid tr.v-grandrow{border:1px solid var(--line);border-radius:var(--radius);
-      background:var(--soft);margin:0 0 10px;padding:4px 0}
-    #vgrid tr.v-totalrow td,#vgrid tr.v-grandrow td{display:flex;justify-content:space-between;
-      gap:12px;padding:6px 12px;text-align:left !important;border:none}
-    #vgrid tr.v-totalrow td[data-label]:not([data-label=""])::before,
-    #vgrid tr.v-grandrow td[data-label]:not([data-label=""])::before{content:attr(data-label);
-      font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);flex:0 0 40%}
-    #vgrid tr.v-daytot td{padding:6px 4px}
-    .inline-add{flex-wrap:wrap}
-  }
-</style>
-<div class="tbl-scroll" style="overflow-x:auto">
-<table class="grid" id="vgrid">
-  <tr class="vgrid-head">
-    <th>Date</th><th>Attendance / Site</th><th>File No (<?= e(T("boss")) ?>)</th><th>Line No</th><th>Hrs</th>
-    <th>Mode</th><th>KM</th><th>Travel <?= e(cur_sym()) ?></th>
-    <?php foreach ($heads as $h): ?><th title="<?= e($h['code']) ?>"><?= e($h['label']) ?></th><?php endforeach; ?>
-    <th>Row <?= e(cur_sym()) ?></th><?php if ($canEdit): ?><th></th><?php endif; ?>
-  </tr>
-  <?php foreach ($byDate as $date => $rows): $dayHours = 0; ?>
-    <?php foreach ($rows as $e):
-      $dayHours += (float)$e['hours']; $monthHours += (float)$e['hours'];
-      $isWork = $e['day_type']==='WORK';
-      $att = $isWork ? ($e['site_label'] ?: '(site)') : ($e['day_type']==='LEAVE' ? ('Leave'.($e['leave_code']?' · '.($leaveOpts[$e['leave_code']]??$e['leave_code']):'')) : ($e['day_type']==='OFFICE' ? ('Office'.($e['office_code']?' · '.($dayOpts[$e['office_code']]??$e['office_code']):'')) : ucfirst(strtolower($e['day_type']))));
-      $amt = expense_extra_decode($e['amounts'] ?? '');
-      // km / mode prefill from vendor memory when not yet filled
-      $mem = ((float)$e['km']>0 || !$isWork) ? null : vendor_km_lookup($v['inspector_id'], $e['vendor_id']);
-      $kmVal = (float)$e['km']>0 ? $e['km'] : ($mem['km'] ?? '');
-      $modeVal = $e['mode_code'] ?: ($mem['mode_code'] ?? '');
-      $tTravel += (float)$e['travel_amount']; $grand += (float)$e['row_total'];
-      foreach ($heads as $h) $tHead[$h['code']] += (float)($amt[$h['code']] ?? 0);
-      $eid = (int)$e['id']; $P = "rows[$eid]";
-    ?>
-    <tr data-eid="<?= $eid ?>">
-      <td class="v-date"><?= e(date('d-M', strtotime($date))) ?><?= $e['is_auto']?' <span class="badge GREEN" style="font-size:10px">auto</span>':'' ?><?= $mem?' <span class="muted" title="km remembered for this vendor" style="font-size:11px">↺</span>':'' ?></td>
-      <td data-label="Attendance / Site"><?= e($att) ?><?php if (!empty($e['receipt_data'])): ?> <a href="/voucher-line-receipt?id=<?= $eid ?>" target="_blank" rel="noopener" title="View the receipt" style="text-decoration:none">📎</a><?php endif; ?></td>
-      <?php if ($canEdit): ?>
-      <td data-label="File No (<?= e(T('boss')) ?>)"><input form="vform" class="form-control" style="width:110px" name="<?= $P ?>[file_no]" value="<?= e($e['file_no']) ?>" <?= $isWork?'':'readonly' ?>></td>
-      <td data-label="Line No"><input form="vform" class="form-control" style="width:80px" name="<?= $P ?>[line_no]" value="<?= e($e['line_no']) ?>" placeholder="acct"></td>
-      <td data-label="Hours"><input form="vform" class="form-control v-hours" style="width:64px" type="number" step="0.25" min="0" max="<?= e(hours_cap()) ?>" name="<?= $P ?>[hours]" value="<?= e($fmt($e['hours'])) ?>"></td>
-      <td data-label="Mode"><select form="vform" class="form-control v-mode" style="width:110px" name="<?= $P ?>[mode]"><option value="">—</option>
-        <?php foreach ($modes as $m): ?><option value="<?= e($m['code']) ?>" <?= $modeVal===$m['code']?'selected':'' ?>><?= e($m['label']) ?></option><?php endforeach; ?></select></td>
-      <td data-label="KM"><input form="vform" class="form-control v-km" style="width:70px" type="number" step="0.1" min="0" name="<?= $P ?>[km]" value="<?= e($kmVal!==''?$fmt($kmVal):'') ?>"></td>
-      <td class="v-travel" data-label="Travel <?= e(cur_sym()) ?>" data-eid="<?= $eid ?>"><?= e(cur_sym()) ?><?= $fmt($e['travel_amount']) ?></td>
-      <?php foreach ($heads as $h): ?>
-        <td data-label="<?= e($h['label']) ?>"><input form="vform" class="form-control v-amt" data-code="<?= e($h['code']) ?>" style="width:80px" type="number" step="0.01" min="0" name="<?= $P ?>[amt][<?= e($h['code']) ?>]" value="<?= e(isset($amt[$h['code']])?$fmt($amt[$h['code']]):'') ?>" <?= $h['head_type']==='BILL'?'title="actual bill"':'' ?>></td>
-      <?php endforeach; ?>
-      <td class="v-rowtotal" data-label="Row total <?= e(cur_sym()) ?>" data-eid="<?= $eid ?>"><strong><?= e(cur_sym()) ?><?= $fmt($e['row_total']) ?></strong></td>
-      <td class="row-actions" data-label=""><button form="del_<?= $eid ?>" class="btn small danger" type="submit" onclick="return confirm('Remove this row?')">✕</button></td>
-      <?php else: ?>
-      <td data-label="File No (<?= e(T('boss')) ?>)"><?= e($e['file_no'] ?: '—') ?></td>
-      <td data-label="Line No"><?= e($e['line_no'] ?: '—') ?></td>
-      <td data-label="Hours"><?= e($fmt($e['hours'])) ?></td>
-      <td data-label="Mode"><?= e($e['mode_code'] ?: '—') ?></td>
-      <td data-label="KM"><?= (float)$e['km']>0 ? e($fmt($e['km'])) : '—' ?></td>
-      <td data-label="Travel <?= e(cur_sym()) ?>"><?= e(cur_sym()) ?><?= $fmt($e['travel_amount']) ?></td>
-      <?php foreach ($heads as $h): ?><td data-label="<?= e($h['label']) ?>"><?= isset($amt[$h['code']]) ? cur_sym().$fmt($amt[$h['code']]) : '—' ?></td><?php endforeach; ?>
-      <?php // Row total in the read-only view carries NO v-rowtotal class on purpose:
-            //  the recalc script (which runs on every load) must not find and zero it. ?>
-      <td data-label="Row total <?= e(cur_sym()) ?>" style="text-align:right"><strong><?= e(cur_sym()) ?><?= $fmt($e['row_total']) ?></strong></td>
-      <?php endif; ?>
-    </tr>
-    <?php // A per-line note / remark — so an incidental or "Others (specify)" expense
-          //  can say what it was for. Kept as a light sub-row rather than another
-          //  column, so the wide grid stays readable. ?>
-    <?php if ($canEdit): ?>
-    <tr class="v-noterow" data-eid="<?= $eid ?>">
-      <td class="muted" style="text-align:right;font-size:11px" colspan="2">Note / remark</td>
-      <td colspan="<?= $ncol - 2 ?>"><input form="vform" class="form-control" style="width:100%" name="<?= $P ?>[note]"
-          value="<?= e($e['notes'] ?? '') ?>" placeholder="what the expense was for — e.g. incidental / conveyance / other"></td>
-    </tr>
-    <?php elseif (!empty($e['notes'])): ?>
-    <tr class="muted" style="font-size:11px"><td></td><td colspan="<?= $ncol - 1 ?>">↳ <?= e($e['notes']) ?></td></tr>
-    <?php endif; ?>
-    <?php endforeach; ?>
-    <?php if (count($rows) > 1): ?><tr class="v-daytot muted" style="font-size:12px"><td colspan="<?= $ncol ?>">↳ <?= e($date) ?> — day total hours: <strong><?= e($fmt($dayHours)) ?></strong></td></tr><?php endif; ?>
-  <?php endforeach; ?>
-  <?php if (!$entries): ?><tr><td colspan="<?= $ncol ?>">No days yet. <?= $canEdit?'Click “Pull working days from jobs”.':'' ?></td></tr><?php endif; ?>
-  <?php if ($entries): ?>
-  <tr class="v-totalrow" style="background:var(--soft)">
-    <td colspan="4" style="text-align:right"><strong>TOTAL</strong></td>
-    <td data-label="Total hours"><strong class="tot-hours"><?= e($fmt($monthHours)) ?></strong></td>
-    <td></td><td></td>
-    <td id="tot-travel" data-label="Travel <?= e(cur_sym()) ?>"><strong><?= e(cur_sym()) ?><?= $fmt($tTravel) ?></strong></td>
-    <?php foreach ($heads as $h): ?><td id="tot-amt-<?= e($h['code']) ?>" data-label="<?= e($h['label']) ?>"><strong><?= e(cur_sym()) ?><?= $fmt($tHead[$h['code']]) ?></strong></td><?php endforeach; ?>
-    <td id="tot-grand" data-label="Total <?= e(cur_sym()) ?>"><strong><?= e(cur_sym()) ?><?= $fmt($grand) ?></strong></td>
-    <?php if ($canEdit): ?><td></td><?php endif; ?>
-  </tr>
-  <tr class="v-grandrow"><td colspan="<?= $ncol - 1 ?>" style="text-align:right"><strong>Grand Total</strong></td><td id="tot-grand2" data-label="Grand total <?= e(cur_sym()) ?>"><strong><?= e(cur_sym()) ?><?= $fmt($grand) ?></strong></td></tr>
-  <?php endif; ?>
-</table>
-</div>
-<?php if ($canEdit): ?>
-  <div style="margin-top:12px"><button class="btn" type="submit">💾 Save all rows &amp; totals</button></div>
-  </form>
-  <?php foreach ($entries as $e): ?>
-    <form id="del_<?= (int)$e['id'] ?>" method="post" action="/voucher-entry?id=<?= (int)$v['id'] ?>"><input type="hidden" name="_do" value="del"><input type="hidden" name="entry_id" value="<?= (int)$e['id'] ?>"></form>
-  <?php endforeach; ?>
-  <p class="muted" style="margin-top:8px">KM auto-fills from what you last entered for that vendor (↺) and stays editable. Travel <?= e(cur_sym()) ?> = KM × your rate; the bottom row totals every column. Only the heads &amp; modes you're entitled to appear.</p>
-<?php endif; ?>
-
-<div class="panel-split" data-tab="Summary" style="margin-top:16px">
-  <div class="panel">
-    <h3 class="tab-sub">Summary — particulars</h3>
-    <table class="grid">
-      <tr><th>Particular</th><th style="text-align:right">Amount</th></tr>
-      <tr><td>Travel charges (KM × rate)</td><td style="text-align:right"><?= e(cur_sym()) ?><?= nf($sum['travel'],0) ?></td></tr>
-      <?php foreach ($sum['heads'] as $code=>$amt): if ($amt==0) continue; ?>
-        <tr><td><?= e($headLabels[$code] ?? $code) ?></td><td style="text-align:right"><?= e(cur_sym()) ?><?= nf($amt,0) ?></td></tr>
-      <?php endforeach; ?>
-      <tr style="background:var(--soft)"><td><strong>Grand Total</strong></td><td style="text-align:right"><strong><?= e(cur_sym()) ?><?= nf($sum['grand'],0) ?></strong></td></tr>
-      <tr><td>Less: Advance</td><td style="text-align:right"><?= e(cur_sym()) ?><?= nf((float)$v['advance'],0) ?></td></tr>
-      <tr><td>Less: Expenses incurred by Office</td><td style="text-align:right"><?= e(cur_sym()) ?><?= nf((float)$v['office_incurred'],0) ?></td></tr>
-      <?php $bal = $sum['grand'] - (float)$v['advance'] - (float)$v['office_incurred']; ?>
-      <tr style="background:var(--soft)"><td><strong>Balance to be paid / (recovered)</strong></td><td style="text-align:right"><strong><?= e(cur_sym()) ?><?= nf($bal,0) ?></strong></td></tr>
-    </table>
-    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-      <a class="btn secondary" href="/voucher-print?id=<?= (int)$v['id'] ?>" target="_blank">🖨 Print / Save PDF</a>
-      <a class="btn secondary" href="/voucher-csv?id=<?= (int)$v['id'] ?>">⬇ Download (Excel/CSV)</a>
-    </div>
-    <p class="muted" style="margin:6px 2px 0;font-size:12px">Print → "Save as PDF" for the signed statement; Download for the spreadsheet accounts can file.</p>
-  </div>
-
-  <div class="panel">
-    <h3 class="tab-sub">Voucher details &amp; approval</h3>
-    <?php if ($canEdit): ?>
-    <form method="post" action="/voucher-header?id=<?= (int)$v['id'] ?>" enctype="multipart/form-data">
-      <div class="form-grid">
-        <div class="ff"><label>Nature of spend</label>
-          <select class="form-control" name="nature"><option value="">—</option><?php foreach ($natureOpts as $k=>$vv): ?><option value="<?= e($k) ?>" <?= $v['nature']===$k?'selected':'' ?>><?= e($vv) ?></option><?php endforeach; ?></select></div>
-        <div class="ff"><label>Less Advance (<?= e(cur_sym()) ?>)</label><input class="form-control" type="number" step="0.01" name="advance" value="<?= e($v['advance']) ?>"></div>
-        <div class="ff"><label>Less Office-incurred (<?= e(cur_sym()) ?>)</label><input class="form-control" type="number" step="0.01" name="office_incurred" value="<?= e($v['office_incurred']) ?>"></div>
-        <div class="ff ff-wide"><label>Supporting file — one file for all bills (PDF/JPG, max 6 MB)</label><input class="form-control" type="file" name="support"></div>
-      </div>
-      <div style="margin-top:8px"><button class="btn small" type="submit">Save details / upload</button></div>
-    </form>
-    <?php else: ?>
-      <div class="kv-grid">
-        <div><span class="k">Nature</span><span class="v"><?= e($natureOpts[$v['nature']] ?? $v['nature'] ?: '—') ?></span></div>
-        <div><span class="k">Advance</span><span class="v"><?= e(cur_sym()) ?><?= nf((float)$v['advance'],0) ?></span></div>
-        <div><span class="k">Office-incurred</span><span class="v"><?= e(cur_sym()) ?><?= nf((float)$v['office_incurred'],0) ?></span></div>
-      </div>
-    <?php endif; ?>
-    <?php if ($v['supporting_file']): ?><p style="margin-top:8px">📎 Supporting: <a href="/voucher-file?id=<?= (int)$v['id'] ?>" target="_blank"><?= e($v['supporting_name'] ?: 'file') ?></a></p><?php endif; ?>
-
-    <hr style="margin:12px 0;border:none;border-top:1px solid #eee">
-    <p><strong>Status:</strong> <span class="badge <?= $statusBadge[$v['status']] ?? 'AMBER' ?>"><?= e($v['status']) ?></span>
-      <?php if ($v['approved_by'] && in_array($v['status'], ['APPROVED','PAID'], true)): ?><span class="muted"> · approved by <?= e($v['approved_by']) ?></span><?php endif; ?></p>
-    <?php
-      //  Branch batch R5 — the approval chain, in words: where it is and who is next.
-      $lv = $progress['levels'] ?? []; $curIdx = $progress['current'] ?? null;
-    ?>
-    <?php if ($v['status'] === 'DRAFT' && trim((string)($v['sent_back_reason'] ?? '')) !== ''): ?>
-      <div class="vchain-note bad" role="status">
-        <strong>Sent back<?= ($v['sent_back_by'] ?? '') !== '' ? ' by ' . e($v['sent_back_by']) : '' ?><?= ($v['sent_back_at'] ?? '') !== '' ? ' on ' . e(fdate(substr((string)$v['sent_back_at'], 0, 10))) : '' ?>:</strong>
-        <?= e($v['sent_back_reason']) ?><br><span class="muted">Correct it and submit again — it goes back to the first approver.</span>
-      </div>
-    <?php endif; ?>
-    <?php if ($v['status'] === 'SUBMITTED' && $curIdx !== null): ?>
-      <p class="vchain-wait"><strong>Waiting for:</strong> <?= e(vappr_waiting_text($progress)) ?></p>
-      <?php if (($lv[$curIdx]['problem'] ?? '') !== ''): ?><div class="vchain-note warn" role="status">⚠ <?= e($lv[$curIdx]['problem']) ?></div><?php endif; ?>
-    <?php elseif ($v['status'] === 'DRAFT' && $lv): ?>
-      <p class="vchain-wait muted">When submitted, it goes to: <?= e(implode(' → ', array_map(fn($l) => $l['short'], $lv))) ?></p>
-    <?php endif; ?>
-    <?php if ($lv && $v['status'] !== 'DRAFT'): ?>
-      <ol class="vchain" aria-label="Approval chain">
-        <?php foreach ($lv as $i => $l): $d = $l['done'] ?? null; ?>
-          <li class="<?= $d ? 'done' : ($i === $curIdx ? 'now' : '') ?>">
-            <span class="vchain-dot" aria-hidden="true"><?= $d ? '✓' : ($i === $curIdx ? '●' : '○') ?></span>
-            <span><strong><?= e($l['label']) ?></strong>
-              <?php if ($d && !empty($l['auto'])): ?> — <?= e($d['user_name']) ?>, <span class="muted">already signed<?= ($d['via'] ?? '') !== '' ? ' at ' . e($d['via']) : ' at an earlier level' ?> — not asked twice</span>
-              <?php elseif ($d): ?> — <?= e($d['user_name']) ?><?= ($d['on_behalf_name'] ?? '') !== '' ? ' for ' . e($d['on_behalf_name']) : '' ?>, <?= e(fdate(substr((string)$d['created_at'], 0, 10))) ?>
-              <?php elseif ($l['approvers']): ?> — <?= e(implode(', ', array_slice(array_map('vappr_name', $l['approvers']), 0, 4))) ?><?= count($l['approvers']) > 4 ? ' …' : '' ?>
-              <?php else: ?> — <span class="muted">an administrator</span><?php endif; ?></span>
-          </li>
-        <?php endforeach; ?>
-      </ol>
-    <?php endif; ?>
-    <div class="row-actions" style="flex-wrap:wrap;gap:6px">
-      <?php if (!empty($canSubmit)): ?>
-        <form method="post" action="/voucher-status?id=<?= (int)$v['id'] ?>"><input type="hidden" name="action" value="submit"><button class="btn" type="submit">Submit for approval</button></form>
-      <?php endif; ?>
-      <?php if ($v['status']==='SUBMITTED' && !empty($canApproveThis)): ?>
-        <form method="post" action="/voucher-status?id=<?= (int)$v['id'] ?>" class="inline-add" style="align-items:flex-end">
-          <input type="hidden" name="action" value="approve">
-          <div class="ff"><label>Note <span class="muted">— optional</span></label><input class="form-control" name="note"></div>
-          <button class="btn" type="submit">Approve<?= !empty($act['on_behalf']) ? ' for ' . e(vappr_name(vappr_user($act['on_behalf']))) : '' ?></button>
-        </form>
-        <form method="post" action="/voucher-status?id=<?= (int)$v['id'] ?>" class="inline-add" style="align-items:flex-end">
-          <input type="hidden" name="action" value="sendback">
-          <div class="ff"><label>Reason for sending back *</label><input class="form-control" name="reason" required placeholder="e.g. hotel bill for 12 Nov missing"></div>
-          <button class="btn secondary" type="submit">Send back</button>
-        </form>
-      <?php elseif ($v['status']==='SUBMITTED' && !voucher_owner_is_me($v) && (int)($v['submitted_by'] ?? 0) === (int)(current_user()['id'] ?? 0)): ?>
-        <p class="muted" style="margin:0;font-size:12.5px">Awaiting approval — it must be approved by someone other than the person who submitted it (maker&nbsp;≠&nbsp;checker).</p>
-      <?php endif; ?>
-      <?php if (!empty($canPaid)): ?>
-        <form method="post" action="/voucher-status?id=<?= (int)$v['id'] ?>"><input type="hidden" name="action" value="paid"><button class="btn" type="submit">Mark paid</button></form>
-      <?php endif; ?>
-      <?php if (!empty($canReopen)): ?>
-        <form method="post" action="/voucher-status?id=<?= (int)$v['id'] ?>" onsubmit="return confirm('Reopen for editing?')"><input type="hidden" name="action" value="reopen"><button class="btn secondary" type="submit">Reopen</button></form>
-      <?php endif; ?>
-    </div>
-  </div>
-</div>
-
-<div class="panel" data-tab="History" style="margin-top:16px">
-  <h3 class="tab-sub">History</h3>
-  <?php if (empty($history)): ?>
-    <p class="muted" style="margin:0">Nothing yet. Each submission, approval, send-back and payment is recorded here — who, at which level, when and why.</p>
   <?php else: ?>
-    <?php $verb = ['SUBMITTED' => 'Submitted', 'APPROVED' => 'Approved', 'SENT_BACK' => 'Sent back', 'REOPENED' => 'Reopened', 'PAID' => 'Marked paid', 'ALREADY_SIGNED' => 'Counted as signed']; ?>
+    <p class="muted" style="margin:8px 0 0">Add an expense: expenses on a <?= e(Tl('job')) ?> are added when you close the day on the <?= e(Tl('job')) ?>. No "not for a <?= e(Tl('job')) ?>" type is switched on for you — ask the Master Admin if you need one.</p>
+  <?php endif; ?>
+</details>
+<?php endif; ?>
+
+<?php // ---- The one action for this viewer ---- ?>
+<div class="panel vc-act-panel">
+  <?php if ($v['status'] === 'SUBMITTED' && $curIdx !== null): ?>
+    <p class="vchain-wait"><strong><?= $iWaiting ? 'Waiting for you' : 'Waiting for' ?>:</strong> <?= e(vappr_waiting_text($progress)) ?></p>
+    <?php if (($lv[$curIdx]['problem'] ?? '') !== ''): ?><div class="vchain-note warn" role="status">⚠ <?= e($lv[$curIdx]['problem']) ?></div><?php endif; ?>
+  <?php elseif ($v['status'] === 'DRAFT' && $lv): ?>
+    <p class="vchain-wait">It will go to: <strong><?= e($chainTxt) ?></strong></p>
+  <?php endif; ?>
+  <?php if ($lv && $v['status'] !== 'DRAFT'): ?>
+    <ol class="vchain" aria-label="Approval chain">
+      <?php foreach ($lv as $i => $l): $d = $l['done'] ?? null; ?>
+        <li class="<?= $d ? 'done' : ($i === $curIdx ? 'now' : '') ?>">
+          <span class="vchain-dot" aria-hidden="true"><?= $d ? '✓' : ($i === $curIdx ? '●' : '○') ?></span>
+          <span><strong><?= e($l['label']) ?></strong>
+            <?php if ($d && !empty($l['auto'])): ?> — <?= e($d['user_name']) ?>, <span class="muted">already signed<?= ($d['via'] ?? '') !== '' ? ' at ' . e($d['via']) : ' at an earlier level' ?> — not asked twice</span>
+            <?php elseif ($d): ?> — <?= e($d['user_name']) ?><?= ($d['on_behalf_name'] ?? '') !== '' ? ' for ' . e($d['on_behalf_name']) : '' ?>, <?= e(fdate(substr((string)$d['created_at'], 0, 10))) ?>
+            <?php elseif ($l['approvers']): ?> — <?= e(implode(', ', array_slice(array_map('vappr_name', $l['approvers']), 0, 4))) ?><?= count($l['approvers']) > 4 ? ' …' : '' ?>
+            <?php else: ?> — <span class="muted">an administrator</span><?php endif; ?></span>
+        </li>
+      <?php endforeach; ?>
+    </ol>
+  <?php endif; ?>
+  <div class="row-actions" style="flex-wrap:wrap;gap:8px">
+    <?php if (!empty($canSubmit)): ?>
+      <form method="post" action="/voucher-status?id=<?= (int)$v['id'] ?>"><input type="hidden" name="action" value="submit"><button class="btn vc-primary" type="submit" <?= !empty($submitProblems) ? 'disabled title="Add what is missing first"' : '' ?>>Submit <?= e($cs . nf($vGrand, 0)) ?></button></form>
+    <?php endif; ?>
+    <?php if ($iWaiting): ?>
+      <form method="post" action="/voucher-status?id=<?= (int)$v['id'] ?>" class="inline-add" style="align-items:flex-end">
+        <input type="hidden" name="action" value="approve">
+        <div class="ff"><label>Note <span class="muted">— optional</span></label><input class="form-control" name="note"></div>
+        <button class="btn vc-primary" type="submit">Approve <?= e($cs . nf($vGrand, 0)) ?><?= !empty($act['on_behalf']) ? ' for ' . e(vappr_name(vappr_user($act['on_behalf']))) : '' ?></button>
+      </form>
+      <form method="post" action="/voucher-status?id=<?= (int)$v['id'] ?>" class="inline-add" style="align-items:flex-end">
+        <input type="hidden" name="action" value="sendback">
+        <div class="ff"><label>Reason for sending back *</label><input class="form-control" name="reason" required placeholder="e.g. hotel bill for 12 Nov missing"></div>
+        <button class="btn secondary" type="submit">Send back with a reason</button>
+      </form>
+    <?php elseif ($v['status']==='SUBMITTED' && !voucher_owner_is_me($v) && (int)($v['submitted_by'] ?? 0) === (int)(current_user()['id'] ?? 0)): ?>
+      <p class="muted" style="margin:0;font-size:12.5px">Awaiting approval — it must be approved by someone other than the person who submitted it (maker&nbsp;≠&nbsp;checker).</p>
+    <?php endif; ?>
+    <?php if (!empty($canPaid)): ?>
+      <?php // E6 — Finance enters the advance when it marks the claim paid. ?>
+      <form method="post" action="/voucher-status?id=<?= (int)$v['id'] ?>" class="inline-add" style="align-items:flex-end">
+        <input type="hidden" name="action" value="paid">
+        <div class="ff"><label>Advance already paid (<?= e($cs) ?>)</label><input class="form-control" style="width:140px" type="number" step="0.01" min="0" name="advance" value="<?= (float)$v['advance'] > 0 ? e((string)(float)$v['advance']) : '' ?>" placeholder="0"></div>
+        <button class="btn vc-primary" type="submit">Mark paid</button>
+      </form>
+    <?php endif; ?>
+    <?php if (!empty($canReopen)): ?>
+      <form method="post" action="/voucher-status?id=<?= (int)$v['id'] ?>" onsubmit="return confirm('Reopen for editing?')"><input type="hidden" name="action" value="reopen"><button class="btn secondary" type="submit">Reopen</button></form>
+    <?php endif; ?>
+  </div>
+</div>
+
+<details class="panel">
+  <summary style="font-weight:700;cursor:pointer">Summary, print and download</summary>
+  <table class="grid" style="margin-top:8px">
+    <tr><th>Particular</th><th style="text-align:right">Amount</th></tr>
+    <tr><td>Travel charges (KM × rate)</td><td style="text-align:right"><?= e($cs) ?><?= nf($sum['travel'],0) ?></td></tr>
+    <?php foreach ($sum['heads'] as $code=>$amt): if ($amt==0) continue; ?>
+      <tr><td><?= e($headLabels[$code] ?? $code) ?></td><td style="text-align:right"><?= e($cs) ?><?= nf($amt,0) ?></td></tr>
+    <?php endforeach; ?>
+    <tr style="background:var(--soft)"><td><strong>Grand Total</strong></td><td style="text-align:right"><strong><?= e($cs) ?><?= nf($sum['grand'],0) ?></strong></td></tr>
+    <tr><td>Less: Advance <span class="muted">(entered by Finance when paid)</span></td><td style="text-align:right"><?= e($cs) ?><?= nf((float)$v['advance'],0) ?></td></tr>
+    <tr><td>Less: Expenses incurred by Office</td><td style="text-align:right"><?= e($cs) ?><?= nf((float)$v['office_incurred'],0) ?></td></tr>
+    <tr style="background:var(--soft)"><td><strong>Balance to be paid / (recovered)</strong></td><td style="text-align:right"><strong><?= e($cs) ?><?= nf($vBal,0) ?></strong></td></tr>
+  </table>
+  <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+    <a class="btn secondary" href="/voucher-print?id=<?= (int)$v['id'] ?>" target="_blank">🖨 Print / Save PDF</a>
+    <a class="btn secondary" href="/voucher-csv?id=<?= (int)$v['id'] ?>">⬇ Download (Excel/CSV)</a>
+  </div>
+  <?php if ($canEdit): ?>
+  <form method="post" action="/voucher-header?id=<?= (int)$v['id'] ?>" enctype="multipart/form-data" style="margin-top:12px">
+    <div class="form-grid">
+      <div class="ff"><label>Nature of spend</label>
+        <select class="form-control" name="nature"><option value="">—</option><?php foreach ($natureOpts as $k=>$vv): ?><option value="<?= e($k) ?>" <?= $v['nature']===$k?'selected':'' ?>><?= e($vv) ?></option><?php endforeach; ?></select></div>
+      <div class="ff"><label>Less Office-incurred (<?= e($cs) ?>)</label><input class="form-control" type="number" step="0.01" name="office_incurred" value="<?= e($v['office_incurred']) ?>"></div>
+      <div class="ff ff-wide"><label>Supporting file — one file for all bills (PDF/JPG, max 6 MB)</label><input class="form-control" type="file" name="support"></div>
+    </div>
+    <div style="margin-top:8px"><button class="btn small secondary" type="submit">Save details / upload</button></div>
+  </form>
+  <?php else: ?>
+    <p class="muted" style="margin:8px 0 0">Nature: <?= e($natureOpts[$v['nature']] ?? $v['nature'] ?: '—') ?></p>
+  <?php endif; ?>
+  <?php if ($v['supporting_file']): ?><p style="margin-top:8px">📎 Supporting: <a href="/voucher-file?id=<?= (int)$v['id'] ?>" target="_blank"><?= e($v['supporting_name'] ?: 'file') ?></a></p><?php endif; ?>
+</details>
+
+<?php if ($legacyMonth && $canEdit): ?>
+<details class="panel">
+  <summary style="font-weight:700;cursor:pointer">The month sheet (older <?= e(Tlp('voucher')) ?>) — hours, days off and amounts per head</summary>
+  <?php $monthHours = 0; require __DIR__ . '/voucher_grid.php'; ?>
+</details>
+<?php endif; ?>
+
+<details class="panel" id="history">
+  <summary style="font-weight:700;cursor:pointer">History</summary>
+  <?php if (empty($history)): ?>
+    <p class="muted" style="margin:8px 0 0">Nothing yet. Each submission, approval, send-back, reopen and payment is recorded here — who, at which level, when and why.</p>
+  <?php else: ?>
+    <?php $verb = ['SUBMITTED' => 'Submitted', 'APPROVED' => 'Approved', 'SENT_BACK' => 'Sent back', 'REOPENED' => 'Reopened', 'PAID' => 'Marked paid', 'ALREADY_SIGNED' => 'Counted as signed', 'REOPEN_ASKED' => 'Asked to reopen']; ?>
     <ul class="vhist">
       <?php foreach (array_reverse($history) as $h): ?>
         <li><span class="muted"><?= e(fdate(substr((string)$h['created_at'], 0, 10))) ?> <?= e(substr((string)$h['created_at'], 11, 5)) ?></span>
@@ -355,51 +282,36 @@
       <?php endforeach; ?>
     </ul>
   <?php endif; ?>
-</div>
+</details>
 <style>
+  .vc-top{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin:10px 0 12px}
+  .vc-total{font-size:34px;font-weight:800;font-variant-numeric:tabular-nums}
+  .vc-status{font-size:16px;color:var(--muted)}
+  .vc-warn{background:var(--warn-soft,#fff7e6);border-left:4px solid var(--warn,#b45309);border-radius:8px;padding:10px 12px;margin:8px 0;font-size:15px;line-height:1.5}
+  .vc-open .vc-openrow{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+  .vc-days{display:grid;gap:10px;margin:10px 0}
+  .vc-day{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:10px 14px}
+  .vc-dayhead{display:flex;justify-content:space-between;gap:10px;font-size:16px}
+  .vc-daysub{color:var(--muted);font-size:14px;margin-top:2px}
+  .vc-lines{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:4px}
+  .vc-lines li{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;padding:6px 0;border-top:1px dashed var(--line);font-size:15px}
+  .vc-lines li.vc-amber{background:var(--warn-soft,#fff7e6);border-left:3px solid var(--warn,#b45309);padding-left:8px;border-radius:4px}
+  .vc-note{font-size:13px;color:var(--muted)}
+  .vc-act{display:flex;gap:6px;align-items:flex-start;flex:none}
+  .vc-edit summary{list-style:none;display:inline-block} .vc-edit summary::-webkit-details-marker{display:none}
+  .vc-editform{display:grid;gap:6px;margin-top:6px;min-width:220px}
+  .vc-dayfoot{margin-top:8px}
+  .vc-primary{min-height:48px;font-size:16px;padding-left:22px;padding-right:22px}
   .vchain{list-style:none;margin:8px 0 10px;padding:0;display:grid;gap:6px;font-size:13px}
   .vchain li{display:flex;gap:8px;align-items:flex-start}
   .vchain-dot{width:18px;flex:none;text-align:center;color:var(--muted,#6b7280)}
   .vchain li.done .vchain-dot{color:var(--ok,#15803d)} .vchain li.now{font-weight:600} .vchain li.now .vchain-dot{color:var(--accent,#2b6cff)}
-  .vchain-wait{margin:6px 0;font-size:13.5px}
-  .vchain-note{border-radius:8px;padding:8px 10px;margin:8px 0;font-size:13px;line-height:1.5}
+  .vchain-wait{margin:6px 0;font-size:15px}
+  .vchain-note{border-radius:8px;padding:8px 10px;margin:8px 0;font-size:14px;line-height:1.5}
   .vchain-note.bad{background:var(--bad-soft,#fdecec);border-left:3px solid var(--bad,#c62828)}
   .vchain-note.warn{background:var(--warn-soft,#fff7e6);border-left:3px solid var(--warn,#b45309)}
-  .vhist{list-style:none;margin:0;padding:0;display:grid;gap:8px;font-size:13px}
+  .vhist{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:8px;font-size:13px}
   .vhist li{border-bottom:1px solid var(--line,#eee);padding-bottom:6px}
   .vhist-why{margin:2px 0 0 0;color:var(--ink,#28313f)}
+  @media (max-width:560px){ .vc-lines li{flex-direction:column} .vc-act{align-self:flex-end} .vc-primary{width:100%} }
 </style>
-</div><!-- /data-tabs (voucher) -->
-
-<script>
-  (function(){
-    var t=document.getElementById('add_daytype'), o=document.getElementById('add_office'), l=document.getElementById('add_leave');
-    if(t){ function sync(){ var v=t.value; o.style.display=(v==='OFFICE')?'':'none'; l.style.display=(v==='LEAVE')?'':'none'; } t.addEventListener('change', sync); sync(); }
-
-    var RATES = <?= json_encode($rates) ?>;
-    var grid = document.getElementById('vgrid');
-    if (!grid) return;
-    function money(n){ return '<?= e(cur_sym()) ?>' + (Math.round(n*100)/100).toLocaleString('en-IN'); }
-    function recalc(){
-      var totTravel=0, totGrand=0, totHead={};
-      grid.querySelectorAll('tr[data-eid]').forEach(function(tr){
-        var km = parseFloat(tr.querySelector('.v-km') ? tr.querySelector('.v-km').value : 0) || 0;
-        var mode = tr.querySelector('.v-mode') ? tr.querySelector('.v-mode').value : '';
-        var travel = km * (RATES[mode] || 0);
-        var row = travel;
-        tr.querySelectorAll('.v-amt').forEach(function(inp){
-          var val = parseFloat(inp.value)||0; row += val;
-          totHead[inp.dataset.code] = (totHead[inp.dataset.code]||0) + val;
-        });
-        var tCell = tr.querySelector('.v-travel'); if (tCell) tCell.innerHTML = money(travel);
-        var rCell = tr.querySelector('.v-rowtotal'); if (rCell) rCell.innerHTML = '<strong>'+money(row)+'</strong>';
-        totTravel += travel; totGrand += row;
-      });
-      var tt=document.getElementById('tot-travel'); if(tt) tt.innerHTML='<strong>'+money(totTravel)+'</strong>';
-      Object.keys(totHead).forEach(function(c){ var el=document.getElementById('tot-amt-'+c); if(el) el.innerHTML='<strong>'+money(totHead[c])+'</strong>'; });
-      var g=document.getElementById('tot-grand'); if(g) g.innerHTML='<strong>'+money(totGrand)+'</strong>';
-      var g2=document.getElementById('tot-grand2'); if(g2) g2.innerHTML='<strong>'+money(totGrand)+'</strong>';
-    }
-    grid.addEventListener('input', recalc); grid.addEventListener('change', recalc); recalc();
-  })();
-</script>
