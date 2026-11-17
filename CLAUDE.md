@@ -45,3 +45,33 @@ working branch; only each site's own `config.local.php` decides test mode.
   `/deploy-check.php`, confirm no red TEST COPY bar, switch to live Razorpay
   keys, one small real payment and refund. If anything is wrong, restore the
   backup.
+
+## How changes are made — the owner's working rules (17 Nov 2026)
+
+The owner approved these after reviewing an enhancement prompt; they apply to
+every module, not only vouchers.
+
+- **Improve what exists. Reuse what exists. Extend only what is missing.** Never
+  build a second copy of a master, a voucher type, an approval workflow or a
+  screen that already exists.
+- **Existing-functionality Reuse Gate.** Before creating any new table, column
+  group, route, screen, setting or workflow, write down: the existing equivalent,
+  why it cannot be reused or extended, the exact gap, and the maintenance cost of
+  the new piece. Put this in the change plan the owner approves.
+- **Audit first, then a plan with an "existing vs needed" table, then the owner's
+  OK, then code.** Explain every change with an example before touching the test
+  copy (owner, 16 Nov 2026).
+- **Nothing hard-coded.** Rates, allowances, limits, deadlines, periods and
+  approval authorities are settings (per band/level, with a per-person override
+  where the owner asked for it). Example values in designs are marked as
+  examples.
+- **Never overwrite historical or approved records.** Rate changes carry an
+  effective-from date; older records keep the value that applied then. Every
+  financial change is traceable in History/audit.
+- **Simplicity over coverage.** Features are added in phases only when real use
+  shows the need (voucher plan: Phase 1 now, Phase 2 after 2–3 months of claims,
+  Phase 3 only if Phase 2 shows the need). Every screen must still pass the
+  Zero Training UI gate in `docs/05-ui-ux-blueprint.md`.
+- **Who tests what.** The automatic suite and the robot check every rule,
+  permission, number and edge case before each zip. The owner only does a short
+  acceptance check list per module (about 10–15 checks), on opstest.
