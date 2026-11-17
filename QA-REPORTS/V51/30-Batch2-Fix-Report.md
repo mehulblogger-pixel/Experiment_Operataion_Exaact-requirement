@@ -72,7 +72,7 @@ This report says what was built, how it was tested, how to install it on the **t
 | --- | --- |
 | **New automatic tests for this batch** (11 files) | **347 checks, all pass.** On the old code most of them fail. Examples: 47 (candidate lock), 43 (portal and Marketplace), and most of the voucher and report checks |
 | **Full suite, first run** | Found **3 problems** that each part's own tests could not see. While checking the report, I found a **fourth** (the voucher tile). **All fixed** (see below) |
-| **Full suite, second run after the fixes** | {{SUITE}} |
+| **Full suite, second run after the fixes** | **SQLite: 21,130 passed, 1 failed.** The one failure is the known duplicate-check test that is unreliable when the machine is busy (X14); it fails the same way on older code. **MariaDB: 21,120 passed** before the same known test-harness stop as every earlier MariaDB run. Its 24 failures are exactly the known MariaDB test-order ones, line for line, and all 5 new failures from the first run are gone. **No new failure on either database.** The voucher-tile fix came after these runs started, so I ran its 350 related checks on SQLite and 244 on MariaDB separately: all pass |
 | **Robot, 59 real-screen tests, before vs after the batch** on identical copies | **Before: 29 passed, 9 failed. After: 27 passed, 11 failed.** The other 21 are "needs you", out of date or incomplete, and the 9 failures before are the same 9 after (known defects in other packs, or tests needing data their tester prepared). **Only 3 tests changed, and all 3 are your new rules, not faults:**<br>• **REP-007:** an inspector searching for another inspector's report no longer finds it (point 5, "own reports only, for reading too");<br>• **OPS-083:** a Coordinator who is not in a voucher's chain can no longer open it (Q3, "strictly own + chain"). The test expected a maker ≠ checker note on that page;<br>• **SCR-vouchers:** two steps are now out of date: the page heading reads "Expense vouchers", and the "Open a voucher for" box is shown only to Master Admin / Admin (A).<br>**No other screen changed.** I will reword these test steps (and the six passport steps) in the robot test book |
 
 **What the full run caught (all fixed before this zip):**
@@ -89,7 +89,9 @@ This report says what was built, how it was tested, how to install it on the **t
 ## The update zip — for the TEST COPY (opstest) only
 
 `EXAACT-V51.1-Batch2-TEST-COPY-update.zip`
-{{ZIP}}
+- **Contents:** 818 entries (803 files), at the top of the zip. Compared with the branch & access zip, **35 files differ**: 33 changed program files, the deploy-check page and `VERSION.txt`. No file was added or removed.
+- **Release stamp:** 74a263f. Deploy-check on the build: **723 of 723 files match.**
+- **SHA-256:** `8350a42a4edbd4a0a05985aa762c2cf3c62bdfd1402bd0c4bba9b4a8b3526542`
 - **Left out:** no `tests/` folder, `config.local.php`, `tenants.php`, database file, or `exaact_data` / `exaact_backups` folder.
 - **Includes** everything from the earlier zips: the security fix, India time and the branch & access batch. **Install the branch & access zip first?** Not needed: this zip has all of it.
 - **Database:** only **additions**, made automatically on first page load. Nothing is deleted.
@@ -101,7 +103,7 @@ This report says what was built, how it was tested, how to install it on the **t
 1. **Back up opstest:** mPanel → Backups, then Admin → Backup & restore → Take a backup now.
 2. File Manager → the opstest **app** folder → upload the zip → Extract → overwrite → delete the zip.
 3. Open `https://opstest.mghaiapps.com/deploy-check.php`. You should see:
-   - Release **{{REL}}**;
+   - Release **74a263f**;
    - the green ✓;
    - the India time line.
 
