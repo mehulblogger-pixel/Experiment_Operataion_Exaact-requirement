@@ -42,7 +42,10 @@ t_ok(strpos(file_get_contents(__DIR__ . '/../views/layout_top.php'), 'is_field_i
 t_ok(strpos(file_get_contents(__DIR__ . '/../views/dashboard.php'), 'is_field_inspector()') !== false,
     'the inspector dashboard branch keys off is_field_inspector');
 $ops = file_get_contents(__DIR__ . '/../lib/ops.php');
-t_ok(strpos($ops, "if (is_field_inspector()) {") !== false, 'the voucher route serves a field inspector their own voucher');
+// Batch 2 (17 Nov 2026): one register for everyone (own + chain); a field
+// inspector keeps the short "My vouchers" page and the unlinked-login message.
+t_ok(strpos($ops, "if (is_field_inspector() && !my_inspector_id())") !== false && strpos($ops, '$mine = is_field_inspector() && !$others;') !== false,
+    'the voucher route serves a field inspector their own voucher');
 t_ok(strpos(file_get_contents(__DIR__ . '/../lib/navindex.php'), 'is_field_inspector()') !== false,
     'the nav index keys off is_field_inspector');
 t_ok(strpos(file_get_contents(__DIR__ . '/../lib/bills.php'), 'is_field_inspector()') !== false,

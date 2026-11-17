@@ -68,6 +68,13 @@ function ops_nav_index($fresh = false) {
         }
         $add('My ' . $thp('voucher'), '/vouchers', 'My work', '🧾', 'Your field expenses.');
     }
+    // Batch 2 (owner, 17 Nov 2026): every individual raises their own expense
+    // voucher — a desk login linked to a team-member record finds it here even
+    // without the Vouchers module (the list then shows only their own, plus any
+    // waiting for their approval).
+    if (!$isInsp && !$can('mod.vouchers.view') && !empty($u['inspector_id'])
+        && !($fx('licence_blocks') && licence_blocks('mod.vouchers.view')))
+        $add('My ' . $thp('voucher'), '/vouchers', 'Me', '🧾', 'Your own expense vouchers, and any waiting for your approval.');
 
     // ---- Operations screens (mirror of the Operations Home tiles) ----------
     if (!$isInsp && ($can('mod.calls.view') || $can('mod.jobs.view') || $can('mod.vouchers.view') || $can('mod.hiring.view') || $can('mod.reconcile.view'))) {

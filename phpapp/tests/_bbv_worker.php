@@ -50,7 +50,8 @@ register_shutdown_function(function () use ($vid) {
                           preg_replace('#<(style|script)\b.*?</\1>#is', ' ', $out)), ENT_QUOTES, 'UTF-8'))),
                       'len' => strlen($out)]) . "\n";
 });
-$_GET['id'] = $vid;
+// Optional query-string values (argv[6], JSON) — e.g. ins/month for find-or-create.
+$_GET = (json_decode((string) ($argv[6] ?? '{}'), true) ?: []) + ['id' => $vid];
 $_POST = $post;
 try { $ok = ops_dispatch($route, $method); $GLOBALS['__bbv_done'] = (bool) $ok; }
 catch (Throwable $e) { $GLOBALS['__bbv_done'] = 'threw: ' . $e->getMessage(); }

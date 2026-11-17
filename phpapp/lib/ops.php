@@ -7739,26 +7739,37 @@ function voucher_owner_is_me($v) { return my_inspector_id() && (int)$v['inspecto
 //  vouchers it pays, and the Business Director — View on the matrix — was
 //  offered Approve and Reopen on every voucher in the company.
 //
-//  Now:
-//   * the claimant opens, edits (while DRAFT) and submits their OWN voucher;
-//   * staff holding the Vouchers module read the vouchers of the offices their
-//     scope covers (Finance and the Business Director included: View);
-//   * staff holding Vouchers EDIT edit and submit drafts in their offices;
-//   * anybody in the voucher's approval chain opens it — that is how an
-//     Asst. Manager, or any N+1 without the module, reaches what they approve;
-//   * APPROVING is the chain alone (lib/voucher_approval.php), never a role.
+//  Batch 2 (owner, 17 Nov 2026 — plan 29 section A, Q3): "Every individual can
+//  create, edit, submit their own vouchers … Assistant Manager can approve
+//  vouchers of their own reportee. They cannot see anyone else." So no role
+//  sees a branch's register because of its role or its Vouchers module any
+//  more. Each person sees ONLY:
+//   (a) their OWN vouchers — opens, edits while DRAFT and submits them (anyone
+//       whose login is linked to a team-member record);
+//   (b) the vouchers they must approve NOW (they, or a delegate, at the
+//       current level of the chain);
+//   (c) the vouchers they have approved or sent back in the chain.
+//  Exceptions: the Master Admin and an Admin see, and may edit and submit,
+//  every voucher (and open a month's voucher FOR someone); Finance sees the
+//  vouchers that reach or passed a Finance level, in the offices it covers.
+//  APPROVING is the chain alone (lib/voucher_approval.php), never a role.
 function voucher_in_scope($v) {
     if (is_master()) return true;
     return !function_exists('scope_allows') || scope_allows(voucher_office_id($v) ?: null, voucher_sbu($v) ?: null);
 }
-function voucher_staff_reads($v) { return can('mod.vouchers.view') && voucher_in_scope($v); }
-function voucher_staff_edits($v) { return (is_master() || can('mod.vouchers.edit')) && voucher_in_scope($v); }
+// The Master Admin and an Admin (or a custom role built on Admin).
+function voucher_sees_all() { return is_master() || user_role() === 'ADMIN'; }
+// Finance, for a voucher at or past a Finance level, in an office it covers.
+function voucher_finance_sees($v) {
+    return user_role() === 'FINANCE' && voucher_in_scope($v)
+        && function_exists('vappr_finance_reached') && vappr_finance_reached($v);
+}
 function can_view_voucher($v) {
-    return voucher_owner_is_me($v) || voucher_staff_reads($v)
+    return voucher_owner_is_me($v) || voucher_sees_all() || voucher_finance_sees($v)
         || (function_exists('vappr_is_participant') && vappr_is_participant($v));
 }
 function can_submit_voucher($v) {
-    return ($v['status'] ?? '') === 'DRAFT' && (voucher_owner_is_me($v) || voucher_staff_edits($v));
+    return ($v['status'] ?? '') === 'DRAFT' && (voucher_owner_is_me($v) || voucher_sees_all());
 }
 // C3 (owner, 16 Nov 2026) — Finance approves last and makes the payment, so
 // Finance marks an APPROVED voucher Paid; the Master Admin and an Admin may too.
@@ -7768,15 +7779,20 @@ function can_mark_voucher_paid($v) {
     $role = user_role();
     return (is_master() || in_array($role, ['ADMIN', 'FINANCE'], true)) && voucher_in_scope($v);
 }
-// Reopen is as it was — a SUBMITTED or APPROVED voucher by coordinator level, a
-// PAID one by a manager — except the Business Director, who is View only
-// (DEF-OPS-034), and only within the offices the person covers.
+// Reopen (owner, 17 Nov 2026 — plan 29 points 2–3):
+//   * APPROVED (not yet paid) → back to DRAFT: Finance in the offices it covers,
+//     the Master Admin or an Admin;
+//   * PAID → back to DRAFT: the Master Admin or an Admin only (settled money);
+//   * SUBMITTED → back to DRAFT: the Master Admin or an Admin; everybody in
+//     the chain uses Send back, with a reason, while it waits for them;
+//   * nobody else — the Business Director and the Business Unit Head never
+//     reopen — and never the claimant themself.
 function can_reopen_voucher($v) {
-    // Reopening is a register right (Vouchers module, in scope) — being somebody's
-    // approver in the chain does not add it; an approver sends back instead.
-    if (user_role() === 'BUSINESS_DIRECTOR' || !voucher_staff_reads($v)) return false;
-    if (($v['status'] ?? '') === 'PAID') return is_admin_level();
-    return is_coordinator_level() && in_array($v['status'] ?? '', ['SUBMITTED', 'APPROVED'], true);
+    $st = (string)($v['status'] ?? '');
+    if (!in_array($st, ['SUBMITTED', 'APPROVED', 'PAID'], true) || voucher_owner_is_me($v)) return false;
+    if (voucher_sees_all()) return true;
+    if ($st === 'APPROVED') return user_role() === 'FINANCE' && voucher_in_scope($v);
+    return false;
 }
 // The module gate lets a voucher route through for somebody without the
 // Vouchers module, so the handler's own checks above can decide: the claimant
@@ -7808,7 +7824,7 @@ function voucher_lock_reason($v) {
 }
 function can_edit_voucher($v) {
     if (voucher_month_frozen($v)) return false;
-    return ($v['status'] === 'DRAFT') && (voucher_owner_is_me($v) || voucher_staff_edits($v));
+    return ($v['status'] === 'DRAFT') && (voucher_owner_is_me($v) || voucher_sees_all());
 }
 
 // Build the month's day rows from the inspector's jobs (idempotent — skips days
@@ -7927,42 +7943,59 @@ function expense_head_label_map() {
     return $out;
 }
 
-function ops_vouchers($route, $method) {
-    $pdo = db();
-
-    if ($route === 'vouchers') {
-        if (is_field_inspector()) {
-            if (!my_inspector_id()) { flash(inspector_link_msg(), 'error'); redirect('/'); }
-            $rows = ops_all("SELECT * FROM vouchers WHERE inspector_id=? ORDER BY month DESC", [my_inspector_id()]);
-            view('ops/voucher_list', ['rows' => $rows, 'mine' => true, 'inspectors' => []]);
-            return;
-        }
-        // Branch batch R5 — staff with the Vouchers module see the offices their
-        // scope covers (not the whole company); anybody also sees their own
-        // vouchers and the ones waiting for, or already signed by, them.
-        $byId = [];
-        if (can('mod.vouchers.view')) {
-            [$sw, $sa] = function_exists('scope_clause') && !is_master() ? scope_clause('COALESCE(v.office_id, i.home_office_id)', 'i.sbu') : ['1=1', []];
-            foreach (ops_all("SELECT v.*, i.name inspector_name FROM vouchers v LEFT JOIN inspectors i ON i.id=v.inspector_id WHERE $sw", $sa) as $r) $byId[(int)$r['id']] = $r;
+// The vouchers register, per section A (owner, 17 Nov 2026): the Master Admin
+// and an Admin see every voucher; anybody else sees their own, those waiting
+// for them now and those they signed or sent back; Finance also sees those at
+// or past a Finance level in the offices it covers. Never a branch's register
+// because of a role or the Vouchers module. Newest month first.
+function voucher_register_rows() {
+    if (function_exists('vappr_migrate')) vappr_migrate();
+    $sel = "SELECT v.*, i.name inspector_name, i.sbu FROM vouchers v LEFT JOIN inspectors i ON i.id=v.inspector_id";
+    $byId = [];
+    if (voucher_sees_all()) {
+        foreach (ops_all($sel) ?: [] as $r) $byId[(int)$r['id']] = $r;
+    } else {
+        if (my_inspector_id())
+            foreach (ops_all("$sel WHERE v.inspector_id=?", [(int)my_inspector_id()]) ?: [] as $r) $byId[(int)$r['id']] = $r;
+        if (user_role() === 'FINANCE') {
+            [$sw, $sa] = function_exists('scope_clause') ? scope_clause('COALESCE(v.office_id, i.home_office_id)', 'i.sbu') : ['1=1', []];
+            foreach (ops_all("$sel WHERE $sw", $sa) ?: [] as $r)
+                if (!isset($byId[(int)$r['id']]) && voucher_finance_sees($r)) $byId[(int)$r['id']] = $r;
         }
         $extra = [];
-        if (my_inspector_id()) $extra = array_merge($extra, array_map('intval', array_column(ops_all("SELECT id FROM vouchers WHERE inspector_id=?", [(int)my_inspector_id()]), 'id')));
-        if (function_exists('vappr_migrate')) {
-            vappr_migrate();
-            $extra = array_merge($extra, array_map('intval', array_column(ops_all("SELECT DISTINCT voucher_id FROM voucher_approval_log WHERE user_id=?", [(int)(current_user()['id'] ?? 0)]), 'voucher_id')));
+        $me = (int)(current_user()['id'] ?? 0);
+        if ($me && function_exists('vappr_migrate')) {
+            try { $extra = array_map('intval', array_column(ops_all("SELECT DISTINCT voucher_id FROM voucher_approval_log
+                    WHERE (user_id=? OR on_behalf_user_id=?) AND action IN ('APPROVED','ALREADY_SIGNED','SENT_BACK')", [$me, $me]) ?: [], 'voucher_id')); }
+            catch (Throwable $e) { $extra = []; }
             foreach (voucher_waiting_on_me() as $w) $extra[] = (int)$w['id'];
         }
         foreach (array_unique($extra) as $xid) {
             if (isset($byId[$xid])) continue;
-            $r = ops_one("SELECT v.*, i.name inspector_name FROM vouchers v LEFT JOIN inspectors i ON i.id=v.inspector_id WHERE v.id=?", [$xid]);
+            $r = ops_one("$sel WHERE v.id=?", [$xid]);
             if ($r && can_view_voucher($r)) $byId[$xid] = $r;
         }
-        ops_require(can('mod.vouchers.view') || $byId || my_inspector_id(), 'You cannot view vouchers.');
-        $rows = array_values($byId);
-        usort($rows, fn($a, $b) => [$b['month'], (string)$a['inspector_name']] <=> [$a['month'], (string)$b['inspector_name']]);
+    }
+    $rows = array_values($byId);
+    usort($rows, fn($a, $b) => [$b['month'], (string)$a['inspector_name']] <=> [$a['month'], (string)$b['inspector_name']]);
+    return $rows;
+}
+
+function ops_vouchers($route, $method) {
+    $pdo = db();
+
+    if ($route === 'vouchers') {
+        if (is_field_inspector() && !my_inspector_id()) { flash(inspector_link_msg(), 'error'); redirect('/'); }
+        $rows = voucher_register_rows();
+        $myIns = (int)my_inspector_id();
+        $others = array_filter($rows, fn($r) => (int)$r['inspector_id'] !== $myIns);
+        ops_require($rows || $myIns || can('mod.vouchers.view') || voucher_sees_all() || user_role() === 'FINANCE', 'You cannot view vouchers.');
         $waitIds = function_exists('voucher_waiting_on_me') ? array_map(fn($w) => (int)$w['id'], voucher_waiting_on_me()) : [];
-        $canCreate = is_master() || can('mod.vouchers.edit');
-        view('ops/voucher_list', ['rows' => $rows, 'mine' => false, 'waitIds' => $waitIds, 'canCreate' => $canCreate,
+        // An inspector who signs nobody's voucher keeps the short "My vouchers" page.
+        $mine = is_field_inspector() && !$others;
+        $canCreate = voucher_sees_all();                  // a month's voucher FOR someone else
+        view('ops/voucher_list', ['rows' => $rows, 'mine' => $mine, 'waitIds' => $waitIds, 'canCreate' => $canCreate,
+            'canOwn' => $myIns > 0, 'seesAll' => voucher_sees_all(), 'isFinance' => user_role() === 'FINANCE',
             'inspectors' => $canCreate ? inspectors_list(false) : []]);
         return;
     }
@@ -7970,17 +8003,20 @@ function ops_vouchers($route, $method) {
     if ($route === 'voucher') {
         $id = (int)($_GET['id'] ?? 0);
         if (!$id) { // find-or-create for inspector + month
-            // Your own month always; somebody else's only with Vouchers EDIT in
-            // their office (a Business Director or Finance — View — cannot create one).
+            // Your own month always (anyone linked to a team-member record);
+            // somebody else's only for the Master Admin or an Admin (batch 2,
+            // owner 17 Nov 2026: every individual raises their own).
             $insId = (int)($_GET['ins'] ?? 0) ?: (int)my_inspector_id();
             $month = preg_match('/^\d{4}-\d{2}$/', $_GET['month'] ?? '') ? $_GET['month'] : date('Y-m');
             if (!$insId) { flash('Pick a ' . Tl('engineer') . ' first.', 'error'); redirect('/vouchers'); }
-            if ($insId !== (int)my_inspector_id())
-                ops_require(voucher_staff_edits(['inspector_id' => $insId, 'office_id' => null]), 'You can open only your own voucher.');
+            $forOther = $insId !== (int)my_inspector_id();
+            if ($forOther) ops_require(voucher_sees_all(), 'You can open only your own voucher.');
             $v = ops_one("SELECT * FROM vouchers WHERE inspector_id=? AND month=?", [$insId, $month]);
             if (!$v) {
+                // Raised for someone else, it belongs to the claimant's own office.
+                $vOffice = $forOther ? (ops_val("SELECT home_office_id FROM inspectors WHERE id=?", [$insId]) ?: null) : (current_user()['home_office_id'] ?? null);
                 $pdo->prepare("INSERT INTO vouchers (inspector_id,office_id,month,status,created_by,created_at) VALUES (?,?,?, 'DRAFT', ?,?)")
-                    ->execute([$insId, current_user()['home_office_id'] ?? null, $month, user_name(current_user()), date('c')]);
+                    ->execute([$insId, $vOffice, $month, user_name(current_user()), date('c')]);
                 $id = $pdo->lastInsertId();
             } else { $id = $v['id']; }
             // Module 30 — carry a job through so "log my expense for this job" lands on the
@@ -8042,14 +8078,15 @@ function ops_vouchers($route, $method) {
     // still applies — a submitted/paid month is refused, never silently written past.
     if ($route === 'voucher-quick-add' && $method === 'POST') {
         $insId = (int)($_POST['inspector_id'] ?? 0) ?: (int)my_inspector_id();
-        if ($insId !== (int)my_inspector_id())
-            ops_require(voucher_staff_edits(['inspector_id' => $insId, 'office_id' => null]), 'You can add expenses only to your own voucher.');
+        $forOther = $insId !== (int)my_inspector_id();
+        if ($forOther) ops_require(voucher_sees_all(), 'You can add expenses only to your own voucher.');
         if (!$insId) { flash('No inspector to log the expense against.', 'error'); redirect('/vouchers'); }
         $month = preg_match('/^\d{4}-\d{2}$/', (string)($_POST['month'] ?? '')) ? $_POST['month'] : date('Y-m');
         $v = ops_one("SELECT * FROM vouchers WHERE inspector_id=? AND month=?", [$insId, $month]);
         if (!$v) {
+            $vOffice = $forOther ? (ops_val("SELECT home_office_id FROM inspectors WHERE id=?", [$insId]) ?: null) : (current_user()['home_office_id'] ?? null);
             $pdo->prepare("INSERT INTO vouchers (inspector_id,office_id,month,status,created_by,created_at) VALUES (?,?,?, 'DRAFT', ?,?)")
-                ->execute([$insId, current_user()['home_office_id'] ?? null, $month, user_name(current_user()), date('c')]);
+                ->execute([$insId, $vOffice, $month, user_name(current_user()), date('c')]);
             $v = ops_one("SELECT * FROM vouchers WHERE id=?", [(int)$pdo->lastInsertId()]);
         }
         if (!can_edit_voucher($v)) { flash(voucher_lock_reason($v) ?: 'This month\'s voucher can no longer be edited — reopen it to add more.', 'error'); redirect('/voucher?id=' . $v['id']); }
@@ -8175,18 +8212,22 @@ function ops_vouchers($route, $method) {
             vappr_log($v, 'PAID');
             flash('Voucher marked as paid.');
         } elseif ($act === 'reopen') {
-            // R5 — a PAID voucher is settled money; reopening it (which would let the
-            // figures be altered) is restricted to a real manager, not any coordinator.
-            // A SUBMITTED / APPROVED voucher may still be reopened by coordinator-level.
-            // The Business Director reopens nothing (View only, DEF-OPS-034).
+            // Batch 2 (owner, 17 Nov 2026) — a PAID voucher is settled money: only the
+            // Master Admin or an Admin reopens it. An APPROVED one: Finance (offices it
+            // covers), the Master Admin or an Admin. A SUBMITTED one: the Master Admin
+            // or an Admin — approvers send back instead. The Business Director and
+            // the Business Unit Head reopen nothing (can_reopen_voucher()).
             if ($v['status'] === 'PAID') {
-                ops_require(can_reopen_voucher($v), 'A paid voucher can only be reopened by a manager.');
+                ops_require(can_reopen_voucher($v), 'A paid voucher can only be reopened by the Master Admin or an Admin.');
+            } elseif ($v['status'] === 'APPROVED') {
+                ops_require(can_reopen_voucher($v), 'An approved voucher can be reopened only by Finance or an administrator.');
             } else {
-                ops_require(can_reopen_voucher($v), 'Only a submitted or approved voucher can be reopened.');
+                ops_require(can_reopen_voucher($v), 'Only an administrator reopens a voucher waiting for approval — an approver uses "Send back" with a reason.');
             }
             // Clear the recorded submitter so the next submit re-establishes maker ≠ checker.
+            $from = (string)$v['status'];
             $pdo->prepare("UPDATE vouchers SET status='DRAFT', submitted_by='' WHERE id=?")->execute([$v['id']]);
-            vappr_log($v, 'REOPENED', '', '', trim((string)($_POST['reason'] ?? '')));
+            vappr_log($v, 'REOPENED', 'FROM_' . $from, 'from ' . ucfirst(strtolower($from)), trim((string)($_POST['reason'] ?? '')));
             flash('Voucher reopened for editing.');
         }
         redirect('/voucher?id=' . $v['id']);

@@ -63,6 +63,6 @@ try {
 // R5 guards untouched: the maker-checker + reopen logic is still present verbatim.
 t_ok(strpos($src, 'maker ≠ checker') !== false || strpos($src, 'must be approved by someone other than the person who submitted it') !== false,
     'the maker != checker approval guard is intact');
-t_ok(strpos($src, "\$v['status'] === 'PAID'") !== false && strpos($src, 'A paid voucher can only be reopened by a manager') !== false,
+t_ok(strpos($src, "\$v['status'] === 'PAID'") !== false && strpos($src, 'A paid voucher can only be reopened by the Master Admin or an Admin') !== false,
     'the PAID-reopen guard is intact');
 t_ok(!preg_match('/can\(\x27vouchers\.quickadd/', $src), 'Module 30 introduces no new permission constant');
