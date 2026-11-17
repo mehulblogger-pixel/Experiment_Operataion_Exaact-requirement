@@ -915,6 +915,7 @@ function ops_candidate_review($route, $method) {
     //  Seeing the screen needs only legitimate access to the candidate. Deciding
     //  anything on it does not happen here.
     ops_require(crev_can_see($cand), 'You cannot open this candidate.');
+    if (function_exists('cand_lock_require')) cand_lock_require($cand);   // Batch 2 — locked elsewhere: no access
 
     if ($method === 'POST') {
         //  B6 — deciding a review is working on the candidate: their office only.

@@ -545,6 +545,8 @@ function ops_candidate_offer($route, $method) {
     $id = (int)($_GET['id'] ?? 0);
     $cand = ops_one("SELECT * FROM candidates WHERE id=?", [$id]);
     if (!$cand) { http_response_code(404); view('notfound'); return true; }
+    //  Batch 2 — a candidate locked with another office: not even the letter.
+    if (function_exists('cand_lock_require')) cand_lock_require($cand);
 
     if ($route === 'offer-letter') {
         ops_require(can('mod.hiring.view'), 'You cannot view offers.');

@@ -43,11 +43,19 @@
         <thead><tr><th>Candidate</th><th>Against</th><th>Stage</th><th>Marketplace professional</th><th>Tier</th><th>Availability</th><th>Matched by</th></tr></thead>
         <tbody>
         <?php foreach ($rows as $r): ?>
+          <?php // Batch 2 — locked with an office this person does not cover: the name and the badge, nothing else.
+            if (!empty($r['locked_out'])): ?>
+          <tr>
+            <td><b><?= e($r['cand_name'] ?: '—') ?></b>
+              <br><span class="pill p-warn" style="font-size:11px;white-space:normal" title="Only that office can open or work on this <?= e(Tl('candidate')) ?> until their process ends.">🔒 <?= e($r['in_process']) ?></span></td>
+            <td colspan="6" class="muted" style="font-size:12px">Only that office can open this <?= e(Tl('candidate')) ?> until their process ends.</td>
+          </tr>
+          <?php continue; endif; ?>
           <tr>
             <td><a href="/candidate?id=<?= (int)$r['cand_id'] ?>"><?= e($r['cand_code']) ?></a>
               <?php if ($r['cand_name']): ?><span class="muted">· <?= e($r['cand_name']) ?></span><?php endif; ?>
               <?php // B6 — whose process this person is in; only that office can work on them. ?>
-              <?php if (!empty($r['in_process'])): ?><br><span class="pill p-warn" style="font-size:11px;white-space:normal" title="Only that office can work on this <?= e(Tl('candidate')) ?> until their process ends.">🔒 <?= e($r['in_process']) ?></span><?php endif; ?></td>
+              <?php if (!empty($r['in_process'])): ?><br><span class="pill p-warn" style="font-size:11px;white-space:normal" title="Only that office can open or work on this <?= e(Tl('candidate')) ?> until their process ends.">🔒 <?= e($r['in_process']) ?></span><?php endif; ?></td>
             <td style="font-size:12px"><?= $r['req_code'] ? e($r['req_code']) : e($r['client_name'] ?: '—') ?></td>
             <td style="font-size:12px"><?= e($r['stage'] ?: '—') ?></td>
             <td><?= e($r['pro_name'] ?: ('#' . $r['pro_id'])) ?>
