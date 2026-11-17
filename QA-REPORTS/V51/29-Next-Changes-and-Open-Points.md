@@ -147,3 +147,7 @@ This explains exactly what I will change, with examples, and lists the 16 open p
 | Q3 | Vouchers: may a **Branch Manager** still see all vouchers of their branch (to monitor), or strictly own + chain like everyone else? | **Strictly own + chain**, as you wrote. Admin and Finance cover the rest |
 
 **One-line answer:** *"Go ahead, Q1–Q3 as recommended."*
+
+**Owner, 17 Nov 2026 — go-ahead:** "Q1. Let it be at present but it is good to have. Q2 Ok. Q3 Ok."
+- Change 1, Change 2, A–D and the other points are **approved as written above**.
+- Q1 (contract number inside the report number) is **recorded for later** as "good to have".
