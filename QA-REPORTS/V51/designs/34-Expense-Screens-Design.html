@@ -78,7 +78,7 @@ th{font-size:12.5px;color:var(--muted);font-weight:600}
 </style>
 
 <div class="wrap">
-  <p class="num">MODULE 1 OF 6 · EXPENSES · VERSION 2, AFTER YOUR COMMENTS · FOR YOUR OK BEFORE ANY CODE</p>
+  <p class="num">MODULE 1 OF 6 · EXPENSES · VERSION 3, WITH YOUR ANSWERS · FOR YOUR OK BEFORE ANY CODE</p>
   <h1>The new expense screens</h1>
   <p class="lede">You said: <i>"What the inspector works for, he is getting paid for. It is simple and short. Suggest something wherein no wrong can be done by the inspector."</i> This version is built on exactly that. The amounts in the pictures are <span class="ex">examples</span>; you set the real ones.</p>
 
@@ -112,7 +112,7 @@ th{font-size:12.5px;color:var(--muted);font-weight:600}
           <div class="card">
             <div class="lab">Today's expenses</div>
             <div class="line"><span>Own bike · 42 km<br><span class="auto">● filled in · usual distance for this site</span></span><span class="amt">₹252</span></div>
-            <div class="line"><span>Daily allowance<br><span class="auto">● filled in · your grade</span></span><span class="amt">₹300 <span class="ex">ex.</span></span></div>
+            <div class="line"><span>Daily allowance<br><span class="auto">● filled in · from your profile</span></span><span class="amt">₹300 <span class="ex">ex.</span></span></div>
             <div class="line"><span>Hotel <span class="lock">📎 bill photo</span></span><span class="amt">₹2,400</span></div>
             <div class="row" style="margin-top:6px"><span class="sm">Total for today</span><b>₹2,952</b></div>
           </div>
@@ -129,16 +129,16 @@ th{font-size:12.5px;color:var(--muted);font-weight:600}
         <div class="bar"><span class="back">←</span><span class="t">Add a bill · 17 Nov</span></div>
         <div class="body">
           <div class="lab">What kind of bill?</div>
-          <div class="opt"><span>Bus / train / air ticket</span><span class="on">Hotel</span><span>Cab / auto</span></div>
+          <div class="opt"><span>Bus / train / air ticket</span><span class="on">Hotel</span><span>Cab</span><span>Auto-rickshaw (no bill)</span><span>Food (no bill)</span></div>
           <div class="lab">Amount (₹)</div>
           <div class="card" style="font-size:16px">2,400</div>
-          <div class="sm">Your limit for a hotel night: ₹3,000 <span class="ex">ex.</span></div>
+          <div class="sm">Your limit for a hotel night: ₹3,000 <span class="ex">ex.</span> (from your band or profile)</div>
           <div class="lab">Photo of the bill</div>
           <div class="card" style="text-align:center;border-style:dashed">📷 Take a photo</div>
         </div>
         <div class="sticky"><span class="btn primary">Add to today</span></div>
       </div></div>
-      <figcaption><b>Only three kinds of bill</b>, only for this job and this day. The photo is required, and the limit you set for his grade is shown before he types.</figcaption>
+      <figcaption><b>Only the types his band allows</b>, only for this job and this day. A bill needs its photo. A "no bill" type (auto-rickshaw, food) asks for the amount and a short note instead, within its daily limit.</figcaption>
     </figure>
 
     <figure>
@@ -200,31 +200,74 @@ th{font-size:12.5px;color:var(--muted);font-weight:600}
     </figure>
 
     <figure>
-      <span class="num">SCREEN 5 · EXPENSE SETTINGS (MASTER ADMIN)</span>
+      <span class="num">SCREEN 5 · EXPENSE TYPES (MASTER ADMIN)</span>
       <div class="phone"><div class="scr">
-        <div class="bar"><span class="back">←</span><span class="t">Expense settings</span></div>
+        <div class="bar"><span class="back">←</span><span class="t">Expense types</span></div>
+        <div class="body">
+          <div class="card">
+            <div class="set"><span><b>Own bike</b><br><span class="sm">Per km · job days</span></span><span class="pill p-ok">On</span></div>
+            <div class="set"><span><b>Hotel</b><br><span class="sm">Bill · photo required · job days</span></span><span class="pill p-ok">On</span></div>
+            <div class="set"><span><b>Auto-rickshaw</b><br><span class="sm">No bill · amount + note · job days</span></span><span class="pill p-ok">On</span></div>
+            <div class="set"><span><b>Food (no bill)</b><br><span class="sm">No bill · amount + note · job days</span></span><span class="pill p-ok">On</span></div>
+            <div class="set"><span><b>Daily allowance</b><br><span class="sm">Per day · added by itself on every job day</span></span><span class="pill p-ok">On</span></div>
+            <div class="set"><span><b>Outstation allowance</b><br><span class="sm">Per day · added when he ticks "outstation"</span></span><span class="pill p-ok">On</span></div>
+            <div class="set"><span><b>Mobile</b><br><span class="sm">Fixed per month · added by itself</span></span><span class="pill p-ok">On</span></div>
+          </div>
+          <div class="sm">Five kinds to choose from when you add a type: per km, bill with photo, no bill (amount + note), per day, fixed per month. No amount is set here.</div>
+        </div>
+        <div class="sticky"><span class="btn ghost">＋ Add an expense type</span></div>
+      </div></div>
+      <figcaption><b>Your points 5 and E2.</b> You add the types you need. A type with no bill (auto-rickshaw, food) is entered as amount + a short note; the approver sees it marked "no bill".</figcaption>
+    </figure>
+
+    <figure>
+      <span class="num">SCREEN 6 · BAND / LEVEL, AND ONE PERSON</span>
+      <div class="phone"><div class="scr">
+        <div class="bar"><span class="back">←</span><span class="t">Band: Field Inspector</span></div>
+        <div class="body">
+          <div class="card">
+            <div class="lab">What this band may claim, and how much</div>
+            <div class="set"><span>Own bike</span><b>₹ __ /km</b></div>
+            <div class="set"><span>Hotel, up to per night</span><b>₹ __</b></div>
+            <div class="set"><span>Auto-rickshaw, up to per day</span><b>₹ __</b></div>
+            <div class="set"><span>Daily allowance</span><b>₹ __ /day</b></div>
+            <div class="set"><span>Mobile</span><b>₹ __ /month</b></div>
+          </div>
+          <div class="card">
+            <div class="lab">Test Inspector · band Field Inspector</div>
+            <div class="set"><span>Daily allowance</span><b>₹ __ <span class="sm">his own</span></b></div>
+            <div class="set"><span>Own car</span><b>allowed <span class="sm">his own</span></b></div>
+            <div class="sm">Everything else follows his band.</div>
+          </div>
+          <div class="card">
+            <div class="lab">Band: Office staff</div>
+            <div class="sm">No field job types. Only the "not for a job" types you switch on.</div>
+          </div>
+        </div>
+        <div class="sticky"><span class="btn primary">Save</span></div>
+      </div></div>
+      <figcaption><b>Your points 2 and 4.</b> Each band says which types it may claim and the amounts. Any person can be given his own amount or an extra type on his profile, whenever needed. "₹ __" = you fill it in.</figcaption>
+    </figure>
+
+    <figure>
+      <span class="num">SCREEN 7 · PERIOD AND DEADLINES</span>
+      <div class="phone"><div class="scr">
+        <div class="bar"><span class="back">←</span><span class="t">Claim rules</span></div>
         <div class="body">
           <div class="card">
             <div class="lab">Claim period</div>
-            <div class="opt" style="margin-top:6px"><span>Weekly</span><span class="on">Fortnightly</span><span>Monthly</span></div>
-            <div class="sm" style="margin-top:6px">A period never crosses a month end, so month accounts stay clean.</div>
+            <div class="opt" style="margin-top:6px"><span class="on">Weekly</span><span>Fortnightly</span><span>Monthly</span></div>
           </div>
           <div class="card">
-            <div class="lab">By grade (Inspector)</div>
-            <div class="set"><span>Own bike</span><b>₹6 /km</b></div>
-            <div class="set"><span>Own car</span><b>₹12 /km</b></div>
-            <div class="set"><span>Daily allowance</span><b>₹300 <span class="ex">ex.</span></b></div>
-            <div class="set"><span>Hotel, per night, up to</span><b>₹3,000 <span class="ex">ex.</span></b></div>
+            <div class="set"><span>A day's expenses can be added for</span><b>8 days</b></div>
+            <div class="set"><span>A claim must be submitted within</span><b>8 days</b><span class="sm">after its period ends</span></div>
+            <div class="set"><span>Everything closes at</span><b>month end</b></div>
           </div>
-          <div class="card">
-            <div class="lab">Rules</div>
-            <div class="set"><span>Confirm a day's expenses within</span><b>3 days <span class="ex">ex.</span></b></div>
-            <div class="set"><span>Expenses not for a job</span><b>Off</b></div>
-          </div>
+          <div class="sm">After a deadline the day or claim is locked. Only the person's N+1 can reopen it, with a reason.</div>
         </div>
-        <div class="sticky"><span class="btn primary">Save settings</span></div>
+        <div class="sticky"><span class="btn primary">Save</span></div>
       </div></div>
-      <figcaption><b>Your point 1, and every rule in one place.</b> Rates and limits are set per grade, so an inspector never types a rate.</figcaption>
+      <figcaption><b>Your points 7, E1 and E4.</b> Weekly, fortnightly or monthly; your 8 days; and the month clears at month end. All three are settings, not fixed in the program.</figcaption>
     </figure>
   </div>
 
@@ -235,36 +278,40 @@ th{font-size:12.5px;color:var(--muted);font-weight:600}
       <tr><td>Claiming a day he did not work</td><td>Expenses exist only on a day he closed on <b>his own allocated job</b>, after checking in. No job, no expense.</td></tr>
       <tr><td>Wrong job number, client or site</td><td>Never typed. Taken from the job.</td></tr>
       <tr><td>Inflating the distance</td><td>The <b>usual distance</b> for each site is remembered once the first claim to it is approved. A different figure needs a reason and is shown to the approver in amber.</td></tr>
-      <tr><td>Wrong rate or a higher allowance</td><td>Never typed. Rate per km and daily allowance come from his <b>grade</b> in settings.</td></tr>
-      <tr><td>A bill without proof, or over the limit</td><td>Photo required to add it. Above the grade limit it is flagged to the approver (or refused, if you prefer).</td></tr>
-      <tr><td>The same bill twice</td><td>One allowance per day per job; a bill with the same date, kind and amount is refused as a repeat.</td></tr>
-      <tr><td>Remembering expenses weeks later</td><td>Confirmed when closing the day; after your deadline (e.g. 3 days) the day is locked and only his N+1 can reopen it.</td></tr>
+      <tr><td>Wrong rate or a higher allowance</td><td>Never typed. Rate per km and allowances come from his <b>band</b>, or from his own profile where you set one.</td></tr>
+      <tr><td>A bill without proof, or over the limit</td><td>A bill type needs its photo. A "no bill" type (auto-rickshaw, food) needs a note and stays within its daily limit. Anything above a limit is shown to the approver in amber (your E3: warn).</td></tr>
+      <tr><td>The same bill twice</td><td>One allowance per day; an expense with the same date, type and amount is refused as a repeat (your point 6).</td></tr>
+      <tr><td>Remembering expenses weeks later</td><td>Confirmed when closing the day; after your deadline (8 days) the day is locked, and the month closes at month end. Only his N+1 can reopen, with a reason.</td></tr>
       <tr><td>Counting a cost twice in profit</td><td>One record: the day's expenses are the claim's lines.</td></tr>
       <tr><td>Approver changing the claim</td><td>Approve or send back only (your rule V2).</td></tr>
     </tbody>
   </table></div>
 
-  <h2>Your point 4 — "other expenses"</h2>
+  <h2>How an allowance is claimed (your question 13)</h2>
   <div class="note">
-    <p style="margin:0 0 6px"><b>My recommendation: none, for inspectors.</b> If he is paid for the work he does, every expense belongs to a job day.</p>
+    <p style="margin:0 0 6px"><b>He does not claim it. It is added by itself.</b></p>
     <ul>
-      <li>A <b>mobile bill</b> becomes a fixed monthly allowance on the person's record (e.g. ₹500 <span class="ex">ex.</span>), added to the claim automatically. He claims nothing.</li>
-      <li>Office staff (coordinators, managers) who travel for the office, not for a job, can keep a short "not for a job" list, switched on only for them. Off by default.</li>
+      <li>A <b>per-day</b> allowance (e.g. daily allowance) is added to every day he closes on a job, at the amount on his band or his profile. He sees it on screen 1.</li>
+      <li>An allowance that applies only sometimes (e.g. outstation) is set as "added when he ticks it". Closing the day then shows one tick box: <b>"Outstation today"</b>. The approver sees which days were ticked.</li>
+      <li>A <b>fixed monthly</b> amount (e.g. mobile) is added to the claim once a month by itself.</li>
     </ul>
   </div>
 
-  <h2>Decisions for you</h2>
+  <h2>Your answers, as I will build them</h2>
   <div class="tbl"><table>
-    <thead><tr><th>#</th><th>Question</th><th>My recommendation</th></tr></thead>
+    <thead><tr><th>#</th><th>Your answer</th><th>How it is built</th></tr></thead>
     <tbody>
-      <tr><td>E1</td><td>Claim period for your company</td><td>Your choice of <b>weekly, fortnightly or monthly</b>, a setting. A period never crosses a month end (a week that does is cut at the 30th/31st).</td></tr>
-      <tr><td>E2</td><td>The amounts by grade: rate per km (bike, car), daily allowance, hotel limit per night, and any other bill limit</td><td><b>Please give me your figures.</b> I will not guess them. Until then I keep today's km rates (bike ₹6, car ₹12) and no allowance or limit.</td></tr>
-      <tr><td>E3</td><td>Above a bill limit: <b>warn the approver</b> or <b>refuse</b>?</td><td><b>Warn</b>, so a genuine case is not blocked; the approver decides.</td></tr>
-      <tr><td>E4</td><td>Days allowed to confirm a day's expenses after the visit</td><td><b>Please give the number.</b> After it, only his N+1 can reopen that day.</td></tr>
-      <tr><td>E5</td><td>Expenses not for a job</td><td><b>Off for inspectors.</b> Mobile bill as a fixed monthly allowance on the person's record. On only for chosen office staff.</td></tr>
-      <tr><td>E6</td><td>Who enters an advance already given</td><td><b>Finance</b>, when it marks the claim paid.</td></tr>
+      <tr><td>E1</td><td>Period configurable</td><td>Weekly, fortnightly or monthly, a setting (screen 7). A period never crosses a month end.</td></tr>
+      <tr><td>E2</td><td>Nothing hard-coded; heads can be added</td><td>You add the expense types (screen 5). Amounts and limits are set per band, with a person's own amount on his profile (screen 6). <b>No amount is built into the program.</b> Today's per-km rates are kept as your starting values, editable.</td></tr>
+      <tr><td>E3</td><td>Warn</td><td>Above a limit, the line is shown in amber to the approver; it is not refused.</td></tr>
+      <tr><td>E4</td><td>On or before the 8th day</td><td>Two settings, both 8 days: a day's expenses can be added for 8 days; a claim must be submitted within 8 days after its period ends. Everything also closes at month end.</td></tr>
+      <tr><td>E5</td><td>Per inspector, band or level</td><td>"Not for a job" types are switched on per band (e.g. Office staff) or per person.</td></tr>
+      <tr><td>E6</td><td>Finance</td><td>Finance enters the advance when it marks the claim paid.</td></tr>
+      <tr><td>5</td><td>Bills need a photo, but some expenses have no bill</td><td>Two kinds: "bill" (photo required) and "no bill" (amount + note, with a daily limit). Approver sees "no bill".</td></tr>
+      <tr><td>6</td><td>Same-date duplicate denied</td><td>Same date, type and amount is refused.</td></tr>
     </tbody>
   </table></div>
+  <p class="sm" style="max-width:80ch">If I have understood E4 wrongly, tell me which of the two 8-day rules you want; both are settings, so either can be changed later.</p>
 
   <h2>After your OK</h2>
   <div class="note">
@@ -274,6 +321,6 @@ th{font-size:12.5px;color:var(--muted);font-weight:600}
       <li>I test it on a private copy, then send one opstest zip with about 10 checks.</li>
       <li>Then module 2, Reports (with your V3, V4, V5).</li>
     </ul>
-    <p style="margin:10px 0 0"><b>One-line answer:</b> "Expenses v2 OK; E1 fortnightly (or weekly/monthly); E2 my figures …; E3–E6 as recommended".</p>
+    <p style="margin:10px 0 0"><b>One-line answer:</b> "Expenses v3 OK, build it".</p>
   </div>
 </div>
