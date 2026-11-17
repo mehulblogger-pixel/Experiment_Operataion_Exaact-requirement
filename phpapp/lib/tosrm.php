@@ -2589,7 +2589,10 @@ function ops_operations_home($method) {
         'jobs_active' => $safe("SELECT COUNT(*) n FROM jobs j JOIN calls c ON c.id=j.call_id WHERE COALESCE(j.closed_flag,0)=0 AND $w"),
         'recurring'   => $safe("SELECT COUNT(*) n FROM calls c WHERE COALESCE(c.is_recurring,0)=1 AND c.status<>'CLOSED' AND $w"),
         'overrides'   => $safe("SELECT COUNT(*) n FROM contract_overrides WHERE status IN ('PENDING','ENDORSED')"),
-        'vouchers'    => $safe("SELECT COUNT(*) n FROM vouchers WHERE status IN ('DRAFT','SUBMITTED')"),
+        // Batch 2 (owner, 17 Nov 2026 — plan 29 A / Q3): a person sees only their own
+        // vouchers and the ones in their chain, so the tile counts only those too.
+        'vouchers'    => function_exists('voucher_pending_count_for_me')
+                          ? voucher_pending_count_for_me() : null,
         'requisitions'=> $safe("SELECT COUNT(*) n FROM requisitions WHERE COALESCE(status,'') NOT IN ('CLOSED','FILLED','CANCELLED')"),
     ];
     // The TPIA service lines, straight from the Service Scope Engine — only the

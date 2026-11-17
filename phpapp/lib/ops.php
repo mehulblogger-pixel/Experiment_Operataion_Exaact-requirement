@@ -7812,6 +7812,22 @@ function can_view_voucher($v) {
     return voucher_owner_is_me($v) || voucher_sees_all() || voucher_finance_sees($v)
         || (function_exists('vappr_is_participant') && vappr_is_participant($v));
 }
+// "Pending" on the Operations home voucher tile (owner, 17 Nov 2026 — plan 29 A
+// and Q3: strictly own + chain). Master Admin / Admin: every draft or waiting
+// voucher. Everybody else: their own drafts and waiting vouchers, plus the ones
+// waiting for them to approve now. Never a branch- or company-wide count.
+function voucher_pending_count_for_me() {
+    try {
+        if (voucher_sees_all())
+            return (int) ops_val("SELECT COUNT(*) FROM vouchers WHERE status IN ('DRAFT','SUBMITTED')");
+        $n = 0;
+        if (my_inspector_id())
+            $n += (int) ops_val("SELECT COUNT(*) FROM vouchers WHERE inspector_id=? AND status IN ('DRAFT','SUBMITTED')", [(int) my_inspector_id()]);
+        if (function_exists('voucher_waiting_on_me'))
+            foreach (voucher_waiting_on_me() as $v) if (!voucher_owner_is_me($v)) $n++;
+        return $n;
+    } catch (Throwable $e) { return null; }
+}
 function can_submit_voucher($v) {
     return ($v['status'] ?? '') === 'DRAFT' && (voucher_owner_is_me($v) || voucher_sees_all());
 }

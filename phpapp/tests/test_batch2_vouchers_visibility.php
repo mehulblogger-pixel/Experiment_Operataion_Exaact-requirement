@@ -60,6 +60,20 @@ try {
     t_ok($l['ok'] && !$l['names'], 'Q3 · the Branch Manager\'s register lists nobody else (no branch-wide register by role)');
     t_ok(!$sees($f['neha'], $vRahul) && $sees($f['neha'], $vAmit), 'coordinator · Neha sees Amit\'s (waiting for her), not the Asst. Manager\'s reportee\'s');
 
+    // ---- the Operations home "Pending" tile counts own + chain only ------------
+    $ownPending = function ($uid) use ($pdo) {
+        $ins = (int) ($pdo->query("SELECT COALESCE(inspector_id,0) FROM users WHERE id=" . (int) $uid)->fetchColumn());
+        return $ins ? (int) ops_val("SELECT COUNT(*) FROM vouchers WHERE inspector_id=? AND status IN ('DRAFT','SUBMITTED')", [$ins]) : 0;
+    };
+    $all = (int) ops_val("SELECT COUNT(*) FROM vouchers WHERE status IN ('DRAFT','SUBMITTED')");
+    bbv_as($f['kiran']);
+    t_eq(voucher_pending_count_for_me(), $ownPending($f['kiran']), 'Q3 · Operations home tile: the Branch Manager (not in any chain) counts only their own vouchers');
+    t_ok(voucher_pending_count_for_me() < $all, 'Q3 · …never the company-wide total (' . $all . ')');
+    bbv_as($f['neha']);
+    t_eq(voucher_pending_count_for_me(), $ownPending($f['neha']) + 1, 'Q3 · Operations home tile: Neha counts her own plus Amit\'s waiting for her');
+    bbv_as($f['master']);
+    t_eq(voucher_pending_count_for_me(), $all, 'Operations home tile: the Master Admin still counts every draft or waiting voucher');
+
     // ---- (b) only once it reaches you: N+2 waits for N+1 ------------------------
     bbv_as($f['master']);
     vappr_config_save(['use' => ['N1' => 1, 'N2' => 1, 'OFFICE_FIN' => 1], 'above' => []]);
