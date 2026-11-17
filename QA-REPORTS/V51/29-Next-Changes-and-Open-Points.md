@@ -84,3 +84,66 @@ This explains exactly what I will change, with examples, and lists the 16 open p
 1. I build Change 1, Change 2 and the 16 points as one batch, with tests.
 2. I run the full test suites and the robot before/after.
 3. I send one opstest zip, with the check list and the rollback steps.
+
+---
+
+## Your answers (17 Nov 2026) and how I will build them
+
+**A. Vouchers (point 2), in your words:** *"Every individual can create, edit, submit their own vouchers. Every voucher is to be approved by the N+1 and other levels as set with respect to amount and reporting. Assistant Manager can approve vouchers of their own reportee. They cannot see anyone else. Very configurable in admin panel."*
+
+**What I will build:**
+- **Everyone** (inspector, Coordinator, Asst. Manager, Branch Manager, anyone) creates, edits and submits **their own** vouchers.
+- **Each person sees only:**
+  - their own vouchers;
+  - the vouchers they must approve, or have approved, in the chain.
+
+  **Nobody sees a whole branch's vouchers** just because of their role. The exceptions are Master Admin and Admin (everything), and Finance for the vouchers that reach its Finance step.
+- **The chain is set on Admin → Approvals → Expense vouchers.** Its levels are:
+  - reporting line N+1 … N+4;
+  - by role (Director, BU Head, any role);
+  - Office Finance and Central Finance.
+
+  Each level has its own **"needed above ₹"** and its place in the order (Change 2).
+- *Example:* Asst. Manager Ravi has two inspectors reporting to him.
+  - He sees his own vouchers and theirs (as N+1).
+  - He does not see other inspectors' vouchers, even in the same branch.
+
+**B. Stage inspection reports (point 3): new feature.** In your words: *"the next inspector must have a direct editable copy of the report from the previous inspection, to keep the numbering under that contract; or the coordinator can select the report for the inspector, editable, with the next report number."*
+
+**What I will build:** a button **"Start next stage report"** on an approved or issued report.
+- **Who may press it:**
+  - the inspector allocated to the next stage, meaning a job on the same work order;
+  - or the Coordinator, who picks which inspector it is for.
+- **What it creates:**
+  - a **new report**, **editable** by that inspector;
+  - with the **next report number** in the same numbering series;
+  - **pre-filled** from the previous report: client, PO, item, specs, form fields and previous findings;
+  - **left empty:** result, inspection date, photos, signatures and approvals;
+  - linked to it ("continues from …/IR/000001").
+- **The previous report** is never changed.
+- *Example:*
+  1. Stage 1: Inspector Amit issues `MGH/AHM/2026/TBREF/IR/000001`.
+  2. Stage 2 is allocated to Rahul. On Amit's report he presses "Start next stage report" and gets `…/IR/000002`, already filled, which he completes and submits.
+
+**C. Candidate pool (point 4), in your words:** *"Before any process, everything is shown to every office. Once the process starts by any office (interview), a badge shows the candidate as locked, with no access to any other office."*
+
+**What I will build:**
+- **Before any process:** every office sees the **full** candidate.
+- **From the moment an office schedules the first interview:** the candidate shows **"Locked — in recruitment with Ahmedabad"** in every other office.
+  - They **cannot open** the candidate or act on them; they see only the name and the badge.
+  - This replaces the "reduced view" idea (point 7).
+- **When that process ends** (rejected, withdrawn, did not join), the lock is lifted.
+
+**D. Passports (point 5):** internal team members have **no passport**. Only Marketplace professionals (freelancers) do. I **remove the staff "Team passports" screen** from the menu; the Marketplace professional's own passport is unchanged.
+
+**The other points (1, 3, 5, 6, 8–13, 15, 16):** I will build them **as recommended** in the table above, unless you say otherwise.
+
+### Three small questions (my recommendation in bold)
+
+| # | Question | Recommendation |
+| --- | --- | --- |
+| Q1 | Report numbers: the next stage report takes the next number in the existing series (per client and report type). Do you also want the **contract number inside the report number**, e.g. `…/C-0012/IR/0003`? | **Not now.** Keep the current series. A contract token can be added to the number pattern later if your clients ask for it |
+| Q2 | Candidate lock: start at the **first interview scheduled**, or already when the office **links the candidate to its requisition**? | **First interview scheduled**, as you wrote |
+| Q3 | Vouchers: may a **Branch Manager** still see all vouchers of their branch (to monitor), or strictly own + chain like everyone else? | **Strictly own + chain**, as you wrote. Admin and Finance cover the rest |
+
+**One-line answer:** *"Go ahead, Q1–Q3 as recommended."*
