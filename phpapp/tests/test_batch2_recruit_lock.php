@@ -301,13 +301,16 @@ $ids = array_values(array_unique(array_filter($ids)));
 $del = function ($sql, array $a = []) use ($pdo) { try { $pdo->prepare($sql)->execute($a); } catch (Throwable $e) {} };
 if ($ids) {
     $ph = implode(',', array_fill(0, count($ids), '?'));
+    // identity links' own history rows go with them (a later test checks that no history points at a missing link)
+    try { $lk = array_map('intval', array_column(ops_all("SELECT id FROM cx_identity_link WHERE candidate_id IN ($ph)", $ids) ?: [], 'id')); } catch (Throwable $e) { $lk = []; }
+    if ($lk) $del("DELETE FROM activities WHERE entity_kind='IDENTITY_LINK' AND entity_id IN (" . implode(',', $lk) . ")");
     foreach (['interviews', 'candidate_events', 'candidate_docs', 'job_offers', 'salary_structures', 'hr_discussions', 'candidate_stage_data', 'cx_identity_link']
              as $t) $del("DELETE FROM $t WHERE candidate_id IN ($ph)", $ids);
     $del("DELETE FROM recruiter_assignments WHERE entity_id IN ($ph) AND subject LIKE 'CAND%'", $ids);
     $del("DELETE FROM activities WHERE entity_kind='CANDIDATE' AND entity_id IN ($ph)", $ids);
     $del("DELETE FROM candidates WHERE id IN ($ph)", $ids);
 }
-foreach ($mine['pro'] as $p) { $del("DELETE FROM cx_identity_link WHERE professional_id=?", [$p]); $del("DELETE FROM cx_professionals WHERE id=?", [$p]); }
+foreach ($mine['pro'] as $p) { $del("DELETE FROM activities WHERE entity_kind='IDENTITY_LINK' AND entity_id IN (SELECT id FROM cx_identity_link WHERE professional_id=?)", [$p]); $del("DELETE FROM cx_identity_link WHERE professional_id=?", [$p]); $del("DELETE FROM cx_professionals WHERE id=?", [$p]); }
 foreach ($mine['req'] as $q) { $del("DELETE FROM recruiter_assignments WHERE entity_id=? AND subject LIKE 'REQ%'", [$q]); $del("DELETE FROM requisitions WHERE id=?", [$q]); }
 foreach ($mine['user'] as $u) $del("DELETE FROM users WHERE id=?", [$u]);
 foreach ($mine['office'] as $o) $del("DELETE FROM offices WHERE id=?", [$o]);

@@ -17,12 +17,16 @@
 
 // One flat, de-duplicated, permission-filtered list of destinations for the
 // signed-in user. Each entry: label, url, area, icon, desc, kind ('screen' |
-// 'action'). Cached per request.
+// 'action'). Cached per request AND per person: the list is permission-filtered,
+// so a cache built for one signed-in person must never be handed to another
+// within the same process ("log in as", a test run that signs in several people).
 function ops_nav_index($fresh = false) {
-    static $cache = null;
-    if ($cache !== null && !$fresh) return $cache;
-
+    static $cache = null, $for = null;
     $u = function_exists('current_user') ? current_user() : null;
+    $who = ($u ? (int) ($u['id'] ?? 0) : 0) . '@' . (function_exists('db_epoch') ? db_epoch() : 0);
+    if ($cache !== null && !$fresh && $for === $who) return $cache;
+    $for = $who;
+
     if (!$u) return $cache = [];
 
     $out = [];

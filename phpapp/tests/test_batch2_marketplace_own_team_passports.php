@@ -23,6 +23,7 @@
 //  Route checks run through the production dispatcher in a separate process
 //  (bb_drive); every row this file commits is removed again at the end.
 // ============================================================================
+$__b2mPrevSession = $_SESSION ?? [];
 t_section('Batch 2 — Marketplace: "your own team" is your own office; no passports for the internal team (points 13, 14/D)');
 
 require_once __DIR__ . '/_branch_batch_helpers.php';
@@ -178,5 +179,6 @@ try {
     $del("DELETE FROM cx_requirements WHERE id IN ($in)");
     foreach ($made as $t => $ids) foreach ($ids as $id) $del("DELETE FROM $t WHERE id=?", [(int)$id]);
     bb_cleanup();
-    bb_as_nobody();
+    // Restore the session this file found (the next test files expect it), not a signed-out one.
+    $_SESSION = $__b2mPrevSession; current_user(true); if (function_exists('ua')) ua(true);
 }
