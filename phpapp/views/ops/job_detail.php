@@ -19,7 +19,8 @@
           // onto this month's voucher (job pre-filled), separate from the client-billable
           // job costs the coordinator records at close. ?>
     <?php if (function_exists('my_inspector_id') && (int)my_inspector_id() > 0 && (int)my_inspector_id() === (int)($job['inspector_id'] ?? 0)): ?>
-      <a class="btn secondary" href="/voucher?addjob=<?= (int)$job['id'] ?>#quick-add" title="Add your own out-of-pocket expense for this job to your monthly voucher">🧾 Log my expense</a>
+      <?php // Expenses Phase 1 — a day's expenses are confirmed on a closed day of his own job (V1). ?>
+      <a class="btn secondary" href="/voucher-day?job=<?= (int)$job['id'] ?>&amp;date=<?= e(function_exists('exp_close_default_date') ? exp_close_default_date((int)my_inspector_id(), $job) : date('Y-m-d')) ?>" title="The expenses of a day you closed on this job — travel, allowances and bills">🧾 My expenses for this day</a>
     <?php endif; ?>
   </div>
 </div>
@@ -246,7 +247,7 @@
               <?php if (!empty($x['report_link'])): ?><a href="<?= e($x['report_link']) ?>" target="_blank" rel="noopener">report</a>
               <?php else: ?><span class="muted">report on file</span><?php endif; ?>
               <?php if (!empty($x['closed_by'] ?? '')): ?> <span class="muted" style="font-size:11px">by <?= e($x['closed_by']) ?></span><?php endif; ?>
-            <?php elseif ($x['working'] && is_coordinator_level()): ?>
+            <?php elseif ($x['working'] && (is_coordinator_level() || (function_exists('exp_visit_is_mine') && exp_visit_is_mine((int)my_inspector_id(), $job, $x['date'])))): /* Expenses Phase 1 — his own day too */ ?>
               <form method="post" action="/job-visit-close?id=<?= (int)$job['id'] ?>" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
                 <input type="hidden" name="date" value="<?= e($x['date']) ?>">
                 <input class="form-control" name="report_link" placeholder="report link — or leave blank to use a report already on this <?= e(Tl('job')) ?>" style="width:300px">

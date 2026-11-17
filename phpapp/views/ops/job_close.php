@@ -1,5 +1,16 @@
-<h1>Close <?= e(Tl('job')) ?> <?= e($job['job_code']) ?></h1>
-<p class="sub">Upload the report, enter the day's expenses (<?= e(Tl("sbu")) ?>-wise) and close. Expenses lock to this job automatically.</p>
+<?php // Expenses Phase 1 — "Close the day" (design v3, screen 1). The engineer on
+      // the job confirms the day's expenses here; they land in their own claim.
+      // Anyone else closing it (a coordinator) records no expenses for them (V2).
+      $expIns = (int)my_inspector_id();
+      $expJob = exp_job((int)$job['id']);
+      $expMine = $expIns && exp_job_is_mine($expIns, $expJob);
+      $expDate = $expMine ? exp_close_default_date($expIns, $expJob) : '';
+      $expClaim = $expMine ? exp_claim_for($expIns, $expDate, false) : null;
+      $expLock = $expMine ? ($expClaim ? exp_line_change_problem($expClaim, $expDate) : exp_day_lock(['status' => 'DRAFT'], $expDate)) : '';
+      $plan = $expMine ? exp_day_plan($expIns, $expJob, $expDate) : null; ?>
+<h1><?= e($job['job_code']) ?><?= $expMine ? ' · ' . e(date('j M', strtotime($expDate))) : '' ?></h1>
+<p class="sub"><?= e(exp_job_client($expJob) ?: '') ?><?= $expJob && exp_job_site($expJob) !== exp_job_client($expJob) ? ' · ' . e(exp_job_site($expJob)) : '' ?>
+  <?= $expMine ? '— close the day and confirm its expenses. They go into your ' . e(Tl('voucher')) . ' by themselves.' : '— upload the report and close. The ' . e(Tl('engineer')) . ' confirms the day\'s expenses on their own ' . e(Tl('voucher')) . '.' ?></p>
 <?php if (!empty($error)): ?><div class="msg msg-error"><?= e($error) ?></div><?php endif; ?>
 <?php // Stated before the form: the bills are what the client is charged on.
       // Each outstanding head can be resolved two ways — upload its bill, or, if
@@ -49,22 +60,19 @@
     <div class="ff"><label>Report upload date<?= $job['reporting_frequency']!=='NOREPORT'?' *':'' ?></label>
       <input class="form-control" type="date" name="report_upload_date" value="<?= e(date('Y-m-d')) ?>" <?= $job['reporting_frequency']!=='NOREPORT'?'required':'' ?>></div>
     <div class="ff ff-wide"><label>Report link (optional)</label><input class="form-control" name="report_link" placeholder="Link to the uploaded report"></div>
-    <div class="ff"><label><?= e(T("sbu")) ?> (for these expenses)</label>
-      <select class="form-control" name="sbu"><option value="">— same as job —</option><?php foreach (OPS_SBUS as $k=>$v): ?><option value="<?= $k ?>" <?= $job['sbu']===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
-    <?php $baseLbl = expense_heading_labels(); ?>
-    <div class="ff"><label><?= e($baseLbl['travel']) ?> (<?= e(cur_sym()) ?>)</label><input class="form-control" type="number" step="0.01" min="0" name="travel" value="0"></div>
-    <div class="ff"><label><?= e($baseLbl['local']) ?> (<?= e(cur_sym()) ?>)</label><input class="form-control" type="number" step="0.01" min="0" name="local" value="0"></div>
-    <div class="ff"><label><?= e($baseLbl['food']) ?> (<?= e(cur_sym()) ?>)</label><input class="form-control" type="number" step="0.01" min="0" name="food" value="0"></div>
-    <div class="ff"><label><?= e($baseLbl['lodging']) ?> (<?= e(cur_sym()) ?>)</label><input class="form-control" type="number" step="0.01" min="0" name="lodging" value="0"></div>
-    <div class="ff"><label><?= e($baseLbl['misc']) ?> (<?= e(cur_sym()) ?>)</label><input class="form-control" type="number" step="0.01" min="0" name="misc" value="0"></div>
-    <?php foreach (expense_extra_headings() as $code=>$label): ?>
-      <div class="ff"><label><?= e($label) ?> (<?= e(cur_sym()) ?>)</label><input class="form-control" type="number" step="0.01" name="extra[<?= e($code) ?>]" value="0"></div>
-    <?php endforeach; ?>
-    <div class="ff ff-wide"><label>Expense notes</label><input class="form-control" name="exp_notes"></div>
   </div>
-  <p class="muted" style="margin:2px;">Add or rename headings under <a href="/lookup?key=expense_heading">Expense headings</a> — new ones appear here automatically.</p>
+  <?php if ($expMine): ?>
+    <h3 class="tab-sub" style="margin:14px 0 6px"><?= $expDate === date('Y-m-d') ? 'Today\'s expenses' : 'Expenses for ' . e(fdate($expDate)) ?></h3>
+    <?php if ($expLock !== ''): ?>
+      <div class="msg msg-error"><?= e($expLock) ?></div>
+    <?php else: ?>
+      <?php $job_ = $job; $job = $expJob; $date = $expDate; require __DIR__ . '/_exp_day_fields.php'; $job = $job_; ?>
+      <p class="muted" style="margin:6px 2px 0;font-size:13px">A bill (ticket, hotel, cab)? Add it on the next screen, with its photo.</p>
+    <?php endif; ?>
+  <?php endif; ?>
   <div style="margin-top:16px;">
-    <button class="btn" type="submit">Close job &amp; send closure email</button>
+    <button class="btn" type="submit" style="min-height:48px"><?= $expMine ? 'Close the day' : 'Close ' . e(Tl('job')) . ' &amp; send closure email' ?></button>
     <a class="btn secondary" href="/job?id=<?= (int)$job['id'] ?>">Cancel</a>
   </div>
+  <?php if ($expMine): ?><p class="muted" style="margin:8px 2px 0;font-size:13px">No expenses today? Close the day anyway.</p><?php endif; ?>
 </form>

@@ -121,8 +121,10 @@ try {
     bbv_as($f['neha']);
     t_ok(!can_edit_voucher(bbv_v($vRahulDraft)) && !can_submit_voucher(bbv_v($vRahulDraft)), 'on behalf · nor edit or submit somebody else\'s draft');
     bbv_route('voucher', 'GET', $f['admin'], 0, [], ['ins' => $f['rahul_ins'], 'month' => '2031-10']);
+    // Expenses Phase 1 — V2 (owner, 17 Nov 2026): "nobody edits someone else's
+    // voucher". The Admin no longer opens a month FOR him either; he raises his own.
     $made = ops_one("SELECT * FROM vouchers WHERE inspector_id=? AND month='2031-10'", [$f['rahul_ins']]);
-    t_ok($made && (int) $made['office_id'] === $f['mum'], 'on behalf · an Admin opens one for him, in the claimant\'s own office');
+    t_ok(!$made, 'on behalf · V2 — an Admin no longer opens one for him (every person raises their own)');
 
     // ---- Reopen ----------------------------------------------------------------
     $vApp  = bbv_voucher($f, $f['amit_ins'], 2200, 'APPROVED');

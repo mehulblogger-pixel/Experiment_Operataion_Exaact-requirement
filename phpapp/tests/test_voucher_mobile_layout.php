@@ -5,7 +5,9 @@
 // the desktop grid and the save/approve flow are untouched.
 t_section('the voucher grid reflows to phone-friendly cards without touching the data flow');
 
-$vd = file_get_contents(__DIR__ . '/../views/ops/voucher_detail.php');
+// Expenses Phase 1 (17 Nov 2026): the month sheet moved, unchanged, into its own
+// partial, shown for an editable month voucher made before claim periods.
+$vd = file_get_contents(__DIR__ . '/../views/ops/voucher_grid.php');
 
 // The mobile reflow exists and is scoped to a media query (desktop unaffected).
 t_ok(strpos($vd, '@media (max-width: 720px)') !== false, 'a phone media query drives the reflow');

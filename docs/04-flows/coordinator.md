@@ -75,6 +75,16 @@ on. Reports and photographs can still be uploaded. A coordinator cannot reopen i
 (the deadline is on you); the branch manager can. That is deliberate, not a
 fault.
 
+**Closing a job no longer records the engineer's expenses (Expenses Phase 1,
+owner 17 Nov 2026).** The engineer confirms each day's expenses himself when he
+closes the day on his own job — travel and allowances come from his band or
+profile — and they go straight into his expense claim, counted once in profit.
+When you close an engineer's job (or a visit day of it), no expense is recorded
+for him: the day shows on his claim as "needs its expenses confirmed". Old
+job-closure expenses stay on the job and in profit as before. As the N+1 of an
+engineer whose claim missed a deadline, you may reopen it once he asks, with a
+reason; you approve or send back his claim, but never change it (V2).
+
 **Inspection reports of a shared work order (owner, 16 Nov 2026 — B4, B5, C2):**
 the office that issues a report and the office that carries out its work order
 open and edit it; the office that sold the work order (contracting office) may

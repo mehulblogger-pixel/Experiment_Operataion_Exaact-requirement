@@ -10,7 +10,7 @@ t_section('Module 47 — offline draft-protect the remaining field-inspector for
 $offline  = file_get_contents(__DIR__ . '/../assets/js/offline.js');
 $checkin  = file_get_contents(__DIR__ . '/../views/ops/job_detail.php');
 $evidence = file_get_contents(__DIR__ . '/../views/ops/idems/evidence.php');
-$voucher  = file_get_contents(__DIR__ . '/../views/ops/voucher_detail.php');
+$voucher  = file_get_contents(__DIR__ . '/../views/ops/voucher_detail.php') . file_get_contents(__DIR__ . '/../views/ops/voucher_grid.php');   // Expenses Phase 1 — the month sheet is a partial
 $fill     = file_get_contents(__DIR__ . '/../views/ops/idems/fill.php');
 
 // The infrastructure this rides is present and unchanged.

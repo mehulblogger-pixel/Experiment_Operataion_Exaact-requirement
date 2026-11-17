@@ -192,6 +192,11 @@ $BASELINE = [
     // whose route maps to the Vouchers module ('voucher' prefix) and is refused
     // without it.
     'job_allocate_role_can', 'vappr_config_can',
+    // Expenses Phase 1 (owner, 17 Nov 2026) — Category B. exp_settings_can() is
+    // vappr_config_can() (Master Admin) for /voucher-rules — the claim period,
+    // deadlines and bands — whose route maps to the Vouchers module ('voucher'
+    // prefix) and is refused without it, exactly like /voucher-approvals.
+    'exp_settings_can',
 ];
 $unclassified = array_values(array_diff($open, $BASELINE));
 t_ok(!$unclassified,
