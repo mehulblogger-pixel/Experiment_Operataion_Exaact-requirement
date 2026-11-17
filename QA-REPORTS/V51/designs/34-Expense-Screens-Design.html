@@ -3,10 +3,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=Inter:wght@400;500;600;700&display=swap">
 <style>
-/* Layout: a design review sheet — short explanation, then numbered phone screens in a wrapping row, then the decisions. */
+/* Layout: a design review sheet — the one-line rule, the flow, numbered phone screens in a wrapping row, the safeguards, then the decisions. */
 :root{
   --bg:#eef2f1; --paper:#ffffff; --ink:#17232b; --muted:#5d6c72; --line:#d6dfdd; --soft:#f2f6f5;
-  --teal:#0f5e5a; --teal-ink:#ffffff; --teal-soft:#e0efed; --gold:#b98a1e; --gold-soft:#f8efd9;
+  --teal:#0f5e5a; --teal-ink:#ffffff; --teal-soft:#e0efed; --gold:#a57a14; --gold-soft:#f8efd9;
   --green:#1d7348; --green-soft:#e2f2e9; --amber:#9a6400; --amber-soft:#fbf0d8; --red:#b3261e; --red-soft:#fbe6e4;
   --phone:#0e1417; --sans:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
 }
@@ -24,8 +24,14 @@ body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15.
 h1{font-size:28px;letter-spacing:-.02em;margin:0 0 6px;text-wrap:balance}
 h2{font-size:20px;margin:36px 0 10px;text-wrap:balance}
 .lede{max-width:68ch;color:var(--muted);margin:0 0 18px}
+.rule{background:var(--teal);color:var(--teal-ink);border-radius:14px;padding:16px 18px;max-width:820px;font-size:18px;font-weight:600}
+.rule small{display:block;font-weight:400;font-size:14.5px;opacity:.9;margin-top:4px}
 .note{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px 16px;max-width:820px}
 .note ul{margin:6px 0 0;padding-left:20px} .note li{margin:3px 0}
+.flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;max-width:980px}
+.flow span{background:var(--paper);border:1.5px solid var(--line);border-radius:10px;padding:8px 11px;font-size:14px}
+.flow span.me{border-color:var(--teal);color:var(--teal);font-weight:600}
+.flow i{color:var(--muted);font-style:normal}
 .screens{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:26px;margin-top:14px}
 figure{margin:0;display:flex;flex-direction:column;gap:10px;min-width:0}
 figcaption{font-size:14px;color:var(--muted);max-width:44ch}
@@ -33,7 +39,7 @@ figcaption b{color:var(--ink)}
 .num{font-family:var(--mono);font-size:12px;color:var(--gold);letter-spacing:.06em}
 .phone{background:var(--phone);border-radius:30px;padding:10px;max-width:330px;width:100%;box-shadow:0 10px 30px rgba(0,0,0,.18)}
 .scr{background:var(--soft);border-radius:22px;overflow:hidden;min-height:560px;display:flex;flex-direction:column;font-size:14px}
-.bar{background:var(--teal);color:var(--teal-ink);padding:12px 14px 12px;display:flex;align-items:center;gap:10px}
+.bar{background:var(--teal);color:var(--teal-ink);padding:12px 14px;display:flex;align-items:center;gap:10px}
 .bar .t{font-weight:700;font-size:16px}
 .bar .back{font-size:18px;opacity:.85}
 .body{padding:12px;display:flex;flex-direction:column;gap:10px;flex:1}
@@ -43,270 +49,231 @@ figcaption b{color:var(--ink)}
 .sm{font-size:12.5px;color:var(--muted)}
 .pill{font-size:11.5px;font-weight:600;padding:2px 9px;border-radius:999px;white-space:nowrap}
 .p-draft{background:var(--amber-soft);color:var(--amber)} .p-wait{background:var(--teal-soft);color:var(--teal)}
-.p-paid{background:var(--green-soft);color:var(--green)} .p-back{background:var(--red-soft);color:var(--red)}
-.btn{display:block;text-align:center;border-radius:12px;padding:13px;font-weight:700;font-size:15px;border:0}
+.p-ok{background:var(--green-soft);color:var(--green)} .p-flag{background:var(--amber-soft);color:var(--amber)}
+.btn{display:block;text-align:center;border-radius:12px;padding:13px;font-weight:700;font-size:15px}
 .primary{background:var(--teal);color:var(--teal-ink)} .ghost{background:var(--paper);color:var(--teal);border:1.5px solid var(--teal)}
 .danger{background:var(--paper);color:var(--red);border:1.5px solid var(--red)}
 .sticky{margin-top:auto;padding:12px;background:var(--paper);border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
 .lab{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
-.chips{display:flex;flex-wrap:wrap;gap:7px}
-.chip{border:1.5px solid var(--line);background:var(--paper);border-radius:999px;padding:8px 12px;font-size:13.5px;font-weight:500}
-.chip.on{border-color:var(--teal);background:var(--teal-soft);color:var(--teal);font-weight:700}
-.job{border:1.5px solid var(--line);background:var(--paper);border-radius:12px;padding:10px 12px}
-.job.on{border-color:var(--teal);box-shadow:0 0 0 2px var(--teal-soft)}
-.field{background:var(--paper);border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;font-size:15px}
-.calc{background:var(--gold-soft);color:var(--ink);border-radius:10px;padding:9px 12px;font-variant-numeric:tabular-nums}
-.line{display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}
+.line{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}
 .line:first-of-type{border-top:0}
 .amt{font-weight:600;white-space:nowrap}
-.step{font-size:12px;color:var(--teal);font-weight:600}
+.auto{font-size:11px;color:var(--green);font-weight:600}
+.lock{font-size:11px;color:var(--muted)}
 .chain{display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:12.5px}
 .chain span{background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:2px 7px}
-.chain .done{background:var(--green-soft);border-color:transparent;color:var(--green)}
 .chain .now{background:var(--teal-soft);border-color:var(--teal);color:var(--teal);font-weight:700}
-.banner{border-radius:12px;padding:10px 12px;font-size:13.5px}
-.b-red{background:var(--red-soft);color:var(--red)} .b-green{background:var(--green-soft);color:var(--green)}
-.tog{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-top:1px solid var(--line);gap:8px}
-.sw{width:38px;height:22px;border-radius:999px;background:var(--teal);position:relative;flex:none}
-.sw::after{content:"";position:absolute;right:3px;top:3px;width:16px;height:16px;border-radius:50%;background:var(--teal-ink)}
-.sw.off{background:var(--line)} .sw.off::after{right:auto;left:3px;background:var(--paper)}
+.flag{background:var(--amber-soft);color:var(--amber);border-radius:10px;padding:8px 10px;font-size:13px}
+.ok{background:var(--green-soft);color:var(--green);border-radius:10px;padding:8px 10px;font-size:13px}
+.opt{display:flex;gap:6px;flex-wrap:wrap}
+.opt span{border:1.5px solid var(--line);border-radius:999px;padding:6px 11px;font-size:13px;background:var(--paper)}
+.opt span.on{border-color:var(--teal);background:var(--teal-soft);color:var(--teal);font-weight:700}
+.set{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-top:1px solid var(--line)}
+.set:first-of-type{border-top:0}
 table{border-collapse:collapse;width:100%;font-size:14.5px}
 th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
 th{font-size:12.5px;color:var(--muted);font-weight:600}
-.tbl{overflow-x:auto;background:var(--paper);border:1px solid var(--line);border-radius:12px;max-width:900px}
-.rec{color:var(--gold);font-weight:700}
+.tbl{overflow-x:auto;background:var(--paper);border:1px solid var(--line);border-radius:12px;max-width:980px}
+.ex{font-size:12px;color:var(--gold);font-weight:600}
 </style>
 
 <div class="wrap">
-  <p class="num">MODULE 1 OF 6 · EXPENSES · FOR YOUR OK BEFORE ANY CODE</p>
+  <p class="num">MODULE 1 OF 6 · EXPENSES · VERSION 2, AFTER YOUR COMMENTS · FOR YOUR OK BEFORE ANY CODE</p>
   <h1>The new expense screens</h1>
-  <p class="lede">You said the voucher page is confusing, "What for" cannot be typed, items are not shown on screen, and approvers can edit claims. These pictures show how it will look and work instead. The figures are an example for Test Inspector in November 2026.</p>
+  <p class="lede">You said: <i>"What the inspector works for, he is getting paid for. It is simple and short. Suggest something wherein no wrong can be done by the inspector."</i> This version is built on exactly that. The amounts in the pictures are <span class="ex">examples</span>; you set the real ones.</p>
 
-  <div class="note">
-    <b>What stays exactly as today</b>
-    <ul>
-      <li>One statement per person per month, the approval chain you checked tonight (N+1 → Director above ₹20,000 → Finance), Finance marks Paid, and the printed statement.</li>
-      <li>Every voucher already on opstest keeps its figures and history. Nothing is deleted.</li>
-      <li>Travel by own vehicle is still worked out as km × your rate (Bike ₹6/km, Car ₹12/km today).</li>
-    </ul>
-    <b style="display:block;margin-top:10px">What changes</b>
-    <ul>
-      <li>No grid with 12 columns. You add one expense at a time, in two short steps, and see every expense as a clear line with its amount.</li>
-      <li>Every expense is <b>for one of your jobs</b>, or for an <b>"other expense" type</b> from the list your admin keeps (your rule V1).</li>
-      <li>Approvers see the same clear list and press <b>Approve</b> or <b>Send back</b>. They never edit your claim (your rule V2).</li>
-      <li>The working-days part (hours per day) is filled from your jobs automatically and moves to its own tab, out of the way.</li>
-    </ul>
+  <div class="rule">The inspector does not fill in a claim. He confirms the expenses of each day he worked, when he closes that day.
+    <small>The program fills in the job, client, site, date, distance, rate and allowance. The inspector only adds a bill (with its photo) when there is one.</small></div>
+
+  <h2>How it flows</h2>
+  <div class="flow">
+    <span>Coordinator allocates the job</span><i>→</i>
+    <span>Inspector inspects</span><i>→</i>
+    <span class="me">Inspector closes the day and confirms its expenses</span><i>→</i>
+    <span>They land in his claim for the period by themselves</span><i>→</i>
+    <span class="me">At period end: one tap, Submit</span><i>→</i>
+    <span>N+1 → Director (above your amount) → Finance</span><i>→</i>
+    <span>Paid</span>
   </div>
+  <p class="sm" style="max-width:80ch;margin-top:10px">This also ends a problem found in the audit: today a cost entered when closing a job and the same cost on the monthly voucher are counted twice in profit. In the new design they are <b>one record</b>.</p>
 
   <h2>The inspector, on a phone</h2>
   <div class="screens">
 
     <figure>
-      <span class="num">SCREEN 1 · MY EXPENSES</span>
-      <div class="phone"><div class="scr">
-        <div class="bar"><span class="t">My expenses</span></div>
-        <div class="body">
-          <div class="card">
-            <div class="row"><b>November 2026</b><span class="pill p-draft">Draft</span></div>
-            <div class="big" style="margin-top:6px">₹3,601</div>
-            <div class="sm">4 expenses · not submitted yet</div>
-          </div>
-          <div class="card">
-            <div class="row"><b>October 2026</b><span class="pill p-paid">Paid</span></div>
-            <div class="row" style="margin-top:4px"><span class="sm">Paid on 05 Nov 2026</span><span class="amt">₹12,450</span></div>
-          </div>
-          <div class="card">
-            <div class="row"><b>September 2026</b><span class="pill p-paid">Paid</span></div>
-            <div class="row" style="margin-top:4px"><span class="sm">Paid on 04 Oct 2026</span><span class="amt">₹9,870</span></div>
-          </div>
-        </div>
-        <div class="sticky"><span class="btn primary">＋ Add expense</span></div>
-      </div></div>
-      <figcaption><b>One big button.</b> Each month is one line with its total and where it stands. Tap a month to see its expenses.</figcaption>
-    </figure>
-
-    <figure>
-      <span class="num">SCREEN 2 · ADD — WHAT WAS IT FOR?</span>
-      <div class="phone"><div class="scr">
-        <div class="bar"><span class="back">←</span><span class="t">Add expense</span></div>
-        <div class="body">
-          <span class="step">Step 1 of 2 — What was it for?</span>
-          <span class="lab">Your jobs this month</span>
-          <div class="job on"><div class="row"><b>JOB-00012</b><span class="sm">17 Nov</span></div><div class="sm">TB Refinery Ltd · Vadodara</div></div>
-          <div class="job"><div class="row"><b>JOB-00009</b><span class="sm">14 Nov</span></div><div class="sm">TB Steel Works · Ankleshwar</div></div>
-          <span class="lab" style="margin-top:6px">Not for a job</span>
-          <div class="chips"><span class="chip">Mobile bill</span><span class="chip">Office supplies</span><span class="chip">Other (say what)</span></div>
-        </div>
-        <div class="sticky"><span class="btn primary">Next</span></div>
-      </div></div>
-      <figcaption><b>No empty box to guess.</b> Your own jobs are listed first, newest on top. The "not for a job" types come from the list in Admin settings (screen 7).</figcaption>
-    </figure>
-
-    <figure>
-      <span class="num">SCREEN 3 · ADD — WHAT DID YOU SPEND?</span>
+      <span class="num">SCREEN 1 · CLOSE THE DAY</span>
       <div class="phone"><div class="scr">
         <div class="bar"><span class="back">←</span><span class="t">JOB-00012 · 17 Nov</span></div>
         <div class="body">
-          <span class="step">Step 2 of 2 — What did you spend?</span>
-          <div class="chips"><span class="chip on">Own bike</span><span class="chip">Own car</span><span class="chip">Bus / train / air ticket</span><span class="chip">Hotel</span><span class="chip">Meals</span><span class="chip">Auto / cab</span><span class="chip">Other</span></div>
-          <span class="lab">Kilometres (both ways)</span>
-          <div class="field">42</div>
-          <div class="calc">42 km × ₹6 = <b>₹252</b> <span class="sm">(your bike rate)</span></div>
-          <span class="lab">Date</span>
-          <div class="field">17 Nov 2026 <span class="sm">— from the job visit</span></div>
-          <span class="lab">Note (optional)</span>
-          <div class="field sm">Site to vendor and back</div>
+          <div class="card">
+            <b>TB Refinery Ltd</b><div class="sm">Vadodara · Contract MGH/C/2026-27/00012</div>
+            <div class="ok" style="margin-top:8px">✓ Report submitted · ✓ Checked in on site 09:42</div>
+          </div>
+          <div class="card">
+            <div class="lab">Today's expenses</div>
+            <div class="line"><span>Own bike · 42 km<br><span class="auto">● filled in · usual distance for this site</span></span><span class="amt">₹252</span></div>
+            <div class="line"><span>Daily allowance<br><span class="auto">● filled in · your grade</span></span><span class="amt">₹300 <span class="ex">ex.</span></span></div>
+            <div class="line"><span>Hotel <span class="lock">📎 bill photo</span></span><span class="amt">₹2,400</span></div>
+            <div class="row" style="margin-top:6px"><span class="sm">Total for today</span><b>₹2,952</b></div>
+          </div>
+          <span class="btn ghost">＋ Add a bill (ticket, hotel, cab)</span>
         </div>
-        <div class="sticky"><span class="btn primary">Save expense</span></div>
+        <div class="sticky"><span class="btn primary">Close the day</span><span class="sm" style="text-align:center">No expenses today? Close the day anyway.</span></div>
       </div></div>
-      <figcaption><b>One tap for the type, one box for the number.</b> Travel works itself out. For a hotel or a ticket you type the amount and take a photo of the bill (screen 3b).</figcaption>
+      <figcaption><b>Your point 2.</b> Expenses are confirmed on the job itself, the day the work is done. Travel and allowance are already filled in; nothing to type unless there is a bill.</figcaption>
     </figure>
 
     <figure>
-      <span class="num">SCREEN 3B · A BILL WITH A RECEIPT</span>
+      <span class="num">SCREEN 2 · ADD A BILL</span>
       <div class="phone"><div class="scr">
-        <div class="bar"><span class="back">←</span><span class="t">JOB-00012 · 17 Nov</span></div>
+        <div class="bar"><span class="back">←</span><span class="t">Add a bill · 17 Nov</span></div>
         <div class="body">
-          <span class="step">Step 2 of 2 — What did you spend?</span>
-          <div class="chips"><span class="chip">Own bike</span><span class="chip">Bus / train / air ticket</span><span class="chip on">Hotel</span><span class="chip">Meals</span><span class="chip">Other</span></div>
-          <span class="lab">Amount (₹)</span>
-          <div class="field">2,400</div>
-          <span class="lab">Photo of the bill</span>
-          <div class="field" style="text-align:center;border-style:dashed">📷 Take a photo or choose a file</div>
-          <div class="sm">A hotel needs its bill. You can save now and add the photo later; you cannot submit the month until it is added.</div>
-          <span class="lab">Date</span>
-          <div class="field">17 Nov 2026</div>
+          <div class="lab">What kind of bill?</div>
+          <div class="opt"><span>Bus / train / air ticket</span><span class="on">Hotel</span><span>Cab / auto</span></div>
+          <div class="lab">Amount (₹)</div>
+          <div class="card" style="font-size:16px">2,400</div>
+          <div class="sm">Your limit for a hotel night: ₹3,000 <span class="ex">ex.</span></div>
+          <div class="lab">Photo of the bill</div>
+          <div class="card" style="text-align:center;border-style:dashed">📷 Take a photo</div>
         </div>
-        <div class="sticky"><span class="btn primary">Save expense</span></div>
+        <div class="sticky"><span class="btn primary">Add to today</span></div>
       </div></div>
-      <figcaption><b>The program says which bills it needs</b>, from the "receipt needed" setting of each type. No surprise at the end.</figcaption>
+      <figcaption><b>Only three kinds of bill</b>, only for this job and this day. The photo is required, and the limit you set for his grade is shown before he types.</figcaption>
     </figure>
 
     <figure>
-      <span class="num">SCREEN 4 · THE MONTH, READY TO SUBMIT</span>
+      <span class="num">SCREEN 3 · MY CLAIM FOR THE PERIOD</span>
       <div class="phone"><div class="scr">
-        <div class="bar"><span class="back">←</span><span class="t">November 2026</span></div>
+        <div class="bar"><span class="back">←</span><span class="t">16–30 Nov 2026</span></div>
         <div class="body">
           <div class="card">
-            <div class="row"><span class="big">₹3,601</span><span class="pill p-draft">Draft</span></div>
-            <div class="sm">4 expenses · advance taken ₹0</div>
+            <div class="row"><span class="big">₹4,632</span><span class="pill p-draft">Ready to submit</span></div>
+            <div class="sm">3 days worked · fortnightly claim</div>
           </div>
           <div class="card">
-            <div class="row"><b>JOB-00012 · TB Refinery</b><span class="sm">17 Nov</span></div>
-            <div class="line"><span>Own bike · 42 km</span><span class="amt">₹252</span></div>
-            <div class="line"><span>Hotel <span class="rec">📎</span></span><span class="amt">₹2,400</span></div>
-            <div class="line"><span>Meals</span><span class="amt">₹350</span></div>
+            <div class="row"><b>17 Nov · JOB-00012</b><span class="amt">₹2,952</span></div>
+            <div class="sm">TB Refinery Ltd · Vadodara · bike 42 km, allowance, hotel 📎</div>
           </div>
           <div class="card">
-            <div class="row"><b>Mobile bill</b><span class="sm">Nov</span></div>
-            <div class="line"><span>Airtel postpaid <span class="rec">📎</span></span><span class="amt">₹599</span></div>
+            <div class="row"><b>19 Nov · JOB-00015</b><span class="amt">₹900</span></div>
+            <div class="sm">TB Steel Works · Ankleshwar · bike 100 km, allowance</div>
           </div>
-          <div class="sm">Tap a line to change or remove it.</div>
+          <div class="card">
+            <div class="row"><b>24 Nov · JOB-00015</b><span class="amt">₹780</span></div>
+            <div class="sm">TB Steel Works · Ankleshwar · bike 80 km, allowance</div>
+          </div>
         </div>
-        <div class="sticky">
-          <div class="sm">It will go to: <b>Test SrInspector</b> → <b>Finance</b> (below ₹20,000, so no Director).</div>
-          <span class="btn primary">Submit for approval</span>
-        </div>
+        <div class="sticky"><div class="sm">It will go to: <b>Test SrInspector</b> → <b>Finance</b></div><span class="btn primary">Submit ₹4,632</span></div>
       </div></div>
-      <figcaption><b>Every expense on screen, no PDF needed</b>, grouped by job with the total on top. Before you submit, it tells you exactly who will approve it.</figcaption>
-    </figure>
-
-    <figure>
-      <span class="num">SCREEN 5 · SENT BACK TO YOU</span>
-      <div class="phone"><div class="scr">
-        <div class="bar"><span class="back">←</span><span class="t">November 2026</span></div>
-        <div class="body">
-          <div class="banner b-red"><b>Sent back by Test SrInspector</b> on 21 Nov: "Hotel bill photo is not readable. Please add a clear photo."</div>
-          <div class="card">
-            <div class="row"><b>JOB-00012 · TB Refinery</b><span class="sm">17 Nov</span></div>
-            <div class="line"><span>Own bike · 42 km</span><span class="amt">₹252</span></div>
-            <div class="line"><span>Hotel <span class="rec">📎</span> <span class="pill p-back">fix this</span></span><span class="amt">₹2,400</span></div>
-            <div class="line"><span>Meals</span><span class="amt">₹350</span></div>
-          </div>
-          <div class="card">
-            <div class="row"><b>Mobile bill</b><span class="sm">Nov</span></div>
-            <div class="line"><span>Airtel postpaid <span class="rec">📎</span></span><span class="amt">₹599</span></div>
-          </div>
-        </div>
-        <div class="sticky"><span class="btn primary">Submit again</span></div>
-      </div></div>
-      <figcaption><b>Only you change your claim.</b> The reason stays at the top until you submit again; the approval then starts again from the first level.</figcaption>
+      <figcaption><b>Your points 1 and 3.</b> The claim fills itself with every day worked, with job number, client and site. Weekly, fortnightly or monthly is your company setting.</figcaption>
     </figure>
   </div>
 
-  <h2>The approver, on a phone or laptop</h2>
+  <h2>The approver</h2>
   <div class="screens">
     <figure>
-      <span class="num">SCREEN 6 · APPROVE OR SEND BACK</span>
+      <span class="num">SCREEN 4 · APPROVE, WITH WARNINGS</span>
       <div class="phone"><div class="scr">
-        <div class="bar"><span class="back">←</span><span class="t">Test Inspector · Nov 2026</span></div>
+        <div class="bar"><span class="back">←</span><span class="t">Test Inspector · 16–30 Nov</span></div>
         <div class="body">
           <div class="card">
-            <div class="row"><span class="big">₹3,601</span><span class="pill p-wait">Waiting for you</span></div>
+            <div class="row"><span class="big">₹4,632</span><span class="pill p-wait">Waiting for you</span></div>
             <div class="chain" style="margin-top:8px"><span class="now">You (N+1)</span>→<span>Finance</span></div>
           </div>
+          <div class="flag">⚠ 19 Nov: 100 km. The usual distance to TB Steel Works is 80 km. His reason: "road closed, took the bypass".</div>
           <div class="card">
-            <div class="row"><b>JOB-00012 · TB Refinery</b><span class="sm">17 Nov</span></div>
-            <div class="line"><span>Own bike · 42 km × ₹6</span><span class="amt">₹252</span></div>
-            <div class="line"><span>Hotel <span class="rec">📎 view bill</span></span><span class="amt">₹2,400</span></div>
-            <div class="line"><span>Meals</span><span class="amt">₹350</span></div>
+            <div class="row"><b>17 Nov · JOB-00012</b><span class="amt">₹2,952</span></div>
+            <div class="sm">bike 42 km ₹252 · allowance ₹300 · hotel ₹2,400 📎 view</div>
           </div>
           <div class="card">
-            <div class="row"><b>Mobile bill</b><span class="sm">Nov</span></div>
-            <div class="line"><span>Airtel postpaid <span class="rec">📎 view bill</span></span><span class="amt">₹599</span></div>
+            <div class="row"><b>19 Nov · JOB-00015</b><span class="amt">₹900</span></div>
+            <div class="sm">bike 100 km ₹600 ⚠ · allowance ₹300</div>
+          </div>
+          <div class="card">
+            <div class="row"><b>24 Nov · JOB-00015</b><span class="amt">₹780</span></div>
+            <div class="sm">bike 80 km ₹480 · allowance ₹300</div>
           </div>
         </div>
-        <div class="sticky"><span class="btn primary">Approve ₹3,601</span><span class="btn danger">Send back with a reason</span></div>
+        <div class="sticky"><span class="btn primary">Approve ₹4,632</span><span class="btn danger">Send back with a reason</span></div>
       </div></div>
-      <figcaption><b>Two buttons, nothing to edit.</b> Bills open with one tap. "Send back" asks for the reason in plain words. Finance sees the same page and, after approving, a <b>Mark paid</b> button.</figcaption>
+      <figcaption><b>Anything unusual is shown in amber at the top</b>, so the approver checks only that. He approves or sends back; he never edits (your rule V2).</figcaption>
     </figure>
 
     <figure>
-      <span class="num">SCREEN 7 · ADMIN SETTINGS (MASTER ADMIN)</span>
+      <span class="num">SCREEN 5 · EXPENSE SETTINGS (MASTER ADMIN)</span>
       <div class="phone"><div class="scr">
-        <div class="bar"><span class="back">←</span><span class="t">Expense types</span></div>
+        <div class="bar"><span class="back">←</span><span class="t">Expense settings</span></div>
         <div class="body">
           <div class="card">
-            <div class="lab">For jobs</div>
-            <div class="tog"><span>Own bike <span class="sm">₹6/km</span></span><span class="sw"></span></div>
-            <div class="tog"><span>Own car <span class="sm">₹12/km</span></span><span class="sw"></span></div>
-            <div class="tog"><span>Hotel <span class="sm">receipt needed</span></span><span class="sw"></span></div>
-            <div class="tog"><span>Meals <span class="sm">no receipt</span></span><span class="sw"></span></div>
-            <div class="tog"><span>Air ticket <span class="sm">receipt needed</span></span><span class="sw off"></span></div>
+            <div class="lab">Claim period</div>
+            <div class="opt" style="margin-top:6px"><span>Weekly</span><span class="on">Fortnightly</span><span>Monthly</span></div>
+            <div class="sm" style="margin-top:6px">A period never crosses a month end, so month accounts stay clean.</div>
           </div>
           <div class="card">
-            <div class="lab">Not for a job</div>
-            <div class="tog"><span>Mobile bill <span class="sm">receipt needed</span></span><span class="sw"></span></div>
-            <div class="tog"><span>Office supplies <span class="sm">receipt needed</span></span><span class="sw"></span></div>
-            <div class="tog"><span>Other (say what)</span><span class="sw"></span></div>
+            <div class="lab">By grade (Inspector)</div>
+            <div class="set"><span>Own bike</span><b>₹6 /km</b></div>
+            <div class="set"><span>Own car</span><b>₹12 /km</b></div>
+            <div class="set"><span>Daily allowance</span><b>₹300 <span class="ex">ex.</span></b></div>
+            <div class="set"><span>Hotel, per night, up to</span><b>₹3,000 <span class="ex">ex.</span></b></div>
           </div>
-          <div class="sm">Who may claim which type, and at what rate, stays on each person's record, as today.</div>
+          <div class="card">
+            <div class="lab">Rules</div>
+            <div class="set"><span>Confirm a day's expenses within</span><b>3 days <span class="ex">ex.</span></b></div>
+            <div class="set"><span>Expenses not for a job</span><b>Off</b></div>
+          </div>
         </div>
-        <div class="sticky"><span class="btn ghost">＋ Add an expense type</span></div>
+        <div class="sticky"><span class="btn primary">Save settings</span></div>
       </div></div>
-      <figcaption><b>Your rule V1, as a setting.</b> Each type says whether it is for jobs or not, whether a receipt is needed, and (for travel) the rate per km. Switch a type off and nobody can pick it.</figcaption>
+      <figcaption><b>Your point 1, and every rule in one place.</b> Rates and limits are set per grade, so an inspector never types a rate.</figcaption>
     </figure>
   </div>
 
-  <h2>Four small decisions for you</h2>
+  <h2>What the inspector cannot do wrong</h2>
   <div class="tbl"><table>
-    <thead><tr><th>#</th><th>Question</th><th>My recommendation</th></tr></thead>
+    <thead><tr><th>Mistake or misuse</th><th>How the design stops it</th></tr></thead>
     <tbody>
-      <tr><td>E1</td><td>Which expense types are <b>"not for a job"</b>?</td><td><b>Telephone / mobile bill</b> and <b>Other (say what)</b> to start. You can add more in settings at any time (e.g. office supplies, training fees).</td></tr>
-      <tr><td>E2</td><td>A type marked <b>"receipt needed"</b>: may the month be submitted without its photo?</td><td><b>No.</b> Save without it is allowed, submit is not. Today the photo is only optional. The types that need one are your current list: tickets, hotel, food bills, cab, auto, telephone, cash purchases. Allowances (food allowance, outstation allowance) need none.</td></tr>
-      <tr><td>E3</td><td>Who fills in the <b>advance</b> already given to the person?</td><td><b>Finance</b>, when it marks the claim paid. Today the claimant types their own advance, which they could leave out.</td></tr>
-      <tr><td>E4</td><td>Must every job expense be on a day of that job's visit?</td><td><b>No, a warning only.</b> Travel the evening before a visit is normal; the line shows "not a visit day" so the approver can see it.</td></tr>
+      <tr><td>Claiming a day he did not work</td><td>Expenses exist only on a day he closed on <b>his own allocated job</b>, after checking in. No job, no expense.</td></tr>
+      <tr><td>Wrong job number, client or site</td><td>Never typed. Taken from the job.</td></tr>
+      <tr><td>Inflating the distance</td><td>The <b>usual distance</b> for each site is remembered once the first claim to it is approved. A different figure needs a reason and is shown to the approver in amber.</td></tr>
+      <tr><td>Wrong rate or a higher allowance</td><td>Never typed. Rate per km and daily allowance come from his <b>grade</b> in settings.</td></tr>
+      <tr><td>A bill without proof, or over the limit</td><td>Photo required to add it. Above the grade limit it is flagged to the approver (or refused, if you prefer).</td></tr>
+      <tr><td>The same bill twice</td><td>One allowance per day per job; a bill with the same date, kind and amount is refused as a repeat.</td></tr>
+      <tr><td>Remembering expenses weeks later</td><td>Confirmed when closing the day; after your deadline (e.g. 3 days) the day is locked and only his N+1 can reopen it.</td></tr>
+      <tr><td>Counting a cost twice in profit</td><td>One record: the day's expenses are the claim's lines.</td></tr>
+      <tr><td>Approver changing the claim</td><td>Approve or send back only (your rule V2).</td></tr>
     </tbody>
   </table></div>
 
-  <h2>What happens after your OK</h2>
+  <h2>Your point 4 — "other expenses"</h2>
+  <div class="note">
+    <p style="margin:0 0 6px"><b>My recommendation: none, for inspectors.</b> If he is paid for the work he does, every expense belongs to a job day.</p>
+    <ul>
+      <li>A <b>mobile bill</b> becomes a fixed monthly allowance on the person's record (e.g. ₹500 <span class="ex">ex.</span>), added to the claim automatically. He claims nothing.</li>
+      <li>Office staff (coordinators, managers) who travel for the office, not for a job, can keep a short "not for a job" list, switched on only for them. Off by default.</li>
+    </ul>
+  </div>
+
+  <h2>Decisions for you</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>#</th><th>Question</th><th>My recommendation</th></tr></thead>
+    <tbody>
+      <tr><td>E1</td><td>Claim period for your company</td><td>Your choice of <b>weekly, fortnightly or monthly</b>, a setting. A period never crosses a month end (a week that does is cut at the 30th/31st).</td></tr>
+      <tr><td>E2</td><td>The amounts by grade: rate per km (bike, car), daily allowance, hotel limit per night, and any other bill limit</td><td><b>Please give me your figures.</b> I will not guess them. Until then I keep today's km rates (bike ₹6, car ₹12) and no allowance or limit.</td></tr>
+      <tr><td>E3</td><td>Above a bill limit: <b>warn the approver</b> or <b>refuse</b>?</td><td><b>Warn</b>, so a genuine case is not blocked; the approver decides.</td></tr>
+      <tr><td>E4</td><td>Days allowed to confirm a day's expenses after the visit</td><td><b>Please give the number.</b> After it, only his N+1 can reopen that day.</td></tr>
+      <tr><td>E5</td><td>Expenses not for a job</td><td><b>Off for inspectors.</b> Mobile bill as a fixed monthly allowance on the person's record. On only for chosen office staff.</td></tr>
+      <tr><td>E6</td><td>Who enters an advance already given</td><td><b>Finance</b>, when it marks the claim paid.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>After your OK</h2>
   <div class="note">
     <ul>
-      <li>I build these screens, keeping all current vouchers and the approval chain, and fix the faults found in vouchers (₹0 totals, "Save" wiping amounts, empty "What for").</li>
-      <li>I test it on a private copy with the robot and the full test suite, then send you one opstest zip.</li>
-      <li>You check it with a <b>short list of about 10 checks</b>, using the screens above as your guide.</li>
-      <li>Then module 2, <b>Reports</b>, which also brings your decisions V3, V4 and V5.</li>
+      <li>I build it on the existing records: every voucher already on opstest keeps its figures and history.</li>
+      <li>The approval chain you tested tonight stays as it is.</li>
+      <li>I test it on a private copy, then send one opstest zip with about 10 checks.</li>
+      <li>Then module 2, Reports (with your V3, V4, V5).</li>
     </ul>
-    <p style="margin:10px 0 0"><b>One-line answer:</b> "Expense screens OK, E1–E4 as recommended", or tell me what to change in any picture.</p>
+    <p style="margin:10px 0 0"><b>One-line answer:</b> "Expenses v2 OK; E1 fortnightly (or weekly/monthly); E2 my figures …; E3–E6 as recommended".</p>
   </div>
 </div>
