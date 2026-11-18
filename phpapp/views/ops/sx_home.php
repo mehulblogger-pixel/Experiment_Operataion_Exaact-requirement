@@ -16,8 +16,9 @@ $tiles = [
     ['sx-green', '💼 Deals', 'Pipeline & stages', 'Sales · daily', '/opportunities'],
     ['sx-orange', '🧾 ' . (function_exists('THP') ? THP('quote') : 'Quotes'), 'GST / export quotes', 'Sales · quoting', '/quotes'],
     ['sx-purple', '📨 ' . (function_exists('THP') ? THP('inquiry') : 'Enquiries'), 'Requests to quote', 'Sales', '/inquiries'],
-    ['sx-brown', '💰 Payments', 'Invoices & dues', 'Sales + Accounts', '/receivables'],
-    ['sx-pink', '🔁 Contracts', 'Orders & renewals', 'Sales', '/contracts'],
+    ['sx-brown', '💰 Orders & payments', 'Won → billed → received', 'Sales + Accounts', '/sales-orders'],
+    ['sx-pink', '🔁 Renewals', 'Contracts ending soon', 'Sales', '/sales-renewals'],
+    ['sx-teal', '🎯 Targets', 'Monthly target per person', 'Managers · monthly', '/sales-targets'],
     ['sx-slate', '🏢 Customers', 'Companies & contacts — the one list', 'Sales + Directory', '/clients?view=sales'],
 ];
 ?>
@@ -27,8 +28,8 @@ $tiles = [
     <p>👋 <?= e($greet . ', ' . (trim((string) ($u['first_name'] ?? '')) ?: user_name($u))) ?>. Today is <?= e(date('l, j F Y')) ?> · everything below updates by itself.</p>
   </div>
   <div class="sxqa">
-    <a href="/lead-new">➕ New lead</a><a href="/sales-today">📝 Log activity</a><a href="/opportunity-new">💼 New deal</a>
-    <a href="/quote-edit">🧾 New <?= e(function_exists('Tl') ? Tl('quote') : 'quote') ?></a><a href="/quotes?status=ACCEPTED">💰 Orders won</a><a href="/quotes">🖨 Print a <?= e(function_exists('Tl') ? Tl('quote') : 'quote') ?></a>
+    <a href="/sales-lead">➕ New lead</a><a href="/sales-today">📝 Log activity</a><a href="/opportunity-new">💼 New deal</a>
+    <a href="/quote-edit">🧾 New <?= e(function_exists('Tl') ? Tl('quote') : 'quote') ?></a><a href="/sales-orders">💰 Orders won</a><a href="/quotes">🖨 Print a <?= e(function_exists('Tl') ? Tl('quote') : 'quote') ?></a>
   </div>
   <div class="sxhead"><div class="sxlab" style="margin:0">⚡ Right now<?= $who && $whoKey !== 'me' ? ' · ' . e($people[$who] ?? '') : ($who ? '' : ' · everyone') ?></div>
     <?php sx_person_chips('sales-home', $whoKey, $people, $seeAll); ?></div>
@@ -45,7 +46,7 @@ $tiles = [
   <div class="sxsteps">
     <a class="sxst" href="/sales-today<?= e($q) ?>"><b class="sx-red">1 ⏰ Open Today ›</b><span>Who to call, which deals are stuck, which payment to chase.</span></a>
     <a class="sxst" href="/sales-today<?= e($q) ?>"><b class="sx-orange">2 📞 Take action ›</b><span>WhatsApp or call straight from the list.</span></a>
-    <a class="sxst" href="/sales-today<?= e($q) ?>"><b class="sx-yellow">3 📝 Log it (2 min) ›</b><span>Open the lead or deal, record what happened and the next step.</span></a>
+    <a class="sxst" href="/sales-today<?= e($q) ?>"><b class="sx-yellow">3 📝 Log it (1 min) ›</b><span>Press 📝 Log on the row, pick what happened — the next date fills itself in.</span></a>
     <a class="sxst" href="/sales-board<?= e($q) ?>"><b class="sx-green">4 💼 Update the deal ›</b><span>Move the stage; won? Raise the order.</span></a>
   </div>
 

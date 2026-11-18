@@ -93,7 +93,7 @@ function ops_area_def($area) {
         case 'sales':
             $title = 'Sales'; $icon = '🎯';
             $sub = 'Leads, opportunities, ' . strtolower(THP('inquiry')) . ', ' . strtolower(THP('quote')) . ' and the pipeline.';
-            $routes = ['sales','sales-home','sales-today','sales-board','sales-dashboard','leads','lead','opportunities','opportunity','inquiries','inquiry','quotes','quote','pipelines','pipeline','approvals','stage-gates','ads-roi','project-costings','project-costing','project-costing-heads','preorder-checklist','templates'];
+            $routes = ['sales','sales-home','sales-today','sales-board','sales-dashboard','sales-lead','sales-log','sales-orders','sales-renewals','sales-targets','sales-settings','leads','lead','opportunities','opportunity','inquiries','inquiry','quotes','quote','pipelines','pipeline','approvals','stage-gates','ads-roi','project-costings','project-costing','project-costing-heads','preorder-checklist','templates'];
             //  Plan 42 step C (owner, 18 Nov 2026) — the owner's Excel CRM: start here.
             $sxOk = $fx('sx_can') && sx_can();
             $sec('Start here');
@@ -101,6 +101,11 @@ function ops_area_def($area) {
             $t($sxOk, '⏰', 'Today', '/sales-today', 'Every follow-up, stale deal, payment and renewal due — worked top to bottom.');
             $t($sxOk, '🧭', 'Pipeline board', '/sales-board', 'Every open lead and deal by stage.');
             $t($sxOk && (!$fx('crmdash_can') || crmdash_can()), '📊', 'Sales dashboard', '/sales-dashboard', 'Leads, wins, win rate, forecast, targets, sources, losses and collections.');
+            $t($sxOk && $fx('leads_can_edit') && leads_can_edit(), '➕', 'New lead', '/sales-lead', 'Company, mobile, source — saved in seconds.');
+            $t($sxOk, '💰', 'Orders & payments', '/sales-orders', 'Orders won, billed, received and overdue.');
+            $t($sxOk, '🔁', 'Renewals', '/sales-renewals', 'Contracts ending soon, by days left.');
+            $t($sxOk, '🎯', 'Targets', '/sales-targets', 'Monthly target per person and what was won.');
+            $t($sxOk && (is_master() || can('settings.manage')), '⚙️', 'Sales settings', '/sales-settings', 'Follow-up days, weekly off, who gets new leads.');
             $sec('Records');
             //  The ONE client register (Directory → Clients), opened with Sales columns.
             $t($sxOk && can('mod.clients.view'), '🏢', T_REG('client'), '/clients?view=sales', 'The one customer list — open deals, won this year, owed, last contact.');

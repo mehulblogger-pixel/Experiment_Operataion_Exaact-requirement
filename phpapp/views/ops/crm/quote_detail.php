@@ -553,6 +553,14 @@
     <tfoot>
       <tr><td colspan="9" class="num muted">Subtotal</td><td class="num"><b><?= e(cur_sym()) ?><?= nf((float)$q['subtotal'], 2) ?></b></td></tr>
       <tr><td colspan="9" class="num muted">GST (<?= (float)$q['gst_pct'] ?>%)</td><td class="num"><?= e(cur_sym()) ?><?= nf((float)$q['gst_amount'], 2) ?></td></tr>
+      <?php // How that GST splits on the invoice — the invoice's own rule (books_is_igst).
+            // Display only: the quotation's figures are not changed.
+            $gsp = function_exists('sx_quote_gst_split') ? sx_quote_gst_split($q) : null;
+            if ($gsp && $gsp['mode'] === 'UNKNOWN'): ?>
+        <tr><td colspan="9" class="num muted" style="font-size:12px">CGST + SGST or IGST is decided once the <?= e(Tl('client')) ?>'s state is on their record.</td><td></td></tr>
+      <?php elseif ($gsp): foreach ($gsp['rows'] as [$gl, $ga]): ?>
+        <tr><td colspan="9" class="num muted" style="font-size:12px">of which <?= e($gl) ?></td><td class="num muted" style="font-size:12px"><?= e(cur_sym()) ?><?= nf((float)$ga, 2) ?></td></tr>
+      <?php endforeach; endif; ?>
       <tr><td colspan="9" class="num"><b>Total</b></td><td class="num"><b><?= e(cur_sym()) ?><?= nf((float)$q['total_amount'], 2) ?></b></td></tr>
     </tfoot>
   </table>

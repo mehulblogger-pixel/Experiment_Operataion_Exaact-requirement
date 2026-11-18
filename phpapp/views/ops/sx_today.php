@@ -7,7 +7,7 @@ $c = $d['counts']; $q = $whoKey !== 'me' ? '?who=' . rawurlencode((string) $whoK
 ?>
 <div class="sx">
   <div class="sxhead"><h1>⏰ Today · <?= e(date('l, j M Y')) ?></h1><?php sx_person_chips('sales-today', $whoKey, $people, $seeAll); ?></div>
-  <p class="sxwhy"><b>Why you're here:</b> everything that needs attention today, in one place. <b>What to do:</b> 1) work top to bottom 2) 💬 / 📞 to contact 3) open the deal or lead, record what happened and set the next step.</p>
+  <p class="sxwhy"><b>Why you're here:</b> everything that needs attention today, in one place. <b>What to do:</b> 1) work top to bottom 2) 💬 / 📞 to contact 3) 📝 Log what happened — the next follow-up date fills itself in.</p>
   <div class="sxkpis">
     <?php sx_kpi('red', '🔴 Overdue', (string) $c['overdue'], 'deals + leads', '#deals');
           sx_kpi('orange', '🟠 Due today', (string) $c['today'], 'deals + leads', '#deals');
@@ -42,7 +42,7 @@ $c = $d['counts']; $q = $whoKey !== 'me' ? '?who=' . rawurlencode((string) $whoK
           <td><?= e($o['client_name'] ?: $o['partner_name']) ?></td><td><?= e($o['stage_name']) ?></td>
           <td class="n"><?= e(sx_money($o['value'])) ?></td><td><?= e($o['next_action'] ?: '—') ?></td>
           <td class="nw"><?= $o['_idle'] !== null ? (int) $o['_idle'] . ' d' : '—' ?></td>
-          <td><?= sx_contact_btns($o['contact_phone'] ?? '', $o['name']) ?></td></tr>
+          <td class="nw"><?= sx_contact_btns($o['contact_phone'] ?? '', $o['name']) ?> <a class="sxc" href="/sales-log?deal=<?= (int) $o['id'] ?>" aria-label="Log activity on <?= e($o['ref']) ?>">📝 Log</a></td></tr>
       <?php endforeach; ?>
     </table></div><?php endif; ?></div>
 
@@ -53,7 +53,7 @@ $c = $d['counts']; $q = $whoKey !== 'me' ? '?who=' . rawurlencode((string) $whoK
         <?php foreach ($d['leads'] as $l): [$lab, $cls] = sx_due_label($l['next_action_on'] ?? ''); ?>
           <tr><td><span class="sxp <?= e($cls) ?>"><?= e($lab) ?></span></td>
             <td><a href="/lead?id=<?= (int) $l['id'] ?>"><?= e($l['company_name']) ?></a><br><span class="muted" style="font-size:12px"><?= e(trim(($l['next_action'] ?: '') . ((float) $l['value'] > 0 ? ' · ' . sx_short($l['value']) . ' est.' : ''), ' ·')) ?></span></td>
-            <td><?= sx_contact_btns($l['contact_phone'] ?? '', $l['company_name']) ?></td></tr>
+            <td class="nw"><?= sx_contact_btns($l['contact_phone'] ?? '', $l['company_name']) ?> <a class="sxc" href="/sales-log?lead=<?= (int) $l['id'] ?>" aria-label="Log activity on <?= e($l['company_name']) ?>">📝 Log</a></td></tr>
         <?php endforeach; ?>
       </table></div><?php endif; ?></div>
     <div class="sxcard" id="stale"><h2>💤 Stale deals · no activity for over <?= (int) sx_stale_days() ?> days</h2>

@@ -102,3 +102,21 @@ if (!function_exists('sx_kpi')) {
 .sx .sxside span{font-size:12px;opacity:.85;display:block}
 .sx .sxside strong{display:block;font-size:20px}
 </style>
+<style>
+/* Parts 2–3: forms (quick lead, log activity, settings, targets) */
+.sx .sxform{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.sx .sxform label{display:block;font-size:12.5px;font-weight:700;margin-bottom:4px}
+.sx .sxform .wide{grid-column:1/-1}
+.sx .sxform small{display:block;color:var(--muted);font-size:12px;margin-top:3px}
+.sx .sxpick{display:flex;flex-wrap:wrap;gap:8px}
+.sx .sxpick label{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--line);border-radius:999px;padding:7px 13px;font-size:13.5px;font-weight:600;cursor:pointer;min-height:40px;margin:0;background:var(--card)}
+.sx .sxpick input{accent-color:var(--brand)}
+.sx .sxpick label:has(input:checked){border-color:var(--brand);background:color-mix(in srgb,var(--brand) 10%,var(--card));color:var(--brand)}
+.sx .sxpick label small{display:inline;margin:0;font-weight:500}
+.sx .sxactions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:14px}
+.sx .sxwarn{border:1.5px solid var(--warn,#b45309);background:var(--warn-bg,#fffbeb);border-radius:12px;padding:10px 14px;margin:0 0 12px}
+.sx .sxwarn ul{margin:6px 0 0 18px;padding:0}
+.sx .sxerr{border:1.5px solid var(--bad,#b91c1c);background:var(--bad-bg,#fef2f2);color:var(--bad,#b91c1c);border-radius:12px;padding:10px 14px;margin:0 0 12px;font-weight:600}
+.sx .sxnum{width:100%;min-width:84px;text-align:right;font-variant-numeric:tabular-nums}
+.sx .sxex{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;background:#fff6cf;color:#8a6a00;border-radius:6px;padding:2px 7px;margin-left:6px;vertical-align:middle}
+</style>
