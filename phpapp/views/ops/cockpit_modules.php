@@ -37,10 +37,10 @@ $featCard = function ($card) use ($featCat, $featOff, $e) {
 ?>
 <style>
   .ck{max-width:760px}
-  .ck .mod{border:1px solid var(--line,#e5e7eb);border-radius:14px;padding:14px 16px;margin-bottom:10px;background:var(--card,#fff)}
-  .ck .mod .hd{display:flex;gap:12px;align-items:flex-start;justify-content:space-between}
-  .ck .mod h3{margin:0;font-size:16px}
-  .ck .mod .blurb{color:#6b7280;font-size:13.5px;margin:3px 0 0}
+  .ck .mod,.ck .hmod{border:1px solid var(--line,#e5e7eb);border-radius:14px;padding:14px 16px;margin-bottom:10px;background:var(--card,#fff)}
+  .ck .hmod .hd,.ck .mod .hd{display:flex;gap:12px;align-items:flex-start;justify-content:space-between}
+  .ck .hmod h3,.ck .mod h3{margin:0;font-size:16px}
+  .ck .hmod .blurb,.ck .mod .blurb{color:#6b7280;font-size:13.5px;margin:3px 0 0}
   .ck .why{font-size:12px;color:#0b6b86;margin:8px 0 0}
   .ck .feats{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
   .ck .feat{font-size:12px;background:#eef2ff;color:#3949ab;border:1px solid #dfe4ff;border-radius:999px;padding:3px 9px}
@@ -113,7 +113,7 @@ $featCard = function ($card) use ($featCat, $featOff, $e) {
   <?php endif; ?>
 
   <?php if (!empty($featCat['home'])): ?>
-    <div class="mod" id="card-home">
+    <div class="hmod" id="card-home">
       <div class="hd"><div style="flex:1"><h3>Home &amp; insights</h3><p class="blurb">What people see first, and the cross-module summaries.</p></div><span class="on-pill is-on">On</span></div>
       <?php $featCard('home'); ?>
     </div>
@@ -199,7 +199,7 @@ $featCard = function ($card) use ($featCat, $featOff, $e) {
             <input type="hidden" name="module" value="<?= $e($key) ?>">
             <input type="hidden" name="on" value="<?= $m['on'] ? '' : '1' ?>">
             <?php if ($m['on']): ?>
-              <button class="btn ghost" type="submit">Turn off this module</button>
+              <button class="btn ghost" type="submit">Turn off this feature</button>
             <?php else: ?>
               <button class="btn" type="submit">Add this to my workspace</button>
             <?php endif; ?>
