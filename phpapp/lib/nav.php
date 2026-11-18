@@ -119,7 +119,7 @@ function nav_screen_label($route) {
         'approval-delegations'  => 'Approval delegations',
         'voucher-approvals'     => 'Expense voucher approvals',
         'voucher-delegations'   => 'Who covers for a voucher approver',
-        'voucher-rules'         => 'Expense rules & bands',
+        'voucher-rules'         => 'Expense setup',
         'voucher-day'           => 'The day\'s expenses',
         'my-approvals'          => 'My approvals',
         'recruit-approvals'     => 'Recruitment approvals',

@@ -5,7 +5,7 @@
 // usual distance, the rate and the allowances come from his band or profile,
 // and each says where it came from (Zero Training UI gate, item 7).
 $cs = cur_sym();
-$srcTxt = fn($s) => $s === 'person' ? 'from your profile' : ($s === 'band' ? 'from your band' : 'standard rate');
+$srcTxt = fn($s) => $s === 'personal' ? 'your personal allowance' : ($s === 'person' ? 'from your profile' : ($s === 'band' ? 'from your band' : 'standard rate'));
 $km1 = fn($n) => rtrim(rtrim(number_format((float)$n, 1, '.', ''), '0'), '.');
 $usual = $plan['usual'] ?? null;
 $usualOk = $usual && !empty($usual['approved']);

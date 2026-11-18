@@ -55,6 +55,9 @@ function exp_migrate() {
         // Expense types — two kinds more, a scope, and AUTO / TICK for per day.
         ensure_column('expense_heads', 'scope', "VARCHAR(10) DEFAULT 'JOB'");
         ensure_column('expense_heads', 'add_mode', "VARCHAR(10) DEFAULT ''");
+        // Expense setup (owner, 18 Nov 2026): a PERSONAL allowance — a top-up one
+        // person gets on top of his band (e.g. a site allowance to adjust his pay).
+        ensure_column('expense_heads', 'personal', 'INT DEFAULT 0');
         // Each person gets a band.
         ensure_column('inspectors', 'band_id', 'INT NULL');
         // Person and band amounts, with a limit and an effective-from date.
@@ -180,7 +183,13 @@ function exp_kind($h) {
 function exp_scope($h) { return strtoupper((string) ($h['scope'] ?? 'JOB')) === 'NONJOB' ? 'NONJOB' : 'JOB'; }
 //  A per-day type the owner has not yet marked AUTO is a tick box: no money is
 //  added to anybody's day by itself until the owner says so.
-function exp_add_mode($h) { return strtoupper((string) ($h['add_mode'] ?? '')) === 'AUTO' ? 'AUTO' : 'TICK'; }
+function exp_add_mode($h) { return exp_is_personal($h) || strtoupper((string) ($h['add_mode'] ?? '')) === 'AUTO' ? 'AUTO' : 'TICK'; }
+//  A personal allowance (owner, 18 Nov 2026): "the allowance a person gets as per
+//  the policy of the company" is the BAND; "his own additional allowance to adjust
+//  the salary" is a PERSONAL type — never in a band, switched on for one person
+//  with his amount, and always ADDED ON TOP of the band (never replacing it).
+//  Paid for each closed job day (per day) or once a month.
+function exp_is_personal($h) { return is_array($h) && (int) ($h['personal'] ?? 0) === 1; }
 function exp_needs_photo($h) { return exp_kind($h) === 'BILL' && (int) ($h['needs_receipt'] ?? 0) === 1; }
 function exp_head($code) {
     static $c = [];
@@ -190,6 +199,7 @@ function exp_head($code) {
 }
 function exp_kind_label($h) {
     $k = exp_kind($h);
+    if (exp_is_personal($h)) return 'Personal allowance · ' . (exp_kind($h) === 'MONTHLY' ? 'once a month' : 'each site day');
     $map = ['PER_KM' => 'Per km', 'BILL' => exp_needs_photo($h) ? 'Bill · photo required' : 'Bill', 'NOBILL' => 'No bill · amount + note',
             'PER_DAY' => 'Per day · ' . (exp_add_mode($h) === 'AUTO' ? 'added by itself on every job day' : 'added when he ticks it'),
             'MONTHLY' => 'Fixed per month · added by itself'];
@@ -202,8 +212,49 @@ function exp_bands($activeOnly = false) {
     try { return ops_all("SELECT * FROM expense_bands" . ($activeOnly ? " WHERE active=1" : "") . " ORDER BY sort_order, name") ?: []; }
     catch (Throwable $e) { return []; }
 }
-function exp_person_band($insId) {
+//  The band a person follows: the one picked on him, else his role's default
+//  band (Expense setup → People). [band id, 'person' | 'role' | ''].
+function exp_band_of($insId) {
+    $own = exp_own_band($insId);
+    if ($own) return [$own, 'person'];
+    $role = exp_person_role($insId);
+    $map = exp_role_bands();
+    $rb = $role !== '' ? (int) ($map[$role] ?? 0) : 0;
+    if ($rb && ops_val("SELECT id FROM expense_bands WHERE id=?", [$rb])) return [$rb, 'role'];
+    return [0, ''];
+}
+function exp_person_band($insId) { return exp_band_of($insId)[0]; }
+function exp_own_band($insId) {
     try { return (int) (ops_val("SELECT band_id FROM inspectors WHERE id=?", [(int) $insId]) ?: 0); } catch (Throwable $e) { return 0; }
+}
+//  The role of the person's login (a team member without a login has none).
+function exp_person_role($insId) {
+    try { return strtoupper((string) (ops_val("SELECT role FROM users WHERE inspector_id=? AND is_active=1 ORDER BY id LIMIT 1", [(int) $insId]) ?: '')); }
+    catch (Throwable $e) { return ''; }
+}
+//  Default band per role — a company setting, {ROLE: band id}.
+function exp_role_bands() {
+    $j = function_exists('setting_get') ? (string) (setting_get('exp_role_bands', '') ?? '') : '';
+    $m = $j !== '' ? json_decode($j, true) : [];
+    $out = [];
+    foreach (is_array($m) ? $m : [] as $r => $b) if ((int) $b > 0) $out[strtoupper((string) $r)] = (int) $b;
+    return $out;
+}
+function exp_role_bands_save(array $map) {
+    $clean = [];
+    foreach ($map as $r => $b) {
+        $r = strtoupper(trim((string) $r)); $b = (int) $b;
+        if ($r === '' || !preg_match('/^[A-Z0-9_]{1,40}$/', $r)) continue;
+        if ($b > 0 && ops_val("SELECT id FROM expense_bands WHERE id=?", [$b])) $clean[$r] = $b;
+    }
+    $old = exp_role_bands();
+    setting_set('exp_role_bands', json_encode($clean));
+    if ($old != $clean && function_exists('act_log')) try { act_log('EXPENSE_BAND', 0, 'ROLE_BANDS', 'Default band per role changed.'); } catch (Throwable $e) {}
+}
+//  The roles held by team members' logins — the rows of "Default band for each role".
+function exp_team_roles() {
+    try { return array_column(ops_all("SELECT DISTINCT u.role FROM users u JOIN inspectors i ON i.id=u.inspector_id WHERE u.is_active=1 AND COALESCE(u.role,'')<>'' ORDER BY u.role") ?: [], 'role'); }
+    catch (Throwable $e) { return []; }
 }
 
 // ---- Entitlement: person row → band row → default (no amount in code) -----
@@ -235,6 +286,20 @@ function exp_entitlement($insId, $kind, $code, $date = null) {
     $b = $band ? exp_ent_latest('band', $band, $kind, $code, $date) : null;
     $def = $kind === 'MODE' ? ops_one("SELECT * FROM travel_modes WHERE code=?", [$code]) : exp_head($code);
     $active = $def && (int) ($def['active'] ?? 1) === 1;
+    //  A personal allowance: only the person's own row counts — on, with his amount.
+    if ($kind === 'HEAD' && exp_is_personal($def)) {
+        $on = $p && (int) $p['allowed'] === 1 && $p['rate_override'] !== null && $p['rate_override'] !== '';
+        return ['allowed' => $on && $active, 'rate' => $on ? (float) $p['rate_override'] : 0.0, 'limit' => null, 'source' => 'personal', 'rate_source' => 'personal'];
+    }
+    //  The band is the company's policy: with a band, the band alone decides
+    //  (owner, 18 Nov 2026 — a person's extra goes on a personal allowance).
+    if ($band) {
+        $allowed = $b && (int) $b['allowed'] === 1;
+        $rate = $b && $b['rate_override'] !== null && $b['rate_override'] !== '' ? (float) $b['rate_override'] : (float) ($def['default_rate'] ?? 0);
+        $limit = $b && $b['limit_amount'] !== null && $b['limit_amount'] !== '' ? (float) $b['limit_amount'] : null;
+        return ['allowed' => $allowed && $active, 'rate' => $rate, 'limit' => $limit, 'source' => 'band', 'rate_source' => $b && $b['rate_override'] !== null && $b['rate_override'] !== '' ? 'band' : 'default'];
+    }
+    //  No band: the person's own rows, as before bands existed.
     if ($p && (int) $p['allowed'] !== -1)      { $allowed = (int) $p['allowed'] === 1; $src = 'person'; }
     elseif ($b && (int) $b['allowed'] !== -1)  { $allowed = (int) $b['allowed'] === 1; $src = 'band'; }
     elseif ($band)                             { $allowed = false; $src = 'band'; }
@@ -286,7 +351,9 @@ function exp_save_rows($who, $id, $ef, array $rows) {
         $pdo->prepare("DELETE FROM inspector_allowances WHERE band_id=? AND (inspector_id IS NULL OR inspector_id=0) AND COALESCE(effective_from,'')=?")->execute([$id, $ef]);
         $ins = $pdo->prepare("INSERT INTO inspector_allowances (inspector_id,band_id,kind,code,allowed,rate_override,limit_amount,effective_from) VALUES (NULL,?,?,?,?,?,?,?)");
     } else {
-        $pdo->prepare("DELETE FROM inspector_allowances WHERE inspector_id=? AND (band_id IS NULL OR band_id=0) AND COALESCE(effective_from,'')=?")->execute([$id, $ef]);
+        // Personal allowances are saved on their own (exp_save_person_rows) — never cleared here.
+        $pdo->prepare("DELETE FROM inspector_allowances WHERE inspector_id=? AND (band_id IS NULL OR band_id=0) AND COALESCE(effective_from,'')=?
+                       AND NOT (kind='HEAD' AND code IN (SELECT code FROM expense_heads WHERE personal=1))")->execute([$id, $ef]);
         $ins = $pdo->prepare("INSERT INTO inspector_allowances (inspector_id,band_id,kind,code,allowed,rate_override,limit_amount,effective_from) VALUES (?,NULL,?,?,?,?,?,?)");
     }
     foreach ($rows as [$kind, $code, $allowed, $rate, $limit]) $ins->execute([$id, $kind, $code, (int) $allowed, $rate, $limit, $ef]);
@@ -298,7 +365,7 @@ function exp_save_rows($who, $id, $ef, array $rows) {
 function exp_rows_from_post(array $b, $isBand) {
     $num = function ($v) { $v = trim((string) $v); return $v === '' || !is_numeric($v) || (float) $v < 0 ? null : round((float) $v, 2); };
     $rows = [];
-    foreach (['HEAD' => ['allow_head', 'head_rate', 'head_limit', "SELECT code FROM expense_heads"],
+    foreach (['HEAD' => ['allow_head', 'head_rate', 'head_limit', "SELECT code FROM expense_heads WHERE COALESCE(personal,0)=0"],
               'MODE' => ['allow_mode', 'mode_rate', 'mode_limit', "SELECT code FROM travel_modes"]] as $kind => [$fa, $fr, $fl, $sql]) {
         foreach (ops_all($sql) ?: [] as $r) {
             $code = $r['code'];
@@ -315,6 +382,81 @@ function exp_rows_from_post(array $b, $isBand) {
         }
     }
     return $rows;
+}
+
+//  Personal allowances posted from the person's record: pa_on[code] = 1,
+//  pa_amt[code] = amount. Only a row that CHANGES what applies on $ef is
+//  written, so an unchanged allowance keeps its own "from" date.
+function exp_personal_rows_from_post($insId, array $b, $ef) {
+    $rows = []; $bad = [];
+    foreach (ops_all("SELECT * FROM expense_heads WHERE personal=1 ORDER BY sort_order, id") ?: [] as $h) {
+        $code = $h['code'];
+        if (!array_key_exists($code, (array) ($b['pa_amt'] ?? [])) && !array_key_exists($code, (array) ($b['pa_on'] ?? []))) continue;
+        $on = !empty($b['pa_on'][$code]);
+        $raw = trim((string) ($b['pa_amt'][$code] ?? ''));
+        if ($raw !== '' && (!is_numeric($raw) || (float) $raw < 0)) { $bad[] = $h['label']; continue; }
+        $amt = $raw === '' ? null : round((float) $raw, 2);
+        if ($on && ($amt === null || $amt <= 0)) { $bad[] = $h['label']; continue; }
+        $cur = exp_ent_latest('person', $insId, 'HEAD', $code, $ef);
+        $curOn = $cur && (int) $cur['allowed'] === 1;
+        $curAmt = $cur && $cur['rate_override'] !== null && $cur['rate_override'] !== '' ? round((float) $cur['rate_override'], 2) : null;
+        if ($on === $curOn && (!$on || $amt === $curAmt)) continue;
+        if (!$on && !$cur) continue;
+        $rows[] = ['HEAD', $code, $on ? 1 : 0, $on ? $amt : null, null];
+    }
+    return [$rows, $bad];
+}
+//  Write person rows for one date WITHOUT clearing the date's other rows
+//  (exp_save_rows clears the whole date — right for a full grid, wrong for a
+//  few changed personal allowances).
+function exp_save_person_rows($insId, $ef, array $rows) {
+    $insId = (int) $insId; if (!$insId || !$rows) return;
+    $pdo = db();
+    foreach ($rows as [$kind, $code, $allowed, $rate, $limit]) {
+        $pdo->prepare("DELETE FROM inspector_allowances WHERE inspector_id=? AND (band_id IS NULL OR band_id=0) AND kind=? AND code=? AND COALESCE(effective_from,'')=?")
+            ->execute([$insId, $kind, $code, $ef]);
+        $pdo->prepare("INSERT INTO inspector_allowances (inspector_id,band_id,kind,code,allowed,rate_override,limit_amount,effective_from) VALUES (?,NULL,?,?,?,?,?,?)")
+            ->execute([$insId, $kind, $code, (int) $allowed, $rate, $limit, $ef]);
+    }
+    if (function_exists('act_log')) try { act_log('INSPECTOR', $insId, 'EXPENSE_RATES', 'Personal allowances changed, applying from ' . $ef . '.'); } catch (Throwable $e) {}
+}
+//  A band's table (Expense setup → Bands): one box per type — the rate for per
+//  km / per day / per month, the limit for a bill or no-bill. Personal types are
+//  never in a band. allow_head[code] / allow_mode[code] = 1, amt_head / amt_mode.
+function exp_band_rows_from_post(array $b) {
+    $num = function ($v) { $v = trim((string) $v); return $v === '' || !is_numeric($v) || (float) $v < 0 ? null : round((float) $v, 2); };
+    $rows = [];
+    foreach (ops_all("SELECT * FROM travel_modes WHERE basis='PER_KM'") ?: [] as $m)
+        $rows[] = ['MODE', $m['code'], !empty($b['allow_mode'][$m['code']]) ? 1 : 0, $num($b['amt_mode'][$m['code']] ?? ''), null];
+    foreach (ops_all("SELECT * FROM expense_heads WHERE COALESCE(personal,0)=0 AND code<>'KMTRAVEL'") ?: [] as $h) {
+        $a = $num($b['amt_head'][$h['code']] ?? '');
+        $isLimit = in_array(exp_kind($h), ['BILL', 'NOBILL'], true);
+        $rows[] = ['HEAD', $h['code'], !empty($b['allow_head'][$h['code']]) ? 1 : 0, $isLimit ? null : $a, $isLimit ? $a : null];
+    }
+    return $rows;
+}
+//  What a band gives, in one line per type, for the person's record.
+function exp_band_summary($bandId, $date = null) {
+    $date = $date ?: exp_today(); $out = [];
+    foreach (ops_all("SELECT * FROM travel_modes WHERE active=1 AND basis='PER_KM' ORDER BY id") ?: [] as $m) {
+        $r = exp_ent_latest('band', $bandId, 'MODE', $m['code'], $date);
+        if ($r && (int) $r['allowed'] === 1) $out[] = $m['label'] . ' ' . exp_money($r['rate_override'] !== null && $r['rate_override'] !== '' ? $r['rate_override'] : $m['default_rate']) . ' a km';
+    }
+    foreach (ops_all("SELECT * FROM expense_heads WHERE active=1 AND COALESCE(personal,0)=0 AND code<>'KMTRAVEL' ORDER BY sort_order, id") ?: [] as $h) {
+        $r = exp_ent_latest('band', $bandId, 'HEAD', $h['code'], $date);
+        if (!$r || (int) $r['allowed'] !== 1) continue;
+        $k = exp_kind($h);
+        if (in_array($k, ['BILL', 'NOBILL'], true)) $out[] = $h['label'] . ($r['limit_amount'] !== null && $r['limit_amount'] !== '' ? ' up to ' . exp_money($r['limit_amount']) : ' (bill amount)');
+        else $out[] = $h['label'] . ' ' . exp_money($r['rate_override'] ?? 0) . ($k === 'MONTHLY' ? ' a month' : ' a day');
+    }
+    return $out;
+}
+//  A new type's code, from its name: upper case, unique across both lists.
+function exp_new_code($label) {
+    $base = substr(trim(preg_replace('/[^A-Z0-9]+/', '_', strtoupper((string) $label)), '_'), 0, 24) ?: 'TYPE';
+    $code = $base; $n = 2;
+    while (ops_val("SELECT id FROM expense_heads WHERE code=?", [$code]) || ops_val("SELECT id FROM travel_modes WHERE code=?", [$code])) $code = substr($base, 0, 24) . '_' . $n++;
+    return $code;
 }
 
 // ---- Usual distance (vendor_km_memory + approved) --------------------------

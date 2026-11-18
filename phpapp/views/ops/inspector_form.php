@@ -289,25 +289,54 @@
 <?php endif; ?>
 
 <?php if ($isEdit && is_master()): ?>
-<div class="panel" data-tab="Allowances &amp; rates" style="border:1px solid #d9b38c;background:#fffaf3">
-  <h3 class="tab-sub" style="margin-top:0">Allowances &amp; rates <span class="muted">— Super Admin only. Not visible to anyone else.</span></h3>
-  <?php // Expenses Phase 1 (screen 6) — the person's band, and their own amount or an
-        // extra type where it differs. "Follows band" leaves it to the band; with
-        // no band, the old rule: nothing set = every job-day type, else only "Yes". ?>
-  <?php $bandsList = function_exists('exp_bands') ? exp_bands(true) : []; $myBand = (int)($ins['band_id'] ?? 0);
-        $follow = $myBand ? 'Follows band' : 'Standard'; ?>
-  <p class="sub">Give this <?= e(Tl('engineer')) ?> a band — it says which expense types they may claim and the amounts. Set their own amount, or an extra type, only where it differs. Blank = follows the band<?= $myBand ? '' : ' (no band: the standard rates)' ?>.</p>
+<div class="panel" data-tab="Expenses" id="expenses" style="border:1px solid #d9b38c;background:#fffaf3">
+  <h3 class="tab-sub" style="margin-top:0">Expenses <span class="muted">— Master Admin only. Not visible to anyone else.</span></h3>
+  <?php // Expense setup (owner, 18 Nov 2026): the BAND is the company's policy and
+        // nobody changes it on a person; his own top-up is a PERSONAL allowance,
+        // always added on top of the band. A person with no band (and no role
+        // band) keeps the old per-person rates below, unchanged. ?>
+  <?php $bandsList = function_exists('exp_bands') ? exp_bands(true) : [];
+        [$effBand, $bandFrom] = function_exists('exp_band_of') ? exp_band_of((int)$ins['id']) : [0, ''];
+        $myBand = (int)($ins['band_id'] ?? 0);
+        $roleBand = 0; if (function_exists('exp_person_role')) { $rk = exp_person_role((int)$ins['id']); $roleBand = (int)(exp_role_bands()[$rk] ?? 0); }
+        $roleBandName = $roleBand ? (string)ops_val("SELECT name FROM expense_bands WHERE id=?", [$roleBand]) : '';
+        $persHeads = ops_all("SELECT * FROM expense_heads WHERE COALESCE(personal,0)=1 ORDER BY sort_order, id") ?: [];
+        $follow = $effBand ? 'Follows band' : 'Standard'; ?>
   <form method="post" action="/m/inspectors/edit?id=<?= (int)$ins['id'] ?>">
     <input type="hidden" name="_do" value="allow_save">
-    <div class="form-grid" style="margin-bottom:10px">
-      <div class="ff"><label>Band / level</label>
-        <select class="form-control" name="band_id"><option value="">— no band —</option>
+    <div class="form-grid" style="margin-bottom:6px">
+      <div class="ff"><label>Band (company policy)</label>
+        <select class="form-control" name="band_id"><option value=""><?= $roleBandName !== '' ? '— ' . e($roleBandName) . ' (from role) —' : '— no band —' ?></option>
           <?php foreach ($bandsList as $bd): ?><option value="<?= (int)$bd['id'] ?>" <?= $myBand === (int)$bd['id'] ? 'selected' : '' ?>><?= e($bd['name']) ?></option><?php endforeach; ?></select>
-        <small class="muted"><a href="/voucher-rules">Bands and their amounts</a></small></div>
-      <div class="ff"><label>His own amounts apply from</label><input class="form-control" type="date" name="allow_from" value="<?= e(date('Y-m-d')) ?>" required>
+        <small class="muted"><a href="/voucher-rules?tab=bands<?= $effBand ? '&amp;band=' . (int)$effBand : '' ?>">See or change the bands</a></small></div>
+      <div class="ff"><label>Changes apply from</label><input class="form-control" type="date" name="allow_from" value="<?= e(date('Y-m-d')) ?>" required>
         <small class="muted">Older claims keep the amounts of their day.</small></div>
     </div>
+    <?php if ($effBand): $sum = exp_band_summary($effBand); ?>
+      <p class="sub" style="margin:4px 0 12px">Policy for this band: <?= $sum ? e(implode(' · ', $sum)) : '<span class="muted">nothing set yet</span>' ?>. The same for everyone in the band.</p>
+    <?php endif; ?>
 
+    <h4 class="tab-sub" style="margin-top:10px">Personal allowances (only for <?= e($ins['name']) ?>)</h4>
+    <p class="muted" style="margin:0 0 8px;font-size:13px">His own top-up, e.g. a site allowance to adjust his pay. Always <strong>added on top</strong> of his band; it never changes the band.</p>
+    <?php if (!$persHeads): ?>
+      <p class="muted">No personal allowance type yet. Add one in <a href="/voucher-rules?tab=types&amp;add=1">Expense setup → Expense types</a> (tick "Personal allowance").</p>
+    <?php else: ?>
+    <table class="grid">
+      <tr><th>On</th><th>Allowance</th><th>Amount (<?= e(cur_sym()) ?>)</th><th>Paid for</th><th>From</th></tr>
+      <?php foreach ($persHeads as $h): $cur = exp_ent_latest('person', (int)$ins['id'], 'HEAD', $h['code'], date('Y-m-d')); $on = $cur && (int)$cur['allowed'] === 1; ?>
+      <tr><td><input type="checkbox" name="pa_on[<?= e($h['code']) ?>]" value="1" <?= $on ? 'checked' : '' ?> aria-label="<?= e($h['label']) ?> on" style="width:22px;height:22px"></td>
+        <td><strong><?= e($h['label']) ?></strong><?= (int)$h['active'] ? '' : ' <span class="muted">· type off</span>' ?></td>
+        <td><input class="form-control" style="width:130px" type="number" step="0.01" min="0" name="pa_amt[<?= e($h['code']) ?>]" value="<?= e($on ? rtrim(rtrim(number_format((float)$cur['rate_override'], 2, '.', ''), '0'), '.') : '') ?>" placeholder="__"></td>
+        <td class="muted"><?= exp_kind($h) === 'MONTHLY' ? 'once a month' : 'each site day' ?></td>
+        <td class="muted"><?= $on ? e(($cur['effective_from'] ?? '') !== '' ? fdate($cur['effective_from']) : 'the start') : '—' ?></td></tr>
+      <?php endforeach; ?>
+    </table>
+    <?php endif; ?>
+
+    <?php if (!$effBand): ?>
+    <details style="margin-top:14px"><summary class="btn secondary" style="display:inline-flex">No band: this person's own rates (the old way)</summary>
+    <input type="hidden" name="legacy" value="1">
+    <p class="muted" style="font-size:13px">Used only while he has no band. Give him a band (or his role a default band) and the band decides instead.</p>
     <h4 class="tab-sub" style="margin-top:6px">Travel modes (per-km)</h4>
     <table class="grid">
       <tr><th>Allowed</th><th>Mode</th><th>Basis</th><th>Default</th><th>This <?= e(Tl('engineer')) ?>'s rate (<?= e(cur_sym()) ?>/km)</th></tr>
@@ -326,7 +355,7 @@
     <h4 class="tab-sub" style="margin-top:14px">Expense heads</h4>
     <table class="grid">
       <tr><th>Allowed</th><th>Head</th><th>Type</th><th>His own amount/rate (<?= e(cur_sym()) ?>)</th><th>His own limit (<?= e(cur_sym()) ?>)</th></tr>
-      <?php foreach ($expHeads as $h): $a = $allowMap['HEAD'][$h['code']] ?? null; $av = $a ? (int)$a['allowed'] : -1;
+      <?php foreach ($expHeads as $h): if (function_exists('exp_is_personal') && exp_is_personal($h)) continue; $a = $allowMap['HEAD'][$h['code']] ?? null; $av = $a ? (int)$a['allowed'] : -1;
             $hk = function_exists('exp_kind') ? exp_kind($h) : $h['head_type']; ?>
       <tr>
         <td><select class="form-control" style="width:140px" name="allow_head[<?= e($h['code']) ?>]" aria-label="<?= e($h['label']) ?> allowed">
@@ -338,7 +367,9 @@
       </tr>
       <?php endforeach; ?>
     </table>
-    <div style="margin-top:12px"><button class="btn" type="submit">Save allowances &amp; rates</button></div>
+    </details>
+    <?php endif; ?>
+    <div style="margin-top:12px"><button class="btn" type="submit">Save</button></div>
   </form>
 </div>
 <?php endif; ?>

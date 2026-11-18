@@ -43,16 +43,34 @@ try {
     t_eq(exp_entitlement($f['amit_ins'], 'HEAD', $f['DA'], $t)['rate'], 300.0, 'band · the daily allowance comes from his band');
     t_eq(exp_entitlement($f['amit_ins'], 'HEAD', $f['DA'], $t)['rate_source'], 'band', 'band · and says so');
     t_ok(!exp_entitlement($f['amit_ins'], 'MODE', $f['mode2'], $t)['allowed'], 'band · the car is not on his band');
+    // The band is the company's policy (owner, 18 Nov 2026): a person row never changes it.
     exp_save_rows('person', $f['amit_ins'], $t, [['HEAD', $f['DA'], -1, 350, null], ['MODE', $f['mode2'], 1, null, null]]);
-    t_eq(exp_entitlement($f['amit_ins'], 'HEAD', $f['DA'], $t)['rate'], 350.0, 'person · his own amount from today');
-    t_ok(exp_entitlement($f['amit_ins'], 'HEAD', $f['DA'], $t)['allowed'], 'person · "follows band" keeps it allowed');
+    t_eq(exp_entitlement($f['amit_ins'], 'HEAD', $f['DA'], $t)['rate'], 300.0, 'policy · a person row does not change his band\'s amount');
+    t_ok(exp_entitlement($f['amit_ins'], 'HEAD', $f['DA'], $t)['allowed'], 'policy · the band\'s allowance stays allowed');
+    t_ok(!exp_entitlement($f['amit_ins'], 'MODE', $f['mode2'], $t)['allowed'], 'policy · nor does it switch on a type his band does not allow (the car)');
+    // His own top-up is a PERSONAL allowance, on top of the band.
+    t_ok(!exp_entitlement($f['amit_ins'], 'HEAD', $f['PERS'], $t)['allowed'], 'personal · off until switched on for him (a band row is never read)');
+    [$rows, $bad] = exp_personal_rows_from_post($f['amit_ins'], ['pa_on' => [$f['PERS'] => '1'], 'pa_amt' => [$f['PERS'] => '']], $t);
+    t_ok(!$rows && $bad, 'personal · on without an amount is refused');
+    [$rows, $bad] = exp_personal_rows_from_post($f['amit_ins'], ['pa_on' => [$f['PERS'] => '1'], 'pa_amt' => [$f['PERS'] => '-5']], $t);
+    t_ok(!$rows && $bad, 'personal · a minus amount is refused');
+    [$rows, $bad] = exp_personal_rows_from_post($f['amit_ins'], ['pa_on' => [$f['PERS'] => '1'], 'pa_amt' => [$f['PERS'] => '100']], $t);
+    exp_save_person_rows($f['amit_ins'], $t, $rows);
+    $en = exp_entitlement($f['amit_ins'], 'HEAD', $f['PERS'], $t);
+    t_ok($en['allowed'] && $en['rate'] == 100.0 && $en['source'] === 'personal', 'personal · ₹100 a site day, for him, from today');
+    t_ok(!exp_entitlement($f['amit_ins'], 'HEAD', $f['PERS'], $y)['allowed'], 'personal · not before its "from" date (history kept)');
+    t_ok(!exp_entitlement($f['rahul_ins'], 'HEAD', $f['PERS'], $t)['allowed'], 'personal · nobody else gets it');
+    [$rows] = exp_personal_rows_from_post($f['amit_ins'], ['pa_on' => [$f['PERS'] => '1'], 'pa_amt' => [$f['PERS'] => '100']], $t);
+    t_eq(count($rows), 0, 'personal · saving it unchanged writes nothing (its "from" date stays)');
+    exp_save_rows('person', $f['amit_ins'], $t, [['HEAD', $f['DA'], -1, null, null]]);
+    t_ok(exp_entitlement($f['amit_ins'], 'HEAD', $f['PERS'], $t)['allowed'], 'personal · saving the old per-person grid on the same date does not wipe it');
     t_eq(exp_entitlement($f['amit_ins'], 'HEAD', $f['DA'], $y)['rate'], 300.0, 'effective date · yesterday keeps the band amount (history kept)');
-    t_ok(exp_entitlement($f['amit_ins'], 'MODE', $f['mode2'], $t)['allowed'], 'person · an extra type (own car) on his profile');
     t_eq(exp_entitlement($f['amit_ins'], 'MODE', $f['mode2'], $t)['rate'], 12.0, 'no band or person rate · the travel mode\'s default (data, not code)');
     exp_save_rows('band', $f['band'], date('Y-m-d', strtotime('+10 days')), [['HEAD', $f['DA'], 1, 320, null], ['MODE', $f['mode'], 1, 7, null]]);
     t_eq(exp_entitlement($f['amit_ins'], 'MODE', $f['mode'], date('Y-m-d', strtotime('+11 days')))['rate'], 7.0, 'a band rate from a later date applies from that date');
     t_eq(exp_entitlement($f['amit_ins'], 'MODE', $f['mode'], $t)['rate'], 6.0, '…and not before it');
-    t_eq(exp_entitlement($f['amit_ins'], 'HEAD', $f['DA'], date('Y-m-d', strtotime('+11 days')))['rate'], 350.0, 'the person\'s own amount still wins over the band');
+    t_eq(exp_entitlement($f['amit_ins'], 'HEAD', $f['DA'], date('Y-m-d', strtotime('+11 days')))['rate'], 320.0, 'a raised band amount reaches him from its date');
+    t_eq(exp_entitlement($f['amit_ins'], 'HEAD', $f['PERS'], date('Y-m-d', strtotime('+11 days')))['rate'], 100.0, '…and his personal allowance stays on top, unchanged');
     db()->prepare("DELETE FROM inspector_allowances WHERE band_id=? AND effective_from>?")->execute([$f['band'], $t]);
     t_ok(exp_entitlement($f['rahul_ins'], 'HEAD', $f['DA'], $t)['allowed'], 'no band, no rows · every job-day type, as before');
     t_ok(!exp_entitlement($f['rahul_ins'], 'HEAD', $f['TEL'], $t)['allowed'], 'no band · a "not for a job" type is never on by default (E5)');
@@ -71,7 +89,8 @@ try {
     $lines = exp1_lines($cv['id']); $f['vids'][] = (int) $cv['id'];
     $by = []; foreach ($lines as $l) $by[$l['head_code']] = $l;
     t_eq((float) ($by['KMTRAVEL']['travel_amount'] ?? 0), 252.0, 'travel · 42 km × ₹6 from the band = ₹252');
-    t_eq((float) ($by[$f['DA']]['row_total'] ?? 0), 350.0, 'allowance · AUTO, at his own amount');
+    t_eq((float) ($by[$f['DA']]['row_total'] ?? 0), 300.0, 'allowance · AUTO, at his band\'s amount');
+    t_eq((float) ($by[$f['PERS']]['row_total'] ?? 0), 100.0, 'personal · added by itself on top, as its own line');
     t_eq((int) ($by[$f['OUT']]['ticked'] ?? 0), 1, 'allowance · TICK, added because he ticked "Outstation today"');
     t_eq((int) ($by['KMTRAVEL']['job_id'] ?? 0), $f['job'], 'the line carries the job');
     t_eq((int) ($by['KMTRAVEL']['client_id'] ?? 0), $f['client'], '…the client');
@@ -90,7 +109,10 @@ try {
     t_ok(!$ok && stripos($msg, 'not one of the expense types') !== false, 'E5 · a "not for a job" type that is off for his band is refused');
     exp_save_rows('person', $f['amit_ins'], date('Y-m-d', strtotime('-2 days')), [['HEAD', $f['TEL'], 1, null, null]]);
     [$ok, $msg] = exp_add_line($f['amit_ins'], $f['TEL'], 120, $t, 0, 'courier');
-    t_ok($ok, 'E5 · switched on for the person, it is added: ' . $msg);
+    t_ok(!$ok, 'E5 · a person row does not switch on a type his band does not allow');
+    exp_save_rows('band', $f['band'], date('Y-m-d', strtotime('-2 days')), [['HEAD', $f['TEL'], 1, null, null]]);
+    [$ok, $msg] = exp_add_line($f['amit_ins'], $f['TEL'], 120, $t, 0, 'courier');
+    t_ok($ok, 'E5 · switched on for his band, it is added: ' . $msg);
     [$ok, $msg] = exp_add_line($f['amit_ins'], $f['HOTEL'], 1200, $t, 0, '');
     t_ok(!$ok && stripos($msg, 'goes on a') !== false, 'a job type without a job is refused (use the day close)');
 

@@ -156,7 +156,7 @@ try {
     bbv_route('voucher-rules', 'POST', $f['master'], 0, ['_do' => 'rules', 'period' => 'FORTNIGHTLY', 'day_days' => '8', 'claim_days' => '8', 'km_tol' => '10']);
     t_eq((string) ops_val("SELECT svalue FROM settings WHERE skey='exp_claim_period'"), 'FORTNIGHTLY', 'settings · the claim period is saved');
     t_eq((string) ops_val("SELECT svalue FROM settings WHERE skey='exp_km_tolerance_pct'"), '10', 'settings · the distance tolerance is saved');
-    $r = bbv_route('voucher-rules', 'GET', $f['master'], 0, [], ['band' => $f['band']]);
+    $r = bbv_route('voucher-rules', 'GET', $f['master'], 0, [], ['tab' => 'bands', 'band' => $f['band']]);
     t_ok($opened($r, 'ops/voucher_rules') && strpos($r['out'], 'what it may claim') !== false, 'settings · a band opens with its amounts');
 } finally {
     exp1_cleanup($f);

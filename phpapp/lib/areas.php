@@ -307,7 +307,7 @@ function ops_area_def($area) {
         case 'admin':
             $title = 'Admin'; $icon = '⚙️';
             $sub = 'For administrators: masters, people, access, licensing and system configuration.';
-            $routes = ['admin','report-types','report-type-edit','irn-rules','compliance','incidents','incident','incident-new','incident-edit','consents','data-requests','workspace/setup','workspace/setup/modules','masters','m/','lookups','custom-fields','cforms','cform','form-designer','ai-forms','users','user-new','user-edit','hierarchy','access','role-workspaces','adspro','sso','licence','product-package','pricing-usage','settings','terminology','service-scope','service-formats','company-profile','backup','ai-settings','books-bridge','approvals-setup','approver-map','approval-rules','idems-approval-rules','templates','report-templates','audit-log'];
+            $routes = ['admin','report-types','report-type-edit','irn-rules','compliance','incidents','incident','incident-new','incident-edit','consents','data-requests','workspace/setup','workspace/setup/modules','masters','m/','lookups','custom-fields','cforms','cform','form-designer','ai-forms','users','user-new','user-edit','hierarchy','access','role-workspaces','adspro','sso','licence','product-package','pricing-usage','settings','terminology','service-scope','service-formats','company-profile','backup','ai-settings','books-bridge','approvals-setup','voucher-rules','approver-map','approval-rules','idems-approval-rules','templates','report-templates','audit-log'];
 
             // Phase 1 — the Company Setup Cockpit is the single front door to all
             // configuration below. Shown first so a non-technical admin starts here.
@@ -357,6 +357,9 @@ function ops_area_def($area) {
             // R11 — SLA targets moved to Quality (service delivery) so it no longer pulls
             // coordinators / asst. managers into Admin. See the 'quality' area above.
             $t(can('settings.manage') || is_master(), '🏢', 'Company profile', '/company-profile', 'Legal name, logo and details.');
+            //  Expense setup (owner, 18 Nov 2026): "not accessible directly" — its own tile.
+            $t($fx('exp_settings_can') && exp_settings_can() && (!$fx('licence_blocks') || !licence_blocks('mod.vouchers.view')),
+               '🧾', 'Expense setup', '/voucher-rules', 'Claim period, expense types, bands (company policy) and each person\'s personal allowances.');
 
             //  APPROVALS IS NOT REPORT CONFIGURATION.
             //

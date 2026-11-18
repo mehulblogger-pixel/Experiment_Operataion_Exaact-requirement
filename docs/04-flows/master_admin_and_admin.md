@@ -47,9 +47,19 @@ that approver's delegate or above them in the reporting line).
 at Admin → Approvals → Expense vouchers → *Claim period, deadlines, expense types and bands*
 (`/voucher-rules`): the claim period (weekly / fortnightly / monthly), the two deadlines (a day's
 expenses for N days; a claim within M days after its period — 8 and 8 to start), the distance
-tolerance, the band list and what each band may claim (amounts, limits, from a date). Expense types
-stay on Masters → Expense heads; a person's band and own amounts on their team-member record
-(Allowances & rates). The Master Admin and an Admin **view** every claim and may approve where
+tolerance, the band list and what each band may claim (amounts, limits, from a date).
+**Expense setup (owner, 18 Nov 2026)** — the same route is now ONE screen, Admin → **Expense setup**
+(its own Admin tile; breadcrumb Home › Admin › Expense setup), with four tabs: 1 Claim rules ·
+2 Expense types (added and changed here, vehicles per km included; the Masters lists "Expense heads" and
+"Travel modes" send the Master Admin here, and stay as they were for anyone else allowed into Masters) ·
+3 Bands = **the company's policy** for a level (one box per type: ₹/km, ₹/day, ₹/month, or the "up to"
+amount of a bill) · 4 People = a **default band for each role** and each person's band (a band picked on
+the person wins; blank follows the role). **A person cannot change his band's amounts.** His own top-up
+("to adjust the salary") is a **personal allowance** — an expense type marked *personal*, switched on for
+him alone with his amount and a from-date on his team-member record (tab **Expenses**), paid for each
+closed site day or once a month, and always **added on top** of the band as its own line, marked
+"personal", which everyone in the approval chain sees (owner's P2). A person with no band and no role
+band keeps the old per-person rates. Master Admin only, as before — no new permission. The Master Admin and an Admin **view** every claim and may approve where
 nobody else can, mark Paid and reopen as before — but since V2 they **no longer edit, submit or open
 a claim for someone else**, and they do not reopen a claim locked by a deadline (only the claimant's N+1).
 

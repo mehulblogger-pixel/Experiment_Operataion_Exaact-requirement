@@ -57,6 +57,9 @@ if (!function_exists('exp1_fixture')) {
         $f['RICK']  = $head('RCK', 'Auto-rickshaw', 'NOBILL');
         $f['MOB']   = $head('MOB', 'Mobile', 'MONTHLY');
         $f['TEL']   = $head('TEL', 'Office courier', 'BILL', 'NONJOB');
+        // A personal allowance (owner, 18 Nov 2026): on for one person, added on top of the band.
+        $f['PERS']  = $head('PRS', 'Site allowance', 'PER_DAY', 'JOB', 'AUTO');
+        $pdo->prepare("UPDATE expense_heads SET personal=1 WHERE code=?")->execute([$f['PERS']]);
         $pdo->prepare("INSERT INTO expense_bands (name, notes, sort_order, active, created_at) VALUES (?, '', 100, 1, ?)")->execute(['Field ' . $t, date('c')]);
         $f['band'] = (int) $pdo->lastInsertId();
         exp_save_rows('band', $f['band'], '2020-01-01', [
@@ -64,6 +67,7 @@ if (!function_exists('exp1_fixture')) {
             ['HEAD', $f['DA'], 1, 300, null], ['HEAD', $f['OUT'], 1, 500, null],
             ['HEAD', $f['HOTEL'], 1, null, 3000], ['HEAD', $f['RICK'], 1, null, 200],
             ['HEAD', $f['MOB'], 1, 400, null], ['HEAD', $f['TEL'], 0, null, null],
+            ['HEAD', $f['PERS'], 1, 999, null],    // a band row for a personal type is never read
         ]);
         $pdo->prepare("UPDATE inspectors SET band_id=? WHERE id=?")->execute([$f['band'], $f['amit_ins']]);
         return $f;

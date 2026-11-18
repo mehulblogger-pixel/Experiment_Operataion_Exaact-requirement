@@ -3841,6 +3841,11 @@ function ops_dispatch($route, $method) {
         $cfg = $masters[$key];
         ops_require(master_access_ok($cfg['access']), "Only " . ($cfg['access']) . "-level users can open {$cfg['label']}.");
         if ($key === 'inspectors') { ops_inspectors($action, $method); return true; } // dedicated screen
+        //  Expense setup (owner, 18 Nov 2026): the expense types and vehicles are added and
+        //  changed on Expense setup → Expense types. The Master Admin's way into the old lists
+        //  lands there; anyone else allowed into Masters keeps the list as before.
+        if (in_array($key, ['expense-heads', 'travel-modes'], true) && $action === 'list' && $method === 'GET'
+            && function_exists('exp_settings_can') && exp_settings_can() && empty($_GET['old'])) redirect('/voucher-rules?tab=types');
         ops_master_handle($key, $cfg, $action, $method);
         return true;
     }
@@ -5221,9 +5226,10 @@ function ops_inspectors($action, $method) {
             // Allowances & rates grid (Super Admin only)
             if (($b['_do'] ?? '') === 'allow_save' && $ins) {
                 ops_require(is_master(), 'Only the Super Admin can set allowances.');
-                save_inspector_allowances($ins['id'], $b);
-                flash('Allowances & rates updated.');
-                redirect('/m/inspectors/edit?id=' . $ins['id']);
+                $bad = save_inspector_allowances($ins['id'], $b);
+                if ($bad) flash('Saved, except: ' . implode(', ', $bad) . ' — a personal allowance that is on needs an amount above 0.', 'error');
+                else flash('Expenses saved.');
+                redirect('/m/inspectors/edit?id=' . $ins['id'] . '#tab=expenses');
             }
             // main save
             $full = trim(trim(($b['first_name'] ?? '') . ' ' . ($b['middle_name'] ?? '')) . ' ' . ($b['last_name'] ?? ''));
@@ -5433,12 +5439,22 @@ function inspector_mode_allowed($insId, $code) {
 // "applies from" date. Rows saved for an earlier date stay, so an older claim
 // keeps the rate of its day (never overwrite history); the same date saved
 // twice is a correction of that date.
+//  Expense setup (18 Nov 2026): the band, the personal allowances that changed,
+//  and — only for a person with no band — the old per-person rates.
+//  Returns the names of personal allowances refused (on, but no amount).
 function save_inspector_allowances($insId, $b) {
-    if (!is_master() || !$insId) return;
-    if (array_key_exists('band_id', $b))
-        db()->prepare("UPDATE inspectors SET band_id=? WHERE id=?")->execute([(int)$b['band_id'] ?: null, $insId]);
+    if (!is_master() || !$insId) return [];
+    if (array_key_exists('band_id', $b) && (int)$b['band_id'] !== exp_own_band($insId)) {
+        $bv = (int)$b['band_id'];
+        if ($bv && !ops_val("SELECT id FROM expense_bands WHERE id=?", [$bv])) $bv = 0;
+        db()->prepare("UPDATE inspectors SET band_id=? WHERE id=?")->execute([$bv ?: null, $insId]);
+        if (function_exists('act_log')) try { act_log('INSPECTOR', $insId, 'EXPENSE_BAND', $bv ? 'Band set to "' . ops_val("SELECT name FROM expense_bands WHERE id=?", [$bv]) . '".' : 'Band set to follow the role.'); } catch (Throwable $e) {}
+    }
     $ef = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($b['allow_from'] ?? '')) ? $b['allow_from'] : date('Y-m-d');
-    exp_save_rows('person', $insId, $ef, exp_rows_from_post($b, false));
+    if (!empty($b['legacy']) && !exp_person_band($insId)) exp_save_rows('person', $insId, $ef, exp_rows_from_post($b, false));
+    [$rows, $bad] = exp_personal_rows_from_post($insId, $b, $ef);
+    exp_save_person_rows($insId, $ef, $rows);
+    return $bad;
 }
 
 // Human labels for an inspector's stored Business Unit codes / skill ids / trade.
@@ -8482,16 +8498,21 @@ function ops_vouchers($route, $method) {
         }
         redirect($back);
     }
-    // ---- Expenses Phase 1 — screens 6 and 7 (Master Admin): bands and claim rules
+    // ---- Expense setup (owner, 18 Nov 2026): ONE screen, four tabs — claim rules,
+    //      expense types, bands (company policy) and people (band + personal
+    //      allowances). Master Admin only, as before. Nothing else moved: the
+    //      types are the same expense_heads / travel_modes rows the Masters lists show.
     if ($route === 'voucher-rules') {
-        ops_require(exp_settings_can(), 'Only the Master Admin sets the expense rules and bands.');
+        ops_require(exp_settings_can(), 'Only the Master Admin sets up expenses.');
         $do = (string)($_POST['_do'] ?? '');
+        $go = fn($tab, $q = '') => redirect('/voucher-rules?tab=' . $tab . $q);
+        $label = fn() => substr(trim(preg_replace('/\s+/', ' ', (string)($_POST['label'] ?? ''))), 0, 150);
         if ($method === 'POST' && $do === 'rules') {
             $per = strtoupper((string)($_POST['period'] ?? 'MONTHLY'));
             $nums = [['day_days', 'A day\'s deadline'], ['claim_days', 'The claim deadline'], ['km_tol', 'The distance tolerance']];
             foreach ($nums as [$k, $lab]) {
                 $x = trim((string)($_POST[$k] ?? ''));
-                if ($x === '' || !is_numeric($x) || (float)$x < 0) { flash($lab . ' must be a number of 0 or more.', 'error'); redirect('/voucher-rules'); }
+                if ($x === '' || !is_numeric($x) || (float)$x < 0) { flash($lab . ' must be a number of 0 or more.', 'error'); $go('rules'); }
             }
             if (!isset(EXP_PERIODS[$per])) $per = 'MONTHLY';
             setting_set('exp_claim_period', $per);
@@ -8499,29 +8520,108 @@ function ops_vouchers($route, $method) {
             setting_set('exp_claim_deadline_days', (string)(int)$_POST['claim_days']);
             setting_set('exp_km_tolerance_pct', (string)round((float)$_POST['km_tol'], 2));
             flash('Claim rules saved. New claims follow them; a claim already open keeps its own dates.');
-            redirect('/voucher-rules');
+            $go('rules');
         }
+        //  Tab 2 — add or change a type, right here.
+        if ($method === 'POST' && in_array($do, ['type_add', 'type_save'], true)) {
+            $lab = $label();
+            $kind = strtoupper((string)($_POST['kind'] ?? ''));
+            $personal = !empty($_POST['personal']) ? 1 : 0;
+            $editId = $do === 'type_save' ? (int)($_POST['id'] ?? 0) : 0;
+            $cur = $editId ? ops_one("SELECT * FROM expense_heads WHERE id=?", [$editId]) : null;
+            if ($do === 'type_save' && (!$cur || $cur['code'] === 'KMTRAVEL')) { flash('That expense type no longer exists.', 'error'); $go('types'); }
+            if ($lab === '') { flash('Give the expense type a name, e.g. "Hotel".', 'error'); $go('types'); }
+            $kinds = $personal ? ['PER_DAY', 'MONTHLY'] : ($cur ? ['BILL', 'NOBILL', 'PER_DAY', 'MONTHLY'] : ['PER_KM', 'BILL', 'NOBILL', 'PER_DAY', 'MONTHLY']);
+            if (!in_array($kind, $kinds, true)) {
+                flash($personal ? 'A personal allowance is paid for each site day or once a month — choose one of those.' : 'Choose what kind of expense it is.', 'error'); $go('types');
+            }
+            if ($kind === 'PER_KM') {
+                if (ops_val("SELECT id FROM travel_modes WHERE LOWER(label)=LOWER(?)", [$lab])) { flash('"' . $lab . '" is already in the list.', 'error'); $go('types'); }
+                $pdo->prepare("INSERT INTO travel_modes (code, label, basis, default_rate, active) VALUES (?,?,'PER_KM',0,1)")->execute([exp_new_code($lab), $lab]);
+                flash('"' . $lab . '" added (per km). Now give each band its rate on the Bands tab.');
+                $go('types');
+            }
+            if (ops_val("SELECT id FROM expense_heads WHERE LOWER(label)=LOWER(?) AND id<>?", [$lab, $editId])) { flash('"' . $lab . '" is already in the list.', 'error'); $go('types'); }
+            $scope = $personal || $kind === 'MONTHLY' ? 'JOB' : (($_POST['scope'] ?? 'JOB') === 'NONJOB' ? 'NONJOB' : 'JOB');
+            $mode = $kind === 'PER_DAY' && !$personal ? ((($_POST['add_mode'] ?? '') === 'AUTO') ? 'AUTO' : 'TICK') : ($personal && $kind === 'PER_DAY' ? 'AUTO' : '');
+            $photo = $kind === 'BILL' && !empty($_POST['needs_receipt']) ? 1 : 0;
+            if ($cur) {
+                $active = !empty($_POST['active']) ? 1 : 0;
+                $pdo->prepare("UPDATE expense_heads SET label=?, head_type=?, scope=?, add_mode=?, needs_receipt=?, personal=?, active=? WHERE id=?")
+                    ->execute([$lab, $kind, $scope, $mode, $photo, $personal, $active, $editId]);
+                if (function_exists('act_log')) try { act_log('EXPENSE_TYPE', $editId, 'CHANGED', 'Expense type "' . $lab . '" changed.'); } catch (Throwable $e) {}
+                flash('"' . $lab . '" saved. Lines already in claims keep their amounts.');
+            } else {
+                $sort = (int)ops_val("SELECT COALESCE(MAX(sort_order),0) FROM expense_heads") + 10;
+                $pdo->prepare("INSERT INTO expense_heads (code, label, head_type, default_rate, needs_receipt, sort_order, active, scope, add_mode, personal) VALUES (?,?,?,0,?,?,1,?,?,?)")
+                    ->execute([exp_new_code($lab), $lab, $kind, $photo, $sort, $scope, $mode, $personal]);
+                flash('"' . $lab . '" added. ' . ($personal ? 'Switch it on for a person on the People tab (or his team-member record), with his amount.' : 'Now say on the Bands tab which bands may claim it, and how much.'));
+            }
+            $go('types');
+        }
+        if ($method === 'POST' && $do === 'mode_save') {
+            $m = ops_one("SELECT * FROM travel_modes WHERE id=? AND basis='PER_KM'", [(int)($_POST['id'] ?? 0)]);
+            $lab = $label();
+            if (!$m) { flash('That vehicle no longer exists.', 'error'); $go('types'); }
+            if ($lab === '') { flash('Give it a name, e.g. "Own bike".', 'error'); $go('types'); }
+            $pdo->prepare("UPDATE travel_modes SET label=?, active=? WHERE id=?")->execute([$lab, !empty($_POST['active']) ? 1 : 0, (int)$m['id']]);
+            flash('"' . $lab . '" saved.');
+            $go('types');
+        }
+        //  Tab 3 — bands: the company's policy.
         if ($method === 'POST' && $do === 'band_add') {
             $name = trim((string)($_POST['name'] ?? ''));
-            if ($name === '') { flash('Give the band a name, e.g. "Field Inspector".', 'error'); redirect('/voucher-rules'); }
+            if ($name === '') { flash('Give the band a name, e.g. "Field Inspector".', 'error'); $go('bands'); }
+            if (ops_val("SELECT id FROM expense_bands WHERE LOWER(name)=LOWER(?)", [$name])) { flash('There is already a band called "' . $name . '".', 'error'); $go('bands'); }
             $pdo->prepare("INSERT INTO expense_bands (name, notes, sort_order, active, created_at) VALUES (?,?,?,1,?)")
                 ->execute([substr($name, 0, 100), substr(trim((string)($_POST['notes'] ?? '')), 0, 255), 100, date('c')]);
-            flash('Band "' . $name . '" added. Now set what it may claim.');
-            redirect('/voucher-rules?band=' . (int)$pdo->lastInsertId());
+            $nid = (int)$pdo->lastInsertId();
+            $from = (int)($_POST['copy_from'] ?? 0);
+            if ($from && ops_val("SELECT id FROM expense_bands WHERE id=?", [$from])) {
+                $rows = [];
+                foreach (['MODE' => "SELECT code FROM travel_modes", 'HEAD' => "SELECT code FROM expense_heads"] as $k => $sql)
+                    foreach (ops_all($sql) ?: [] as $c) {
+                        $r = exp_ent_latest('band', $from, $k, $c['code'], date('Y-m-d'));
+                        if ($r) $rows[] = [$k, $c['code'], (int)$r['allowed'], $r['rate_override'], $r['limit_amount']];
+                    }
+                exp_save_rows('band', $nid, date('Y-m-d'), $rows);
+            }
+            flash('Band "' . $name . '" added' . ($from ? ' as a copy' : '') . '. Now set what it may claim, and how much.');
+            $go('bands', '&band=' . $nid);
         }
         if ($method === 'POST' && $do === 'band_save') {
             $bid = (int)($_POST['band_id'] ?? 0);
             $band = ops_one("SELECT * FROM expense_bands WHERE id=?", [$bid]);
-            if (!$band) { flash('That band no longer exists.', 'error'); redirect('/voucher-rules'); }
+            if (!$band) { flash('That band no longer exists.', 'error'); $go('bands'); }
             $name = trim((string)($_POST['name'] ?? '')) ?: $band['name'];
+            if (ops_val("SELECT id FROM expense_bands WHERE LOWER(name)=LOWER(?) AND id<>?", [$name, $bid])) { flash('There is already a band called "' . $name . '".', 'error'); $go('bands', '&band=' . $bid); }
+            foreach (array_merge(array_values((array)($_POST['amt_head'] ?? [])), array_values((array)($_POST['amt_mode'] ?? []))) as $x)
+                if (trim((string)$x) !== '' && (!is_numeric($x) || (float)$x < 0)) { flash('Each amount must be a number of 0 or more.', 'error'); $go('bands', '&band=' . $bid); }
             $pdo->prepare("UPDATE expense_bands SET name=?, notes=?, active=? WHERE id=?")
                 ->execute([substr($name, 0, 100), substr(trim((string)($_POST['notes'] ?? '')), 0, 255), !empty($_POST['active']) ? 1 : 0, $bid]);
             $ef = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['allow_from'] ?? '')) ? $_POST['allow_from'] : date('Y-m-d');
-            exp_save_rows('band', $bid, $ef, exp_rows_from_post($_POST, true));
+            exp_save_rows('band', $bid, $ef, exp_band_rows_from_post($_POST));
             flash('Band "' . $name . '" saved — these amounts apply from ' . fdate($ef) . '. Lines already confirmed keep their amounts.');
-            redirect('/voucher-rules?band=' . $bid);
+            $go('bands', '&band=' . $bid);
         }
-        $bandId = (int)($_GET['band'] ?? 0);
+        //  Tab 4 — the default band for each role, and each person's band.
+        if ($method === 'POST' && $do === 'people_save') {
+            exp_role_bands_save((array)($_POST['role_band'] ?? []));
+            $n = 0;
+            foreach ((array)($_POST['band'] ?? []) as $iid => $bv) {
+                $iid = (int)$iid; $bv = (int)$bv;
+                if ($bv && !ops_val("SELECT id FROM expense_bands WHERE id=?", [$bv])) continue;
+                if (exp_own_band($iid) === $bv) continue;
+                $pdo->prepare("UPDATE inspectors SET band_id=? WHERE id=?")->execute([$bv ?: null, $iid]);
+                if (function_exists('act_log')) try { act_log('INSPECTOR', $iid, 'EXPENSE_BAND', $bv ? 'Band set to "' . ops_val("SELECT name FROM expense_bands WHERE id=?", [$bv]) . '".' : 'Band set to follow the role.'); } catch (Throwable $e) {}
+                $n++;
+            }
+            flash('Saved.' . ($n ? ' ' . $n . ' ' . ($n === 1 ? 'person' : 'people') . ' changed.' : ''));
+            $go('people');
+        }
+        $tab = in_array($_GET['tab'] ?? '', ['rules', 'types', 'bands', 'people'], true) ? $_GET['tab'] : 'rules';
+        $bands = exp_bands();
+        $bandId = (int)($_GET['band'] ?? 0) ?: (int)($bands[0]['id'] ?? 0);
         $band = $bandId ? ops_one("SELECT * FROM expense_bands WHERE id=?", [$bandId]) : null;
         $asOf = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['on'] ?? '')) ? $_GET['on'] : date('Y-m-d');
         $bandRows = ['HEAD' => [], 'MODE' => []]; $bandDates = [];
@@ -8533,10 +8633,20 @@ function ops_vouchers($route, $method) {
                 }
             $bandDates = array_column(ops_all("SELECT DISTINCT COALESCE(effective_from,'') ef FROM inspector_allowances WHERE band_id=? ORDER BY ef DESC", [$bandId]) ?: [], 'ef');
         }
-        if (function_exists('nav_under')) nav_under('voucher-rules', 'admin', ['label' => 'Expense vouchers', 'url' => '/voucher-approvals']);
-        view('ops/voucher_rules', ['rules' => exp_rules(), 'bands' => exp_bands(), 'band' => $band, 'bandRows' => $bandRows, 'bandDates' => $bandDates, 'asOf' => $asOf,
-            'heads' => ops_all("SELECT * FROM expense_heads ORDER BY sort_order, id") ?: [], 'modes' => ops_all("SELECT * FROM travel_modes ORDER BY id") ?: [],
-            'bandCount' => array_column(ops_all("SELECT band_id, COUNT(*) n FROM inspectors WHERE band_id IS NOT NULL GROUP BY band_id") ?: [], 'n', 'band_id')]);
+        $people = [];
+        if ($tab === 'people') {
+            $roleOf = [];
+            foreach (ops_all("SELECT inspector_id, role FROM users WHERE is_active=1 AND inspector_id IS NOT NULL ORDER BY id DESC") ?: [] as $u) $roleOf[(int)$u['inspector_id']] = strtoupper((string)$u['role']);
+            $pcount = array_column(ops_all("SELECT a.inspector_id, COUNT(DISTINCT a.code) n FROM inspector_allowances a JOIN expense_heads h ON h.code=a.code AND a.kind='HEAD'
+                                            WHERE h.personal=1 AND a.allowed=1 AND (a.band_id IS NULL OR a.band_id=0) GROUP BY a.inspector_id") ?: [], 'n', 'inspector_id');
+            foreach (ops_all("SELECT id, name, band_id FROM inspectors WHERE COALESCE(NULLIF(status,''),'ACTIVE')='ACTIVE' ORDER BY name") ?: [] as $i)
+                $people[] = $i + ['role' => $roleOf[(int)$i['id']] ?? '', 'personal' => (int)($pcount[$i['id']] ?? 0)];
+        }
+        if (function_exists('nav_under')) nav_under('voucher-rules', 'admin');
+        view('ops/voucher_rules', ['tab' => $tab, 'rules' => exp_rules(), 'bands' => $bands, 'band' => $band, 'bandRows' => $bandRows, 'bandDates' => $bandDates, 'asOf' => $asOf,
+            'heads' => ops_all("SELECT * FROM expense_heads WHERE code<>'KMTRAVEL' ORDER BY sort_order, id") ?: [], 'modes' => ops_all("SELECT * FROM travel_modes WHERE basis='PER_KM' ORDER BY id") ?: [],
+            'bandCount' => array_column(ops_all("SELECT band_id, COUNT(*) n FROM inspectors WHERE band_id IS NOT NULL GROUP BY band_id") ?: [], 'n', 'band_id'),
+            'people' => $people, 'roles' => exp_team_roles(), 'roleBands' => exp_role_bands(), 'editId' => (int)($_GET['edit'] ?? 0), 'editMode' => (int)($_GET['mode'] ?? 0)]);
         return;
     }
 

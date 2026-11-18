@@ -1585,6 +1585,10 @@
     var href = active.getAttribute('href');
     if (window.location.pathname === href) return;          // already on the area home
     if (crumbs.querySelector('a[href="' + href + '"]')) return;  // area crumb already present
+    //  The trail already names ANOTHER area (a screen placed under Admin while its module's
+    //  menu item is under Operations, e.g. Expense setup): one area per trail, never two —
+    //  "Home › Operations › Admin › Expense setup" sent the owner to a different screen (18 Nov 2026).
+    for (var ai = 0; ai < AREAS.length; ai++) if (crumbs.querySelector('a[href="' + AREAS[ai] + '"]')) return;
     var home = crumbs.querySelector('a');
     if (!home || home.getAttribute('href') !== '/') return;  // only augment the standard Home › … crumb
     var labelEl = active.querySelector('span:not(.s-ic)');

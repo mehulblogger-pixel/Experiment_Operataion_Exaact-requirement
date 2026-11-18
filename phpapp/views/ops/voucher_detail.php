@@ -118,6 +118,7 @@
           <?php if (!$parts): ?><span class="muted"><?= $g['work'] ? e(trim((string)$e['notes']) !== '' ? $e['notes'] : 'Day worked — no expenses') : e(trim((string)($e['leave_code'] ?: $e['office_code'] ?: '')) ?: 'No expenses') ?></span><?php endif; ?>
           <?php foreach ($parts as $i => $pt): ?><?= $i ? ' · ' : '' ?><?= e($pt['label']) ?> <strong><?= e($cs . nf($pt['amount'], 0)) ?></strong><?php endforeach; ?>
           <?php if ($nobill): ?> <span class="pill p-mut">no bill</span><?php endif; ?>
+          <?php if ($h && exp_is_personal($h)): ?> <span class="pill p-mut" title="A personal allowance, added on top of the band">personal</span><?php endif; ?>
           <?php if ((int)($e['ticked'] ?? 0) === 1): ?> <span class="pill p-mut">ticked</span><?php endif; ?>
           <?php if (!empty($e['receipt_data'])): ?> <a href="/voucher-line-receipt?id=<?= (int)$e['id'] ?>" target="_blank" rel="noopener">📎 view</a><?php elseif ($h && exp_needs_photo($h)): ?> <span class="pill p-warn">no photo</span><?php endif; ?>
           <?php if (trim((string)($e['km_reason'] ?? '')) !== ''): ?><br><span class="vc-note">Reason for the distance: “<?= e($e['km_reason']) ?>”</span><?php endif; ?>
