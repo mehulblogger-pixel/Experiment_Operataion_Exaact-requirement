@@ -59,7 +59,9 @@
   // on every page load is worse than one that never collapsed.
   try { if (localStorage.getItem("navCollapsed") === "1") document.documentElement.classList.add("nav-collapsed"); } catch (e) {}
 </script>
-</head><body class="<?= $u ? 'app' : '' ?><?= $isInsp ? ' inspector' : '' ?>" data-upload-max="<?= function_exists('upload_post_max_bytes') ? (int)upload_post_max_bytes() : 0 ?>">
+</head><body class="<?= $u ? 'app' : '' ?><?= $isInsp ? ' inspector' : '' ?>" data-upload-max="<?= function_exists('upload_post_max_bytes') ? (int)upload_post_max_bytes() : 0 ?>"<?php
+  // Plan 42 step A — screens switched off for this company: app.js hides the links to them.
+  if ($u && function_exists('feat_client_rules') && ($__fr = feat_client_rules())) echo ' data-feat-off="' . htmlspecialchars(json_encode($__fr), ENT_QUOTES) . '"'; ?>>
 <?php if (function_exists('app_is_test_copy') && app_is_test_copy()): ?>
 <div role="status" style="background:#7c2d12;color:#fff;text-align:center;padding:6px 12px;font-size:13px;font-weight:600;position:sticky;top:0;z-index:1000">TEST COPY — not the live system. <?= e(app_test_mail_banner()) ?> Payments: Razorpay test keys only.</div>
 <?php endif; ?>
@@ -96,13 +98,13 @@
             // discover that searching records is a thing at all. ?>
       <a class="s-item<?= $navOn(['search']) ?>" href="/search"><span class="s-ic">🔍</span><span>Search records</span></a>
       <?php // Where a handover between selling, doing and billing was skipped. ?>
-      <?php if (function_exists('chain_can') && chain_can()): ?>
+      <?php if (function_exists('chain_can') && chain_can() && (!function_exists('feat_on') || feat_on('/flow-gaps'))): ?>
         <a class="s-item<?= $navOn(['flow-gaps']) ?>" href="/flow-gaps"><span class="s-ic">🔗</span><span>Where the flow is broken</span></a>
       <?php endif; ?>
       <?php // The one screen that answers "what should I do today" with money attached.
             // It sits above the module groups on purpose: it is cross-module, and a
             // person who only opens one screen a day should open this one. ?>
-      <?php if (function_exists('adv_can') && adv_can()): ?>
+      <?php if (function_exists('adv_can') && adv_can() && (!function_exists('feat_on') || feat_on('/advisor'))): ?>
         <a class="s-item<?= $navOn(['advisor']) ?>" href="/advisor"><span class="s-ic">🩺</span><span>What to fix</span></a>
       <?php endif; ?>
 

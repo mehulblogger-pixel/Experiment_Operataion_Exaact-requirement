@@ -43,6 +43,17 @@ flowchart TD
 "Reopen as draft" on an approved costing unless they gave its highest approval themselves (or are
 that approver's delegate or above them in the reporting line).
 
+**Switches for every screen (plan 42 step A, owner 18 Nov 2026).** Admin → **Modules & features**:
+each module card now also lists **every screen** of that module with an on/off switch ("Screens in this
+module", one Save per card), plus the switches that already existed on their own screens (pre-order
+checklist, customer satisfaction, client / vendor portal, careers page — the same settings). Two
+one-click layouts at the top, each showing exactly what changes before it is applied: **"Simple start"**
+(Recruitment and Marketplace modules off; project costing, pipelines, pre-order checklist, MGH Books,
+Business Unit P&L, cost reconciliation, Command Centre, What to fix and Where the flow is broken off) and
+**"Back to <date>"** (exactly how the company was set up when this version first ran). A switched-off
+screen is hidden from tiles, "Find a screen", the left menu and links, and refused by its address; its
+records are kept. Installing the update changes nothing. Same people as the module switch.
+
 **Expense claims (Expenses Phase 1, owner 17 Nov 2026).** The Master Admin sets the expense rules
 at Admin → Approvals → Expense vouchers → *Claim period, deadlines, expense types and bands*
 (`/voucher-rules`): the claim period (weekly / fortnightly / monthly), the two deadlines (a day's

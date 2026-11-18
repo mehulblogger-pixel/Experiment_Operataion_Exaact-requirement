@@ -32,6 +32,8 @@ function ops_area_def($area) {
     // 'red' | 'amber' | 'green' | '' (neutral). $ext opens in a new tab.
     $t = function ($show, $icon, $label, $route, $desc = '', $count = null, $tone = '', $ext = false) use (&$sections) {
         if (!$show) return;
+        //  Plan 42 step A — a screen whose feature is switched off is not a tile.
+        if (!$ext && function_exists('feat_on') && !feat_on($route)) return;
         if (empty($sections)) $sections[] = ['label' => '', 'tiles' => []];
         $sections[count($sections) - 1]['tiles'][] = [
             'icon' => $icon, 'label' => $label, 'route' => $route, 'desc' => $desc,

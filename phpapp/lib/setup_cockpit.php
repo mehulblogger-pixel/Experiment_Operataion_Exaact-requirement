@@ -599,6 +599,40 @@ function ops_cockpit($route, $method) {
         return true;
     }
 
+    // Plan 42 step A (owner, 18 Nov 2026) — the switches for every screen of a
+    // module (one card at a time), and the two one-click layouts. Same people as
+    // the module switch above (cockpit_can). Nothing is deleted: a switched-off
+    // screen keeps its records and comes back with its switch.
+    if ($route === 'workspace/setup/features-save' && $method === 'POST' && function_exists('feat_save_off')) {
+        $card = (string) ($_POST['card'] ?? '');
+        $cat = feat_catalog(); $all = feat_catalog_keys($cat);
+        $cardKeys = array_column($cat[$card] ?? [], 'key');
+        $on = array_map('strval', array_keys((array) ($_POST['on'] ?? [])));
+        $off = array_keys(feat_off_entries());
+        $off = array_values(array_diff($off, $cardKeys));
+        foreach ($cardKeys as $k) if (!in_array($k, $on, true)) $off[] = $k;
+        [$nowOff, $nowOn] = feat_save_off($off, $all);
+        $leg = 0;
+        foreach (FEAT_LEGACY as [$sk, $def, $lcard]) {
+            if ($lcard !== $card || !array_key_exists('legacy_seen', $_POST)) continue;
+            $want = !empty($_POST['legacy'][$sk]) ? '1' : '0';
+            if ((string) setting_get($sk, $def) !== $want) { setting_set($sk, $want); $leg++; }
+        }
+        if ($leg) feat_note_change();
+        $n = count($nowOff) + count($nowOn) + $leg;
+        flash($n ? 'Saved. ' . ($nowOff ? count($nowOff) . ' switched off' : '') . ($nowOff && $nowOn ? ', ' : '') . ($nowOn ? count($nowOn) . ' switched on' : '')
+                   . ($leg ? (($nowOff || $nowOn) ? ', ' : '') . $leg . ' other switch' . ($leg > 1 ? 'es' : '') . ' changed' : '') . '. Nothing is deleted.'
+                 : 'Nothing changed.');
+        redirect('/workspace/setup/modules#card-' . rawurlencode($card));
+    }
+    if ($route === 'workspace/setup/features-preset' && $method === 'POST' && function_exists('feat_apply_preset')) {
+        $preset = in_array($_POST['preset'] ?? '', ['simple', 'baseline'], true) ? $_POST['preset'] : '';
+        if ($preset === '') redirect('/workspace/setup/modules');
+        if (empty($_POST['confirm'])) redirect('/workspace/setup/modules?preset=' . $preset);
+        flash(feat_apply_preset($preset));
+        redirect('/workspace/setup/modules');
+    }
+
     // --- GET pages ---
     switch ($route) {
         case 'workspace/setup/profile':
@@ -607,9 +641,18 @@ function ops_cockpit($route, $method) {
             redirect('/company-profile');
             return true;
         case 'workspace/setup/modules':
+            if (function_exists('feat_migrate')) feat_migrate();
+            $featCat = function_exists('feat_catalog') ? feat_catalog() : [];
+            $presetAsk = in_array($_GET['preset'] ?? '', ['simple', 'baseline'], true) ? $_GET['preset'] : '';
             view('ops/cockpit_modules', [
                 'modules'    => cockpit_modules(),
                 'confirmOff' => (string) ($_GET['confirm_off'] ?? ''),
+                'featCat'    => $featCat,
+                'featOff'    => function_exists('feat_off_entries') ? feat_off_entries() : [],
+                'presetAsk'  => $presetAsk,
+                'presetPlan' => $presetAsk !== '' ? feat_preset_plan($presetAsk) : [],
+                'featBase'   => json_decode((string) (setting_get('features_baseline', '') ?? ''), true) ?: [],
+                'featChanged'=> json_decode((string) (setting_get('features_changed', '') ?? ''), true) ?: [],
             ]);
             return true;
         case 'workspace/setup/forms':

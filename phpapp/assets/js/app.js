@@ -1466,6 +1466,7 @@
     initTabValidation();
     initTabAnchors();
     initModuleCrumb();
+    initFeatOff();
     initResponsiveTables();
     initEmbedModals();
     initPasswordReveal();
@@ -1573,6 +1574,47 @@
   // open (its item is highlighted), so slot that area in right after Home:
   // "Home › Sales › Opportunities", and the middle crumb returns to the area
   // home. One place, every screen — no per-page breadcrumb to maintain.
+  // Plan 42 step A (owner, 18 Nov 2026) — a screen switched off for this company:
+  // links and buttons that would open it are hidden on every page. The server
+  // refuses the screen anyway (lib/features.php); this only keeps it out of sight.
+  // Same rule as feat_family_match(): "lead" covers lead, leads, lead-new.
+  function initFeatOff() {
+    var raw = document.body && document.body.getAttribute('data-feat-off');
+    if (!raw) return;
+    var rules; try { rules = JSON.parse(raw); } catch (e) { return; }
+    if (!rules || !rules.length) return;
+    function esc(x) { return String(x).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+    function fam(route, stem) {
+      if (!stem) return false;
+      if (route === stem) return true;
+      // Only the screen and its singular / plural (lead, leads): a "-child" screen may
+      // belong to another module, which only the server can tell (it refuses those).
+      var tail = '(s|es|ies|y)?$';
+      return new RegExp('^' + esc(stem) + tail).test(route);
+    }
+    function blocked(href) {
+      var u; try { u = new URL(href, location.href); } catch (e) { return false; }
+      if (u.origin !== location.origin) return false;
+      var route = u.pathname.replace(/^\/+|\/+$/g, '');
+      if (route === '' || route.indexOf('workspace/setup') === 0 || route.indexOf('m/') === 0) return false;
+      var full = '/' + route + (u.search || '');
+      for (var i = 0; i < rules.length; i++) {
+        var r = rules[i];
+        if (r.k) { if (full === r.k) return true; continue; }
+        if (route !== r.p && !fam(route, r.s)) continue;
+        var kept = false;
+        for (var j = 0; j < (r.x || []).length; j++) if (fam(route, r.x[j])) { kept = true; break; }
+        if (!kept) return true;
+      }
+      return false;
+    }
+    Array.prototype.forEach.call(document.querySelectorAll('a[href], button[formaction]'), function (el) {
+      var href = el.getAttribute('href') || el.getAttribute('formaction');
+      if (!href || href.charAt(0) === '#' || /^(mailto|tel|javascript):/i.test(href)) return;
+      if (blocked(href)) el.style.display = 'none';
+    });
+  }
+
   function initModuleCrumb() {
     var crumbs = document.querySelector('.crumbs');
     if (!crumbs) return;

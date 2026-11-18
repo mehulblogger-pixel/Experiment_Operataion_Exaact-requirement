@@ -31,8 +31,18 @@ sales roles BDM/KAM/MM/ME are in the CRM mini-matrix below.)
 > |---|---|---|
 > | What the company has **bought** | Licence / product package (provider-side) | entitlement, `PRODUCT_MODULES` |
 > | Which modules are **switched on** for the company | **Admin → Modules & features** | `modules_off` setting, per tenant |
+> | Which **screens** of a switched-on module are on (plan 42 step A, owner 18 Nov 2026) | **Admin → Modules & features** → "Screens in this module" (+ "Simple start" / "Back to <date>") | `features_off` setting, per tenant (`lib/features.php`) |
 > | Which modules **each role** holds | **Admin → Roles & permissions** | `role_access` setting, per tenant |
 >
+> **Screen switches grant nothing.** A screen switched off is hidden from every
+> menu and refused by its address for everybody (`feat_route_blocked()`, asked in
+> `index.php` before any handler); switching it on only makes it reachable again
+> for the people this matrix already allows. Changing them needs the same right as
+> the module switch (`cockpit_can()`: Master Admin or `settings.manage`) — **no new
+> permission**. Core screens (jobs, work orders, clients, vendors, vouchers, every
+> approvals inbox, users, settings, Modules & features …, `FEAT_CORE`) can never be
+> switched off. Records are never deleted.
+
 > `role_defaults()` in `lib/access.php` supplies the shipped default; a company's
 > own `role_access` overrides it (`role_grant_perm()` writes through
 > `setting_set`, so it lives in that company's own database and never leaks

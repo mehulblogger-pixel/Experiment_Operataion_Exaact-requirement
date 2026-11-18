@@ -35,6 +35,7 @@ function ops_nav_index($fresh = false) {
         $label = trim((string)$label);
         $url   = trim((string)$url);
         if ($label === '' || $url === '' || $url === '#') return;
+        if (function_exists('feat_on') && !feat_on($url)) return;   // plan 42 — switched off, not listed
         $key = strtolower($url . '|' . $label);
         if (isset($seen[$key])) return;
         $seen[$key] = true;

@@ -5,6 +5,35 @@
 // and lists what depends on it — never a silent disable.
 $e = fn($s) => htmlspecialchars((string) $s, ENT_QUOTES);
 $confirmOff = (string) ($confirmOff ?? '');
+$featCat = $featCat ?? []; $featOff = $featOff ?? []; $presetAsk = (string) ($presetAsk ?? ''); $presetPlan = $presetPlan ?? [];
+$featBase = $featBase ?? []; $featChanged = $featChanged ?? [];
+//  Plan 42 step A — the switches for every screen of one card. One form per card.
+$featCard = function ($card) use ($featCat, $featOff, $e) {
+    $items = $featCat[$card] ?? [];
+    $legacy = array_values(array_filter(defined('FEAT_LEGACY') ? FEAT_LEGACY : [], fn($l) => $l[2] === $card));
+    if (!$items && !$legacy) return;
+    $nOff = count(array_filter($items, fn($i) => isset($featOff[$i['key']])));
+    ?>
+    <details class="fx" <?= $nOff ? 'open' : '' ?>>
+      <summary><span>Screens in this module</span> <span class="muted">· <?= count($items) - $nOff ?> on<?= $nOff ? ' · <b>' . $nOff . ' off</b>' : '' ?></span></summary>
+      <form method="post" action="/workspace/setup/features-save">
+        <?php if (function_exists('csrf_field')) echo csrf_field(); ?>
+        <input type="hidden" name="card" value="<?= $e($card) ?>">
+        <?php foreach ($items as $i): $on = !isset($featOff[$i['key']]); ?>
+          <label class="fx-row"><span class="fx-t"><b><?= $e($i['label']) ?></b><?php if ($i['desc'] !== ''): ?><span><?= $e($i['desc']) ?></span><?php endif; ?></span>
+            <input type="checkbox" class="fx-sw" name="on[<?= $e($i['key']) ?>]" value="1" <?= $on ? 'checked' : '' ?> aria-label="<?= $e($i['label']) ?> on"></label>
+        <?php endforeach; ?>
+        <?php if ($legacy): ?><input type="hidden" name="legacy_seen" value="1">
+          <?php foreach ($legacy as [$sk, $def, , $lab, $what]): ?>
+          <label class="fx-row"><span class="fx-t"><b><?= $e($lab) ?></b><span><?= $e($what) ?> <i>(the switch you already had, now also here)</i></span></span>
+            <input type="checkbox" class="fx-sw" name="legacy[<?= $e($sk) ?>]" value="1" <?= feat_legacy_on($sk, $def) ? 'checked' : '' ?> aria-label="<?= $e($lab) ?> on"></label>
+          <?php endforeach; ?>
+        <?php endif; ?>
+        <div style="margin-top:10px"><button class="btn" type="submit">Save switches</button>
+          <span class="muted" style="font-size:12.5px;margin-left:8px">Off = hidden from menus and links. Records are kept; switching on brings everything back.</span></div>
+      </form>
+    </details>
+<?php };
 ?>
 <style>
   .ck{max-width:760px}
@@ -24,6 +53,19 @@ $confirmOff = (string) ($confirmOff ?? '');
   .ck .confirm h3{margin:0 0 6px;font-size:15px;color:#b42318}
   .ck .confirm ul{margin:6px 0 12px 18px;padding:0}
   .ck-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .ck .fx{margin-top:12px;border-top:1px solid var(--line,#e5e7eb);padding-top:8px}
+  .ck .fx summary{cursor:pointer;font-weight:600;font-size:14px;padding:4px 0}
+  .ck .fx-row{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--line,#eef0f2);cursor:pointer}
+  .ck .fx-t{flex:1;min-width:0} .ck .fx-t b{display:block;font-size:14px} .ck .fx-t span{color:#6b7280;font-size:12.5px}
+  .ck .fx-sw{appearance:none;-webkit-appearance:none;width:44px;height:26px;border-radius:999px;background:#c9d2d1;position:relative;flex:none;cursor:pointer;margin:0;transition:background .15s}
+  .ck .fx-sw::after{content:"";position:absolute;left:3px;top:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .15s}
+  .ck .fx-sw:checked{background:var(--brand,#145f5a)} .ck .fx-sw:checked::after{left:21px}
+  .ck .fx-sw:focus-visible{outline:2px solid var(--focus,#2563eb);outline-offset:2px}
+  .ck .qs{border:1px solid var(--line,#e5e7eb);border-radius:14px;padding:14px 16px;margin-bottom:12px;background:var(--card,#fff)}
+  .ck .qs-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+  @media (max-width:640px){.ck .qs-grid{grid-template-columns:1fr}}
+  .ck .qs-p{border:1px solid var(--line,#e5e7eb);border-radius:12px;padding:12px;background:var(--bg,#f6f8f8)}
+  .ck .qs-p b{display:block} .ck .qs-p span{display:block;color:#6b7280;font-size:13px;margin:2px 0 10px}
 </style>
 
 <div class="ck">
@@ -32,6 +74,51 @@ $confirmOff = (string) ($confirmOff ?? '');
         //  could not be found at all (UAT 1.6.3). ?>
   <h1 style="margin:.2em 0">Modules &amp; features</h1>
   <p class="muted" style="margin-top:0">Turn on only the parts of the software your company needs. Everything here uses your plan — turning a feature off simply hides it and its screens.</p>
+
+  <?php if (function_exists('feat_catalog')): ?>
+  <div class="qs">
+    <h3 style="margin:0;font-size:16px">Quick start</h3>
+    <p class="muted" style="margin:3px 0 0;font-size:13.5px">One click for a whole layout. Each button first shows exactly what will change. Nothing is ever deleted.</p>
+    <div class="qs-grid">
+      <div class="qs-p"><b>↩️ Back to <?= $e(isset($featBase['at']) ? date('j M Y', strtotime($featBase['at'])) : 'today') ?></b><span>Every module and screen exactly as it was on <?= $e(isset($featBase['at']) ? date('j M Y', strtotime($featBase['at'])) : 'the day the switches arrived') ?>.</span>
+        <form method="post" action="/workspace/setup/features-preset" style="margin:0"><?php if (function_exists('csrf_field')) echo csrf_field(); ?><input type="hidden" name="preset" value="baseline"><button class="btn secondary" type="submit">Use this</button></form></div>
+      <div class="qs-p"><b>✨ Simple start (recommended)</b><span>The core that earns money: jobs, reports, expenses, invoices and simple sales. The rest is switched off.</span>
+        <form method="post" action="/workspace/setup/features-preset" style="margin:0"><?php if (function_exists('csrf_field')) echo csrf_field(); ?><input type="hidden" name="preset" value="simple"><button class="btn" type="submit">Use this</button></form></div>
+    </div>
+    <?php if ($featChanged): ?><p class="muted" style="margin:8px 0 0;font-size:12.5px">Last change: <?= $e(date('j M Y, H:i', strtotime($featChanged['at'] ?? 'now'))) ?><?= ($featChanged['by'] ?? '') !== '' ? ' by ' . $e($featChanged['by']) : '' ?> · every change is in the audit log.</p><?php endif; ?>
+  </div>
+
+  <?php if ($presetAsk !== ''): ?>
+    <div class="confirm" id="preset-confirm" style="border-color:#9ccfc8;background:#f2faf8">
+      <?php if ($presetAsk === 'simple'): ?>
+        <h3 style="color:inherit">Use Simple start?</h3>
+        <p style="margin:.2em 0;font-size:13.5px">This switches OFF:</p>
+        <ul>
+          <?php if (!empty($presetPlan['modules'])): ?><li>Modules: <?= $e(implode(' · ', array_map(fn($k) => ($modules[$k]['label'] ?? $k), $presetPlan['modules']))) ?></li><?php endif; ?>
+          <?php if (!empty($presetPlan['labels'])): ?><li>Screens: <?= $e(implode(' · ', $presetPlan['labels'])) ?></li><?php endif; ?>
+          <?php if (!in_array('Pre-order checklist', $presetPlan['labels'] ?? [], true)): ?><li>Pre-order checklist</li><?php endif; ?>
+        </ul>
+      <?php else: ?>
+        <h3 style="color:inherit">Go back to <?= $e(isset($featBase['at']) ? date('j M Y', strtotime($featBase['at'])) : 'how it was') ?>?</h3>
+        <p style="margin:.2em 0 10px;font-size:13.5px">Every module, screen and switch is set back exactly as it was then.</p>
+      <?php endif; ?>
+      <p style="margin:0 0 10px;font-size:13.5px"><b>Nothing is deleted.</b> To undo, use “Back to <?= $e(isset($featBase['at']) ? date('j M Y', strtotime($featBase['at'])) : 'today') ?>”.</p>
+      <div class="ck-actions">
+        <form method="post" action="/workspace/setup/features-preset" style="margin:0"><?php if (function_exists('csrf_field')) echo csrf_field(); ?>
+          <input type="hidden" name="preset" value="<?= $e($presetAsk) ?>"><input type="hidden" name="confirm" value="1">
+          <button class="btn" type="submit"><?= $presetAsk === 'simple' ? 'Yes, use Simple start' : 'Yes, go back' ?></button></form>
+        <a class="btn secondary" href="/workspace/setup/modules">Cancel</a>
+      </div>
+    </div>
+  <?php endif; ?>
+
+  <?php if (!empty($featCat['home'])): ?>
+    <div class="mod" id="card-home">
+      <div class="hd"><div style="flex:1"><h3>Home &amp; insights</h3><p class="blurb">What people see first, and the cross-module summaries.</p></div><span class="on-pill is-on">On</span></div>
+      <?php $featCard('home'); ?>
+    </div>
+  <?php endif; ?>
+  <?php endif; ?>
 
   <?php
   // Confirmation panel when the admin asked to turn a feature OFF (§17).
@@ -57,7 +144,7 @@ $confirmOff = (string) ($confirmOff ?? '');
   <?php endif; ?>
 
   <?php foreach ($modules as $key => $m): ?>
-    <div class="mod">
+    <div class="mod" id="card-<?= $e($key) ?>">
       <div class="hd">
         <div style="flex:1">
           <h3><?= $e($m['label']) ?></h3>
@@ -112,13 +199,14 @@ $confirmOff = (string) ($confirmOff ?? '');
             <input type="hidden" name="module" value="<?= $e($key) ?>">
             <input type="hidden" name="on" value="<?= $m['on'] ? '' : '1' ?>">
             <?php if ($m['on']): ?>
-              <button class="btn ghost" type="submit">Turn off this feature</button>
+              <button class="btn ghost" type="submit">Turn off this module</button>
             <?php else: ?>
               <button class="btn" type="submit">Add this to my workspace</button>
             <?php endif; ?>
           </form>
         <?php endif; ?>
       </div>
+      <?php if (!empty($m['on']) && empty($m['locked'])) $featCard($key); ?>
     </div>
   <?php endforeach; ?>
 </div>

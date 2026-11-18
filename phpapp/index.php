@@ -232,6 +232,7 @@ try {
     require __DIR__ . '/lib/costing_heads.php';   // owner, 9 Nov 2026 — flexible cost heads
     require __DIR__ . '/lib/projcosting.php';
     require __DIR__ . '/lib/areas.php';
+    require __DIR__ . '/lib/features.php';       // plan 42 step A — a switch for every screen (owner, 18 Nov 2026)
     require __DIR__ . '/lib/navindex.php';
     require __DIR__ . '/lib/voucher_approval.php'; // branch batch R5 — expense voucher approval chain
     require __DIR__ . '/lib/expenses.php';        // Expenses Phase 1 (owner, 17 Nov 2026) — periods, day close, bands, deadlines
@@ -1354,6 +1355,12 @@ if ($method === 'POST' && isset($_POST['_ft'])) {
         redirect_back($route);
     }
 }
+
+// Plan 42 step A (owner, 18 Nov 2026) — a screen whose feature switch is OFF
+// is refused here, by its address too, before any handler runs. Core screens
+// (Admin, users, settings, Modules & features …) are never switched off.
+if (function_exists('feat_migrate')) feat_migrate();
+if (function_exists('feat_route_blocked') && ($featKey = feat_route_blocked($route)) !== '') { feat_deny($featKey); return; }
 
 if ($route === '') {
     // A brand-new company is guided to the welcome / getting-started once, instead of
