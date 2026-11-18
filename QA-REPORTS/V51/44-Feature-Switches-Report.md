@@ -53,11 +53,26 @@ Switching it on brings everything back.
 
 ## How it was tested
 
-TBD-RESULTS
+| Check | Result |
+| --- | --- |
+| New automatic tests (`test_feature_switches.php`) | **53 checks, all pass.** They cover: about 130 screens with a switch, each on its module card; core screens without a switch; off = no tile, not in "Find a screen", refused by its address together with its family (/leads also /lead), but **never** another module's screen (/reports does not take /report-approve); a forged setting cannot switch off jobs or approvals; one card saved at a time; the existing switches saved from here; Simple start asks first, then switches off exactly its list; "Back to …" restores modules, screens and switches exactly; no record is deleted; the baseline is never overwritten |
+| Full suite, SQLite | **21,397 passed.** Only the release stamp "failed" (it is renewed at release time; the zip shows 729 of 729) |
+| Full suite, MariaDB (your server's database type) | **21,387 passed.** The failures are exactly the **24 known** MariaDB test-order ones, plus the same release stamp. **No new failure** |
+| Robot: 98 real-screen tests (the 83 from reports 38/39 + 15 that use Modules & features), before vs after | **All identical.** The first run found 5 tests on Modules & features failing. I had renamed the button "Turn off this feature" (your test book uses those words), and the new "Home & insights" card was being counted as a module. Both are fixed: the button keeps its name, and the card is no longer counted as a module. All 98 now behave exactly as before. FLOW-15 still has the one step it had before (the known DEF-DIR-009, unrelated) |
+| I used it in a browser | Simple start (Recruitment, Marketplace, What to fix and Where the flow is broken left the menu; /project-costings refused), then "Back to 18 Nov 2026" (everything back) |
 
 ## The zip (opstest only)
 
-TBD-ZIP
+`EXAACT-V51.1-Switches-TEST-COPY-update.zip`
+- **Release stamp:** 8c158fe. Deploy-check on the build: **729 of 729 files match** (one new file: `lib/features.php`).
+- **SHA-256:** `1a1facaee6e887db69d5397bfb38d0c5536b7e107ffe29eb3698dfe9a9d60218`
+- **Includes** the Expense setup update (report 39). If you have not installed that yet, this zip covers both.
+- **Left out, as always:** `config.local.php`, `tenants.php`, `tests/`, database files, `exaact_data*` / `exaact_backups*`.
+
+**Install** (the same steps as last time):
+1. Back up opstest.
+2. File Manager → opstest app folder → upload → Extract (overwrite) → delete the zip.
+3. Open `deploy-check.php`: Release **8c158fe**, green ✓. Send me the screenshot.
 
 ## Your checks (about 10 minutes, in the Mehul Blogger company, as admin)
 
