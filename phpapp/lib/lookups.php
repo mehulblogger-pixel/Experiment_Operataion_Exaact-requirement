@@ -65,6 +65,7 @@ function lk_migrate() {
     lk_ensure_type_map('expense_heading', 'Expense heading', EXPENSE_HEADINGS);
     lk_ensure_type_map('industry', 'Industry', INDUSTRIES);
     lk_ensure_type_map('department', 'Department', DEPARTMENTS);
+    if (defined('CONTACT_BUYING_ROLES')) lk_ensure_type_map('contact_buying_role', 'Buying role (contacts)', CONTACT_BUYING_ROLES);
     lk_ensure_type_map('client_type', 'Client type', CLIENT_TYPES);
     lk_ensure_type_map('designation', 'Designation', DESIGNATIONS);
     // voucher attendance codes: leave types + office/WFH/holiday day codes

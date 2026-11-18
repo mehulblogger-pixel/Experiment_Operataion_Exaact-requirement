@@ -417,8 +417,9 @@ function connect_org_register(array $in) {
         //  just proved who it was could be duplicated afterwards by anyone
         //  typing a slightly different name — the one check that cannot be
         //  argued with was left with nothing to match against.
-        $pCols = ['legal_name', 'display_name', 'is_client', 'is_vendor', 'is_subcontractor', 'status', 'created_at'];
-        $pVals = [$name, $name, $isAgency ? 0 : 1, 0, $isAgency ? 1 : 0, 'ACTIVE', $now];
+        //  Numbered by the one rule every firm uses (it used to get no code).
+        $pCols = ['code', 'legal_name', 'display_name', 'is_client', 'is_vendor', 'is_subcontractor', 'status', 'created_at'];
+        $pVals = [function_exists('gen_partner_code') ? gen_partner_code(null, $name) : null, $name, $name, $isAgency ? 0 : 1, 0, $isAgency ? 1 : 0, 'ACTIVE', $now];
         foreach (['gstin' => clean_gstin((string)($in['gstin'] ?? '')),
                   'pan'   => strtoupper(trim((string)($in['pan'] ?? '')))] as $c => $v) {
             if ($v !== '' && (!function_exists('column_exists') || column_exists('business_partners', $c))) {

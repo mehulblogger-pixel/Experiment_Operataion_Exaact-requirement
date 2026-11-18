@@ -154,14 +154,16 @@ function addr_name($a) { return (lk_options_or('address_type', ADDRESS_TYPES)[$a
   </form>
 
 <?php elseif ($tab === 'contacts'): ?>
-  <table class="grid"><tr><th>Name</th><th>Designation</th><th>Department</th><th>Project</th><th>Mobile</th><th>Email</th><th>At (site / office)</th></tr>
-    <?php foreach ($contacts as $c): ?><tr><td><?= e($c['name']) ?><?php if ($c['is_primary']): ?> <span class="badge AMBER">primary</span><?php endif; ?></td><td><?= e($c['designation'] ?: '—') ?></td><td><?= e(lk_options_or('department', DEPARTMENTS)[$c['department']] ?? ($c['department'] ?: '—')) ?></td><td><?= e($c['project'] ?? '' ?: '—') ?></td><td><?= e($c['mobile'] ?: '—') ?></td><td><?= e($c['email'] ?: '—') ?></td><td><?= isset($addrById[$c['address_id']]) ? e(addr_name($addrById[$c['address_id']])) : '—' ?></td></tr><?php endforeach; ?>
-    <?php if (!$contacts): ?><tr><td colspan="7">No contacts yet.</td></tr><?php endif; ?></table>
+  <table class="grid"><tr><th>Name</th><th>Designation</th><th>Department</th><th>Buying role</th><th>Project</th><th>Mobile</th><th>Email</th><th>At (site / office)</th></tr>
+    <?php $buyRoles = lk_options_or('contact_buying_role', defined('CONTACT_BUYING_ROLES') ? CONTACT_BUYING_ROLES : []);
+          foreach ($contacts as $c): $wa = function_exists('sx_wa') ? sx_wa($c['mobile'] ?? '') : ''; ?><tr><td><?= e($c['name']) ?><?php if ($c['is_primary']): ?> <span class="badge AMBER">primary</span><?php endif; ?></td><td><?= e($c['designation'] ?: '—') ?></td><td><?= e(lk_options_or('department', DEPARTMENTS)[$c['department']] ?? ($c['department'] ?: '—')) ?></td><td><?= e(($c['buying_role'] ?? '') !== '' ? ($buyRoles[$c['buying_role']] ?? $c['buying_role']) : '—') ?></td><td><?= e($c['project'] ?? '' ?: '—') ?></td><td><?= e($c['mobile'] ?: '—') ?><?php if ($wa !== ''): ?> <a href="<?= e($wa) ?>" target="_blank" rel="noopener" title="WhatsApp <?= e($c['name']) ?>" aria-label="WhatsApp <?= e($c['name']) ?>">💬</a><?php endif; ?></td><td><?= e($c['email'] ?: '—') ?></td><td><?= isset($addrById[$c['address_id']]) ? e(addr_name($addrById[$c['address_id']])) : '—' ?></td></tr><?php endforeach; ?>
+    <?php if (!$contacts): ?><tr><td colspan="8">No contacts yet.</td></tr><?php endif; ?></table>
   <h3 class="tab-sub">Add a contact</h3>
   <form method="post" action="/partner-add?id=<?= $id ?>&kind=contact" class="inline-add">
     <div class="ff"><label>Name</label><input class="form-control" name="name" required></div>
     <div class="ff"><label>Designation</label><input class="form-control" name="designation" placeholder="e.g. QA/QC Manager"></div>
     <div class="ff"><label>Department</label><select class="form-control searchable" name="department"><option value="">—</option><?php foreach (lk_options_or('department', DEPARTMENTS) as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
+    <div class="ff"><label>Buying role</label><select class="form-control" name="buying_role"><option value="">—</option><?php foreach ($buyRoles as $k => $v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Project (optional)</label><input class="form-control" name="project"></div>
     <div class="ff"><label>Mobile</label><input class="form-control" name="mobile"></div>
     <div class="ff"><label>Email</label><input class="form-control" name="email"></div>

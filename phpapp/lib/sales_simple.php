@@ -295,3 +295,40 @@ function ops_sales_simple($route, $method) {
             return true;
     }
 }
+
+// ---- Sales view of the ONE client register (Directory → Clients) -------------
+//  Per firm on the page: open deals and their value, won this financial year,
+//  amount owed (only for people who may see receivables), last contact, and the
+//  primary contact to WhatsApp or ring. Deals come through opp_all(), so the
+//  office scope of the deal register applies; nothing is stored.
+function sx_client_sales_cols(array $ids) {
+    $ids = array_values(array_filter(array_map('intval', $ids)));
+    if (!$ids) return [];
+    $out = array_fill_keys($ids, ['deals' => 0, 'pipe' => 0.0, 'won' => 0.0, 'owed' => null, 'touch' => '', 'contact' => '', 'phone' => '']);
+    $fa = '';
+    try { [$fa] = fy_range(active_fy()); } catch (Throwable $e) {}
+    foreach (function_exists('opp_all') ? opp_all([]) : [] as $o) {
+        $pid = (int) ($o['partner_id'] ?? 0); if (!isset($out[$pid])) continue;
+        if ($o['status'] === 'OPEN') { $out[$pid]['deals']++; $out[$pid]['pipe'] += (float) $o['value']; }
+        elseif ($o['status'] === 'WON' && ($fa === '' || substr((string) $o['won_at'], 0, 10) >= $fa)) $out[$pid]['won'] += (float) $o['value'];
+    }
+    $ar = function_exists('ar_can') && ar_can() && function_exists('books_outstanding');
+    $in = implode(',', $ids);
+    try {
+        foreach (ops_all("SELECT partner_id, name, mobile, phone FROM partner_contacts WHERE partner_id IN ($in) ORDER BY is_primary DESC, id") ?: [] as $c) {
+            $pid = (int) $c['partner_id'];
+            if ($out[$pid]['contact'] === '') { $out[$pid]['contact'] = (string) $c['name']; $out[$pid]['phone'] = (string) (($c['mobile'] ?? '') ?: ($c['phone'] ?? '')); }
+        }
+        foreach (ops_all("SELECT partner_id, MAX(occurred_at) t FROM activities WHERE partner_id IN ($in) GROUP BY partner_id") ?: [] as $a)
+            $out[(int) $a['partner_id']]['touch'] = (string) $a['t'];
+    } catch (Throwable $e) {}
+    if ($ar) foreach ($ids as $pid) { try { $bo = books_outstanding($pid); $out[$pid]['owed'] = (float) (is_array($bo) ? ($bo['outstanding'] ?? 0) : $bo); } catch (Throwable $e) {} }
+    return $out;
+}
+//  Two small icons (WhatsApp, call) for a table cell outside the Sales screens.
+function sx_contact_btns_plain($phone, $label = '') {
+    $wa = sx_wa($phone); $tel = sx_tel($phone); $out = '';
+    if ($wa !== '') $out .= '<a href="' . e($wa) . '" target="_blank" rel="noopener" title="WhatsApp" aria-label="WhatsApp ' . e($label) . '">💬</a> ';
+    if ($tel !== '') $out .= '<a href="' . e($tel) . '" title="Call" aria-label="Call ' . e($label) . '">📞</a>';
+    return $out;
+}

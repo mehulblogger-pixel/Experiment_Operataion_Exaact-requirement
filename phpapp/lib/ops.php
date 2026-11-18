@@ -27,6 +27,10 @@ const DAILY_HOURS_CAP = 8.5;
 // two ways one is worked — day by day, or as a continuous posting at a site.
 const JOB_TYPES = ['INSPECTION'=>'Day-based inspection','DEPUTATION'=>'Resident / site posting'];
 const EXPENSE_HEADINGS = ['TRAVEL'=>'Travel','LOCAL'=>'Local conveyance','FOOD'=>'Food','LODGING'=>'Lodging','MISC'=>'Misc'];
+//  A contact's part in a purchase (owner, 18 Nov 2026 — Sales). STARTING
+//  values only: the list is the "Buying role" master (Masters → lookups), so
+//  each company renames, adds or removes entries without a code change.
+const CONTACT_BUYING_ROLES = ['DECISION_MAKER'=>'Decision maker','INFLUENCER'=>'Influencer / technical','USER'=>'User of our service','PURCHASE'=>'Purchase / procurement','FINANCE'=>'Finance / accounts','GATEKEEPER'=>'Gatekeeper / assistant'];
 const DEPARTMENTS = ['QUALITY'=>'Quality','PROJECTS'=>'Projects','ENGINEERING'=>'Engineering','DESIGN'=>'Design','INSPECTION'=>'Inspection','PROCUREMENT'=>'Procurement / Purchase','PRODUCTION'=>'Production','MAINTENANCE'=>'Maintenance','SAFETY'=>'Safety / HSE','COMMERCIAL'=>'Commercial / Finance','STORES'=>'Stores','PLANNING'=>'Planning','OWNER'=>'Owner','PARTNER'=>'Partner','DIRECTOR'=>'Director','MANAGEMENT'=>'Management','OTHER'=>'Other'];
 const DESIGNATIONS = ['INSPECTOR'=>'Inspector','SR_INSPECTOR'=>'Sr. Inspector','LEAD_INSPECTOR'=>'Lead Inspector','EXECUTIVE'=>'Executive','SR_EXECUTIVE'=>'Sr. Executive','ENGINEER'=>'Engineer','SR_ENGINEER'=>'Sr. Engineer','LEAD_ENGINEER'=>'Lead Engineer','COORDINATOR'=>'Coordinator','SR_COORDINATOR'=>'Sr. Coordinator','ASST_MANAGER'=>'Asst. Manager','DY_MANAGER'=>'Deputy Manager','MANAGER'=>'Manager','SR_MANAGER'=>'Sr. Manager','BRANCH_MANAGER'=>'Branch Manager','SBU_HEAD'=>'Business Unit Head','GM'=>'General Manager','DIRECTOR'=>'Director','OTHER'=>'Other'];
 // NOTE (R10 — vestigial field): jobs.stage is NOT the real job lifecycle. The live
@@ -395,6 +399,8 @@ function ops_migrate() {
     ensure_column('partner_addresses', 'town_village', "VARCHAR(150) DEFAULT ''");
     ensure_column('partner_addresses', 'district', "VARCHAR(150) DEFAULT ''");
     ensure_column('partner_contacts', 'project', "VARCHAR(200) DEFAULT ''");
+    //  Their part in a purchase — decision maker, influencer, purchase … (Sales).
+    ensure_column('partner_contacts', 'buying_role', "VARCHAR(40) DEFAULT ''");
     // contracts / purchase orders carry Business Unit for revenue attribution
     ensure_column('partner_contracts', 'sbu', "VARCHAR(20) DEFAULT ''");
     ensure_column('partner_purchase_orders', 'sbu', "VARCHAR(20) DEFAULT ''");
@@ -1118,13 +1124,27 @@ function partner_short_name($name) {
     $n = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', normalize_name($name)));
     return substr($n, 0, 5) ?: 'XXXXX';
 }
+//  ONE numbering rule for every firm, whichever door it comes in by (owner,
+//  18 Nov 2026: "the firm shall be universal … nothing duplicate"). The full
+//  form, lead → customer, deal → customer, a quote for a new name, a branch
+//  company, the Excel import and a Connect registration all call this, so a
+//  firm is AHM-26-TATAP-00007 wherever it was first typed. Codes already on
+//  file are never rewritten — they are printed on invoices and quotations.
+//
+//  The running number is the highest one under this office + year, read from
+//  every code (not the alphabetically last one: AHM-26-ZETA-00002 sorts after
+//  AHM-26-TATAP-00005, and taking ITS number repeated 00003 for the next firm).
 function gen_partner_code($branchId, $name) {
     $bc = branch_abbr($branchId);
     $yy = substr((string)date('Y'), 2, 2);
     $prefix = "$bc-$yy-";
-    $last = ops_val("SELECT code FROM business_partners WHERE code LIKE ? ORDER BY code DESC LIMIT 1", ["$prefix%"]);
-    $seq = ($last && preg_match('/-(\d{5})$/', $last, $m)) ? (int)$m[1] + 1 : 1;
-    return sprintf("%s-%s-%s-%05d", $bc, $yy, partner_short_name($name), $seq);
+    $max = 0;
+    foreach (ops_all("SELECT code FROM business_partners WHERE code LIKE ?", ["$prefix%"]) ?: [] as $r)
+        if (preg_match('/-(\d{5})$/', (string) $r['code'], $m)) $max = max($max, (int) $m[1]);
+    $short = partner_short_name($name);
+    do { $code = sprintf("%s-%s-%s-%05d", $bc, $yy, $short, ++$max); }
+    while (ops_val("SELECT 1 FROM business_partners WHERE code=?", [$code]));
+    return $code;
 }
 // "Other (add new)…" on a lookup dropdown → create the value and return its code.
 function resolve_new_lookup($typeKey, $val, $newText) {
@@ -4899,69 +4919,13 @@ function ops_quick_add() {
     $name = trim($b['name'] ?? '');
     if ($name === '') { echo json_encode(['ok' => false, 'error' => 'Enter a name.']); return; }
     try {
+        //  Retired (owner, 18 Nov 2026 — one universal firm record, one form).
+        //  No screen has used this cut-down box for a client or vendor since the
+        //  "+ Add" links started opening the full Directory form; it is refused
+        //  here so it cannot become a second way in with fewer checks.
         if (in_array($kind, ['client', 'vendor', 'both'], true)) {
-            $isClient = ($kind === 'client' || $kind === 'both') ? 1 : 0;
-            $isVendor = ($kind === 'vendor' || $kind === 'both') ? 1 : 0;
-            $gstin = clean_gstin($b['gstin'] ?? '');
-            $pan = $gstin ? pan_from_gstin($gstin) : strtoupper(trim($b['pan'] ?? ''));
-            $state = $gstin ? state_from_gstin($gstin) : trim($b['state'] ?? '');
-            // §b — the record must be usable the moment it exists: an address to
-            // travel to, somebody to ring, and a tax identity to invoice against.
-            $line1 = trim($b['line1'] ?? ''); $city = trim($b['qcity'] ?? '');
-            $pName = trim($b['pname'] ?? ''); $pMob = trim($b['pmob'] ?? ''); $pMail = trim($b['pmail'] ?? '');
-            $need = [];
-            if ($isClient && $gstin === '' && $pan === '') $need[] = 'a GSTIN or a PAN';
-            if ($line1 === '' && $city === '') $need[] = 'an address';
-            if ($pName === '') $need[] = 'a contact person';
-            if ($pMob === '') $need[] = 'a mobile number';
-            if ($isClient && $pMail === '') $need[] = 'an e-mail address';
-            if ($need) {
-                $last = array_pop($need);
-                echo json_encode(['ok' => false, 'error' => 'Enter '
-                    . ($need ? implode(', ', $need) . ' and ' . $last : $last)
-                    . '. These are needed before the work can be sent out or billed.']);
-                return;
-            }
-            // The same company twice is worse than a missing one: the calls split
-            // between two records, the profitability splits with them, and nobody
-            // notices until somebody adds up two lots of the same client by hand.
-            // Matched on the name as well as on the tax numbers, because a second
-            // record is usually typed by somebody who did not find the first.
-            $dup = find_duplicate_partner($name, $gstin, $pan, trim($b['tan'] ?? ''), 0);
-            if ($dup) {
-                $r = $dup['row'];
-                $already = ((int)($r['is_client'] ?? 0) && $isClient) || ((int)($r['is_vendor'] ?? 0) && $isVendor);
-                if (!$already) {
-                    // On file, but not yet in this list. Tick the extra role rather
-                    // than making a second copy of the same company.
-                    // Worked out here rather than in SQL: a bound "1" is a string,
-                    // and letting the database decide what that means differs
-                    // between MySQL and SQLite.
-                    db()->prepare("UPDATE business_partners SET is_client=?, is_vendor=? WHERE id=?")
-                        ->execute([((int)($r['is_client'] ?? 0) || $isClient) ? 1 : 0,
-                                   ((int)($r['is_vendor'] ?? 0) || $isVendor) ? 1 : 0, $r['id']]);
-                    echo json_encode(['ok' => true, 'id' => (int)$r['id'], 'label' => $r['legal_name'],
-                        'note' => $r['legal_name'] . ' was already on file as ' . $r['code']
-                                . ' (matched by ' . $dup['by'] . '). It has been added to this list rather than duplicated.',
-                        'roles' => ['client' => $isClient, 'vendor' => $isVendor]]);
-                    return;
-                }
-                echo json_encode(['ok' => false, 'error' => $r['legal_name'] . ' is already on file as '
-                    . $r['code'] . ' (matched by ' . $dup['by'] . '). Pick it from the list instead of adding it twice.']);
-                return;
-            }
-            $token = short_token($name);
-            $last = ops_val("SELECT code FROM business_partners WHERE code LIKE ? ORDER BY code DESC LIMIT 1", ["GEN-$token-%"]);
-            $seq = $last ? ((int)substr($last, strrpos($last, '-') + 1)) + 1 : 1;
-            $code = sprintf("GEN-%s-%04d", $token, $seq);
-            $pdo->prepare("INSERT INTO business_partners (code,legal_name,is_client,is_vendor,status,gstin,pan,state,created_at) VALUES (?,?,?,?, 'ACTIVE', ?,?,?,?)")
-                ->execute([$code, $name, $isClient, $isVendor, $gstin, $pan, $state, date('c')]);
-            $pid = (int)$pdo->lastInsertId();
-            $pdo->prepare("INSERT INTO partner_addresses (partner_id,address_type,label,line1,city,state,is_primary) VALUES (?,?,?,?,?,?,1)")
-                ->execute([$pid, $isVendor && !$isClient ? 'FACTORY' : 'REGISTERED', $isVendor && !$isClient ? 'Works' : 'Registered office', $line1, $city, $state]);
-            $pdo->prepare("INSERT INTO partner_contacts (partner_id,name,mobile,email,is_primary) VALUES (?,?,?,?,1)")
-                ->execute([$pid, $pName, $pMob, $pMail]);
-            echo json_encode(['ok' => true, 'id' => $pid, 'label' => $name, 'roles' => ['client' => $isClient, 'vendor' => $isVendor]]);
+            echo json_encode(['ok' => false, 'url' => '/partner-new?role=' . ($kind === 'vendor' ? 'is_vendor' : 'is_client'),
+                'error' => 'Add a ' . Tl('client') . ' or ' . Tl('vendor') . ' on the full form (Directory → New), so it is checked once and never entered twice.']);
             return;
         }
         if ($kind === 'office') {

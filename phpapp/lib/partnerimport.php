@@ -355,12 +355,9 @@ function partner_import_apply(array $rows) {
 
 // The same GEN-XXXX-0001 series the rest of the app uses, so an imported
 // company is indistinguishable from one typed in by hand.
-function partner_next_code($name) {
-    $token = short_token($name);
-    $last = ops_val("SELECT code FROM business_partners WHERE code LIKE ? ORDER BY code DESC LIMIT 1", ["GEN-$token-%"]);
-    $seq = $last ? ((int)substr($last, strrpos($last, '-') + 1)) + 1 : 1;
-    return sprintf('GEN-%s-%04d', $token, $seq);
-}
+//  The one numbering rule (gen_partner_code) — an imported firm is numbered
+//  exactly as one typed into the form.
+function partner_next_code($name) { return gen_partner_code(null, $name); }
 
 // ---------------------------------------------------------------------------
 //  Handlers

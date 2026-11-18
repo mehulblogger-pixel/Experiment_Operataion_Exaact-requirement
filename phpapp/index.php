@@ -1446,8 +1446,17 @@ if ($route === 'clients' || $route === 'vendors') {
     })();
     $s = $pdo->prepare("SELECT * FROM business_partners WHERE $where ORDER BY legal_name LIMIT $per OFFSET " . (($page - 1) * $per));
     $s->execute($args);
+    $rows = $s->fetchAll();
+    //  The SAME client register, opened from Sales (owner, 18 Nov 2026: "the firm
+    //  shall be universal — opened from Sales as well as from Directory"). The
+    //  Sales view only adds columns read from the existing deals, ledger and
+    //  activities; it is not a second customer list.
+    $salesView = $route === 'clients' && ($_GET['view'] ?? '') === 'sales' && function_exists('sx_can') && sx_can();
+    if ($salesView && function_exists('nav_under')) nav_under('clients', 'sales');
     return view('list', [
-        'rows' => $s->fetchAll(), 'total' => $total, 'roleField' => $roleField,
+        'rows' => $rows, 'total' => $total, 'roleField' => $roleField,
+        'salesView' => $salesView, 'salesOk' => $route === 'clients' && function_exists('sx_can') && sx_can(),
+        'salesCols' => $salesView ? sx_client_sales_cols(array_map(fn($r) => (int) $r['id'], $rows)) : [],
         'title' => $route === 'clients' ? T_REG('client') : T_REG('vendor'),
         'subtitle' => $route === 'clients'
             ? Tlp('client') . ', contacts, contracts and billing references'
@@ -1695,7 +1704,7 @@ if ($route === 'partner-add' && $method === 'POST') {
             'Only Accounts / back-office can register a contract. It is created from the won quotation, not here.');
     }
     $map = [
-        'contact' => ['partner_contacts', ['name','designation','department','project','email','mobile','phone','address_id'], 'contacts'],
+        'contact' => ['partner_contacts', ['name','designation','department','buying_role','project','email','mobile','phone','address_id'], 'contacts'],
         'address' => ['partner_addresses', ['address_type','label','line1','line2','town_village','district','city','state','pincode','country'], 'addresses'],
         'registration' => ['partner_registrations', ['doc_type','number','valid_to','notes'], 'registration'],
         'contract' => ['partner_contracts', ['contract_number','title','sbu','value','start_date','end_date','notes','qty_total'], 'contracts'],

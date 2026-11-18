@@ -954,8 +954,7 @@ function opp_add_customer($oppId, array $b = []) {
                 'near' => $near];
     $pdo = db(); $own = !$pdo->inTransaction(); if ($own) $pdo->beginTransaction();
     try {
-        $code = 'C-' . strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $name), 0, 8)) . '-'
-              . str_pad((string)((int)ops_val("SELECT COUNT(*) FROM business_partners") + 1), 4, '0', STR_PAD_LEFT);
+        $code = gen_partner_code(($o['office_id'] ?? '') !== '' ? (int) $o['office_id'] : null, $name); // the one numbering rule
         $pdo->prepare("INSERT INTO business_partners (code,legal_name,display_name,is_client,is_vendor,status,state,created_at) VALUES (?,?,?,1,0,'ACTIVE',?,?)")
             ->execute([$code, $name, $name, $state, date('c')]);
         $pid = (int)$pdo->lastInsertId();
@@ -967,6 +966,11 @@ function opp_add_customer($oppId, array $b = []) {
             try { $pdo->prepare("INSERT INTO partner_contacts (partner_id,name,email,mobile,is_primary) VALUES (?,?,?,?,1)")
                       ->execute([$pid, $o['contact_name'], (string)($o['contact_email'] ?? ''), (string)($o['contact_phone'] ?? '')]); }
             catch (Throwable $e) { /* contact shape differs on an older install */ }
+            //  Same flag as the registration form: this person already at another firm.
+            if (function_exists('partner_contact_clash') && function_exists('flash')) {
+                try { $cl = partner_contact_clash((string) ($o['contact_phone'] ?? ''), (string) ($o['contact_email'] ?? ''), $pid);
+                      if ($cl) flash(partner_contact_clash_msg($cl), 'warning'); } catch (Throwable $e) {}
+            }
         }
         if ($own) $pdo->commit();
     } catch (Throwable $e) { if ($own && $pdo->inTransaction()) $pdo->rollBack(); throw $e; }

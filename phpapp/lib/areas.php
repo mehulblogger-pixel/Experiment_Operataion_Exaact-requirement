@@ -102,6 +102,8 @@ function ops_area_def($area) {
             $t($sxOk, '🧭', 'Pipeline board', '/sales-board', 'Every open lead and deal by stage.');
             $t($sxOk && (!$fx('crmdash_can') || crmdash_can()), '📊', 'Sales dashboard', '/sales-dashboard', 'Leads, wins, win rate, forecast, targets, sources, losses and collections.');
             $sec('Records');
+            //  The ONE client register (Directory → Clients), opened with Sales columns.
+            $t($sxOk && can('mod.clients.view'), '🏢', T_REG('client'), '/clients?view=sales', 'The one customer list — open deals, won this year, owed, last contact.');
             $t($fx('leads_can_view') && leads_can_view(), '🎯', 'Leads', '/leads', 'A company worth pursuing — before any specific job.',
                 $num(fn() => $fx('leads_due_count') ? leads_due_count() : 0), 'amber');
             $t($fx('opp_can_view') && opp_can_view(), '💡', 'Opportunities', '/opportunities', 'A live deal you are working to win or lose.');

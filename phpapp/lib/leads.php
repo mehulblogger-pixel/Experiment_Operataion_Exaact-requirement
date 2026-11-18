@@ -930,8 +930,7 @@ function lead_convert($leadId, array $b = []) {
             //  A name is evidence, not proof: allowed, and recorded.
             if (($hit['confidence'] ?? 'NONE') === 'POSSIBLE') $near = $hit['row'];
         }
-        $code = 'C-' . strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $name), 0, 8)) . '-'
-              . str_pad((string)((int)ops_val("SELECT COUNT(*) FROM business_partners") + 1), 4, '0', STR_PAD_LEFT);
+        $code = gen_partner_code(($l['office_id'] ?? '') !== '' ? (int) $l['office_id'] : null, $name); // the one numbering rule
         $pdo->prepare("INSERT INTO business_partners (code,legal_name,display_name,is_client,is_vendor,status,state,created_at)
                        VALUES (?,?,?,1,0,'ACTIVE',?,?)")
             ->execute([$code, $name, $name, (string)($b['state'] ?? ''), date('c')]);
@@ -948,6 +947,12 @@ function lead_convert($leadId, array $b = []) {
                                VALUES (?,?,?,?,1)")
                     ->execute([$partnerId, $l['contact_name'], $l['contact_email'], $l['contact_phone']]);
             } catch (Throwable $e) { /* contact shape differs on an older install */ }
+            //  The same check the registration form runs: this person already
+            //  listed for another firm (same mobile or e-mail) is FLAGGED, not refused.
+            if (function_exists('partner_contact_clash') && function_exists('flash')) {
+                try { $cl = partner_contact_clash((string) $l['contact_phone'], (string) $l['contact_email'], $partnerId);
+                      if ($cl) flash(partner_contact_clash_msg($cl), 'warning'); } catch (Throwable $e) {}
+            }
         }
     }
 

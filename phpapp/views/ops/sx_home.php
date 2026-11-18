@@ -18,7 +18,7 @@ $tiles = [
     ['sx-purple', '📨 ' . (function_exists('THP') ? THP('inquiry') : 'Enquiries'), 'Requests to quote', 'Sales', '/inquiries'],
     ['sx-brown', '💰 Payments', 'Invoices & dues', 'Sales + Accounts', '/receivables'],
     ['sx-pink', '🔁 Contracts', 'Orders & renewals', 'Sales', '/contracts'],
-    ['sx-slate', '🏢 Customers', 'Companies & contacts', 'Sales', '/clients'],
+    ['sx-slate', '🏢 Customers', 'Companies & contacts — the one list', 'Sales + Directory', '/clients?view=sales'],
 ];
 ?>
 <div class="sx">

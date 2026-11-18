@@ -348,7 +348,7 @@ function ops_customer360($route, $method) {
         //  The GROUP ROOT is the parent, not the record you happened to open, so
         //  a branch of a branch still lands in one family rather than a chain.
         $root = (int) ($parent['parent_id'] ?? 0) ?: (int) $parent['id'];
-        $code = function_exists('ops_next_code') ? ops_next_code('business_partners', 'code', 'C') : ('C' . time());
+        $code = gen_partner_code($br, $name); // the one numbering rule
         db()->prepare("INSERT INTO business_partners (code, legal_name, display_name, parent_id, home_branch_id, gstin, is_client, is_vendor, status, created_at)
                        VALUES (?,?,?,?,?,?,1,0,'ACTIVE',?)")
             ->execute([$code, $name, trim((string) ($_POST['display_name'] ?? '')) ?: $name, $root, $br, $gstin, date('c')]);

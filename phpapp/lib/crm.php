@@ -3917,10 +3917,7 @@ function crm_register_client_for_quote($q) {
         }
         if (($hit['confidence'] ?? 'NONE') === 'POSSIBLE') $near = $hit['row'];
     }
-    $token = function_exists('short_token') ? short_token($name) : strtoupper(substr(preg_replace('/[^A-Za-z]/', '', $name), 0, 4));
-    $last = ops_val("SELECT code FROM business_partners WHERE code LIKE ? ORDER BY code DESC LIMIT 1", ["GEN-$token-%"]);
-    $seq = $last ? ((int)substr($last, strrpos($last, '-') + 1)) + 1 : 1;
-    $code = sprintf("GEN-%s-%04d", $token, $seq);
+    $code = gen_partner_code(($q['office_id'] ?? '') !== '' ? (int) $q['office_id'] : null, $name); // the one numbering rule
     db()->prepare("INSERT INTO business_partners (code,legal_name,display_name,is_client,is_vendor,status,created_at) VALUES (?,?,?,1,0,'ACTIVE',?)")
         ->execute([$code, $name, $name, date('c')]);
     $pid = (int)db()->lastInsertId();
