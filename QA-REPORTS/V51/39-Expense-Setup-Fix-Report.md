@@ -66,11 +66,26 @@ Everyone else in the band still gets ₹200 for food. His claims before 1 Dec ke
 
 ## How it was tested
 
-TBD-RESULTS
+| Check | Result |
+| --- | --- |
+| New automatic tests for Expense setup (`test_expense_setup.php`) | **67 checks, all pass.** They cover: the four tabs; an Admin is refused every save; types added and changed here (bill, no bill, per day, per month, per km); duplicate or empty names refused; a personal type is only per site day or per month; band boxes (rate or "up to"), "copy of" another band, minus amounts refused, personal types never in a band; the role band, a person's own band winning over it, blank following the role; personal allowance on/off, the amount required, "from" dates kept; the day close showing "your personal allowance"; two lines on the claim; once a month added once; the N+1 approver sees "personal"; the Masters lists lead here; the breadcrumb |
+| Expense tests from report 38, updated to your rule | **146 checks, all pass.** Changed: a person row no longer changes his band's amount, and a personal allowance is added on top |
+| Full suite, SQLite | **21,345 passed.** 1 "failed": the release stamp, which is renewed at release time (the zip shows 728 of 728) |
+| Full suite, MariaDB (your server's database type) | **21,336 passed.** The failures are exactly the **24 known** MariaDB test-order ones, line for line, plus the same release stamp. **No new failure** |
+| Robot: the same 83 real-screen tests as report 38 (vouchers, job closing, profit, money, whole journeys), before vs after | **All 83 identical, step by step.** Nothing outside expense setup changed |
+| I opened the new screens myself | Every tab on a laptop, the bands tab at phone width (the boxes fit), and a person's Expenses tab. Screens were saved and checked |
 
 ## The zip (opstest only)
 
-TBD-ZIP
+`EXAACT-V51.1-ExpenseSetup-TEST-COPY-update.zip`
+- **Release stamp:** d1bf06e. Deploy-check on the build: **728 of 728 files match.**
+- **SHA-256:** `04cde97bc970771436b06f0a3b31ad993f054f035a9baf7c2002b25af14896be`
+- **Left out, as always:** `config.local.php`, `tenants.php`, `tests/`, database files, `exaact_data*` / `exaact_backups*`.
+
+**Install** (the same steps as last time):
+1. Back up opstest.
+2. File Manager → opstest app folder → upload → Extract (overwrite) → delete the zip.
+3. Open `deploy-check.php`: Release **d1bf06e**, green ✓. Send me the screenshot.
 
 ## Your checks (about 25 minutes)
 
