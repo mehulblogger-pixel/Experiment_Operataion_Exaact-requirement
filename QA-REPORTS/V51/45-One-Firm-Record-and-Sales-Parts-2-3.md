@@ -98,7 +98,21 @@ Every new screen in this report has **its own switch** in Admin → Modules & fe
 
 ## 6. Tests run before this zip
 
-RESULTS_PLACEHOLDER
+| Check | Result |
+|---|---|
+| New tests for this work | **One firm record: 21/21 ✅ · Sales parts 2–3: 50/50 ✅** · Sales part 1: 31/31 ✅ · Feature switches: 53/53 ✅ |
+| Full automatic suite, SQLite (all 762 test files) | **21,499 passed**, 6 not passed. 2 were real and are now fixed: the targets table is created at start-up, and a new access check is recorded. 2 are the release stamp, refreshed in this zip. 2 are old timing tests, unrelated (see below) |
+| Full suite, MariaDB (the live database type) | All the new tests ran and passed. The other failures are the same ones already known from earlier rounds, and the run stops at the same known spot as before |
+| Robot: 98 screen-by-screen cases, compared with the last run | **No case got worse.** 5 admin cases went from failed to passed |
+| Screens opened by the robot, desktop and phone (390 px) | All new screens: no PHP error, no script error, no sideways scrolling on the phone |
+| Duplicate guard | The same firm a second time is refused; a repeated mobile on a new lead is flagged |
+
+**The two old timing tests.**
+
+- An approvals check that "due in one hour" counts as "due today" fails if it runs within an hour of midnight India time. It ran at 23:58.
+- A recruitment check where four people convert the same candidate at the same instant fails when the machine is under heavy load. It passed when re-run on its own.
+
+Neither touches Sales, clients or vendors.
 
 ## 7. Your check list on opstest (about 12 checks)
 
