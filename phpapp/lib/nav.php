@@ -134,6 +134,10 @@ function nav_screen_label($route) {
         'office-finance'        => 'Office finance',
         'attendance-recon'      => 'Attendance reconcile',
         'crm-dashboard'         => 'Sales reports',
+        'sales-home'            => 'Sales home',
+        'sales-today'           => 'Today',
+        'sales-board'           => 'Pipeline board',
+        'sales-dashboard'       => 'Sales dashboard',
         'portal-users'          => 'Client portal users',
         'internal-audits'       => 'Internal audits',
         //  These match the screen's own <h1> exactly. A breadcrumb that says

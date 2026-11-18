@@ -4408,6 +4408,8 @@ function ops_dispatch($route, $method) {
             return ops_stage_gates($route, $method);
         case $route === 'crm-dashboard':
             return ops_crmdash($route, $method);
+        case in_array($route, ['sales-home', 'sales-today', 'sales-board', 'sales-dashboard'], true):   // plan 42 step C
+            return ops_sales_simple($route, $method);
         case $route === 'contracts-to-register':                      // Accounts' own screen for won deals (no deal page needed)
             return ops_contracts_to_register($method);
         case $route === 'opportunities' || strncmp($route, 'opportunity', 11) === 0:
