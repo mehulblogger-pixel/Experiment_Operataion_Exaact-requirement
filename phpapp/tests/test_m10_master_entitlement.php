@@ -197,6 +197,11 @@ $BASELINE = [
     // deadlines and bands — whose route maps to the Vouchers module ('voucher'
     // prefix) and is refused without it, exactly like /voucher-approvals.
     'exp_settings_can',
+    // Simple Sales (owner, 18 Nov 2026) — Category B. sx_can_see_all() only
+    // answers "may this person pick another salesperson's list" (management or
+    // Master Admin). Every Sales screen that asks it first requires sx_can(),
+    // which refuses without the Sales licence and a Leads / Deals view right.
+    'sx_can_see_all',
 ];
 $unclassified = array_values(array_diff($open, $BASELINE));
 t_ok(!$unclassified,

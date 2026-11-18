@@ -774,7 +774,8 @@ function run_schema($withSeeds = true) {
     if (function_exists('conf_migrate')) conf_migrate();
     if (function_exists('act_migrate')) act_migrate();
     if (function_exists('leads_migrate')) leads_migrate();               // leads, pipelines, configurable stages                   // the activity spine — Customer 360 reads this                // §4.2 undertakings, client NDAs, breaches                 // the event, before the corrective action               // §8.7 nonconformity & corrective action
-    if (function_exists('opp_migrate')) opp_migrate();                 // opportunities — the deal, distinct from the quotation
+    if (function_exists('opp_migrate')) opp_migrate();
+    if (function_exists('sx_more_migrate')) sx_more_migrate();      // Simple Sales: sales_targets (per person, per month; history kept)                 // opportunities — the deal, distinct from the quotation
     if (function_exists('books_migrate')) books_migrate();             // invoices, receipts, allocations, credit notes
     if (function_exists('booksbridge_migrate')) booksbridge_migrate(); // MGH Books connector: outbox + link columns
     if (function_exists('licissue_migrate')) licissue_migrate();       // Super Admin licence console: issued_licences
