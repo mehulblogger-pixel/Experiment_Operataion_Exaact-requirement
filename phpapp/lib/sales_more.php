@@ -338,21 +338,29 @@ function sxt_save(array $post, array $months) {
             $n++;
         }
     }
-    foreach ($changed as $uid => $rows) sxt_mail_change((int) $uid, $rows, $me);
+    $GLOBALS['sxt_mail_notes'] = [];
+    foreach ($changed as $uid => $rows) $GLOBALS['sxt_mail_notes'][] = sxt_mail_change((int) $uid, $rows, $me);
     return $n;
 }
 //  One e-mail per person per save, listing every month that changed.
+//  Returns one plain sentence for the person who saved: whether it went, and if
+//  not, why (the same reason the Notification log records).
 function sxt_mail_change($uid, array $rows, $by) {
-    if (!function_exists('ops_mail')) return;
     $u = ops_one("SELECT * FROM users WHERE id=? AND is_active=1", [(int) $uid]);
+    $nm = $u ? user_name($u) : 'that person';
+    if (!function_exists('ops_mail')) return "Could not e-mail $nm: e-mail is not available here.";
     $to = trim((string) ($u['email'] ?? ''));
-    if (!$u || $to === '') return;
+    if (!$u || $to === '') return "Could not e-mail $nm: no e-mail address on their login (Admin → Users).";
     $lines = [];
     foreach ($rows as [$ym, $prev, $amt])
         $lines[] = date('M Y', strtotime($ym . '-01')) . ': ' . ($prev === null ? 'set to ' . sx_money($amt) : sx_money($prev) . ' → ' . sx_money($amt));
     $body = 'Hello ' . user_name($u) . ",\n\nYour sales target was changed by $by on " . date('j M Y') . ":\n\n  " . implode("\n  ", $lines)
           . "\n\nSee all your targets under Sales → Targets.\n";
-    try { ops_mail($to, 'Your sales target was changed', $body, '', 'sales_target'); } catch (Throwable $e) {}
+    try { $ok = ops_mail($to, 'Your sales target was changed', $body, '', 'sales_target'); }
+    catch (Throwable $e) { return "Could not e-mail $nm: " . $e->getMessage(); }
+    if ($ok) return "E-mailed $nm.";
+    $why = (string) (ops_val("SELECT error FROM email_log ORDER BY id DESC LIMIT 1") ?: 'see Settings → Notification log');
+    return "Could not e-mail $nm: $why.";
 }
 //  Changes to MY targets I have not yet acknowledged (Sales home notice).
 function sxt_unseen_for($uid) {
@@ -477,7 +485,9 @@ function ops_sales_more($route, $method) {
             if ($method === 'POST') {
                 ops_require($can, 'Only a sales manager sets targets.');
                 $n = sxt_save($_POST, $months);
-                flash($n ? "$n target" . ($n === 1 ? '' : 's') . ' saved. Earlier figures stay in the history.' : 'Nothing changed.');
+                $notes = $GLOBALS['sxt_mail_notes'] ?? [];
+                $bad = array_values(array_filter($notes, fn($x) => strncmp($x, 'Could not', 9) === 0));
+                flash($n ? "$n target" . ($n === 1 ? '' : 's') . ' saved. Earlier figures stay in the history. ' . implode(' ', $notes) : 'Nothing changed.', $bad ? 'warning' : 'success');
                 redirect('/sales-targets');
             }
             $people = sx_target_people();

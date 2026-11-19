@@ -33,7 +33,7 @@ $val = fn($k, $d = '') => htmlspecialchars((string)($r[$k] ?? $d), ENT_QUOTES);
                 //  are for deals; the other Sales approvals live where they belong,
                 //  and the note says where. ?>
           <input type="hidden" name="entity_kind" value="OPPORTUNITY">
-          <div class="form-control" style="background:var(--field,#f8fafc)">Deals (opportunities)</div>
+          <div class="form-control" style="background:var(--field,#f8fafc)"><?= e(THP('opportunity')) ?></div>
           <div class="muted" style="font-size:12px;margin-top:3px">Quotations are approved by value levels, set on <a href="/sales-setup#levels">Set up Sales</a>. Leads have their own rules: the person responsible marks a lead lost (reason and remarks), and reassigning it waits for a manager.</div>
         </div>
 

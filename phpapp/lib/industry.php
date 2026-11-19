@@ -49,7 +49,7 @@ const INDUSTRY_TEMPLATES = [
         'label' => 'Inspection, testing & certification',
         'blurb' => 'Third-party inspection, NDT, vendor assessment, certification bodies.',
         'funnel' => [
-            ['Enquiry received',   'OPEN',  10, 7],
+            ['New deal',           'OPEN',  10, 7],
             ['Scope agreed',       'OPEN',  30, 10],
             ['Quotation sent',     'OPEN',  50, 14],
             ['Rate negotiation',   'OPEN',  70, 10],
@@ -81,7 +81,7 @@ const INDUSTRY_TEMPLATES = [
         'label' => 'Testing & calibration laboratory',
         'blurb' => 'Materials testing, calibration, NABL / ISO 17025 laboratories, sample analysis.',
         'funnel' => [
-            ['Enquiry received',    'OPEN',  10, 5],
+            ['New deal',            'OPEN',  10, 5],
             ['Scope & methods',     'OPEN',  30, 7],
             ['Quotation sent',      'OPEN',  50, 10],
             ['Rate negotiation',    'OPEN',  70, 7],

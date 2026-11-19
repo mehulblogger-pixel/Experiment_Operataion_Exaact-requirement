@@ -481,10 +481,10 @@ function fd_forms_rest() {
             ],
         ];
         $out['opportunity'] = [
-            'label' => 'Opportunities', 'icon' => '💡',
-            'help'  => 'The new-opportunity form',
+            'label' => TP('opportunity'), 'icon' => '💡',
+            'help'  => 'The new-' . Tl('opportunity') . ' form',
             'fields' => [
-                'name'           => $F('What is the opportunity?', 'text', 'The opportunity', true),
+                'name'           => $F('What is the ' . Tl('opportunity') . '?', 'text', 'The opportunity', true),
                 'partner_id'     => $F($T('client'), 'dropdown', 'The opportunity'),
                 'partner_name'   => $F('…or who it is for', 'text', 'The opportunity'),
                 'pipeline_id'    => $F('Pipeline', 'dropdown', 'The opportunity'),

@@ -113,7 +113,7 @@ try {
     t_eq(crm_quote_deal_link(crm_quote_get($qid)), null, 'Accounts are not offered a link to the deal — the quotation keeps its usual place for them');
     t_eq(crm_quote_lead_link(['id' => $lq, 'lead_id' => $lid]), null, '…nor a link to the lead');
     $strip = chain_strip('QUOTE', $qid);
-    t_ok(strpos($strip, 'href="/opportunity?id=' . $oid . '"') === false && strpos($strip, 'Opportunity') !== false,
+    t_ok(strpos($strip, 'href="/opportunity?id=' . $oid . '"') === false && strpos($strip, 'Deal') !== false,   // the register is called Deal (owner, 19 Nov 2026)
         'the strip still shows the deal it came from, as plain text — not a link that is refused');
     t_ok(strpos($strip, 'href="/quote?id=' . $qid . '"') !== false, '…and everything they can open is still a link');
     t_as_admin();

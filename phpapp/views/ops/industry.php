@@ -1,6 +1,6 @@
 <div class="master-head">
   <div><h1>Your industry</h1>
-  <p class="sub" style="margin:2px 0 0">Choose the trade you are in and the whole sales apparatus is built for you — a lead pipeline, an opportunity funnel with realistic probabilities and service levels, the sources deals come from in that trade, and the reasons they are lost. A CRM that has to be configured before it is useful is one that gets abandoned in week two.</p></div>
+  <p class="sub" style="margin:2px 0 0">Choose the trade you are in and the whole sales apparatus is built for you — a lead pipeline, a <?= e(Tl('opportunity')) ?> funnel with realistic probabilities and service levels, the sources deals come from in that trade, and the reasons they are lost. A CRM that has to be configured before it is useful is one that gets abandoned in week two.</p></div>
 </div>
 
 <?php if ($current): ?>
@@ -23,7 +23,7 @@
 
   <div class="panel-split">
     <div>
-      <p class="muted" style="font-size:12.5px;margin:0 0 6px"><b>The opportunity funnel</b> — what gets created</p>
+      <p class="muted" style="font-size:12.5px;margin:0 0 6px"><b>The <?= e(Tl('opportunity')) ?> funnel</b> — what gets created</p>
       <table class="dt">
         <caption class="sr-only">Funnel stages</caption>
         <thead><tr><th scope="col">#</th><th scope="col">Stage</th><th scope="col" class="num">Probability</th><th scope="col" class="num">Days allowed</th></tr></thead>

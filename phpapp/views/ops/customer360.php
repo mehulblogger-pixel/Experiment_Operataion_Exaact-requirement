@@ -243,7 +243,7 @@
         <h3 style="margin-top:0">What we are selling them</h3>
         <?php if ($pipeline['open']): ?>
           <table class="dt">
-            <caption class="sr-only">Open opportunities</caption>
+            <caption class="sr-only">Open <?= e(Tlp('opportunity')) ?></caption>
             <thead><tr><th scope="col">Deal</th><th scope="col">Stage</th><th scope="col" class="num">Estimate</th><th scope="col" class="num">Weighted</th></tr></thead>
             <tbody>
             <?php foreach ($pipeline['open'] as $o): ?>

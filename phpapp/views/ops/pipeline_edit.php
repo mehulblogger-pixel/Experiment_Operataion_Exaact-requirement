@@ -1,6 +1,6 @@
 <div class="master-head">
   <div><h1><?= e($p['name']) ?></h1>
-  <p class="sub" style="margin:2px 0 0"><?= e($p['entity_kind'] === 'LEAD' ? 'Lead pipeline' : 'Opportunity funnel') ?>
+  <p class="sub" style="margin:2px 0 0"><?= e($p['entity_kind'] === 'LEAD' ? 'Lead pipeline' : TH('opportunity') . ' funnel') ?>
     <?php if ((int)$p['is_default']): ?><span class="pill p-ok">Default</span><?php endif; ?>
     <?php if (!(int)$p['active']): ?><span class="pill p-bad">Retired</span><?php endif; ?>
   </p></div>

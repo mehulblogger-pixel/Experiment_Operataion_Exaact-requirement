@@ -45,7 +45,7 @@ $crm = file_get_contents(__DIR__ . '/../lib/crm.php');
 t_ok(strpos($crm, "\$backKey === 'sales-setup' ? '/sales-setup#levels' : (\$backKey === 'sales-approvals' ? '/sales-approvals?tab=quote#levels' : '/quote-approval-rules')") !== false, 'back= is honoured for Set up Sales and Sales approvals only — never a free redirect');
 t_ok(strpos($crm, "must be above the \"from\" value") !== false, 'a band whose "up to" is not above "from" is refused');
 $sg = file_get_contents(__DIR__ . '/../views/ops/stage_gates.php');
-t_ok(strpos($sg, '<select class="form-control" name="entity_kind">') === false && strpos($sg, 'Deals (opportunities)') !== false,
+t_ok(strpos($sg, '<select class="form-control" name="entity_kind">') === false && strpos($sg, "THP('opportunity')") !== false,   // labelled Deals (owner, 19 Nov 2026)
     'deal-stage rules no longer show a one-choice "Applies to" drop-down');
 
 $pdo->exec("DELETE FROM quote_approval_rules");

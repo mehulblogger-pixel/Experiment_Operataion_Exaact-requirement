@@ -92,7 +92,7 @@ function ops_area_def($area) {
             break;
         case 'sales':
             $title = 'Sales'; $icon = '🎯';
-            $sub = 'Leads, opportunities, ' . strtolower(THP('inquiry')) . ', ' . strtolower(THP('quote')) . ' and the pipeline.';
+            $sub = 'Leads, ' . Tlp('opportunity') . ', ' . strtolower(THP('inquiry')) . ', ' . strtolower(THP('quote')) . ' and the pipeline.';
             $routes = ['sales','sales-home','sales-today','sales-board','sales-dashboard','sales-lead','sales-log','sales-orders','sales-renewals','sales-targets','sales-settings','leads','lead','opportunities','opportunity','inquiries','inquiry','quotes','quote','pipelines','pipeline','approvals','stage-gates','ads-roi','project-costings','project-costing','project-costing-heads','preorder-checklist','templates'];
             //  Plan 42 step C (owner, 18 Nov 2026) — the owner's Excel CRM: start here.
             $sxOk = $fx('sx_can') && sx_can();
@@ -111,7 +111,7 @@ function ops_area_def($area) {
             $t($sxOk && can('mod.clients.view'), '🏢', T_REG('client'), '/clients?view=sales', 'The one customer list — open deals, won this year, owed, last contact.');
             $t($fx('leads_can_view') && leads_can_view(), '🎯', 'Leads', '/leads', 'A company worth pursuing — before any specific job.',
                 $num(fn() => $fx('leads_due_count') ? leads_due_count() : 0), 'amber');
-            $t($fx('opp_can_view') && opp_can_view(), '💡', 'Opportunities', '/opportunities', 'A live deal you are working to win or lose.');
+            $t($fx('opp_can_view') && opp_can_view(), '💡', TP('opportunity'), '/opportunities', 'A live deal you are working to win or lose.');
             $t(can('mod.inquiries.view'), '📨', THP('inquiry'), '/inquiries', 'A specific request to quote — a ' . strtolower(Tl('quote')) . ' is raised from it.',
                 $num(fn() => $fx('inquiries_due_count') ? inquiries_due_count() : 0), 'amber');
             $t(can('mod.quotes.view'), '📝', THP('quote'), '/quotes', 'Quotations, revisions and approvals.',

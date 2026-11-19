@@ -36,6 +36,9 @@ const TERM_DEFAULTS = [
     // -- sales ---------------------------------------------------------------
     'inquiry'      => ['Inquiry', 'Inquiries', 'Sales', 'An enquiry received from a client.'],
     'quote'        => ['Quote', 'Quotes', 'Sales', 'Our commercial offer against an inquiry.'],
+    //  Owner, 19 Nov 2026: "it must be deal" — the opportunities register is
+    //  called Deal everywhere (the database keeps its own name, opportunities).
+    'opportunity'  => ['Deal', 'Deals', 'Sales', 'A live piece of business you are working to win or lose.'],
     // "Sales Order" rather than "Order", so it can never be read as the work
     // order below. One is what the customer bought; the other is what we then
     // have to go and do.

@@ -163,6 +163,9 @@ function nav_screen_label($route) {
         'pricing-usage'         => 'Plans, pricing & usage',
     ];
     if (isset($override[$route])) return $override[$route];
+    //  The opportunities register is called by its Terminology word ("Deal").
+    if (($route === 'opportunity' || $route === 'opportunities') && function_exists('T'))
+        return $route === 'opportunity' ? T('opportunity') : TP('opportunity');
     if (strncmp($route, 'm/', 2) === 0) $route = substr($route, 2);
     //  "Equip new" and "Quote edit" read like database rows. The module is
     //  already named one step up the trail, so the verb alone is clearer.

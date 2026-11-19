@@ -1,9 +1,9 @@
 <?php $c = $counts; $view = $view ?? 'board'; ?>
 <div class="master-head">
-  <div><h1>Opportunities</h1>
+  <div><h1><?= e(THP('opportunity')) ?></h1>
   <p class="sub" style="margin:2px 0 0">Pieces of business you are trying to win. Kept apart from quotations on purpose: one deal often carries three quotations, and counting quotations makes the forecast three times too big. A deal can also be lost before anyone quotes — that loss is the one worth recording.</p></div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
-    <?php if ($canEdit): ?><a class="btn" href="/opportunity-new">+ New opportunity</a><?php endif; ?>
+    <?php if ($canEdit): ?><a class="btn" href="/opportunity-new">+ New <?= e(Tl('opportunity')) ?></a><?php endif; ?>
     <?php if ($view !== 'list'): ?>
       <a class="btn secondary" href="/opportunities?<?= e(http_build_query(array_merge($_GET,['export'=>'csv']))) ?>">⬇ CSV</a>
     <?php endif; ?>
@@ -30,7 +30,7 @@
   <?php if ($view !== 'list'): ?>
     <form method="get" action="/opportunities" style="display:flex;gap:8px;margin-left:auto" role="search">
       <input type="hidden" name="v" value="list">
-      <label class="sr-only" for="opp-find">Find an opportunity</label>
+      <label class="sr-only" for="opp-find">Find <?= e(Tla('opportunity')) ?></label>
       <input class="form-control" id="opp-find" name="q" value="<?= e($_GET['q'] ?? '') ?>" placeholder="Find a deal or a customer">
       <button class="btn small secondary">Find</button>
     </form>
@@ -74,7 +74,7 @@
   <?php if ($losses): ?>
     <div class="panel" style="margin-top:16px">
       <h3 style="margin:0 0 4px">Why deals were lost <span class="muted" style="font-weight:400;font-size:13px">— last 12 months</span></h3>
-      <p class="muted" style="font-size:13px;margin:0 0 10px">Unanswerable before opportunities existed: a lost quotation had a reason, but a deal lost before anybody quoted had nowhere to record one.</p>
+      <p class="muted" style="font-size:13px;margin:0 0 10px">Unanswerable before <?= e(Tlp('opportunity')) ?> existed: a lost quotation had a reason, but a deal lost before anybody quoted had nowhere to record one.</p>
       <table class="dt">
         <caption class="sr-only">Loss reasons</caption>
         <thead><tr><th scope="col">Reason</th><th scope="col" class="num">Deals</th><th scope="col" class="num">Estimated value</th></tr></thead>
@@ -93,11 +93,11 @@
 <?php else: ?>
   <div style="margin-top:16px">
     <?= dt_render($dt, $rows, $total, [
-          'caption'     => 'Opportunity register',
+          'caption'     => TH('opportunity') . ' register',
           'search'      => true,
           'search_hint' => 'Deal, customer or reference…',
           'export'      => true,
-          'empty'       => 'Nothing yet. An opportunity opens from a lead, or straight from here when a customer tells you what they are planning.',
+          'empty'       => 'Nothing yet. ' . ucfirst(Tla('opportunity')) . ' opens from a lead, or straight from here when a customer tells you what they are planning.',
         ]) ?>
   </div>
 <?php endif; ?>

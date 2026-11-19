@@ -41,7 +41,7 @@
 // kind used by the activity timeline, so the two agree about what things are.
 const CHAIN_STAGES = [
     'LEAD'        => ['Lead',        '🎯', '/lead?id='],
-    'OPPORTUNITY' => ['Opportunity', '💡', '/opportunity?id='],
+    'OPPORTUNITY' => ['Deal', '💡', '/opportunity?id='],
     'INQUIRY'     => ['Enquiry',     '📨', '/inquiry-edit?id='],
     'QUOTE'       => ['Quotation',   '📝', '/quote?id='],
     'CALL'        => ['Order',       '📞', '/call?id='],
@@ -289,7 +289,7 @@ function chain_from($kind, $id) {
 function chain_label($stage, array $r) {
     switch ($stage) {
         case 'LEAD':    return [$r['ref'] ?: 'Lead', $r['company_name'] ?? '', $r['stage_name'] ?? ''];
-        case 'OPPORTUNITY': return [$r['ref'] ?: 'Opportunity', $r['name'] ?? '',
+        case 'OPPORTUNITY': return [$r['ref'] ?: T('opportunity'), $r['name'] ?? '',
                                     OPP_STATUS[$r['status']] ?? ($r['stage_name'] ?? '')];
         case 'INQUIRY': return [$r['inquiry_no'] ?: 'Enquiry', $r['subject'] ?? '', $r['status'] ?? ''];
         case 'QUOTE':   return [$r['quote_no'] . ((int)($r['rev'] ?? 0) ? ' r' . (int)$r['rev'] : ''),

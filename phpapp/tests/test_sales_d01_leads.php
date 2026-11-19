@@ -52,7 +52,7 @@ $MM  = $mk('d01_mm',  'MARKETING_MANAGER');
 $INS = $mk('d01_ins', 'INSPECTOR');
 $FIN = $mk('d01_fin', 'FINANCE');
 $OM  = $mk('d01_om',  'OPERATION_MANAGER');
-foreach (['leads' => '+ New lead', 'opportunities' => 'New opportunity'] as $route => $mark) {
+foreach (['leads' => '+ New lead', 'opportunities' => 'New deal'] as $route => $mark) {
     $r = $drive($ME, $route, 'GET', [], [], [$mark]);
     t_ok($r['done'] === 'return' && !empty($r['has'][$mark]), "a Marketing Executive opens /$route (" . ($r['error'] ?? 'ok') . ')');
     $r = $drive($INS, $route, 'GET', [], [], [$mark]);

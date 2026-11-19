@@ -444,7 +444,7 @@ function adv_silent_customers() {
               . 'it is an apology.',
             'Ring the named contact. Then <b>record the call</b> on the customer — one line is enough. That is what '
               . 'takes them off this list and tells the next person it was done.',
-            'If there is nothing to sell them right now, open an <b>opportunity</b> with an expected close date '
+            'If there is nothing to sell them right now, open a <b>' . Tl('opportunity') . '</b> with an expected close date '
               . 'anyway. A deal with a date comes back to you; a good intention does not.',
             'Work down the list by outstanding value — a customer who owes you money and has gone quiet is the one '
               . 'to ring today.',
@@ -570,7 +570,7 @@ function adv_ad_spend_dry() {
         'key' => 'adspend', 'severity' => 'CASH',
         'title' => 'Advertising you are paying for that has produced nothing',
         'n' => count($rows), 'value' => $wasted,
-        'cost' => fmoney($wasted) . ' of advertising has produced no live opportunity — '
+        'cost' => fmoney($wasted) . ' of advertising has produced no live ' . Tl('opportunity') . ' — '
                 . ($noLead ? $noLead . ' ' . ($noLead === 1 ? 'campaign' : 'campaigns') . ' produced no lead at all'
                            : 'every one of them produced leads that then went nowhere') . '.',
         'why' => 'Ad platforms report cost per lead, and by that measure most of these look acceptable. '

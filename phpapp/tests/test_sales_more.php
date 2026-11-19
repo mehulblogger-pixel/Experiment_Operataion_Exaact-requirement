@@ -103,10 +103,14 @@ try {
     $mail = ops_one("SELECT * FROM email_log ORDER BY id DESC");
     t_ok((int) ops_val("SELECT COUNT(*) FROM email_log") === $mailBefore + 1 && strpos((string) $mail['body'], '₹6,00,000 → ₹6,50,000') !== false,
          'targets · the salesperson is e-mailed what changed (₹6,00,000 → ₹6,50,000)');
+    t_ok(strpos(implode(' ', $GLOBALS['sxt_mail_notes'] ?? []), 'Kiran') !== false, 'targets · the person saving is told whether the e-mail went (or why not): ' . implode(' ', $GLOBALS['sxt_mail_notes'] ?? []));
+    db()->prepare("UPDATE users SET email='' WHERE id=?")->execute([$f['kiran']]);
+    sxt_save(['t' => [$f['kiran'] => [$m1 => '660000']]], $months);
+    t_ok(strpos(implode(' ', $GLOBALS['sxt_mail_notes'] ?? []), 'no e-mail address') !== false, 'targets · a salesperson with no e-mail address is named, not skipped in silence');
     bbv_route('sales-targets', 'POST', $f['kiran'], 0, ['seen' => '1']);
     t_eq(count(sxt_unseen_for($f['kiran'])), 0, 'targets · "OK, seen" clears the notice');
-    t_eq(sxt_target_total($f['kiran'], $m0 . '-01', $m1 . '-28'), 1200000.0, 'targets · the dashboard total for the two months = 5.5 L + 6.5 L (latest figures)');
-    t_eq(sx_target_total($f['kiran'], $m0 . '-01', $m1 . '-28'), 1200000.0, 'targets · part 1\'s dashboard hook now reads them');
+    t_eq(sxt_target_total($f['kiran'], $m0 . '-01', $m1 . '-28'), 1210000.0, 'targets · the dashboard total for the two months = 5.5 L + 6.6 L (latest figures)');
+    t_eq(sx_target_total($f['kiran'], $m0 . '-01', $m1 . '-28'), 1210000.0, 'targets · part 1\'s dashboard hook now reads them');
 
     // ---- Renewals ----------------------------------------------------------------------------
     $pid = (int) ops_val("SELECT id FROM business_partners LIMIT 1");
@@ -166,6 +170,18 @@ try {
     $before = (int) ops_val("SELECT COUNT(*) FROM sales_targets");
     bbv_route('sales-targets', 'POST', $f['neha'], 0, ['t' => [$f['kiran'] => [$m0 => '1']]]);
     t_eq((int) ops_val("SELECT COUNT(*) FROM sales_targets"), $before, 'targets · a non-manager cannot set targets');
+    // ---- Owner, 19 Nov 2026: "it must be deal"; the first deal stage reads like an Enquiry ----
+    t_eq([T('opportunity'), TP('opportunity'), Tla('opportunity')], ['Deal', 'Deals', 'a deal'], 'wording · the opportunities register is called Deal (a Terminology word)');
+    t_eq(nav_screen_label('opportunity'), 'Deal', 'wording · the breadcrumb says Deal, not Opportunity');
+    $dp2 = bbv_route('opportunities', 'GET', $f['master'], 0);
+    t_ok(strpos($dp2['out'], 'Opportunit') === false && strpos($dp2['out'], 'Deals') !== false, 'wording · the register screen says Deals and never Opportunity');
+    $pidO = (int) ops_val("SELECT id FROM pipelines WHERE entity_kind='OPPORTUNITY' LIMIT 1");
+    db()->prepare("INSERT INTO pipeline_stages (pipeline_id,seq,name,kind,probability,sla_days,active) VALUES (?,99,'Enquiry received','OPEN',10,7,1)")->execute([$pidO]);
+    $stg = (int) db()->lastInsertId();
+    db()->prepare("DELETE FROM settings WHERE skey='opp_stage_rename_v1'")->execute(); $sc = &settings_cache(); unset($sc['opp_stage_rename_v1']);
+    opp_rename_first_stage();
+    t_eq((string) ops_val("SELECT name FROM pipeline_stages WHERE id=?", [$stg]), 'New deal', 'stage · a deal stage still called "Enquiry received" becomes "New deal"');
+    db()->prepare("DELETE FROM pipeline_stages WHERE id=?")->execute([$stg]);
     $all = feat_catalog_keys();
     t_ok(isset($all['sales-lead'], $all['sales-orders'], $all['sales-renewals'], $all['sales-targets'], $all['sales-settings']), 'switches · each new screen is in Modules & features with its own switch');
 } finally {

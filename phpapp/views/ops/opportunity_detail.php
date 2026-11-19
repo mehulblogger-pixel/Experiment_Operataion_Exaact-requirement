@@ -16,7 +16,7 @@
   <?php // Delete — administrators only, and only while it is safe to remove: not
         //   won, and no quotation linked. Otherwise it is part of the record. ?>
   <?php if ((is_admin_level() || is_master()) && $o['status'] !== 'WON' && !count($quotes)): ?>
-  <form method="post" action="/opportunity-delete" onsubmit="return confirm('Delete opportunity <?= e($o['ref']) ?>? This cannot be undone. (Lost deals are kept as history — consider marking it lost instead.)')">
+  <form method="post" action="/opportunity-delete" onsubmit="return confirm('Delete <?= e(Tl('opportunity')) ?> <?= e($o['ref']) ?>? This cannot be undone. (Lost deals are kept as history — consider marking it lost instead.)')">
     <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
     <button class="btn small danger" type="submit">Delete</button></form>
   <?php endif; ?>

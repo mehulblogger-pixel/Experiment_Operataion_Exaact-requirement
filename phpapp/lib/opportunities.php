@@ -127,13 +127,26 @@ function opp_migrate() {
     ensure_column('opportunities', 'sent_to_accounts_at', "VARCHAR(30) DEFAULT ''");
     ensure_column('opportunities', 'contract_id', 'INT NULL');
     opp_seed_pipeline();
+    //  Owner, 19 Nov 2026: a deal's first stage was "Enquiry received", which reads
+    //  like the separate Enquiry record. Renamed once to "New deal" — only where the
+    //  stage still carries that exact default name; a name a company chose stays.
+    opp_rename_first_stage();
+}
+function opp_rename_first_stage() {
+    try {
+        if ((string) (setting_get('opp_stage_rename_v1', '') ?? '') === '') {
+            db()->exec("UPDATE pipeline_stages SET name='New deal' WHERE name='Enquiry received'
+                        AND pipeline_id IN (SELECT id FROM pipelines WHERE entity_kind='OPPORTUNITY')");
+            setting_set('opp_stage_rename_v1', date('c'));
+        }
+    } catch (Throwable $e) { /* tried again on the next boot */ }
 }
 
 function opp_seed_pipeline() {
     try {
         if ((int)ops_val("SELECT COUNT(*) FROM pipelines WHERE entity_kind='OPPORTUNITY'") > 0) return;
         db()->prepare("INSERT INTO pipelines (name,entity_kind,is_default,active,created_by,created_at)
-                       VALUES ('Opportunity pipeline','OPPORTUNITY',1,1,'system',?)")->execute([date('c')]);
+                       VALUES ('Deal pipeline','OPPORTUNITY',1,1,'system',?)")->execute([date('c')]);
         $pid = (int)db()->lastInsertId();
         $st = db()->prepare("INSERT INTO pipeline_stages (pipeline_id,seq,name,kind,probability,sla_days,active)
                              VALUES (?,?,?,?,?,?,1)");
@@ -325,7 +338,7 @@ function opp_board($pipelineId = 0) {
 function opp_create(array $b) {
     opp_migrate();
     $name = trim((string)($b['name'] ?? ''));
-    if ($name === '') return ['err' => 'Give the opportunity a name — what is the piece of business?'];
+    if ($name === '') return ['err' => 'Give the ' . Tl('opportunity') . ' a name — what is the piece of business?'];
     $pid = (int)($b['partner_id'] ?? 0);
     $pname = trim((string)($b['partner_name'] ?? ''));
     if (!$pid && $pname === '') return ['err' => 'Say which customer, or who it is for.'];
@@ -360,7 +373,7 @@ function opp_create(array $b) {
     $id = (int)db()->lastInsertId();
     if (function_exists('custom_save')) custom_save('opportunity', $id, $b);
     if (function_exists('act_log'))
-        act_log('OPPORTUNITY', $id, 'SYSTEM', 'Opportunity ' . $ref . ' opened — ' . $name,
+        act_log('OPPORTUNITY', $id, 'SYSTEM', T('opportunity') . ' ' . $ref . ' opened — ' . $name,
                 ['auto' => 1, 'partner_id' => $pid ?: null]);
     return ['id' => $id, 'ref' => $ref];
 }
@@ -385,8 +398,8 @@ function opp_record_move($o, $to) {
 function opp_move($oppId, $stageId, array $b = [], $bypassGate = false) {
     opp_migrate();
     $o = opp_row($oppId);
-    if (!$o) return ['err' => 'That opportunity no longer exists.'];
-    if ($o['status'] !== 'OPEN') return ['err' => 'That opportunity is already ' . strtolower(OPP_STATUS[$o['status']] ?? $o['status']) . '.'];
+    if (!$o) return ['err' => 'That ' . Tl('opportunity') . ' no longer exists.'];
+    if ($o['status'] !== 'OPEN') return ['err' => 'That ' . Tl('opportunity') . ' is already ' . strtolower(OPP_STATUS[$o['status']] ?? $o['status']) . '.'];
     $to = stage_row((int)$stageId);
     if (!$to) return ['err' => 'Choose a stage to move it to.'];
 
@@ -451,7 +464,7 @@ function opp_move($oppId, $stageId, array $b = [], $bypassGate = false) {
 function opp_reopen($oppId, $reason) {
     opp_migrate();
     $o = opp_row($oppId);
-    if (!$o) return ['err' => 'That opportunity no longer exists.'];
+    if (!$o) return ['err' => 'That ' . Tl('opportunity') . ' no longer exists.'];
     if (!leads_can_reopen()) return ['err' => 'Only a manager can reopen a closed deal.'];
     if (!in_array((string)$o['status'], ['WON', 'LOST'], true)) return ['err' => 'This deal is still open.'];
     if ($o['status'] === 'WON' && (trim((string)($o['sent_to_accounts_at'] ?? '')) !== '' || (int)($o['contract_id'] ?? 0) || (int)($o['call_id'] ?? 0)))
@@ -474,7 +487,7 @@ function opp_reopen($oppId, $reason) {
 function opp_update($oppId, array $b) {
     opp_migrate();
     $o = opp_row($oppId);
-    if (!$o) return 'That opportunity no longer exists.';
+    if (!$o) return 'That ' . Tl('opportunity') . ' no longer exists.';
 
     // ---- The pipeline, which used to be permanent -------------------------
     //  Reported: "once the pipeline is selected nothing can be changed". True —
@@ -497,7 +510,7 @@ function opp_update($oppId, array $b) {
         // stages that no funnel or forecast expects to find on an opportunity.
         $pk = ops_val("SELECT entity_kind FROM pipelines WHERE id=?", [$newPipe]);
         if ((string)$pk !== 'OPPORTUNITY')
-            return 'That is a lead pipeline, not a deal pipeline. Pick one built for opportunities.';
+            return 'That is a lead pipeline, not a deal pipeline. Pick one built for ' . Tlp('opportunity') . '.';
         $stages = function_exists('pipeline_stages') ? pipeline_stages($newPipe) : [];
         $first = null;
         foreach ($stages as $st) if (($st['kind'] ?? 'OPEN') === 'OPEN') { $first = $st; break; }
@@ -575,7 +588,7 @@ function opp_update($oppId, array $b) {
 function opp_link_quote($oppId, $quoteId) {
     opp_migrate();
     $o = opp_row($oppId);
-    if (!$o) return 'That opportunity no longer exists.';
+    if (!$o) return 'That ' . Tl('opportunity') . ' no longer exists.';
     $q = opp_try(fn() => ops_one("SELECT id, quote_no FROM quotations WHERE id=?", [(int)$quoteId]), null);
     if (!$q) return 'That quotation no longer exists.';
     if (opp_try(fn() => ops_val("SELECT id FROM opportunity_quotes WHERE opportunity_id=? AND quotation_id=?",
@@ -603,7 +616,7 @@ function opp_unlink_quote($oppId, $quoteId) {
 function opp_create_quote($oppId) {
     opp_migrate();
     $o = opp_row($oppId);
-    if (!$o) return ['err' => 'That opportunity no longer exists.'];
+    if (!$o) return ['err' => 'That ' . Tl('opportunity') . ' no longer exists.'];
     //  Owner, 13 Nov 2026 (bounce list 2.1): a deal could not quote until it had a customer
     //  RECORD, and for a new prospect the only way to get one was to mark its lead "won"
     //  before anything was sold. A quotation made straight from a lead never needed that:
@@ -680,7 +693,7 @@ function opp_from_lead($leadId, array $b = []) {
 function opp_order_block($o) {
     if (!function_exists('licence_enabled') || !licence_enabled('operations'))
         return 'not-installed';                       // Sales-only: say nothing about orders
-    if (($o['status'] ?? '') !== 'WON') return 'Only a won opportunity becomes an order.';
+    if (($o['status'] ?? '') !== 'WON') return 'Only a won ' . Tl('opportunity') . ' becomes an order.';
     if (empty($o['partner_id']))
         return 'It has no customer on the master yet, so an order has nowhere to point. Add them as a customer first.';
     if (!empty($o['call_id'])) return 'An order has already been raised from this deal.';
@@ -782,7 +795,7 @@ function opp_order_quote($oppId) {
 function opp_raise_order($oppId, array $b = []) {
     opp_migrate();
     $o = opp_row($oppId);
-    if (!$o) return ['err' => 'That opportunity no longer exists.'];
+    if (!$o) return ['err' => 'That ' . Tl('opportunity') . ' no longer exists.'];
     $why = opp_order_block($o);
     if ($why === 'not-installed') return ['err' => 'Operations is not switched on for this installation.'];
     if ($why !== '') return ['err' => $why];
@@ -815,7 +828,7 @@ function opp_raise_order($oppId, array $b = []) {
                      (float)($q['subtotal'] ?? $o['value']),
                      date('Y-m-d'),
                      (string)($b['inspection_required_date'] ?? ''),
-                     trim('Raised from opportunity ' . $o['ref'] . ' — ' . $o['name'] . "\n" . (string)$o['requirement']),
+                     trim('Raised from ' . Tl('opportunity') . ' ' . $o['ref'] . ' — ' . $o['name'] . "\n" . (string)$o['requirement']),
                      user_name(current_user()), date('c')]);
         $callId = (int)$pdo->lastInsertId();
     } catch (Throwable $e) {
@@ -827,7 +840,7 @@ function opp_raise_order($oppId, array $b = []) {
     if (function_exists('act_log')) {
         act_log('OPPORTUNITY', (int)$o['id'], 'SYSTEM', 'Order ' . $code . ' raised from this deal',
                 ['auto' => 1, 'partner_id' => $o['partner_id'] ?: null]);
-        act_log('CALL', $callId, 'SYSTEM', 'Raised from opportunity ' . $o['ref'],
+        act_log('CALL', $callId, 'SYSTEM', 'Raised from ' . Tl('opportunity') . ' ' . $o['ref'],
                 ['auto' => 1, 'partner_id' => $o['partner_id'] ?: null]);
     }
     return ['ok' => true, 'call_id' => $callId, 'code' => $code, 'quote' => $q];
@@ -844,7 +857,7 @@ function opp_raise_order($oppId, array $b = []) {
 function opp_send_to_accounts($oppId) {
     opp_migrate();
     $o = opp_row($oppId);
-    if (!$o) return ['err' => 'That opportunity no longer exists.'];
+    if (!$o) return ['err' => 'That ' . Tl('opportunity') . ' no longer exists.'];
     if (($o['status'] ?? '') !== 'WON') return ['err' => 'Only a won deal is handed to Accounts.'];
     if (empty($o['partner_id'])) return ['err' => 'Add the customer to the master first, so the contract has somewhere to point.'];
     if (!empty($o['call_id'])) return ['err' => 'A work order has already been raised from this deal.'];
@@ -864,7 +877,7 @@ function opp_send_to_accounts($oppId) {
 function opp_register_contract($oppId, array $b = []) {
     opp_migrate();
     $o = opp_row($oppId);
-    if (!$o) return ['err' => 'That opportunity no longer exists.'];
+    if (!$o) return ['err' => 'That ' . Tl('opportunity') . ' no longer exists.'];
     if (($o['status'] ?? '') !== 'WON') return ['err' => 'Only a won deal becomes a contract.'];
     if (empty($o['partner_id'])) return ['err' => 'Add the customer to the master first.'];
     if (!empty($o['contract_id'])) return ['err' => 'A contract has already been registered for this deal.'];
@@ -894,7 +907,7 @@ function opp_register_contract($oppId, array $b = []) {
         $me = user_name(current_user()); $meId = (int)(current_user()['id'] ?? 0);
         $pdo->prepare("INSERT INTO partner_contracts (partner_id,contract_number,title,value,start_date,end_date,notes,branch_id,open_status,requested_by,requested_by_id,requested_at,is_active) VALUES (?,?,?,?,?,?,?,?, 'PENDING', ?,?,?, 0)")
             ->execute([$cid, $contractNo, (string)$o['name'], (float)$o['value'], (string)($b['start_date'] ?? ''), (string)($b['end_date'] ?? ''),
-                       'From opportunity ' . $o['ref'] . ' (won without a quotation)', $branchId, $me, $meId, date('c')]);
+                       'From ' . Tl('opportunity') . ' ' . $o['ref'] . ' (won without a quotation)', $branchId, $me, $meId, date('c')]);
         $contractId = (int)$pdo->lastInsertId();
         $openStatus = function_exists('contract_after_register') ? contract_after_register($contractId) : 'PENDING';
     }
@@ -931,7 +944,7 @@ function opps_awaiting_contract() {
 function opp_add_customer($oppId, array $b = []) {
     opp_migrate();
     $o = opp_row($oppId);
-    if (!$o) return ['err' => 'That opportunity no longer exists.'];
+    if (!$o) return ['err' => 'That ' . Tl('opportunity') . ' no longer exists.'];
     if (($o['status'] ?? '') !== 'WON') return ['err' => 'The customer is added once the deal is won.'];
     if (!empty($o['partner_id'])) return ['err' => 'This deal already has its customer.'];
     if (!empty($o['lead_id'])) return ['err' => 'This deal came from a lead — make the lead a customer, and the deal takes it from there.'];
@@ -1006,7 +1019,7 @@ function ops_contracts_to_register($method) {
 function opp_generate_quote($oppId) {
     opp_migrate();
     $o = opp_row($oppId);
-    if (!$o) return ['err' => 'That opportunity no longer exists.'];
+    if (!$o) return ['err' => 'That ' . Tl('opportunity') . ' no longer exists.'];
     if (empty($o['partner_id'])) return ['err' => 'Add the customer first, so the quotation has a client.'];
     if (($o['status'] ?? '') === 'LOST') return ['err' => 'A lost deal does not get a quotation.'];
     if (opp_quotes((int)$o['id'])) return ['err' => 'This deal already has a quotation.'];
@@ -1033,7 +1046,7 @@ function opp_dt_columns() {
     return [
         'ref' => ['label' => 'Ref', 'sort' => 'o.ref', 'render' => fn($o) =>
             '<a href="/opportunity?id=' . (int)$o['id'] . '"><b>' . e($o['ref']) . '</b></a>'],
-        'name' => ['label' => 'Opportunity', 'sort' => 'o.name', 'render' => function ($o) {
+        'name' => ['label' => T('opportunity'), 'sort' => 'o.name', 'render' => function ($o) {
             $h = '<a href="/opportunity?id=' . (int)$o['id'] . '">' . e($o['name']) . '</a>';
             $h .= '<br><span class="muted" style="font-size:12px">'
                 . e($o['client_name'] ?: $o['partner_name']) . '</span>';
@@ -1071,12 +1084,12 @@ function opp_scope_gate($route) {
     if ($id <= 0) return;
     $office = opp_try(fn() => ops_val("SELECT office_id FROM opportunities WHERE id=?", [$id]), false);
     if ($office === false) return;              // no such deal — the route's own 404 answers
-    ops_require(scope_office_allows($office), 'This opportunity is outside your office / branch scope.');
+    ops_require(scope_office_allows($office), 'This ' . Tl('opportunity') . ' is outside your office / branch scope.');
 }
 
 function ops_opportunities($route, $method) {
     opp_scope_gate($route);   // M14 — object-level branch scope, before anything reads an id
-    ops_require(opp_can_view(), 'You cannot open the opportunity register.');
+    ops_require(opp_can_view(), 'You cannot open the ' . Tl('opportunity') . ' register.');
     opp_migrate();
     $canEdit = opp_can_edit();
 
@@ -1089,7 +1102,7 @@ function ops_opportunities($route, $method) {
                    'fy_from' => $fy['all'] ? '' : $fy['from'], 'fy_to_excl' => $fy['all'] ? '' : $fy['to_excl']];
 
         if (wants_csv()) {
-            $csv = [['Ref','Opportunity','Customer','Stage','Status','Estimate','Weighted','%','Expected close',
+            $csv = [['Ref',T('opportunity'),'Customer','Stage','Status','Estimate','Weighted','%','Expected close',
                      'Owner','Branch','Against','Days in stage','Lost reason']];
             foreach (opp_all($filter) as $o)
                 $csv[] = [$o['ref'], $o['name'], $o['client_name'] ?: $o['partner_name'], $o['stage_name'],
@@ -1116,20 +1129,20 @@ function ops_opportunities($route, $method) {
     // Deleting an opportunity — administrators only, and never once it is WON or
     // has quotations linked to it (those are the record of real business).
     if ($route === 'opportunity-delete' && $method === 'POST') {
-        ops_require(is_admin_level() || is_master(), 'Only an administrator can delete opportunities.');
+        ops_require(is_admin_level() || is_master(), 'Only an administrator can delete ' . Tlp('opportunity') . '.');
         $id = (int)($_POST['id'] ?? 0);
         $o  = $id ? opp_row($id) : null;
-        if (!$o) { flash('That opportunity no longer exists.', 'error'); redirect('/opportunities'); }
+        if (!$o) { flash('That ' . Tl('opportunity') . ' no longer exists.', 'error'); redirect('/opportunities'); }
         $quotes = (int)ops_val("SELECT COUNT(*) FROM opportunity_quotes WHERE opportunity_id=?", [$id]);
         if ($o['status'] === 'WON' || $quotes) {
-            flash('This opportunity is ' . ($o['status'] === 'WON' ? 'won' : 'linked to ' . $quotes . ' quotation(s)')
+            flash('This ' . Tl('opportunity') . ' is ' . ($o['status'] === 'WON' ? 'won' : 'linked to ' . $quotes . ' quotation(s)')
                 . ', so it is part of the record and cannot be deleted. Mark it lost instead if it should not be chased.', 'error');
             redirect('/opportunity?id=' . $id);
         }
-        if (function_exists('act_log')) act_log('OPPORTUNITY', $id, 'DELETED', 'Opportunity ' . $o['ref'] . ' deleted — ' . $o['name']);
+        if (function_exists('act_log')) act_log('OPPORTUNITY', $id, 'DELETED', T('opportunity') . ' ' . $o['ref'] . ' deleted — ' . $o['name']);
         try { db()->prepare("DELETE FROM opportunity_stage_history WHERE opportunity_id=?")->execute([$id]); } catch (Throwable $e) {}
         db()->prepare("DELETE FROM opportunities WHERE id=?")->execute([$id]);
-        flash('Opportunity ' . $o['ref'] . ' deleted.');
+        flash(T('opportunity') . ' ' . $o['ref'] . ' deleted.');
         redirect('/opportunities');
     }
 
@@ -1223,7 +1236,7 @@ function ops_opportunities($route, $method) {
     }
 
 
-    ops_require($canEdit, 'You cannot change an opportunity.');
+    ops_require($canEdit, 'You cannot change ' . Tla('opportunity') . '.');
 
     if ($route === 'opportunity-new') {
         // On a first visit we prefill from the query string (e.g. opened from a
@@ -1235,7 +1248,7 @@ function ops_opportunities($route, $method) {
         if ($method === 'POST') {
             $r = opp_create($_POST);
             if (empty($r['err'])) {
-                flash('Opportunity ' . $r['ref'] . ' opened.');
+                flash(T('opportunity') . ' ' . $r['ref'] . ' opened.');
                 redirect('/opportunity?id=' . $r['id']);
             }
             $prefill = $_POST;
@@ -1341,8 +1354,8 @@ function ops_opportunities($route, $method) {
         $r = opp_from_lead((int)($_POST['lead_id'] ?? 0), $_POST);
         if (!empty($r['err'])) { flash($r['err'], 'error'); redirect_back('/leads'); }
         flash(!empty($r['existing'])
-              ? 'That lead already has an opportunity — here it is.'
-              : 'Opportunity opened from the lead. The lead stays as the record of where it came from.');
+              ? 'That lead already has ' . Tla('opportunity') . ' — here it is.'
+              : T('opportunity') . ' opened from the lead. The lead stays as the record of where it came from.');
         redirect('/opportunity?id=' . $r['id']);
     }
 

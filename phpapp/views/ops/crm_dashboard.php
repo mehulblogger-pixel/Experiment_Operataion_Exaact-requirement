@@ -98,7 +98,7 @@
       <h3 style="margin-top:0">From first contact to won</h3>
       <div class="kv-grid">
         <div><span class="k">Leads created</span><span><?= (int)$top['leads'] ?></span></div>
-        <div><span class="k">Became opportunities</span><span><?= (int)$top['to_opp'] ?><?= $top['lead_to_opp'] !== null ? ' <span class="muted">(' . (int)$top['lead_to_opp'] . '%)</span>' : '' ?></span></div>
+        <div><span class="k">Became <?= e(Tlp('opportunity')) ?></span><span><?= (int)$top['to_opp'] ?><?= $top['lead_to_opp'] !== null ? ' <span class="muted">(' . (int)$top['lead_to_opp'] . '%)</span>' : '' ?></span></div>
         <div><span class="k">Quotations raised</span><span><?= (int)$top['quotes'] ?></span></div>
         <div><span class="k">Deals won</span><span><b><?= (int)$top['won'] ?></b></span></div>
       </div>

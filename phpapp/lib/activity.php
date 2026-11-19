@@ -79,7 +79,7 @@ function act_kinds_manual() {
 const ACT_ENTITIES = [
     'PARTNER'   => ['Customer',        '/client?id='],
     'LEAD'      => ['Lead',            '/lead?id='],
-    'OPPORTUNITY' => ['Opportunity',   '/opportunity?id='],
+    'OPPORTUNITY' => ['Deal',   '/opportunity?id='],
     'INQUIRY'   => ['Inquiry',         '/inquiry-edit?id='],
     'QUOTE'     => ['Quotation',       '/quote?id='],
     'CALL'      => [null,               '/call?id='],   // labels for these two come from

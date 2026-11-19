@@ -43,7 +43,7 @@ const PIPE_KINDS = [
 ];
 
 const PIPE_ENTITIES = [
-    'OPPORTUNITY' => 'Opportunity funnel',
+    'OPPORTUNITY' => 'Deal funnel',
     'LEAD'        => 'Lead pipeline',
 ];
 

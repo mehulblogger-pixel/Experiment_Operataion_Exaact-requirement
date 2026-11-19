@@ -177,7 +177,7 @@ function search_sources() {
     // A CRM spine record with its own OPP- reference and register, previously
     // reachable but not findable by its own number. Permission-gated AND office+SBU
     // scoped from day one — a correctly-scoped new path, nothing loosened.
-    $add('opportunities', 'Opportunities', '📈', function_exists('opp_can_view') && opp_can_view(),
+    $add('opportunities', TP('opportunity'), '📈', function_exists('opp_can_view') && opp_can_view(),
         function ($q, $n) use ($like) {
             $l = $like($q);
             [$sw, $sa] = scope_clause('o.office_id', 'o.sbu');

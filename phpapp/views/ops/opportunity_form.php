@@ -1,4 +1,4 @@
-<div class="master-head"><div><h1>New opportunity</h1>
+<div class="master-head"><div><h1>New <?= e(Tl('opportunity')) ?></h1>
   <p class="sub" style="margin:2px 0 0">A piece of business you are trying to win. It can exist long before there is anything to quote.</p></div></div>
 
 <?php if (!empty($form_err)): ?>
@@ -9,7 +9,7 @@
 <?php endif; ?>
 <form method="post" action="/opportunity-new" class="panel" style="margin-top:16px;max-width:900px">
   <div class="form-grid" style="gap:12px 16px">
-    <div class="ff-wide"><label>What is the opportunity? *</label>
+    <div class="ff-wide"><label>What is the <?= e(Tl('opportunity')) ?>? *</label>
       <input class="form-control" name="name" required maxlength="255" value="<?= e($prefill['name'] ?? '') ?>"
              placeholder="e.g. Annual vessel inspection contract — 2027 renewal">
       <span class="muted" style="font-size:12px">Name it the way you would say it out loud in a review.</span></div>
@@ -49,7 +49,7 @@
     <div><label>By when</label><input class="form-control" type="date" name="next_action_on" value="<?= e($prefill['next_action_on'] ?? '') ?>"></div>
     <div class="ff-wide"><label>What they need</label><textarea class="form-control" name="requirement" rows="3"><?= e($prefill['requirement'] ?? '') ?></textarea></div>
   </div>
-  <button class="btn" style="margin-top:14px">Open the opportunity</button>
+  <button class="btn" style="margin-top:14px">Open the <?= e(Tl('opportunity')) ?></button>
   <a class="btn secondary" href="/opportunities" style="margin-left:8px">Cancel</a>
   <?php // Form Designer — render any field this company added, and apply their
         // label / order / hide / required overrides to the built-in ones.
