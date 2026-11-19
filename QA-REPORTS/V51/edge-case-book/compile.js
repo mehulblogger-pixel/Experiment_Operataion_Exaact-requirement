@@ -63,6 +63,6 @@ const sevRank = { high: 0, medium: 1, low: 2 };
 findings.sort((a, b) => sevRank[a.severity] - sevRank[b.severity]);
 fs.writeFileSync(path.join(BOOK, 'cases.json'), JSON.stringify(cases));
 fs.writeFileSync(path.join(BOOK, 'findings.json'), JSON.stringify(findings));
-fs.writeFileSync(path.join(BOOK, 'coverage.json'), JSON.stringify({ built: new Date().toISOString(), release: '74a263f', parts: coverage }));
+fs.writeFileSync(path.join(BOOK, 'coverage.json'), JSON.stringify({ built: new Date().toISOString(), release: '69287af', parts: coverage }));
 console.log('cases', cases.length, 'findings', findings.length);
 for (const c of coverage) console.log(c.part, c.cases, 'routes', c.routesCovered + '/' + c.routes, 'buttons', c.buttonsCovered + '/' + c.buttons, 'nav', c.nav, 'other', c.other, c.done ? '' : '(coverage not written yet)');
