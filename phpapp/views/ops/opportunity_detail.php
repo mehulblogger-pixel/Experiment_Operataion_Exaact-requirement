@@ -540,4 +540,12 @@
 
 <?php // Module 49 — the activity spine, shown where the record is read (as on lead / call /
       // complaint / NCR). The controller already fetched this timeline; it was never rendered. ?>
+<?php // The ONE log form (views/ops/_log_form.php) — the same one the lead page and
+      // Sales → Today use (owner, 19 Nov 2026). A deal had no way to log a call.
+      if ($canEdit): $lfBack = (string) ($_GET['back'] ?? '');
+        if (!preg_match('#^/[a-z0-9\-/?=&%._]*$#i', $lfBack) || strpos($lfBack, '//') !== false) $lfBack = '';
+        $lf = ['kind' => 'OPPORTUNITY', 'id' => (int) $o['id'], 'office' => (int) ($o['office_id'] ?? 0), 'who' => (string) ($o['contact_name'] ?? ''),
+               'back' => $lfBack !== '' ? $lfBack : '/opportunity?id=' . (int) $o['id'] . '#log', 'open' => !empty($_GET['log'])]; ?>
+  <div class="panel" style="margin-top:16px"><?php include __DIR__ . '/_log_form.php'; ?></div>
+<?php endif; ?>
 <?php if (function_exists('act_render_timeline')) act_render_timeline('OPPORTUNITY', (int)$o['id'], 'Activity'); ?>

@@ -190,61 +190,14 @@
   <p class="muted" style="margin:4px 0 12px">Every call, message or meeting with them, newest first — so the story is never lost and the follow-up is never forgotten.</p>
 
   <?php if ($canLog): ?>
-  <details class="ct-log" id="log"<?= $contacts ? '' : ' open' ?>>
-    <summary class="btn small">＋ Log a contact</summary>
-  <form method="post" action="/lead-contact">
-    <input type="hidden" name="id" value="<?= (int)$l['id'] ?>">
-    <div class="form-grid">
-      <div class="ff"><label for="c-method">How</label>
-        <select class="form-control" name="method" id="c-method">
-          <?php foreach ($methods as $k=>$v): ?>
-            <option value="<?= e($k) ?>" <?= ($l['pref_contact'] ?? '')===$k?'selected':'' ?>><?= e($v) ?></option>
-          <?php endforeach; ?>
-        </select></div>
-      <div class="ff"><label for="c-dir">Which way</label>
-        <select class="form-control" name="direction" id="c-dir">
-          <option value="OUT">We contacted them</option>
-          <option value="IN">They contacted us</option>
-        </select></div>
-      <div class="ff"><label for="c-when">When</label>
-        <input class="form-control" type="date" name="occurred_on" id="c-when" value="<?= e($today) ?>" max="<?= e($today) ?>"></div>
-      <div class="ff"><label for="c-who">Who you spoke to</label>
-        <input class="form-control" name="with_whom" id="c-who" maxlength="150" value="<?= e($l['contact_name'] ?: '') ?>" placeholder="Name at their end"></div>
-      <div class="ff ff-wide"><label for="c-note">What was said</label>
-        <textarea class="form-control" name="note" id="c-note" rows="2" placeholder="Briefly — what they asked, what you told them, what they decided"></textarea></div>
-      <div class="ff"><label for="c-outcome">How it went</label>
-        <input class="form-control" name="outcome" id="c-outcome" maxlength="60" list="c-outcomes" placeholder="e.g. Interested, Call back, No answer">
-        <datalist id="c-outcomes">
-          <option>Interested</option><option>Wants a quotation</option><option>Call back later</option>
-          <option>No answer</option><option>Not interested</option><option>Asked us to email</option>
-        </datalist></div>
-      <div class="ff"><label for="c-time">Time it took</label>
-        <select class="form-control" name="time_spent" id="c-time">
-          <option value="0">—</option>
-          <option value="15">15 minutes</option><option value="30">Half an hour</option>
-          <option value="45">45 minutes</option><option value="60">1 hour</option>
-          <option value="90">1½ hours</option><option value="120">2 hours</option>
-          <option value="240">Half a day</option><option value="480">A full day</option>
-        </select></div>
-      <div class="ff"><label for="c-pref">They prefer to be reached by</label>
-        <select class="form-control" name="pref_contact" id="c-pref">
-          <option value="">— no preference noted —</option>
-          <?php foreach ($prefMethods as $k=>$v): ?>
-            <option value="<?= e($k) ?>" <?= ($l['pref_contact'] ?? '')===$k?'selected':'' ?>><?= e($v) ?></option>
-          <?php endforeach; ?>
-        </select></div>
-    </div>
-    <div class="form-sec" style="margin-top:6px"><h3 style="font-size:14px">And the next step</h3>
-      <p>The one thing people forget. Fill it and it drives your follow-up list; leave it if there is nothing to do yet.</p></div>
-    <div class="form-grid">
-      <div class="ff ff-wide"><label for="c-next">Next thing to do</label>
-        <input class="form-control" name="next_action" id="c-next" maxlength="255" placeholder="e.g. Send the capability statement"></div>
-      <div class="ff"><label for="c-nexton">By when</label>
-        <input class="form-control" type="date" name="next_action_on" id="c-nexton" min="<?= e($today) ?>"></div>
-    </div>
-    <div class="form-actions"><button class="btn" type="submit">Save this contact</button></div>
-  </form>
-  </details>
+  <?php // The ONE log form (views/ops/_log_form.php) — the same one the deal page
+        // and Sales → Today use (owner, 19 Nov 2026).
+        $lfBack = (string) ($_GET['back'] ?? '');
+        if (!preg_match('#^/[a-z0-9\-/?=&%._]*$#i', $lfBack) || strpos($lfBack, '//') !== false) $lfBack = '';
+        $lf = ['kind' => 'LEAD', 'id' => (int) $l['id'], 'office' => (int) ($l['office_id'] ?? 0), 'who' => (string) ($l['contact_name'] ?? ''),
+               'pref' => (string) ($l['pref_contact'] ?? ''), 'back' => $lfBack !== '' ? $lfBack : '/lead?id=' . (int) $l['id'] . '#lead=contacts',
+               'open' => !$contacts || !empty($_GET['log'])];
+        include __DIR__ . '/_log_form.php'; ?>
   <?php endif; ?>
 
   <?php if ($contacts): ?>

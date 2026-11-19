@@ -1749,6 +1749,24 @@
       var head = t.querySelector('thead tr');
       if (!head) { for (var i = 0; i < t.rows.length; i++) { if (t.rows[i].querySelector('th')) { head = t.rows[i]; break; } } }
       if (!head) return;
+      //  A label | value table ("Who to talk to | Mr X | Telephone | 98…") has
+      //  its headings BESIDE the values, not above them. Treating its first row
+      //  as the column names put the first row's values — a contact's name and
+      //  mobile — over every other card on a phone (owner, 19 Nov 2026, lead
+      //  page). Such a table is recognised by a heading row that also holds a
+      //  value cell; each value then takes the heading just before it.
+      if (head.querySelector('td') && head.querySelector('th')) {
+        t.dataset.rtReady = '1';
+        Array.prototype.forEach.call(t.rows, function (tr) {
+          var lab = '';
+          Array.prototype.forEach.call(tr.cells, function (c) {
+            if (c.tagName === 'TH') { lab = c.textContent.trim(); c.classList.add('rt-kvth'); }
+            else if (lab && !c.hasAttribute('data-label')) { c.setAttribute('data-label', lab); lab = ''; }
+          });
+        });
+        t.classList.add('rtable', 'rt-kv');
+        return;
+      }
       var labels = Array.prototype.map.call(head.cells, function (c) { return c.textContent.trim(); });
       if (!labels.some(function (s) { return s; })) return;      // headerless layout table — leave it
       t.dataset.rtReady = '1';

@@ -91,8 +91,22 @@ try {
     sxt_save(['t' => [$f['kiran'] => [$m0 => '550000']]], $months);
     t_eq((int) ops_val("SELECT COUNT(*) FROM sales_targets WHERE user_id=? AND ym=?", [$f['kiran'], $m0]), 2, 'targets · a change is a NEW row — the old figure stays in the history');
     t_eq(sxt_grid($months)[$f['kiran']][$m0], 550000.0, 'targets · the latest figure is the one that counts');
-    t_eq(sxt_target_total($f['kiran'], $m0 . '-01', $m1 . '-28'), 1150000.0, 'targets · the dashboard total for the two months = 5.5 L + 6 L');
-    t_eq(sx_target_total($f['kiran'], $m0 . '-01', $m1 . '-28'), 1150000.0, 'targets · part 1\'s dashboard hook now reads them');
+    // Owner, 19 Nov 2026 — "when target is changed then what is changed must be reflected somewhere".
+    $lastRow = ops_one("SELECT * FROM sales_targets WHERE user_id=? AND ym=? ORDER BY id DESC", [$f['kiran'], $m0]);
+    t_eq([(float) $lastRow['prev_amount'], (float) $lastRow['amount']], [500000.0, 550000.0], 'targets · the change is stored as before → after (₹5,00,000 → ₹5,50,000)');
+    t_eq(count(sxt_changes($months)[$f['kiran']][$m0]), 2, 'targets · the month box knows it was changed (two figures on file)');
+    $un = sxt_unseen_for($f['kiran']);
+    t_ok(count($un) === 3 && in_array(550000.0, array_map(fn($r) => (float) $r['amount'], $un), true), 'targets · the salesperson has a notice for every change not yet seen (3)');
+    db()->prepare("UPDATE users SET email=? WHERE id=?")->execute(['kiran.fx@example.test', $f['kiran']]);
+    $mailBefore = (int) ops_val("SELECT COUNT(*) FROM email_log");
+    sxt_save(['t' => [$f['kiran'] => [$m1 => '650000']]], $months);
+    $mail = ops_one("SELECT * FROM email_log ORDER BY id DESC");
+    t_ok((int) ops_val("SELECT COUNT(*) FROM email_log") === $mailBefore + 1 && strpos((string) $mail['body'], '₹6,00,000 → ₹6,50,000') !== false,
+         'targets · the salesperson is e-mailed what changed (₹6,00,000 → ₹6,50,000)');
+    bbv_route('sales-targets', 'POST', $f['kiran'], 0, ['seen' => '1']);
+    t_eq(count(sxt_unseen_for($f['kiran'])), 0, 'targets · "OK, seen" clears the notice');
+    t_eq(sxt_target_total($f['kiran'], $m0 . '-01', $m1 . '-28'), 1200000.0, 'targets · the dashboard total for the two months = 5.5 L + 6.5 L (latest figures)');
+    t_eq(sx_target_total($f['kiran'], $m0 . '-01', $m1 . '-28'), 1200000.0, 'targets · part 1\'s dashboard hook now reads them');
 
     // ---- Renewals ----------------------------------------------------------------------------
     $pid = (int) ops_val("SELECT id FROM business_partners LIMIT 1");
@@ -135,7 +149,14 @@ try {
         t_ok($opened($rr, $view), "screen · /$route opens for the Master Admin" . (($rr['view_err'] ?? '') !== '' ? ' — ' . $rr['view_err'] : ''));
     }
     $rr = bbv_route('sales-log', 'GET', $f['master'], 0, [], ['deal' => (string) $o['id']]);
-    t_ok($opened($rr, 'ops/sx_log'), 'screen · /sales-log opens on a deal' . (($rr['view_err'] ?? '') !== '' ? ' — ' . $rr['view_err'] : ''));
+    t_ok(($rr['view'] ?? '') !== 'ops/sx_log', 'one form · /sales-log no longer shows a second, different form');
+    t_eq(sx_log_url('LEAD', 7, '/sales-today'), '/lead?id=7&log=1&back=%2Fsales-today#lead=contacts', 'one form · Today\'s 📝 Log opens the lead\'s own form, and comes back to Today');
+    $lp = bbv_route('lead', 'GET', $f['master'], 0, [], ['id' => (string) $r['id'], 'log' => '1']);
+    t_ok(strpos($lp['out'], 'Log a conversation') !== false && strpos($lp['view'] ?? '', 'lead_detail') !== false, 'one form · the lead page shows the one log form');
+    $dp = bbv_route('opportunity', 'GET', $f['master'], 0, [], ['id' => (string) $o['id']]);
+    t_ok(strpos($dp['out'], 'Log a conversation') !== false, 'one form · the deal page shows the same form (it had none)');
+    $src = file_get_contents(dirname(__DIR__) . '/views/ops/lead_detail.php');
+    t_ok(strpos($src, 'action="/lead-contact"') === false && strpos($src, "_log_form.php") !== false, 'one form · the lead page no longer carries its own separate form');
     t_ok(!$opened(bbv_route('sales-settings', 'GET', $f['neha'], 0), 'ops/sx_settings'), 'screen · a coordinator cannot open Sales settings');
     t_ok(!$opened(bbv_route('sales-lead', 'GET', $f['amit'], 0), 'ops/sx_lead'), 'screen · an inspector without Sales cannot add a lead');
     $before = (int) ops_val("SELECT COUNT(*) FROM sales_targets");

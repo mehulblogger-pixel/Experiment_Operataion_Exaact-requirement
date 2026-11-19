@@ -46,6 +46,10 @@ function sx_more_migrate() {
         id $pk, user_id INT NOT NULL, ym VARCHAR(7) NOT NULL, amount DECIMAL(16,2) DEFAULT 0,
         set_by VARCHAR(150) DEFAULT '', set_at VARCHAR(40) DEFAULT '')");
     try { db()->exec("CREATE INDEX idx_sales_targets_u ON sales_targets (user_id, ym)"); } catch (Throwable $e) {}
+    //  The previous figure, kept on the row so every change reads "before → after",
+    //  and when the salesperson saw it (their Sales home notice, owner 19 Nov 2026).
+    ensure_column('sales_targets', 'prev_amount', 'DECIMAL(16,2) NULL');
+    ensure_column('sales_targets', 'seen_at', "VARCHAR(40) DEFAULT ''");
 }
 
 // ---- Settings ----------------------------------------------------------------
@@ -187,15 +191,22 @@ function sx_log_save(array $t, array $b) {
     $nextAct = trim((string) ($b['next_action'] ?? ''));
     if ($nextAct === '' && $nextOn !== '') $nextAct = 'Follow up';
     $outLabel = $oc !== '' ? $outs[$oc]['label'] : '';
+    //  The "More details" of the one form: which way, when, time it took.
+    $dir = in_array(($b['direction'] ?? 'OUT'), ['IN', 'OUT'], true) ? (string) ($b['direction'] ?? 'OUT') : 'OUT';
+    $when = trim((string) ($b['occurred_on'] ?? ''));
+    if ($when !== '' && (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $when) || $when > date('Y-m-d'))) return ['err' => 'When it happened cannot be in the future.'];
+    $mins = max(0, min(1440, (int) ($b['time_spent'] ?? 0)));
     if ($t['kind'] === 'LEAD') {
         $r = lead_log_contact($t['id'], ['method' => $method, 'note' => $note, 'outcome' => $outLabel, 'with_whom' => trim((string) ($b['with_whom'] ?? '')),
-                                         'next_action' => $nextAct, 'next_action_on' => $nextOn, 'direction' => 'OUT']);
+                                         'next_action' => $nextAct, 'next_action_on' => $nextOn, 'direction' => $dir,
+                                         'occurred_on' => $when, 'time_spent' => $mins, 'pref_contact' => (string) ($b['pref_contact'] ?? '')]);
         if (!empty($r['err'])) return $r;
     } else {
         $o = $t['row'];
         $who = trim((string) ($b['with_whom'] ?? ''));
         act_log('OPPORTUNITY', $t['id'], $method, $who !== '' ? $who : LEAD_CONTACT_METHODS[$method], [
-            'body' => $note, 'outcome' => $outLabel, 'with_whom' => $who, 'direction' => 'OUT',
+            'body' => $note, 'outcome' => $outLabel, 'with_whom' => $who, 'direction' => $dir, 'duration_mins' => $mins,
+            'occurred_at' => ($when === '' || $when === date('Y-m-d')) ? date('c') : $when . 'T12:00:00',
             'partner_id' => ($o['partner_id'] ?? null) ?: null, 'office_id' => $o['office_id'] ?? '', 'sbu' => $o['sbu'] ?? '']);
         if ($nextAct !== '' || $nextOn !== '') {
             try {
@@ -207,6 +218,13 @@ function sx_log_save(array $t, array $b) {
         }
     }
     return ['ok' => true, 'next' => $nextOn];
+}
+
+//  Where "📝 Log" goes: the record's own page, its log form open, and back
+//  to where the person came from once saved.
+function sx_log_url($kind, $id, $back = '/sales-today') {
+    $q = '&log=1&back=' . rawurlencode((string) $back);
+    return $kind === 'LEAD' ? '/lead?id=' . (int) $id . $q . '#lead=contacts' : '/opportunity?id=' . (int) $id . $q . '#log';
 }
 
 // ---- Orders & payments -------------------------------------------------------------
@@ -297,7 +315,7 @@ function sxt_target_total($who, $from, $to) {
 //  Save only the cells that changed; each change is a new row (history kept).
 function sxt_save(array $post, array $months) {
     sx_more_migrate();
-    $cur = sxt_grid($months); $n = 0; $me = user_name(current_user());
+    $cur = sxt_grid($months); $n = 0; $me = user_name(current_user()); $changed = [];
     $people = sx_target_people();
     foreach ((array) ($post['t'] ?? []) as $uid => $row) {
         $uid = (int) $uid; if (!isset($people[$uid])) continue;
@@ -307,11 +325,44 @@ function sxt_save(array $post, array $months) {
             $amt = max(0, round((float) $v, 2));
             if (isset($cur[$uid][$ym]) && abs($cur[$uid][$ym] - $amt) < 0.005) continue;
             if (!isset($cur[$uid][$ym]) && $amt == 0.0) continue;
-            db()->prepare("INSERT INTO sales_targets (user_id, ym, amount, set_by, set_at) VALUES (?,?,?,?,?)")->execute([$uid, $ym, $amt, $me, date('c')]);
+            $prev = isset($cur[$uid][$ym]) ? (float) $cur[$uid][$ym] : null;
+            db()->prepare("INSERT INTO sales_targets (user_id, ym, amount, prev_amount, set_by, set_at, seen_at) VALUES (?,?,?,?,?,?,'')")
+                ->execute([$uid, $ym, $amt, $prev, $me, date('c')]);
+            $changed[$uid][] = [$ym, $prev, $amt];
             $n++;
         }
     }
+    foreach ($changed as $uid => $rows) sxt_mail_change((int) $uid, $rows, $me);
     return $n;
+}
+//  One e-mail per person per save, listing every month that changed.
+function sxt_mail_change($uid, array $rows, $by) {
+    if (!function_exists('ops_mail')) return;
+    $u = ops_one("SELECT * FROM users WHERE id=? AND is_active=1", [(int) $uid]);
+    $to = trim((string) ($u['email'] ?? ''));
+    if (!$u || $to === '') return;
+    $lines = [];
+    foreach ($rows as [$ym, $prev, $amt])
+        $lines[] = date('M Y', strtotime($ym . '-01')) . ': ' . ($prev === null ? 'set to ' . sx_money($amt) : sx_money($prev) . ' → ' . sx_money($amt));
+    $body = 'Hello ' . user_name($u) . ",\n\nYour sales target was changed by $by on " . date('j M Y') . ":\n\n  " . implode("\n  ", $lines)
+          . "\n\nSee all your targets under Sales → Targets.\n";
+    try { ops_mail($to, 'Your sales target was changed', $body, '', 'sales_target'); } catch (Throwable $e) {}
+}
+//  Changes to MY targets I have not yet acknowledged (Sales home notice).
+function sxt_unseen_for($uid) {
+    sx_more_migrate();
+    try { return ops_all("SELECT * FROM sales_targets WHERE user_id=? AND COALESCE(seen_at,'')='' AND set_by<>? ORDER BY ym, id",
+                         [(int) $uid, user_name(ops_one("SELECT * FROM users WHERE id=?", [(int) $uid]) ?: [])]) ?: []; }
+    catch (Throwable $e) { return []; }
+}
+//  A month whose target has been changed: its earlier figures, newest first.
+function sxt_changes(array $months) {
+    sx_more_migrate();
+    $out = [];
+    if (!$months) return $out;
+    $in = implode(',', array_fill(0, count($months), '?'));
+    foreach (ops_all("SELECT * FROM sales_targets WHERE ym IN ($in) ORDER BY id", $months) ?: [] as $r) $out[(int) $r['user_id']][$r['ym']][] = $r;
+    return $out;
 }
 //  Who can carry a target: the Sales roles plus anyone who owns a lead or deal.
 function sx_target_people() {
@@ -380,22 +431,20 @@ function ops_sales_more($route, $method) {
             return true;
 
         case 'sales-log':
+            //  ONE log form (owner, 19 Nov 2026): it lives on the lead and deal
+            //  pages (views/ops/_log_form.php). This address only saves it, and
+            //  sends a visit to the record's own form.
             $t = sx_log_target();
             if (!$t) { http_response_code(404); view('notfound'); return true; }
             ops_require($t['can'], 'Logging on this record needs the right to edit it.');
             $back = (string) ($_POST['back'] ?? $_GET['back'] ?? '/sales-today');
             if (!preg_match('#^/[a-z0-9\-/?=&%._]*$#i', $back) || strpos($back, '//') !== false) $back = '/sales-today';
-            $err = '';
             if ($method === 'POST') {
                 $r = sx_log_save($t, $_POST);
                 if (!empty($r['ok'])) { flash('Logged on ' . $t['ref'] . '.' . ($r['next'] !== '' ? ' Next follow-up ' . fdate($r['next']) . '.' : ' No next step set.')); redirect($back); }
-                $err = $r['err'];
+                flash($r['err'], 'error');
             }
-            $dates = [];
-            foreach (sx_outcomes() as $k => $o) $dates[$k] = sx_add_working_days($o['days'], $t['office']);
-            view('ops/sx_log', ['t' => $t, 'err' => $err, 'old' => $method === 'POST' ? $_POST : [], 'back' => $back,
-                'outcomes' => sx_outcomes(), 'dates' => $dates, 'methods' => LEAD_CONTACT_METHODS,
-                'recent' => function_exists('act_for_entity') ? array_slice(array_values(array_filter(act_for_entity($t['kind'], $t['id'], 12), fn($a) => empty($a['auto']))), 0, 4) : []]);
+            redirect(sx_log_url($t['kind'], $t['id'], $back));
             return true;
 
         case 'sales-orders':
@@ -414,6 +463,11 @@ function ops_sales_more($route, $method) {
 
         case 'sales-targets':
             $months = sxt_months(); $can = sxt_can_set();
+            if ($method === 'POST' && !empty($_POST['seen'])) {
+                //  The salesperson acknowledges the change notice on their Sales home.
+                db()->prepare("UPDATE sales_targets SET seen_at=? WHERE user_id=? AND COALESCE(seen_at,'')=''")->execute([date('c'), (int) (current_user()['id'] ?? 0)]);
+                redirect('/sales-home');
+            }
             if ($method === 'POST') {
                 ops_require($can, 'Only a sales manager sets targets.');
                 $n = sxt_save($_POST, $months);
@@ -422,8 +476,9 @@ function ops_sales_more($route, $method) {
             }
             $people = sx_target_people();
             if (!$can) { $me = (int) (current_user()['id'] ?? 0); $people = isset($people[$me]) ? [$me => $people[$me]] : []; }
-            view('ops/sx_targets', ['months' => $months, 'people' => $people, 'grid' => sxt_grid($months), 'won' => sxt_won($months), 'can' => $can,
-                'hist' => $can ? (ops_all("SELECT t.*, u.first_name, u.last_name FROM sales_targets t LEFT JOIN users u ON u.id=t.user_id ORDER BY t.id DESC LIMIT 15") ?: []) : []]);
+            view('ops/sx_targets', ['months' => $months, 'people' => $people, 'grid' => sxt_grid($months), 'won' => sxt_won($months), 'can' => $can, 'changes' => sxt_changes($months),
+                'hist' => ops_all("SELECT t.*, u.first_name, u.last_name FROM sales_targets t LEFT JOIN users u ON u.id=t.user_id"
+                         . ($can ? '' : ' WHERE t.user_id=' . (int) (current_user()['id'] ?? 0)) . " ORDER BY t.id DESC LIMIT 30") ?: []]);
             return true;
 
         case 'sales-settings':

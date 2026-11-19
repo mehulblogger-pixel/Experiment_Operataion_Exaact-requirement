@@ -42,7 +42,7 @@ $c = $d['counts']; $q = $whoKey !== 'me' ? '?who=' . rawurlencode((string) $whoK
           <td><?= e($o['client_name'] ?: $o['partner_name']) ?></td><td><?= e($o['stage_name']) ?></td>
           <td class="n"><?= e(sx_money($o['value'])) ?></td><td><?= e($o['next_action'] ?: '—') ?></td>
           <td class="nw"><?= $o['_idle'] !== null ? (int) $o['_idle'] . ' d' : '—' ?></td>
-          <td class="nw"><?= sx_contact_btns($o['contact_phone'] ?? '', $o['name']) ?> <a class="sxc" href="/sales-log?deal=<?= (int) $o['id'] ?>" aria-label="Log activity on <?= e($o['ref']) ?>">📝 Log</a></td></tr>
+          <td class="nw"><?= sx_contact_btns($o['contact_phone'] ?? '', $o['name']) ?> <a class="sxc" href="<?= e(sx_log_url('OPPORTUNITY', (int) $o['id'], '/sales-today' . $q)) ?>" aria-label="Log activity on <?= e($o['ref']) ?>">📝 Log</a></td></tr>
       <?php endforeach; ?>
     </table></div><?php endif; ?></div>
 
@@ -53,7 +53,7 @@ $c = $d['counts']; $q = $whoKey !== 'me' ? '?who=' . rawurlencode((string) $whoK
         <?php foreach ($d['leads'] as $l): [$lab, $cls] = sx_due_label($l['next_action_on'] ?? ''); ?>
           <tr><td><span class="sxp <?= e($cls) ?>"><?= e($lab) ?></span></td>
             <td><a href="/lead?id=<?= (int) $l['id'] ?>"><?= e($l['company_name']) ?></a><br><span class="muted" style="font-size:12px"><?= e(trim(($l['next_action'] ?: '') . ((float) $l['value'] > 0 ? ' · ' . sx_short($l['value']) . ' est.' : ''), ' ·')) ?></span></td>
-            <td class="nw"><?= sx_contact_btns($l['contact_phone'] ?? '', $l['company_name']) ?> <a class="sxc" href="/sales-log?lead=<?= (int) $l['id'] ?>" aria-label="Log activity on <?= e($l['company_name']) ?>">📝 Log</a></td></tr>
+            <td class="nw"><?= sx_contact_btns($l['contact_phone'] ?? '', $l['company_name']) ?> <a class="sxc" href="<?= e(sx_log_url('LEAD', (int) $l['id'], '/sales-today' . $q)) ?>" aria-label="Log activity on <?= e($l['company_name']) ?>">📝 Log</a></td></tr>
         <?php endforeach; ?>
       </table></div><?php endif; ?></div>
     <div class="sxcard" id="stale"><h2>💤 Stale deals · no activity for over <?= (int) sx_stale_days() ?> days</h2>

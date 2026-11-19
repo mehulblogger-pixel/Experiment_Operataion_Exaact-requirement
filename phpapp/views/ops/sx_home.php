@@ -27,6 +27,15 @@ $tiles = [
     <h1><?= e($company !== '' ? $company . ' · ' : '') ?>Sales</h1>
     <p>👋 <?= e($greet . ', ' . (trim((string) ($u['first_name'] ?? '')) ?: user_name($u))) ?>. Today is <?= e(date('l, j F Y')) ?> · everything below updates by itself.</p>
   </div>
+  <?php $tch = function_exists('sxt_unseen_for') ? sxt_unseen_for((int) ($u['id'] ?? 0)) : []; if ($tch): ?>
+    <div class="sxcard" role="status" style="margin:0 0 12px;border-color:var(--sx-orange);border-width:2px">
+      <h2>🎯 Your target was changed</h2>
+      <div class="tbl"><table class="sxt"><?php foreach ($tch as $r): $pv = $r['prev_amount'] ?? null; ?>
+        <tr><td><?= e(date('M Y', strtotime($r['ym'] . '-01'))) ?></td><td class="n"><?= $pv === null ? '<span class="muted">set to</span>' : e(sx_money($pv)) . ' →' ?> <b><?= e(sx_money($r['amount'])) ?></b></td><td class="muted">by <?= e($r['set_by']) ?> · <?= e(fdate(substr((string) $r['set_at'], 0, 10))) ?></td></tr>
+      <?php endforeach; ?></table></div>
+      <form method="post" action="/sales-targets" class="sxactions" style="margin-top:8px"><input type="hidden" name="seen" value="1"><button class="btn small" type="submit">OK, seen</button><a class="btn small ghost" href="/sales-targets">Open Targets</a></form>
+    </div>
+  <?php endif; ?>
   <div class="sxqa">
     <a href="/sales-lead">➕ New lead</a><a href="/sales-today">📝 Log activity</a><a href="/opportunity-new">💼 New deal</a>
     <a href="/quote-edit">🧾 New <?= e(function_exists('Tl') ? Tl('quote') : 'quote') ?></a><a href="/sales-orders">💰 Orders won</a><a href="/quotes">🖨 Print a <?= e(function_exists('Tl') ? Tl('quote') : 'quote') ?></a>

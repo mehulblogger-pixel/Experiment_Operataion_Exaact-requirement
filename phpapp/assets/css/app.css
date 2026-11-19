@@ -259,6 +259,9 @@ table.grid tr:hover td{background:color-mix(in srgb,var(--brand) 5%,transparent)
       (verified on /candidates). Qualifying the selector (0,2,1) lets the hide
       win without touching the card layout itself.  */
   table.rtable tr.rt-head{display:none}
+  /* A label | value table: the labels travel onto the values (data-label),
+     so the heading cells themselves are hidden in the card. */
+  table.rtable.rt-kv th.rt-kvth{display:none}
   table.rtable tbody,table.rtable tr,table.rtable tbody,table.rtable tr{display:block;width:auto}
   table.rtable tr,table.rtable tr{background:var(--card);border:1px solid var(--line);
     border-radius:10px;box-shadow:var(--shadow-sm);margin:0 0 10px;overflow:hidden}
