@@ -14,18 +14,33 @@ const PARTS = [
 ];
 // Status of each finding, by its place (1, 2, …) in that part's findings file.
 const STATUS = {
-  SALA: { now: [1, 9, 10, 14, 15, 16, 17, 19, 23], earlier: [28, 29, 30, 31, 32, 34] },
-  SALB: { now: [1, 2, 3, 25], ask: [11] },
-  SALC: { now: Array.from({ length: 23 }, (_, i) => i + 1) },
+  //  "now" = fixed in this update; "earlier" = fixed in update 69287af or before.
+  SALA: { now: [2, 3, 4, 5, 6, 7, 8, 11, 12, 13, 18, 20, 21, 22, 24, 25, 26, 27, 33],
+          earlier: [1, 9, 10, 14, 15, 16, 17, 19, 23, 28, 29, 30, 31, 32, 34] },
+  SALB: { now: [4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24], earlier: [1, 2, 3, 25], ask: [11] },
+  SALC: { earlier: Array.from({ length: 23 }, (_, i) => i + 1) },
 };
 // Questions that this update has answered (they are no longer asked).
-const ANSWERED = { 'EC-SALC-043': 'Done in this update: each office now lists only its own people, and saving someone of another office is refused.' };
+const ANSWERED = {
+  'EC-SALC-043': 'Done: each office lists only its own people, and saving someone of another office is refused.',
+  'EC-SALA-005': 'Your answer: Saturday is a working day, and it stays a setting (Sales settings → weekly off). Nothing to change.',
+  'EC-SALC-050': 'Your answer: the full-year target. Done — "This financial year" now counts the whole year\'s target (and a quarter or month its whole target).',
+  'EC-SALA-003': 'Done: a negative lead value is refused, on the new-lead form and on edit.',
+  'EC-SALA-011': 'Done: the customer made from a lead gets the lead\'s branch, and the enquiry the business unit (asked on the convert screen when the lead has none).',
+  'EC-SALC-088': 'Done for the branch (as EC-SALA-011). Payment terms are still entered on the customer\'s record.',
+  'EC-SALA-022': 'Done: a deal\'s approval goes only to people who can open Sales leads and work for its branch; a rule for a role without Sales access is refused.',
+  'EC-SALA-036': 'Done: two Won stages, or a Won stage first, is flagged and cannot be made the default; new deals always open on an open stage.',
+  'EC-SALB-052': 'Done the way docs/03 draws it: only a Draft or a Sent quotation is marked lost by hand; the screen says what to do with the others.',
+  'EC-SALB-053': 'Done: an accepted quotation is final and is not revised (the won order stays with Accounts).',
+  'EC-SALB-060': 'Done: once sent, documents can no longer be removed; only a master can still add one (e.g. the client\'s PO).',
+  'EC-SALB-011': 'Done: the subject box takes up to 255 letters and says so; a longer one is refused with its length instead of being cut.',
+};
 const personas = JSON.parse(fs.readFileSync(path.join(S, 'personas.json'), 'utf8'));
 const who = (p) => { const u = personas[p] && personas[p][0]; return u ? `${u.name} (login ${u.login})` : (p === 'MASTER_ADMIN' ? 'your Master Admin login' : String(p || '').replace(/_/g, ' ').toLowerCase()); };
 const read = (f) => fs.existsSync(f) ? fs.readFileSync(f, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)) : [];
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const str = (v) => Array.isArray(v) ? v.join('; ') : (v == null ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v));
-const LABEL = { now: ['Fixed in this update', 'st-now'], earlier: ['Fixed in an earlier update', 'st-earlier'], ask: ['Waiting for your decision', 'st-ask'], open: ['Not fixed yet — next round', 'st-open'] };
+const LABEL = { now: ['Fixed in this update', 'st-now'], earlier: ['Fixed in update 69287af or before', 'st-earlier'], ask: ['Waiting for your decision', 'st-ask'], open: ['Not fixed yet — next round', 'st-open'] };
 
 const parts = PARTS.map(([code, name]) => {
   const cases = read(path.join(SRC, code + '.jsonl'));
