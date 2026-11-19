@@ -186,6 +186,17 @@ try {
     $od = opp_create(['name' => 'Fx numbering ' . uniqid(), 'partner_name' => 'Fx', 'value' => 1, 'pipeline_id' => pipeline_default('OPPORTUNITY')['id']]);
     $made['o'][] = (int) $od['id'];
     t_ok(preg_match('/^DEAL-\d{4}-\d{4}$/', (string) $od['ref']) === 1, 'numbering · a new deal is numbered DEAL-2026-0001 style (' . $od['ref'] . '), set in Settings → Numbering');
+    // ---- Found by the test-book helper, 19 Nov 2026 -----------------------------------------
+    t_eq([sx_is_date('2027-02-30'), sx_is_date('2028-02-29'), sx_is_date('31/12/2026')], [false, true, false], 'dates · 30 Feb is refused, 29 Feb 2028 is a real date, 31/12/2026 is not the date format');
+    $_GET = ['lead' => (string) $r['id']]; $tl = sx_log_target(); $_GET = [];
+    t_ok(!empty(sx_log_save($tl, ['method' => 'CALL', 'note' => 'x', 'next_action_on' => '2027-02-30'])['err']), 'dates · a next follow-up of 30 Feb is refused, not stored');
+    db()->prepare("UPDATE leads SET office_id=? WHERE id=?")->execute([$f['ahm'], $r['id']]);
+    $before = (int) ops_val("SELECT COUNT(*) FROM activities WHERE entity_kind='LEAD' AND entity_id=?", [$r['id']]);
+    $rs = bbv_route('sales-log', 'POST', $f['kiran'], 0, ['lead' => (string) $r['id'], 'method' => 'CALL', 'note' => 'from another branch', 'back' => '/sales-today']);
+    t_ok(stripos(json_encode($rs), 'another office') !== false, 'scope · …and is told it belongs to another office / branch (not a permission error): ' . substr(json_encode($rs), 0, 300));
+    t_eq((int) ops_val("SELECT COUNT(*) FROM activities WHERE entity_kind='LEAD' AND entity_id=?", [$r['id']]), $before, 'scope · a Mumbai branch manager cannot log on an Ahmedabad lead through the log form');
+    $tlx = act_for_entity('OPPORTUNITY', (int) $o['id'], 20); ob_start(); act_render_timeline('OPPORTUNITY', (int) $o['id'], 'Activity'); $tlh = ob_get_clean();
+    t_ok(strpos($tlh, 'Next: Site visit') !== false, 'timeline · the deal\'s Activity list shows the next step that was logged');
     $all = feat_catalog_keys();
     t_ok(isset($all['sales-lead'], $all['sales-orders'], $all['sales-renewals'], $all['sales-targets'], $all['sales-settings']), 'switches · each new screen is in Modules & features with its own switch');
 } finally {

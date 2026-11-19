@@ -2166,7 +2166,7 @@ function ops_crm_inquiries($route, $method) {
             if (trim($b['contact_name'] ?? '') === '')          $need[] = 'the contact person';
             if (trim($b['contact_email'] ?? '') === '' && trim($b['contact_mobile'] ?? '') === '')
                                                                 $need[] = 'a contact e-mail or mobile';
-            if (($b['sbu'] ?? '') === '')                        $need[] = 'the ' . Tl('sbu') . ' (business unit)';
+            if (($b['sbu'] ?? '') === '')                        $need[] = (Tl('sbu') === 'business unit' ? 'the business unit' : 'the ' . Tl('sbu') . ' (business unit)');
             if (trim($b['subject'] ?? '') === '')               $need[] = 'a subject';
             //  Not received yet cannot be recorded (owner, 13 Nov 2026): a date in the future is refused,
             //  and so is one that is not a date at all.

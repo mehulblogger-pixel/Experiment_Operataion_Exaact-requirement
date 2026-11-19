@@ -1708,6 +1708,14 @@ function ops_leads($route, $method) {
     // CRM must do that this one could not.
     if ($route === 'lead-contact' && $method === 'POST') {
         $id = (int)($_POST['id'] ?? 0);
+        //  Retired as a screen (owner, 19 Nov 2026 — one log form, /sales-log). An
+        //  old page or bookmark posting here still gets the same date checks.
+        foreach (['occurred_on' => 'When it happened', 'next_action_on' => 'The next follow-up date'] as $dk => $dl) {
+            $dv = trim((string)($_POST[$dk] ?? ''));
+            if ($dv !== '' && function_exists('sx_is_date') && !sx_is_date($dv)) { flash($dl . ' is not a real date.', 'error'); redirect('/lead?id=' . $id); }
+        }
+        if (trim((string)($_POST['occurred_on'] ?? '')) > date('Y-m-d')) { flash('When it happened cannot be in the future.', 'error'); redirect('/lead?id=' . $id); }
+        if (($no = trim((string)($_POST['next_action_on'] ?? ''))) !== '' && $no < date('Y-m-d')) { flash('The next follow-up cannot be in the past.', 'error'); redirect('/lead?id=' . $id); }
         $r = lead_log_contact($id, $_POST);
         if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/lead?id=' . $id); }
         flash('Logged. ' . (trim((string)($_POST['next_action'] ?? '')) !== ''

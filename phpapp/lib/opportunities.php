@@ -661,7 +661,7 @@ function opp_from_lead($leadId, array $b = []) {
     if ($existing) return ['id' => (int)$existing, 'existing' => true];
 
     $r = opp_create([
-        'name'           => trim((string)($b['name'] ?? '')) ?: ($l['company_name'] . ' — ' . ($l['requirement'] ? mb_substr((string)$l['requirement'], 0, 60) : 'opportunity')),
+        'name'           => trim((string)($b['name'] ?? '')) ?: ($l['company_name'] . ' — ' . ($l['requirement'] ? mb_substr((string)$l['requirement'], 0, 60) : Tl('opportunity'))),
         'partner_id'     => (int)($b['partner_id'] ?? 0) ?: (int)($l['partner_id'] ?? 0),
         'partner_name'   => (string)$l['company_name'],
         'lead_id'        => (int)$l['id'],

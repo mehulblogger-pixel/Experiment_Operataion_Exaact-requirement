@@ -185,7 +185,7 @@ function sx_log_save(array $t, array $b) {
     $note = trim((string) ($b['note'] ?? ''));
     if ($oc === '' && $note === '') return ['err' => 'Pick what happened, or write a line about it.'];
     $nextOn = trim((string) ($b['next_action_on'] ?? ''));
-    if ($nextOn !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $nextOn)) return ['err' => 'The next follow-up date is not a date.'];
+    if ($nextOn !== '' && !sx_is_date($nextOn)) return ['err' => 'The next follow-up date is not a real date.'];
     if ($nextOn === '' && $oc !== '' && $outs[$oc]['days'] > 0) $nextOn = sx_add_working_days($outs[$oc]['days'], $t['office']);
     if ($nextOn !== '' && $nextOn < date('Y-m-d')) return ['err' => 'The next follow-up cannot be in the past.'];
     $nextAct = trim((string) ($b['next_action'] ?? ''));
@@ -194,7 +194,8 @@ function sx_log_save(array $t, array $b) {
     //  The "More details" of the one form: which way, when, time it took.
     $dir = in_array(($b['direction'] ?? 'OUT'), ['IN', 'OUT'], true) ? (string) ($b['direction'] ?? 'OUT') : 'OUT';
     $when = trim((string) ($b['occurred_on'] ?? ''));
-    if ($when !== '' && (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $when) || $when > date('Y-m-d'))) return ['err' => 'When it happened cannot be in the future.'];
+    if ($when !== '' && !sx_is_date($when)) return ['err' => 'When it happened is not a real date.'];
+    if ($when !== '' && $when > date('Y-m-d')) return ['err' => 'When it happened cannot be in the future.'];
     $mins = max(0, min(1440, (int) ($b['time_spent'] ?? 0)));
     if ($t['kind'] === 'LEAD') {
         $r = lead_log_contact($t['id'], ['method' => $method, 'note' => $note, 'outcome' => $outLabel, 'with_whom' => trim((string) ($b['with_whom'] ?? '')),
@@ -217,7 +218,11 @@ function sx_log_save(array $t, array $b) {
                 ->execute([mb_substr($nextAct, 0, 255), $nextOn, date('c'), $t['id']]);
         }
     }
-    return ['ok' => true, 'next' => $nextOn];
+    return ['ok' => true, 'next' => $nextOn, 'next_action' => $nextAct];
+}
+//  A real calendar date (30 Feb is refused, not rolled into March).
+function sx_is_date($d) {
+    return (bool) preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', (string) $d, $m) && checkdate((int) $m[2], (int) $m[3], (int) $m[1]);
 }
 
 //  A return address from the page itself: only a path on this site (a
@@ -451,11 +456,15 @@ function ops_sales_more($route, $method) {
             $t = sx_log_target();
             if (!$t) { http_response_code(404); view('notfound'); return true; }
             ops_require($t['can'], 'Logging on this record needs the right to edit it.');
+            //  The same branch boundary as opening the record itself: a record of
+            //  another office is not logged on from here either.
+            ops_require(!function_exists('scope_office_allows') || scope_office_allows($t['office'] ?: null),
+                'This ' . ($t['kind'] === 'LEAD' ? 'lead' : Tl('opportunity')) . ' belongs to another office / branch.');
             $back = (string) ($_POST['back'] ?? $_GET['back'] ?? '/sales-today');
             $back = sx_safe_back($back, '/sales-today');
             if ($method === 'POST') {
                 $r = sx_log_save($t, $_POST);
-                if (!empty($r['ok'])) { flash('Logged on ' . $t['ref'] . '.' . ($r['next'] !== '' ? ' Next follow-up ' . fdate($r['next']) . '.' : ' No next step set.')); redirect($back); }
+                if (!empty($r['ok'])) { flash('Logged on ' . $t['ref'] . '.' . ($r['next'] !== '' ? ' Next follow-up ' . fdate($r['next']) . '.' : (($r['next_action'] ?? '') !== '' ? ' Next step noted, with no date.' : ' No next step set.'))); redirect($back); }
                 flash($r['err'], 'error');
             }
             redirect(sx_log_url($t['kind'], $t['id'], $back));

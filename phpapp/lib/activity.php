@@ -722,6 +722,10 @@ function act_render_timeline($entityKind, $entityId, $title = 'History', $limit 
            . e(ACT_KINDS[$r['kind']] ?? $r['kind']) . '</span> <strong>' . e($r['subject']) . '</strong>'
            . (trim((string)$r['body']) !== '' ? '<div class="muted" style="font-size:12.5px;white-space:pre-wrap">' . e($r['body']) . '</div>' : '')
            . (trim((string)($r['with_whom'] ?? '')) !== '' ? '<div class="muted" style="font-size:11.5px">with ' . e($r['with_whom']) . '</div>' : '')
+           . (trim((string)($r['outcome'] ?? '')) !== '' ? ' <span class="pill p-warn" style="font-size:10px">' . e($r['outcome']) . '</span>' : '')
+           . (trim((string)($r['next_step'] ?? '')) !== '' || trim((string)($r['next_step_on'] ?? '')) !== ''
+                ? '<div class="muted" style="font-size:11.5px">Next: ' . e(trim((string)($r['next_step'] ?? '')) ?: 'follow up')
+                  . (trim((string)($r['next_step_on'] ?? '')) !== '' ? ' · by ' . e(fdate((string)$r['next_step_on'])) : '') . '</div>' : '')
            . '</td><td class="muted" style="font-size:11.5px;white-space:nowrap">'
            . e($r['created_by'] ?: ($r['owner'] ?? '')) . '</td></tr>';
     }
