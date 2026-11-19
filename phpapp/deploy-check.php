@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '3bd0a2f · 2026-11-18 18:39 UTC · 742 files';
+$RELEASE = '906e79f · 2026-11-19 05:40 UTC · 742 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -226,7 +226,7 @@ $EXPECT  = [
     'lib/saas_provision_cli.php' => ['s'=>4816,'h'=>'76f04fae8c24f082'],
     'lib/saas_sync_cli.php' => ['s'=>2939,'h'=>'5fb733d865f2f34b'],
     'lib/saas_tenants.php' => ['s'=>111383,'h'=>'b58ea4138e6da3c2'],
-    'lib/sales_more.php' => ['s'=>29885,'h'=>'d44a19d3d0bbf2cb'],
+    'lib/sales_more.php' => ['s'=>33791,'h'=>'a15c5d892489d844'],
     'lib/sales_simple.php' => ['s'=>22371,'h'=>'be5868509dbc7b9f'],
     'lib/samples.php' => ['s'=>14677,'h'=>'fa38e5f628b43f6a'],
     'lib/satisfaction.php' => ['s'=>16437,'h'=>'4cb166c77b0e2650'],
@@ -343,6 +343,7 @@ $EXPECT  = [
     'views/ops/_glance_strip.php' => ['s'=>5313,'h'=>'e52df179c80ecccc'],
     'views/ops/_issue_panel.php' => ['s'=>8621,'h'=>'8f7e08e2edf793d4'],
     'views/ops/_job_billing.php' => ['s'=>11286,'h'=>'eca4b42766d077f8'],
+    'views/ops/_log_form.php' => ['s'=>6451,'h'=>'c927d77cff95df3a'],
     'views/ops/_milestones.php' => ['s'=>14233,'h'=>'97f8400b402ed483'],
     'views/ops/_ops_registers.php' => ['s'=>6510,'h'=>'403bb12d7870ae8e'],
     'views/ops/_perm_verb_grid.php' => ['s'=>5876,'h'=>'8c4af262a49e2628'],
@@ -541,7 +542,7 @@ $EXPECT  = [
     'views/ops/job_form.php' => ['s'=>58256,'h'=>'febdd33268c6e59e'],
     'views/ops/jobs.php' => ['s'=>7058,'h'=>'54c963c415ee7600'],
     'views/ops/lead_convert.php' => ['s'=>3111,'h'=>'7796f2979e388479'],
-    'views/ops/lead_detail.php' => ['s'=>39494,'h'=>'d6f732e3498703dd'],
+    'views/ops/lead_detail.php' => ['s'=>36393,'h'=>'8dc229f1729bcb4e'],
     'views/ops/lead_form.php' => ['s'=>13316,'h'=>'4b62e8d6ec3009bd'],
     'views/ops/leads.php' => ['s'=>14514,'h'=>'fd384bd79901f753'],
     'views/ops/ledger.php' => ['s'=>4304,'h'=>'414f7ffeb7052c79'],
@@ -574,7 +575,7 @@ $EXPECT  = [
     'views/ops/office_finance.php' => ['s'=>10379,'h'=>'5391012e7e28c8b5'],
     'views/ops/operations_home.php' => ['s'=>16889,'h'=>'5e9df2e4207f6766'],
     'views/ops/opportunities.php' => ['s'=>6993,'h'=>'f6c105203b970888'],
-    'views/ops/opportunity_detail.php' => ['s'=>38700,'h'=>'74254ee353d2f371'],
+    'views/ops/opportunity_detail.php' => ['s'=>39416,'h'=>'38dbf155889314b8'],
     'views/ops/opportunity_form.php' => ['s'=>6508,'h'=>'cb05777e648dc213'],
     'views/ops/ops_desk.php' => ['s'=>5950,'h'=>'50cc74a4ae6338bb'],
     'views/ops/owner_home.php' => ['s'=>7755,'h'=>'9be8dd1b0498872a'],
@@ -649,14 +650,13 @@ $EXPECT  = [
     'views/ops/super_admin.php' => ['s'=>25523,'h'=>'276844b10ac9c368'],
     'views/ops/sx_board.php' => ['s'=>4010,'h'=>'2598db8655e8380f'],
     'views/ops/sx_dash.php' => ['s'=>7224,'h'=>'289e93907515324c'],
-    'views/ops/sx_home.php' => ['s'=>6205,'h'=>'9dcfc68ff9967cc7'],
+    'views/ops/sx_home.php' => ['s'=>7234,'h'=>'16f0aaeb36a693b6'],
     'views/ops/sx_lead.php' => ['s'=>4006,'h'=>'4f438a8b297b9ead'],
-    'views/ops/sx_log.php' => ['s'=>4698,'h'=>'0ed88aa1ae735142'],
     'views/ops/sx_orders.php' => ['s'=>4224,'h'=>'2b0a2b924425709e'],
     'views/ops/sx_renewals.php' => ['s'=>2805,'h'=>'3c13f6762993fff8'],
     'views/ops/sx_settings.php' => ['s'=>4842,'h'=>'c4b40b8f43b3aa60'],
-    'views/ops/sx_targets.php' => ['s'=>3462,'h'=>'111883b6587ca7f3'],
-    'views/ops/sx_today.php' => ['s'=>7226,'h'=>'51d0d7a1d39a8aa9'],
+    'views/ops/sx_targets.php' => ['s'=>4336,'h'=>'13b9d220f3b7ddb4'],
+    'views/ops/sx_today.php' => ['s'=>7289,'h'=>'51cbfc35e0ac3ea0'],
     'views/ops/system_status.php' => ['s'=>2399,'h'=>'90287c341b6166f4'],
     'views/ops/tally_export.php' => ['s'=>13104,'h'=>'4b8ef6be8b7b91b4'],
     'views/ops/tapi.php' => ['s'=>988,'h'=>'33442189ab50828c'],
