@@ -24,6 +24,9 @@ function numbering_types() {
     return [
         'INQ'  => ['label' => 'Enquiries',        'default_prefix' => 'INQ'],
         'Q'    => ['label' => 'Quotations',       'default_prefix' => 'Q'],
+        //  Deals (owner, 19 Nov 2026: DEAL-2026-0001 instead of OPP-…). Numbers
+        //  already given keep their OPP- form; the year is the financial year.
+        'DEAL' => ['label' => 'Deals',            'default_prefix' => 'DEAL', 'fy_default' => 1, 'sep_default' => '-', 'pad_default' => 4, 'fy_style_default' => 'YYYY'],
         'CALL' => ['label' => 'Inspection calls', 'default_prefix' => 'CALL'],
         'JOB'  => ['label' => 'Deputations / jobs','default_prefix' => 'JOB'],
         'REQ'  => ['label' => 'Requisitions',     'default_prefix' => 'REQ'],
@@ -42,7 +45,7 @@ function numbering_has($key) { return isset(numbering_types()[$key]); }
 // enquiries, quotations, inspection calls, deputations or invoices — only
 // Requirements and Candidates remain.
 function numbering_module_map() {
-    return ['INQ' => 'sales', 'Q' => 'sales', 'CALL' => 'operations', 'JOB' => 'operations',
+    return ['INQ' => 'sales', 'Q' => 'sales', 'DEAL' => 'sales', 'CALL' => 'operations', 'JOB' => 'operations',
             'REQ' => 'hr', 'CV' => 'hr', 'INV' => 'money', 'RCP' => 'money', 'CN' => 'money'];
 }
 // The document types to show on THIS workspace — filtered by the enabled modules.

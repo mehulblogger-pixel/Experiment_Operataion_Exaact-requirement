@@ -157,6 +157,8 @@ function opp_seed_pipeline() {
 }
 
 function opp_ref_next() {
+    //  Settings → Numbering → Deals decides the form (default DEAL-2026-0001).
+    if (function_exists('numbering_has') && numbering_has('DEAL')) return numbering_next('DEAL', 'opportunities', 'ref');
     $y = date('Y');
     $last = opp_try(fn() => ops_val("SELECT ref FROM opportunities WHERE ref LIKE ? ORDER BY ref DESC LIMIT 1", ["OPP-$y-%"]), '');
     $n = $last ? ((int)substr((string)$last, strrpos((string)$last, '-') + 1)) + 1 : 1;

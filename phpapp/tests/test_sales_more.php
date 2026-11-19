@@ -183,6 +183,9 @@ try {
     t_eq((string) ops_val("SELECT name FROM pipeline_stages WHERE id=?", [$stg]), 'New deal', 'stage · a deal stage still called "Enquiry received" becomes "New deal"');
     t_eq((int) ops_val("SELECT COUNT(*) FROM pipelines WHERE entity_kind='OPPORTUNITY' AND name='Opportunity pipeline'"), 0, 'stage · a deal pipeline still called "Opportunity pipeline" becomes "Deal pipeline"');
     db()->prepare("DELETE FROM pipeline_stages WHERE id=?")->execute([$stg]);
+    $od = opp_create(['name' => 'Fx numbering ' . uniqid(), 'partner_name' => 'Fx', 'value' => 1, 'pipeline_id' => pipeline_default('OPPORTUNITY')['id']]);
+    $made['o'][] = (int) $od['id'];
+    t_ok(preg_match('/^DEAL-\d{4}-\d{4}$/', (string) $od['ref']) === 1, 'numbering · a new deal is numbered DEAL-2026-0001 style (' . $od['ref'] . '), set in Settings → Numbering');
     $all = feat_catalog_keys();
     t_ok(isset($all['sales-lead'], $all['sales-orders'], $all['sales-renewals'], $all['sales-targets'], $all['sales-settings']), 'switches · each new screen is in Modules & features with its own switch');
 } finally {
