@@ -11,7 +11,7 @@
 - **Log:** one form everywhere.
 - **Targets:** before → after in History, a mark on the month box, a notice for the salesperson, and an e-mail.
 
-**This zip** replaces update 3bd0a2f and contains everything in it plus the fixes below.
+**This zip** (update **906e79f**) replaces update 3bd0a2f and contains everything in it plus the fixes below.
 
 ---
 
