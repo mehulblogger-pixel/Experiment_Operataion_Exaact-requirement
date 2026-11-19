@@ -1220,6 +1220,24 @@ function crm_diff_snapshots($oldSnap, $newSnap) {
 // ---- Locking a closed quote (§xix) -----------------------------------------
 // Accepted or lost quotes are read-only. The Super Admin can grant a time-boxed
 // unlock, and only in answer to a request raised in the system.
+//  Does any of this quotation's printed text use letters the PDF's built-in font
+//  cannot draw (Gujarati, Hindi, emoji …)? Then they would print as "?" (test book
+//  SALB-012); the quotation screen says so and points to the Word document, which keeps them.
+function crm_quote_pdf_unprintable(array $q, array $lines = []) {
+    $txt = [(string)($q['client_name'] ?? ''), (string)($q['subject'] ?? ''), (string)($q['contact_name'] ?? ''), (string)($q['terms_conditions'] ?? ''), (string)($q['site_location'] ?? '')];
+    if (!empty($q['client_id'])) { $p = ops_one("SELECT display_name, legal_name FROM business_partners WHERE id=?", [(int)$q['client_id']]); if ($p) { $txt[] = (string)$p['display_name']; $txt[] = (string)$p['legal_name']; } }
+    foreach ($lines as $l) $txt[] = (string)($l['description'] ?? '');
+    foreach ($txt as $s) {
+        if ($s === '' || !preg_match('/[^\x00-\x7F]/', $s)) continue;
+        if (function_exists('iconv') && @iconv('UTF-8', 'Windows-1252', str_replace('₹', '', $s)) === false) return true;
+    }
+    return false;
+}
+//  '' or a real calendar date in YYYY-MM-DD (29 Feb 2026 and 31/02/2026 are not).
+function crm_real_date($d) {
+    $d = trim((string)$d);
+    return $d === '' || (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $d, $m) && checkdate((int)$m[2], (int)$m[3], (int)$m[1]));
+}
 function quote_is_locked($q) {
     if (!$q) return false;
     $status = (string)($q['status'] ?? '');
@@ -1860,6 +1878,13 @@ function crm_quote_transition_problem($q, $to) {
             if ($from === 'LOST') return 'This ' . $L . ' is marked lost. If the ' . Tl('client') . ' comes back, raise a revision.';
             if ($to === 'ACCEPTED' && !in_array($from, ['SENT', 'EXPIRED'], true))
                 return 'A ' . $L . ' can be accepted only once it has gone to the ' . Tl('client') . '.';
+            //  docs/03 draws only DRAFT → LOST and SENT → LOST (test book SALB-052): a quotation
+            //  with its approvers, approved, rejected or expired is not "lost" by hand.
+            if ($to === 'LOST' && !in_array($from, ['DRAFT', 'SENT'], true))
+                return $from === 'PENDING_APPROVAL' ? 'This ' . $L . ' is with its approvers. Withdraw it to draft first, then mark it lost.'
+                     : ($from === 'APPROVED' ? 'This ' . $L . ' is approved but not sent. Send it, or take the approval back to draft, before marking it lost.'
+                     : ($from === 'EXPIRED' ? 'This ' . $L . ' has expired — it already counts as not won. Raise a revision if the ' . Tl('client') . ' comes back.'
+                     : 'A rejected ' . $L . ' goes back to draft for changes; mark the draft lost if the deal has died.'));
             if (!crm_quote_can_record_decision($q)) {
                 $oid = crm_quote_owner_user_id($q);
                 $wu  = $oid ? ops_one("SELECT first_name, last_name, username FROM users WHERE id=?", [$oid]) : null;
@@ -2140,6 +2165,8 @@ function ops_crm_inquiries($route, $method) {
             $cid = ($b['client_id'] ?? '') !== '' ? (int)$b['client_id'] : null;
             // D-12 — no new enquiry for a customer who is blocked.
             if ($cid && !$inq && ($tb = partner_trade_block($cid)) !== '') { flash($tb, 'error'); redirect('/inquiry-new'); }
+            //  …nor an existing one moved onto a blocked customer (test book SALA-050).
+            if ($cid && $inq && $cid !== (int)($inq['client_id'] ?? 0) && ($tb = partner_trade_block($cid)) !== '') { flash($tb . ' The ' . Tl('inquiry') . ' was not changed.', 'error'); redirect('/inquiry-edit?id=' . (int)$inq['id']); }
             // A typed name that looks like a customer already on file is said at
             // once, so the enquiry can be pointed at them (SA-18). Never blocking:
             // a name is evidence, not proof.
@@ -2549,6 +2576,9 @@ function ops_crm_quotes($route, $method) {
                 $refused = 'Say who the ' . Tl('quote') . ' is for — pick the ' . Tl('client') . ', or type their name. Nothing was saved.';
             elseif (trim((string)($b['subject'] ?? '')) === '')
                 $refused = 'Give the ' . Tl('quote') . ' a subject — what is being offered. Nothing was saved.';
+            //  The live database keeps 255 letters; a longer subject was cut without a word (SALB-011).
+            elseif (mb_strlen(trim((string)($b['subject'] ?? ''))) > 255)
+                $refused = 'The subject is ' . mb_strlen(trim((string)$b['subject'])) . ' letters long — keep it to 255 and put the rest in the scope / terms. Nothing was saved.';
             // D-12 — a blacklisted, inactive, on-hold or blocked customer gets no
             // quotation (new, or moved onto them by an edit).
             elseif ($cid && ($tb = partner_trade_block($cid)) !== '') $refused = $tb;
@@ -3079,6 +3109,13 @@ function ops_crm_quotes($route, $method) {
         $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
         ops_require(can('crm.quote.create') || can('mod.quotes.edit') || is_master_of('quotes'), 'You cannot revise quotations.');
         if (!crm_quote_can_work($q)) { flash(crm_assignee_words((int)crm_quote_owner_user_id($q), Tl('quote')), 'error'); redirect('/quote?id=' . $q['id']); }
+        //  Only the latest revision, and never an accepted one: the won order is final and
+        //  is with Accounts (docs/03; test book SALB-053 / SALB-055).
+        if ((int)($q['is_current'] ?? 1) !== 1) {
+            $cur = ops_val("SELECT id FROM quotations WHERE quote_no=? AND COALESCE(is_current,1)=1 ORDER BY rev DESC LIMIT 1", [$q['quote_no']]);
+            flash('This is an older revision — a newer one already exists. Revise the latest one.', 'error'); redirect('/quote?id=' . (int)($cur ?: $q['id']));
+        }
+        if ((string)$q['status'] === 'ACCEPTED') { flash('This ' . Tl('quote') . ' was accepted — the order is won and with Accounts, so it is not revised. A new piece of work is a new ' . Tl('quote') . '.', 'error'); redirect('/quote?id=' . $q['id']); }
         $summary = trim($_POST['summary'] ?? '') ?: 'Revised';
         $made = crm_quote_make_revision($q, $summary);
         $nid = $made['id']; $newRev = $made['rev']; $srcLines = $made['lines']; $srcLocs = $made['locs'];
@@ -3169,6 +3206,11 @@ function ops_crm_quotes($route, $method) {
         $step = ops_one("SELECT * FROM quote_approvals WHERE id=?", [(int)($_POST['step'] ?? 0)]);
         if (!$step) { flash('Approval step not found.', 'error'); redirect('/quotes'); }
         $q = crm_quote_get($step['quote_id']); if (!$q) { http_response_code(404); view('notfound'); return; }
+        //  Pressed twice (or from an old tab): it is already signed — say that, not "not an approver" (SALB-028).
+        if (strtoupper((string)($step['status'] ?? '')) !== 'PENDING') {
+            flash('This step was already ' . strtolower((string)$step['status']) . ($step['acted_by'] ?? '' ? ' by ' . $step['acted_by'] : '') . ' — nothing more to do here.', 'warning');
+            redirect('/quote?id=' . $q['id']);
+        }
         ops_require(crm_can_act_approval($step), 'You are not an approver for this step.');
         // A step can be signed only while its quotation is waiting for approval.
         // Once a level has rejected it, or it has gone back to draft, or been
@@ -3322,6 +3364,9 @@ function ops_crm_quotes($route, $method) {
         // to clear. isset() tells the two apart exactly.
         $start = isset($_POST['start_date']) ? trim((string)$_POST['start_date']) : (string)($pf['start_date'] ?? '');
         $end   = isset($_POST['end_date'])   ? trim((string)$_POST['end_date'])   : (string)($pf['end_date'] ?? '');
+        //  Real dates, and the end on or after the start (test book SALB-065).
+        if (!crm_real_date($start) || !crm_real_date($end)) { flash('The contract dates must be real dates.', 'error'); redirect('/quote?id=' . $q['id']); }
+        if ($start !== '' && $end !== '' && $end < $start) { flash('The contract cannot end (' . fdate($end) . ') before it starts (' . fdate($start) . ').', 'error'); redirect('/quote?id=' . $q['id']); }
         // The contract's value is the money actually committed — the client's PO
         // when there is one, the quotation when there is not.
         $cValue = (isset($_POST['value']) && trim((string)$_POST['value']) !== '') ? (float)$_POST['value']
@@ -3501,6 +3546,9 @@ function ops_crm_quotes($route, $method) {
     if ($route === 'quote-files' && $method === 'POST') {
         $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
         ops_require(can('crm.quote.create') || can('mod.quotes.edit') || is_master_of('quotes'), 'You cannot attach files to ' . Tlp('quote') . '.');
+        //  Once it has gone to the customer the screen offers no upload (except to a master);
+        //  a typed address is refused the same way (test book SALB-060).
+        ops_require(!quote_is_locked($q) || is_master(), 'This ' . Tl('quote') . ' has gone to the customer, so its documents are fixed. A change is a revision.');
         $kind  = in_array($_POST['kind'] ?? '', array_keys(QUOTE_FILE_KINDS), true) ? $_POST['kind'] : 'ATTACHMENT';
         $note  = trim($_POST['note'] ?? '');
         $share = !empty($_POST['share_with_inspector']) ? 1 : 0;
@@ -3510,9 +3558,10 @@ function ops_crm_quotes($route, $method) {
             foreach ($files['tmp_name'] as $i => $tmp) {
                 if (!$tmp || !is_uploaded_file($tmp)) continue;
                 $size = (int)($files['size'][$i] ?? 0);
-                if ($size <= 0 || $size > QUOTE_FILE_MAX) { $skipped[] = $files['name'][$i] . ' (over ' . round(QUOTE_FILE_MAX / 1048576) . ' MB)'; continue; }
+                if ($size <= 0) { $skipped[] = $files['name'][$i] . ' (the file is empty)'; continue; }
+                if ($size > QUOTE_FILE_MAX) { $skipped[] = $files['name'][$i] . ' (over ' . round(QUOTE_FILE_MAX / 1048576) . ' MB)'; continue; }
                 $pdo->prepare("INSERT INTO quote_files (quote_id,kind,file_name,mime,file_data,note,share_with_inspector,uploaded_by,uploaded_at) VALUES (?,?,?,?,?,?,?,?,?)")
-                    ->execute([$q['id'], $kind, substr((string)$files['name'][$i], 0, 200),
+                    ->execute([$q['id'], $kind, mb_substr((string)$files['name'][$i], 0, 200),
                         (string)($files['type'][$i] ?? ''), base64_encode((string)file_get_contents($tmp)),
                         $note, $share, user_name(current_user()), date('c')]);
                 $n++;
@@ -3532,7 +3581,7 @@ function ops_crm_quotes($route, $method) {
         if (!$f) { http_response_code(404); echo 'Not found'; return; }
         $bin = base64_decode((string)$f['file_data']);
         header('Content-Type: ' . ($f['mime'] ?: 'application/octet-stream'));
-        header('Content-Disposition: attachment; filename="' . preg_replace('/[^A-Za-z0-9._-]/', '_', $f['file_name']) . '"');
+        header('Content-Disposition: ' . download_disposition((string)$f['file_name']));   // any language (SALB-059)
         header('Content-Length: ' . strlen($bin));
         echo $bin; return;
     }
@@ -3540,6 +3589,8 @@ function ops_crm_quotes($route, $method) {
         $f = ops_one("SELECT * FROM quote_files WHERE id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$f) { flash('File not found.', 'error'); redirect('/quotes'); }
         ops_require(can('crm.quote.create') || is_master(), 'You cannot remove attachments.');
+        //  A sent quotation's documents are the record of what the customer received (SALB-060).
+        ops_require(!quote_is_locked(crm_quote_get((int)$f['quote_id'])), 'This ' . Tl('quote') . ' has gone to the customer, so its documents cannot be removed.');
         $pdo->prepare("DELETE FROM quote_files WHERE id=?")->execute([(int)$f['id']]);
         crm_log_change((int)$f['quote_id'], 'Removed attachment ' . $f['file_name']);
         flash('Attachment removed.');
@@ -3592,15 +3643,26 @@ function ops_crm_quotes($route, $method) {
         if ($do === 'add' && trim((string)($_POST['note'] ?? '')) === '') {
             // DEF-SAL-033 — an empty "+ Add" saved a blank follow-up row.
             flash('Say what the follow-up is (for example "Call Ravi about the PO") — nothing was added.', 'error');
+        } elseif ($do === 'add' && !crm_real_date(trim((string)($_POST['due_date'] ?? '')))) {
+            flash('That follow-up date is not a real date — nothing was added.', 'error');
         } elseif ($do === 'add') {
             $due = trim($_POST['due_date'] ?? '') ?: date('Y-m-d');
             $pdo->prepare("INSERT INTO quote_followups (quote_id,kind,due_date,status,note,created_at) VALUES (?,?,?, 'PENDING', ?, ?)")
                 ->execute([$q['id'], trim($_POST['kind'] ?? 'MANUAL') ?: 'MANUAL', $due, trim($_POST['note'] ?? ''), date('c')]);
             flash('Follow-up added.');
         } elseif ($do === 'delete') {
-            $pdo->prepare("DELETE FROM quote_followups WHERE id=? AND quote_id=?")->execute([(int)($_POST['fid'] ?? 0), $q['id']]);
-            flash('Follow-up removed.');
+            $st = $pdo->prepare("DELETE FROM quote_followups WHERE id=? AND quote_id=?"); $st->execute([(int)($_POST['fid'] ?? 0), $q['id']]);
+            //  Say so only when one was removed (SALB-047: another quotation's follow-up is not this one's).
+            $st->rowCount() ? flash('Follow-up removed.') : flash('That follow-up is not on this ' . Tl('quote') . ' — nothing was removed.', 'error');
         } else {
+            //  Real dates and the listed statuses only (SALB-045): a follow-up dated 31 Feb never comes due.
+            foreach ((array)($_POST['f_id'] ?? []) as $i => $fid) {
+                if (!crm_real_date(trim((string)($_POST['f_due'][$i] ?? ''))) || !crm_real_date(trim((string)($_POST['f_done'][$i] ?? '')))
+                    || !in_array((string)($_POST['f_status'][$i] ?? 'PENDING'), ['PENDING', 'DONE', 'SENT', 'SKIPPED'], true)) {
+                    flash('A follow-up has a date that is not real, or an unknown status — nothing was saved. Check the dates.', 'error');
+                    redirect('/quote?id=' . $q['id']);
+                }
+            }
             foreach ((array)($_POST['f_id'] ?? []) as $i => $fid) {
                 $pdo->prepare("UPDATE quote_followups SET due_date=?, status=?, done_date=?, note=? WHERE id=? AND quote_id=?")
                     ->execute([trim((string)($_POST['f_due'][$i] ?? '')), (string)($_POST['f_status'][$i] ?? 'PENDING'),
@@ -4653,7 +4715,7 @@ function crm_send_quote_email($q) {
     $att = [];
     $tpl = ops_one("SELECT * FROM crm_templates WHERE kind='QUOTE_DOC' ORDER BY is_default DESC, id DESC");
     $pdf = quote_pdf_build($q, crm_quote_lines($q["id"]), $tpl ?: [], quote_signature($q), quote_letterhead());
-    if ($pdf) $att[] = ['name' => 'Quote-' . preg_replace('/[^A-Za-z0-9_.-]/', '', $q['quote_no']) . '.pdf', 'data' => $pdf, 'type' => 'application/pdf'];
+    if ($pdf) $att[] = ['name' => 'Quote-' . preg_replace('/[^A-Za-z0-9_.-]/', '', $q['quote_no'] . ((int)($q['rev'] ?? 0) > 0 ? '-R' . (int)$q['rev'] : '')) . '.pdf', 'data' => $pdf, 'type' => 'application/pdf'];   // same name as the download (SALB-043)
     $et = ops_one("SELECT * FROM crm_templates WHERE kind='EMAIL_QUOTE' AND active=1 ORDER BY is_default DESC, id DESC");
     $subject = ($et && $et['subject']) ? crm_fill_email($et['subject'], $q) : ('Quotation ' . $q['quote_no'] . ' — ' . app_name());
     $body = ($et && $et['body']) ? crm_fill_email($et['body'], $q) : crm_default_quote_email($q);

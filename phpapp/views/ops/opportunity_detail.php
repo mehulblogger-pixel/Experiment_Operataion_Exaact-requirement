@@ -22,6 +22,9 @@
   <?php endif; ?>
 </div>
 
+<?php if (!empty($tradeBlock)): ?>
+  <div class="msg msg-error" style="margin-top:12px">⛔ <?= e($tradeBlock) ?> No <?= e(Tl('quote')) ?> can be made for this <?= e(Tl('opportunity')) ?> until that changes.</div>
+<?php endif; ?>
 <?php if (!empty($gate)):
   $gTo = function_exists('stage_row') ? stage_row((int)$gate['to_stage_id']) : null; ?>
   <div class="msg msg-warning" style="margin-top:12px">
@@ -40,7 +43,7 @@
           <button class="btn small" name="decision" value="APPROVED">Approve the move</button>
           <button class="btn small secondary" name="decision" value="REJECTED">Send back</button>
         </form>
-      <?php else: ?>
+      <?php elseif ((int)($gate['requested_by_id'] ?? 0) === (int)(current_user()['id'] ?? 0) || is_master()):   // only who may withdraw it sees the button (SALA-023) ?>
         <form method="post" action="/approval-act" style="display:inline"
               onsubmit="return confirm('Withdraw this request? The deal stays where it is.')">
           <input type="hidden" name="id" value="<?= (int)$gate['id'] ?>">

@@ -60,7 +60,7 @@
     <div class="ff"><label>Contact e-mail</label><input class="form-control" type="email" name="contact_email" id="contact_email" value="<?= e($g('contact_email')) ?>"></div>
     <div class="ff"><label>Contact mobile</label><input class="form-control" name="contact_mobile" id="contact_mobile" value="<?= e($g('contact_mobile')) ?>"></div>
 
-    <div class="ff ff-wide"><label>Subject / scope title</label><input class="form-control" name="subject" value="<?= e($g('subject')) ?>" placeholder="e.g. Third-party inspection services — pipeline project"></div>
+    <div class="ff ff-wide"><label>Subject / scope title</label><input class="form-control" name="subject" maxlength="255" value="<?= e($g('subject')) ?>" placeholder="e.g. Third-party inspection services — pipeline project"></div>
 
     <?php // What we have already quoted this customer and its group. Filled by
           // JS from /quote-client when a customer is known, so it also updates
@@ -630,10 +630,12 @@
     tbody.querySelectorAll('.lrow').forEach(function(tr){
       var q = parseFloat(tr.querySelector('.l_qty').value) || 0,
           r = parseFloat(tr.querySelector('.l_rate').value) || 0;
-      var a = q * r; tr.querySelector('.l_amt').textContent = nfmt(a); sub += a;
+      //  Each line rounded to paise, as the saved quotation does (SALB-013): what is shown is what is saved.
+      var a = Math.round(q * r * 100) / 100; tr.querySelector('.l_amt').textContent = nfmt(a); sub += a;
     });
+    sub = Math.round(sub * 100) / 100;
     var gp = parseFloat(document.getElementById('gst_pct').value) || 0;
-    var gst = sub * gp / 100;
+    var gst = Math.round(sub * gp) / 100;
     document.getElementById('t_sub').textContent = nfmt(sub);
     document.getElementById('t_gp').textContent  = gp;
     document.getElementById('t_gst').textContent = nfmt(gst);
@@ -707,7 +709,10 @@
   document.getElementById('addrow').addEventListener('click', function(){
     var tr = tbody.querySelector('.lrow').cloneNode(true);
     tr.querySelectorAll('input').forEach(function(i){ i.value=''; });
-    tr.querySelectorAll('select').forEach(function(s){ s.selectedIndex=0; s.dataset.cur=''; });
+    //  A new line starts empty, but as a "line item" order unless chosen otherwise (SALB-014: it used
+    //  to take the first option, "Open order (ARC / call-off)").
+    tr.querySelectorAll('select').forEach(function(s){ s.selectedIndex=0; s.dataset.cur='';
+      if (s.name === 'l_order[]') { for (var k = 0; k < s.options.length; k++) if (s.options[k].value === 'LINE') { s.selectedIndex = k; break; } } });
     tr.querySelector('.l_amt').textContent = '0';
     tbody.appendChild(tr); wireLine(tr); refreshLocPickers(); applyLineOffices();
   });

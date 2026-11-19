@@ -26,7 +26,7 @@ $bars = function (array $rows, $vKey, $labKey, $color, $fmt) {
           sx_kpi('purple', '💵 Avg deal size', $k['avg'] === null ? '—' : sx_short($k['avg']), 'per won deal');
           sx_kpi('slate', '💼 Open pipeline', sx_short($k['open_v']), $k['open_n'] . ' open deals (today)', '/sales-board');
           sx_kpi('orange', '📈 Weighted forecast', sx_short($k['weighted']), 'pipeline × win %');
-          sx_kpi('pink', '🎯 Target', $k['target'] > 0 ? sx_short($k['target']) : 'Not set', $k['target'] > 0 ? 'for this period' : 'set monthly targets');
+          sx_kpi('pink', '🎯 Target', $k['target'] > 0 ? sx_short($k['target']) : 'Not set', $k['target'] > 0 ? 'for the whole ' . preg_replace('/^this /', '', strtolower((string) ($dd['label'] ?? 'period'))) : 'set monthly targets');
           sx_kpi('brown', '✅ Achievement', $k['ach'] === null ? '—' : $k['ach'] . '%', 'won ÷ target'); ?>
   </div>
 

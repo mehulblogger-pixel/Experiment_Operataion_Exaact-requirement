@@ -4,7 +4,7 @@ $h = $roll['header']; $lines = $roll['lines']; $T = $roll['totals']; $byHead = $
 $heads = $roll['heads'] ?? []; $client = $roll['client'] ?? null;
 $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
 $sym = function_exists('cur_sym') ? cur_sym() : '₹';
-$money = fn($n) => $sym . ' ' . nf((float)$n, 0);
+$money = fn($n) => $sym . ' ' . nfm((float)$n);   // paise kept (SALA-060)
 $basis = (string)$h['basis'];
 $qtyLabel = $basis === 'DAILY' ? 'Man-days' : ($basis === 'FIXED' ? 'Units' : 'Man-months');
 $rateLabel = $basis === 'DAILY' ? 'Rate/man-day' : ($basis === 'FIXED' ? 'Lump' : 'Rate/man-month');
@@ -69,14 +69,14 @@ $basisName = defined('PC_BASES') ? (PC_BASES[$basis] ?? $basis) : $basis;
     <tr><td class="l"><?= $e($ln['role_label']) ?><br><span class="muted" style="font-size:9px"><?= $e($lb === 'FIXED' ? 'lump sum' : $bw[0]) ?></span></td>
       <?php foreach ($shown as $hk=>$hl): ?><td><?= isset($lh[$hk]) ? nf((float)$lh[$hk]) : '—' ?></td><?php endforeach; ?>
       <td><?= nf($c['direct']) ?></td><td><?= nf($c['loaded']) ?></td>
-      <td><?= nf($c['proposed']) ?><span class="muted" style="font-size:9px"><?= $e($bw[2]) ?></span></td>
+      <td><?= nfm($c['proposed']) ?><span class="muted" style="font-size:9px"><?= $e($bw[2]) ?></span></td>
       <td><?= $lb==='FIXED' ? '1' : nf((float)$ln['boq_qty'], $lb==='DAILY'?0:1) ?> <span class="muted" style="font-size:9px"><?= $e(strtolower($bw[1])) ?></span></td>
-      <td><?= nf($c['revenue']) ?></td></tr>
+      <td><?= nfm($c['revenue']) ?></td></tr>
   <?php endforeach; ?>
   </tbody>
   <tfoot><tr class="tot"><td class="l">Total</td>
     <?php foreach ($shown as $hk=>$hl): ?><td><?= nf((float)($byHead[$hk] ?? 0)) ?></td><?php endforeach; ?>
-    <td><?= nf($T['direct']) ?></td><td></td><td></td><td></td><td><?= nf($T['revenue']) ?></td></tr></tfoot>
+    <td><?= nf($T['direct']) ?></td><td></td><td></td><td></td><td><?= nfm($T['revenue']) ?></td></tr></tfoot>
 </table>
 
 <?php // How each role's heads are worked out, with their remarks (owner, 9 Nov 2026).

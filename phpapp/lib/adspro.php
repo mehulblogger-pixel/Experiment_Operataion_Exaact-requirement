@@ -476,7 +476,9 @@ function ops_adspro($route, $method) {
         redirect('/adspro');
     }
     if ($route === 'adspro-import' && $method === 'POST') {
-        ops_require(can('mod.leads.edit') || is_master_of('leads'), 'You cannot create leads.');
+        //  The honest reason (SALA-041): a salesperson may create leads through enquiries, but
+        //  bringing them across from Ads Pro needs the Leads module's own edit right.
+        ops_require(can('mod.leads.edit') || is_master_of('leads'), 'Bringing leads across from Ads Pro needs the Leads edit right (Admin → Users → permissions). Your own leads you can still add with + New lead.');
         $r = ads_import_leads();
         if (!empty($r['err'])) flash($r['err'], 'error');
         else flash('Leads brought across: ' . $r['msg'] . '.', $r['failed'] ? 'warning' : 'success');

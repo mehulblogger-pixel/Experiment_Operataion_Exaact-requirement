@@ -1303,7 +1303,8 @@ function appr_delegation_save($id, array $post) {
     $dates = [];
     foreach (['effective_from', 'effective_to'] as $d) {
         $v = substr($val($d), 0, 10);
-        if ($v !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $v)) return [false, 'That is not a date.', 0];
+        //  A real calendar date: 31 Feb 2026 is refused, not stored (test book SALB-037).
+        if ($v !== '' && (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $v, $dm) || !checkdate((int)$dm[2], (int)$dm[3], (int)$dm[1]))) return [false, 'That is not a real date.', 0];
         $dates[$d] = $v;
     }
     if ($dates['effective_from'] !== '' && $dates['effective_to'] !== '' && $dates['effective_to'] < $dates['effective_from'])

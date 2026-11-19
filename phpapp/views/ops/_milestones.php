@@ -7,8 +7,9 @@
 //                  $msPendingAmend (bool)
 $msMode = $msMode ?? 'quote';
 $isC = $msMode === 'contract';
-$pc = fn($v) => rtrim(rtrim(number_format((float)$v, 2, '.', ''), '0'), '.');
-$money = fn($v) => e(cur_sym()) . nf((float)$v, 0);
+//  Shares as typed (33.334%, not 33.33%) and amounts to the paisa, so the rows add up on screen (SALB-069).
+$pc = fn($v) => rtrim(rtrim(number_format((float)$v, 3, '.', ''), '0'), '.');
+$money = fn($v) => e(cur_sym()) . nf((float)$v, fmod((float)$v, 1) ? 2 : 0);
 $planned = array_values(array_filter($msRows, fn($r) => ($r['status'] ?? 'PLANNED') === 'PLANNED'));
 $fixedPct = array_sum(array_map(fn($r) => (float)$r['pct'], array_filter($msRows, fn($r) => ($r['status'] ?? '') === 'ACHIEVED')));
 $relTitle = ''; foreach ($msRows as $r) if (!empty($r['releases_retention'])) $relTitle = $r['title'];
@@ -105,7 +106,7 @@ foreach (($msHidden ?? []) as $k => $v) $hidden .= '<input type="hidden" name="'
         foreach ($edRows as $i => $r): ?>
           <tr class="ms-row">
             <td><input class="form-control" name="ms_title[<?= $i ?>]" value="<?= e($r['title']) ?>" maxlength="200" placeholder="e.g. Design approved by the client"></td>
-            <td><input class="form-control" type="number" step="0.01" min="0" max="100" name="ms_pct[<?= $i ?>]" value="<?= $r['pct'] === '' ? '' : e($pc($r['pct'])) ?>" data-ms-pct></td>
+            <td><input class="form-control" type="number" step="0.001" min="0" max="100" name="ms_pct[<?= $i ?>]" value="<?= $r['pct'] === '' ? '' : e($pc($r['pct'])) ?>" data-ms-pct></td>
             <td class="ms-hide-sm" style="text-align:center"><input type="radio" name="ms_release" value="<?= $i ?>" <?= !empty($r['releases_retention']) ? 'checked' : '' ?> aria-label="This milestone releases the retention"></td>
             <td><button type="button" class="btn small secondary" data-ms-del aria-label="Remove this milestone">✕</button></td>
           </tr>

@@ -452,7 +452,7 @@ function ms_pdf_lines(array $q) {
     if (!$rows) return [];
     $out = [];
     foreach (ms_with_amounts($rows, ms_quote_base($q)) as $i => $r)
-        $out[] = ($i + 1) . '. ' . $r['title'] . ' — ' . rtrim(rtrim(nf((float)$r['pct'], 2), '0'), '.') . '% — '
+        $out[] = ($i + 1) . '. ' . $r['title'] . ' — ' . rtrim(rtrim(nf((float)$r['pct'], 3), '0'), '.') . '% — '   // 33.334% as typed (SALB-069)
                . nf((float)$r['amount'], 2) . ' plus GST'
                . (!empty($r['releases_retention']) ? ' (retention released on this milestone)' : '');
     $ret = (float)($q['ms_retention_pct'] ?? 0);

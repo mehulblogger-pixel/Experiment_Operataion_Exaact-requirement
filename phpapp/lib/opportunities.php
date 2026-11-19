@@ -354,7 +354,10 @@ function opp_create(array $b) {
         $pname = $p ? (string)($p['display_name'] ?: $p['legal_name']) : '';
     }
     $pipe = (int)($b['pipeline_id'] ?? 0) ?: (int)(pipeline_default('OPPORTUNITY')['id'] ?? 0);
-    $stage = (int)($b['stage_id'] ?? 0) ?: (int)(($pipeline_stages = pipeline_stages($pipe))[0]['id'] ?? 0);
+    //  A new deal opens on the funnel's first OPEN stage, never on a won or lost one (SALA-036).
+    $stage = (int)($b['stage_id'] ?? 0);
+    if (!$stage) { foreach (($pipeline_stages = pipeline_stages($pipe)) as $ps) if (($ps['kind'] ?? 'OPEN') === 'OPEN') { $stage = (int)$ps['id']; break; }
+                   if (!$stage) $stage = (int)($pipeline_stages[0]['id'] ?? 0); }
     $u = current_user();
     $ref = opp_ref_next();
     db()->prepare("INSERT INTO opportunities
@@ -409,6 +412,10 @@ function opp_move($oppId, $stageId, array $b = [], $bypassGate = false) {
     if ($o['status'] !== 'OPEN') return ['err' => 'That ' . Tl('opportunity') . ' is already ' . strtolower(OPP_STATUS[$o['status']] ?? $o['status']) . '.'];
     $to = stage_row((int)$stageId);
     if (!$to) return ['err' => 'Choose a stage to move it to.'];
+    //  A stage of this deal's own funnel only (as for leads) — a stage of another funnel, from an
+    //  old tab or a typed form, made the deal vanish from its board (test book SALA-020).
+    if ((int)($o['pipeline_id'] ?? 0) && (int)$to['pipeline_id'] !== (int)$o['pipeline_id'])
+        return ['err' => 'That stage belongs to another funnel. Pick a stage of this ' . Tl('opportunity') . '\'s own funnel (or change its funnel first).'];
 
     // Refuse a move to the stage it is already in. The dropdown pre-selects the
     // current stage, so pressing "Move it" without changing anything used to go
@@ -631,10 +638,16 @@ function opp_unlink_quote($oppId, $quoteId) {
 // customer, the deal name and the working value across, links itself back to the
 // opportunity so the forecast stays joined, and lands on the quote so line items
 // can be added and it can be submitted. Returns ['id','no'] or ['err'].
+//  A customer the company has stopped trading with (on hold, blocked …) gets no quotation —
+//  the same rule as the quotation form and the enquiry form (D-12; test book SALA-029).
+function opp_trade_block(array $o) {
+    return (!empty($o['partner_id']) && function_exists('partner_trade_block')) ? (string)partner_trade_block((int)$o['partner_id']) : '';
+}
 function opp_create_quote($oppId) {
     opp_migrate();
     $o = opp_row($oppId);
     if (!$o) return ['err' => 'That ' . Tl('opportunity') . ' no longer exists.'];
+    if (($tb = opp_trade_block($o)) !== '') return ['err' => $tb];
     //  Owner, 13 Nov 2026 (bounce list 2.1): a deal could not quote until it had a customer
     //  RECORD, and for a new prospect the only way to get one was to mark its lead "won"
     //  before anything was sold. A quotation made straight from a lead never needed that:
@@ -1042,6 +1055,7 @@ function opp_generate_quote($oppId) {
     $o = opp_row($oppId);
     if (!$o) return ['err' => 'That ' . Tl('opportunity') . ' no longer exists.'];
     if (empty($o['partner_id'])) return ['err' => 'Add the customer first, so the quotation has a client.'];
+    if (($tb = opp_trade_block($o)) !== '') return ['err' => $tb];
     if (($o['status'] ?? '') === 'LOST') return ['err' => 'A lost deal does not get a quotation.'];
     if (opp_quotes((int)$o['id'])) return ['err' => 'This deal already has a quotation.'];
     $pdo = db();
@@ -1188,6 +1202,7 @@ function ops_opportunities($route, $method) {
                 ? array_values(array_filter(pipe_all(), fn($pl) => ($pl['entity_kind'] ?? '') === 'OPPORTUNITY'))
                 : [],
             'orderBlock' => opp_order_block($o), 'orderQuote' => opp_order_quote((int)$o['id']),
+            'tradeBlock' => opp_trade_block($o),
             'canOrder' => function_exists('licence_enabled') && licence_enabled('operations')
                           && (can('mod.calls.edit') || is_master_of('calls')),
             'days' => opp_days_in_stage($o), 'stalled' => opp_stalled($o),

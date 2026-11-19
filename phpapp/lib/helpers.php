@@ -64,6 +64,15 @@ function redirect_tab_fragment() {
     return '#' . $key . '=' . $tab;
 }
 
+//  A download's file name, kept in any language: plain-letter browsers get a
+//  readable stand-in, every modern browser the real name (RFC 6266 filename*).
+//  "स्पेक EC.txt" downloads as "स्पेक EC.txt", not "________EC.txt".
+function download_disposition($name, $type = 'attachment') {
+    $name = str_replace(["\r", "\n", '"', '\\', '/'], ' ', trim((string)$name)) ?: 'file';
+    $ascii = preg_replace('/_+/', '_', (string)preg_replace('/[^A-Za-z0-9._ -]/u', '_', $name));
+    if (trim(str_replace(['_', '.'], '', $ascii)) === '') $ascii = 'file' . (strrpos($name, '.') !== false ? substr($name, strrpos($name, '.')) : '');
+    return $type . '; filename="' . $ascii . '"; filename*=UTF-8\'\'' . rawurlencode($name);
+}
 function redirect($path) {
     //  Put them back on the panel they were working on. Only ever ADDS a
     //  fragment — a caller that already chose one keeps it — and only for a

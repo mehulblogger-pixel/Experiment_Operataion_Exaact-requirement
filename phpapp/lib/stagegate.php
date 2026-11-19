@@ -131,6 +131,24 @@ function gate_request($entityKind, $entityId, $gate, $fromStageId, $toStage, $am
 // resolves to everybody holding it; and a rule that names neither is open to
 // anybody who may approve quotations — the same people, so an approval matrix
 // does not need to be built twice.
+//  Only people who can actually open the deal or lead act on its request (test book SALA-022):
+//  the Leads module (the approval screen's own gate) and the record's branch. A role-wide rule
+//  otherwise named both branches' managers, neither of whom could open the page.
+function gate_people_fit(array $users, $req) {
+    $office = 0;
+    $kind = strtoupper((string)($req['entity_kind'] ?? 'OPPORTUNITY'));
+    $tbl = $kind === 'LEAD' ? 'leads' : 'opportunities';
+    if (!empty($req['entity_id'])) $office = (int)gate_try(fn() => ops_val("SELECT office_id FROM $tbl WHERE id=?", [(int)$req['entity_id']]), 0);
+    $out = [];
+    foreach ($users as $u) {
+        $full = gate_try(fn() => ops_one("SELECT * FROM users WHERE id=?", [(int)$u['id']]), null) ?: $u;
+        $master = !empty($full['is_superuser']) || strtoupper((string)($full['role'] ?? '')) === 'MASTER_ADMIN';
+        if (!$master && function_exists('user_effective_perms') && !in_array('mod.leads.view', (array)user_effective_perms($full), true)) continue;
+        if ($office && function_exists('sx_user_covers_office') && !sx_user_covers_office((int)$u['id'], $office)) continue;
+        $out[] = $u;
+    }
+    return $out;
+}
 function gate_approvers($req) {
     if (!empty($req['approver_user_id'])) {
         $u = gate_try(fn() => ops_one("SELECT id, username, first_name, last_name, email, role
@@ -140,9 +158,9 @@ function gate_approvers($req) {
     if (trim((string)($req['approver_role'] ?? '')) !== '') {
         $keys = function_exists('approver_role_keys') ? approver_role_keys($req['approver_role']) : [(string)$req['approver_role']];
         $phk = implode(',', array_fill(0, count($keys), '?'));
-        return gate_try(fn() => ops_all("SELECT id, username, first_name, last_name, email, role
+        return gate_people_fit(gate_try(fn() => ops_all("SELECT id, username, first_name, last_name, email, role
                                          FROM users WHERE role IN ($phk) AND is_active = 1
-                                         ORDER BY first_name, username", $keys), []) ?: [];
+                                         ORDER BY first_name, username", $keys), []) ?: [], $req);
     }
     $roles = [];
     foreach (ORG_ROLES as $rk => $rl) {
@@ -151,15 +169,15 @@ function gate_approvers($req) {
     }
     if (!$roles) return [];
     $ph = implode(',', array_fill(0, count($roles), '?'));
-    return gate_try(fn() => ops_all("SELECT id, username, first_name, last_name, email, role
+    return gate_people_fit(gate_try(fn() => ops_all("SELECT id, username, first_name, last_name, email, role
                                      FROM users WHERE role IN ($ph) AND is_active = 1
-                                     ORDER BY first_name, username", $roles), []) ?: [];
+                                     ORDER BY first_name, username", $roles), []) ?: [], $req);
 }
 
 function gate_waiting_on($req) {
     $names = [];
     foreach (gate_approvers($req) as $u) $names[] = trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')) ?: $u['username'];
-    if (!$names) return 'nobody — no active user holds the role this rule names';
+    if (!$names) return 'nobody — no active user of this branch holds the role this rule names AND can open Sales leads (check the rule in Stage gates)';
     return count($names) <= 3 ? implode(', ', $names) : $names[0] . ' and ' . (count($names) - 1) . ' others';
 }
 
@@ -278,6 +296,14 @@ function gate_rule_save(array $b, $id = 0) {
     $stageKind = in_array((string)($b['stage_kind'] ?? ''), ['', 'OPEN', 'WON', 'LOST'], true) ? (string)$b['stage_kind'] : 'WON';
     if ($stageId <= 0 && $stageKind === '')
         return 'Say which stage this gate guards — either one named stage, or every stage of one kind.';
+    //  A rule addressed to a role that cannot open Sales leads would stop deals that nobody can
+    //  approve (test book SALA-022) — refuse it with the reason.
+    $ar = trim((string)($b['approver_role'] ?? ''));
+    if ($ar !== '' && !(int)($b['approver_user_id'] ?? 0) && $ar !== 'MASTER_ADMIN' && function_exists('role_perms')) {
+        $keys = function_exists('approver_role_keys') ? approver_role_keys($ar) : [$ar];
+        $any = false; foreach ($keys as $k) if (in_array('mod.leads.view', (array)role_perms($k), true)) { $any = true; break; }
+        if (!$any) return 'The role "' . (function_exists('role_name') ? role_name($ar) : $ar) . '" cannot open Sales leads, so it could never approve a ' . Tl('opportunity') . '. Pick a role that works in Sales, or name a person.';
+    }
     $args = [$name, $kind, (int)($b['pipeline_id'] ?? 0), $stageId, $stageKind,
              trim((string)($b['sbu'] ?? '')), $min, $max,
              trim((string)($b['approver_role'] ?? '')), ((int)($b['approver_user_id'] ?? 0)) ?: null,

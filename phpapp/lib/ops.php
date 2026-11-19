@@ -903,7 +903,7 @@ function ops_preorder_checklist($method) {
         $on  = !empty($_POST['enabled']) ? '1' : '';
         $req = !empty($_POST['require_all']) ? '1' : '';
         $items = [];
-        foreach (preg_split('/\r?\n/', (string)($_POST['items'] ?? '')) as $ln) { $ln = trim($ln); if ($ln !== '') $items[] = substr($ln, 0, 300); }
+        foreach (preg_split('/\r?\n/', (string)($_POST['items'] ?? '')) as $ln) { $ln = trim($ln); if ($ln !== '') $items[] = mb_substr($ln, 0, 300); }   // letters, not bytes (SALB-038)
         setting_set('preorder_checklist_on', $on);
         setting_set('preorder_checklist_require', $req);
         setting_set('preorder_checklist_items', implode("\n", $items));

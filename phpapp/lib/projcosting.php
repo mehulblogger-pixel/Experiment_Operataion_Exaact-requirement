@@ -809,11 +809,15 @@ function pc_make_quote($roll) {
         $sub = 0;
         foreach ($lines as $ln) { $c = pc_line_calc($ln, $h); $sub += $c['revenue']; }
         $gstPct = 18; $gst = round($sub * $gstPct / 100, 2); $total = $sub + $gst;
+        //  The customer's name: the master's, else the name typed on the enquiry or lead this costing
+        //  was made for — a typed (not yet registered) customer is carried, not dropped (SALA-064).
+        $cname = (int)$h['client_id'] ? (string)ops_val("SELECT COALESCE(NULLIF(display_name,''),legal_name) FROM business_partners WHERE id=?", [(int)$h['client_id']]) : '';
+        if ($cname === '' && !empty($h['inquiry_id'])) $cname = (string)ops_val("SELECT client_name FROM crm_inquiries WHERE id=?", [(int)$h['inquiry_id']]);
+        if ($cname === '' && !empty($h['lead_id'])) $cname = (string)ops_val("SELECT company_name FROM leads WHERE id=?", [(int)$h['lead_id']]);
         db()->prepare("INSERT INTO quotations (quote_no,rev,is_current,client_id,client_name,office_id,subject,site_location,
                         currency,validity_days,subtotal,gst_pct,gst_amount,total_amount,status,owner_id,created_by,created_at)
                        VALUES (?,0,1,?,?,?,?,?, 'INR',30,?,?,?,?, 'DRAFT',?,?,?)")
-            ->execute([$no, (int)$h['client_id'] ?: null,
-                (string)ops_val("SELECT COALESCE(display_name,legal_name) FROM business_partners WHERE id=?", [(int)$h['client_id']]),
+            ->execute([$no, (int)$h['client_id'] ?: null, $cname,
                 (int)$h['office_id'] ?: null, (string)$h['title'], (string)$h['site'],
                 $sub, $gstPct, $gst, $total, (int)(current_user()['id'] ?? 0) ?: null, user_name(current_user()), date('c')]);
         $qid = (int)db()->lastInsertId();
@@ -1616,7 +1620,9 @@ function pc_ctc_from_rate($rate, $margin, array $h, $dpm = 0) {
     $load = (float)($h['overhead_pct'] ?? 0) + (float)($h['insurance_pct'] ?? 0) + (float)($h['baddebt_pct'] ?? 0) + (float)($h['contingency_pct'] ?? 0);
     $neg = (float)($h['negotiation_pct'] ?? 0);
     $before = $rate / (1 + $neg / 100);                      // the rate before the negotiation padding
-    $mayCost = $rate * (1 - $tm / 100);
+    //  The margin is taken on the rate BEFORE the padding, exactly as the forward direction does
+    //  (pc_line_calc), so CTC → rate → CTC comes back to the same CTC (test book SALA-069).
+    $mayCost = $before * (1 - $tm / 100);
     $direct = strtoupper((string)($h['load_on'] ?? 'COST')) === 'RATE' ? $mayCost - $before * $load / 100 : $mayCost / (1 + $load / 100);
     if (strtoupper((string)($h['basis'] ?? 'LONG')) === 'DAILY') {
         $dpm = (float)$dpm; if ($dpm < 1 || $dpm > 31) $dpm = ch_days_per_month();
@@ -1855,7 +1861,10 @@ function ops_projcosting($route, $method) {
             $pdo->prepare("DELETE FROM project_costing_lines WHERE id=? AND costing_id=?")->execute([(int)($_POST['line_id'] ?? 0), $cid]);
             pc_restamp($cid);
             flash('Role removed.');
-        }
+        } elseif ($h && pc_locked($h)) {
+            //  Say why nothing happened (test book SALA-072).
+            flash('This costing is locked (' . (function_exists('pc_lock_reason') ? (pc_lock_reason($h) ?: 'submitted for approval') : 'submitted for approval') . '), so its roles cannot be removed. Send it back to draft first.', 'error');
+        } elseif ($h) flash('You cannot change this costing.', 'error');
         redirect('/project-costing?id=' . $cid);
     }
 

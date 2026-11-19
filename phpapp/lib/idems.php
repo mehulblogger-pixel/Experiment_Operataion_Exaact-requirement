@@ -7407,7 +7407,7 @@ function ops_idems_vetting_checklist($method) {
         }
         // Normalise the items: trim, drop blanks, cap length, keep order.
         $items = [];
-        foreach (preg_split('/\r?\n/', (string)($_POST['items'] ?? '')) as $ln) { $ln = trim($ln); if ($ln !== '') $items[] = substr($ln, 0, 300); }
+        foreach (preg_split('/\r?\n/', (string)($_POST['items'] ?? '')) as $ln) { $ln = trim($ln); if ($ln !== '') $items[] = mb_substr($ln, 0, 300); }   // letters, not bytes (SALB-038)
         setting_set('vetting_checklist_on', $on);
         setting_set('vetting_checklist_require', $req);
         setting_set('vetting_gate_required', $gate);

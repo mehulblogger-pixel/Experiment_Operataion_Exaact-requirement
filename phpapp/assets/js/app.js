@@ -2168,12 +2168,17 @@
   document.addEventListener('change', function (ev) {
     var inp = ev.target;
     if (!inp || inp.tagName !== 'INPUT' || inp.type !== 'file' || !inp.files) return;
+    //  The whole upload must fit the server's request limit (with a little room for the form),
+    //  and each file the screen's own limit (data-max-bytes, e.g. 8 MB — exactly 8 MB is allowed).
     var max = parseInt((document.body && document.body.getAttribute('data-upload-max')) || '0', 10);
-    if (!(max > 0)) return;
-    var total = 0; for (var i = 0; i < inp.files.length; i++) total += inp.files[i].size;
-    if (total <= max * 0.98) { inp.setCustomValidity(''); var old = inp.parentNode && inp.parentNode.querySelector('.upload-too-large'); if (old) old.parentNode.removeChild(old); return; }
-    var mb = Math.floor(max / 1048576), have = (total / 1048576).toFixed(1);
-    var msg = 'That file is too large (' + have + ' MB) — the limit is ' + mb + ' MB. Choose a smaller file or compress it.';
+    var per = parseInt(inp.getAttribute('data-max-bytes') || '0', 10);
+    if (!(max > 0) && !(per > 0)) return;
+    var total = 0, big = 0; for (var i = 0; i < inp.files.length; i++) { total += inp.files[i].size; if (inp.files[i].size > big) big = inp.files[i].size; }
+    var tooBig = (per > 0 && big > per) ? big : ((max > 0 && total > max * 0.98) ? total : 0);
+    if (per > 0 && big > per) max = per;
+    if (!tooBig) { inp.setCustomValidity(''); var old = inp.parentNode && inp.parentNode.querySelector('.upload-too-large'); if (old) old.parentNode.removeChild(old); return; }
+    var mb = Math.floor(max / 1048576), have = (tooBig / 1048576).toFixed(1);
+    var msg = 'That file is too large (' + have + ' MB) — the limit is ' + mb + ' MB. Choose a smaller file or compress it';
     //  Keep the choice but mark it wrong: Save is then refused with this reason (the form guard),
     //  instead of silently saving the rest without the file.
     inp.setCustomValidity(msg);

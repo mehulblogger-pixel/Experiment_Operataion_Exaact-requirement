@@ -289,7 +289,7 @@
   <?php endif; ?>
   <?php if ($canEdit): ?>
   <form method="post" action="/lead-files?id=<?= (int)$l['id'] ?>" enctype="multipart/form-data" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:12px">
-    <div class="form-sec" style="margin:0"><label style="display:block;font-size:12px" for="lf-file">File(s)</label><input id="lf-file" type="file" name="files[]" multiple required></div>
+    <div class="form-sec" style="margin:0"><label style="display:block;font-size:12px" for="lf-file">File(s)</label><input id="lf-file" type="file" name="files[]" multiple required data-max-bytes="<?= (int) LEAD_FILE_MAX ?>"></div>
     <div class="form-sec" style="margin:0"><label style="display:block;font-size:12px" for="lf-kind">What is it?</label>
       <select id="lf-kind" name="kind" class="form-control" style="min-width:220px"><?php foreach ($fileKinds as $k=>$lbl): ?><option value="<?= e($k) ?>"<?= $k==='REQUIREMENT'?' selected':'' ?>><?= e($lbl) ?></option><?php endforeach; ?></select></div>
     <div class="form-sec" style="margin:0"><label style="display:block;font-size:12px" for="lf-note">Note (optional)</label><input id="lf-note" class="form-control" name="note" placeholder="e.g. Rev 2" style="width:180px"></div>

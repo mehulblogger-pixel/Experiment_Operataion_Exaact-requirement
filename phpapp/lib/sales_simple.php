@@ -183,8 +183,20 @@ function sx_period($p) {
         default:        $fy = function_exists('active_fy') ? active_fy() : date('Y'); [$a] = function_exists('fy_range') ? fy_range($fy) : [date('Y-04-01')]; return [$a, $t, 'This financial year'];
     }
 }
+//  The last day the TARGET of a period runs to (owner, 19 Nov 2026 — "Full year target"): the whole
+//  financial year, quarter or month, not only the months up to today. Achievement still counts to today.
+function sx_target_end($period) {
+    $t = sx_today();
+    switch ($period) {
+        case 'month':   return date('Y-m-t', strtotime($t));
+        case 'quarter': $m = (int) date('n', strtotime($t)); $qe = (int) (floor(($m - 1) / 3) * 3 + 3); return date('Y-m-t', strtotime(date('Y', strtotime($t)) . '-' . sprintf('%02d', $qe) . '-01'));
+        case '90':      return $t;
+        default:        $fy = function_exists('active_fy') ? active_fy() : date('Y'); return function_exists('fy_range') ? (fy_range($fy)[1] ?? $t) : $t;
+    }
+}
 function sx_dash_data($who, $period) {
     [$from, $to, $label] = sx_period($period);
+    $tEnd = sx_target_end($period);
     $own = fn($r) => !$who || (int) ($r['owner_user_id'] ?? 0) === $who;
     $in = fn($d) => ($d = substr((string) $d, 0, 10)) !== '' && $d >= $from && $d <= $to;
     $allDeals = function_exists('opp_all') ? array_values(array_filter(opp_all([]), $own)) : [];
@@ -197,7 +209,7 @@ function sx_dash_data($who, $period) {
     $wonV = array_sum(array_map(fn($o) => (float) $o['value'], $won));
     $openV = array_sum(array_map(fn($o) => (float) $o['value'], $open));
     $weighted = array_sum(array_map(fn($o) => function_exists('opp_weighted') ? opp_weighted($o) : 0, $open));
-    $target = sx_target_total($who, $from, $to);
+    $target = sx_target_total($who, $from, $tEnd);
     // Pipeline by stage (the deal pipeline's own open stages, in order).
     $stages = [];
     foreach ($open as $o) {
@@ -238,7 +250,7 @@ function sx_dash_data($who, $period) {
         $team[] = ['id' => $uid, 'name' => $name,
                    'open' => array_sum(array_map(fn($o) => (float) $o['value'], array_filter($open, $mine))),
                    'won' => array_sum(array_map(fn($o) => (float) $o['value'], array_filter($won, $mine))),
-                   'acts' => sx_activity_count($uid, 30), 'target' => sx_target_total($uid, $from, $to)];
+                   'acts' => sx_activity_count($uid, 30), 'target' => sx_target_total($uid, $from, $tEnd)];
     }
     usort($team, fn($a, $b) => $b['won'] <=> $a['won']);
     $top = $open; usort($top, fn($a, $b) => (float) $b['value'] <=> (float) $a['value']);

@@ -1770,6 +1770,14 @@ if ($route === 'partner-add' && $method === 'POST') {
     if (isset($map[$kind])) {
         [$table, $fields, $tab] = $map[$kind];
         if ($kind === 'address' && !empty($b['city'])) $b['city'] = normalise_city($b['city']); // light spell-normalise
+        // A contract (and a purchase order) ends on or after it starts, on real dates (test book SALB-065).
+        if (in_array($kind, ['contract'], true)) {
+            $sd = trim((string)($b['start_date'] ?? '')); $ed = trim((string)($b['end_date'] ?? ''));
+            if (!crm_real_date($sd) || !crm_real_date($ed) || ($sd !== '' && $ed !== '' && $ed < $sd)) {
+                flash('The contract dates must be real dates, and the end on or after the start.', 'error');
+                redirect("/partner?id={$p['id']}&tab=contracts");
+            }
+        }
         // A contact's buying role must be one of the editable list (Masters → Buying role).
         if ($kind === 'contact' && ($b['buying_role'] ?? '') !== '' && function_exists('lk_options_or')
             && !isset(lk_options_or('contact_buying_role', defined('CONTACT_BUYING_ROLES') ? CONTACT_BUYING_ROLES : [])[(string)$b['buying_role']])) $b['buying_role'] = '';

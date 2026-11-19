@@ -589,6 +589,20 @@ function lead_possible_duplicate($company, $email = '') {
     return null;
 }
 
+//  The checks a lead's own boxes need, the same on create and on edit (test book
+//  SALA-002 / SALA-003): a real calendar date (29 Feb 2027 and 2026-13-45 are not),
+//  and a value that is not below zero. '' = fine.
+function lead_real_date($d) {
+    $d = trim((string)$d);
+    return $d === '' || (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $d, $m) && checkdate((int)$m[2], (int)$m[3], (int)$m[1]));
+}
+function lead_fields_err(array $b) {
+    if (array_key_exists('value', $b) && trim((string)$b['value']) !== '' && (!is_numeric(str_replace(',', '', (string)$b['value'])) || (float)str_replace(',', '', (string)$b['value']) < 0))
+        return 'The value must be an amount of 0 or more.';
+    foreach (['expected_close' => 'The expected close date', 'next_action_on' => 'The next follow-up date'] as $k => $w)
+        if (array_key_exists($k, $b) && !lead_real_date($b[$k])) return $w . ' is not a real date.';
+    return '';
+}
 function lead_create(array $b) {
     leads_migrate();
 
@@ -609,6 +623,7 @@ function lead_create(array $b) {
         else     $partnerId = 0;   // a stale id is not a customer; fall back to the typed name
     }
     if ($company === '') return ['err' => 'A lead needs a company or person to chase. Pick one from the master, or type a name.'];
+    if (($e = lead_fields_err($b)) !== '') return ['err' => $e];
     //  A person opens leads only in an office they work for — else the lead is saved and
     //  at once "outside your office" to its own maker (test book SALA-001).
     if (($b['office_id'] ?? '') !== '' && current_user() && function_exists('scope_office_allows') && !scope_office_allows((int)$b['office_id']))
@@ -935,10 +950,12 @@ function lead_convert($leadId, array $b = []) {
             if (($hit['confidence'] ?? 'NONE') === 'POSSIBLE') $near = $hit['row'];
         }
         $code = gen_partner_code(($l['office_id'] ?? '') !== '' ? (int) $l['office_id'] : null, $name); // the one numbering rule
+        //  The customer belongs to the lead's branch (test book SALA-011); payment terms are asked on its record.
         $pdo->prepare("INSERT INTO business_partners (code,legal_name,display_name,is_client,is_vendor,status,state,created_at)
                        VALUES (?,?,?,1,0,'ACTIVE',?,?)")
             ->execute([$code, $name, $name, (string)($b['state'] ?? ''), date('c')]);
         $partnerId = (int)$pdo->lastInsertId();
+        if (!empty($l['office_id'])) { try { $pdo->prepare("UPDATE business_partners SET home_branch_id=? WHERE id=? AND home_branch_id IS NULL")->execute([(int)$l['office_id'], $partnerId]); } catch (Throwable $e) {} }
         if (function_exists('partner_audit_created'))
             partner_audit_created($partnerId, 'Created by converting lead ' . (string)$l['ref']
                 . ($near ? '. It looks similar to ' . trim((string)($near['code'] ?? '')) . ' — '
@@ -993,7 +1010,8 @@ function lead_convert($leadId, array $b = []) {
             ->execute([$no, $partnerId, $l['company_name'], $l['contact_name'], $l['contact_email'],
                        $l['contact_phone'],
                        $subject,
-                       (string)$l['requirement'], (string)$l['sbu'], (string)$l['source'],
+                       //  The enquiry form requires a business unit: the lead's, else the one chosen on the convert screen (SALA-011).
+                       (string)$l['requirement'], (string)($l['sbu'] ?: ($b['sbu'] ?? '')), (string)$l['source'],
                        // assigned_to holds a person's id — it was given the owner's NAME,
                        // so a converted enquiry showed nobody as its owner.
                        date('Y-m-d'), $assignTo,
@@ -1007,7 +1025,11 @@ function lead_convert($leadId, array $b = []) {
         catch (Throwable $e) { /* lead_id column not present yet */ }
     } catch (Throwable $e) { /* CRM tables not built on this install */ }
 
-    $stageId = (int)($b['stage_id'] ?? 0) ?: (int)$l['stage_id'];
+    //  A won lead sits on its funnel's Won stage, not the open stage it was on (test book SALA-015:
+    //  the Leads CSV showed "New enquiry" with status "Won — customer").
+    $stageId = (int)($b['stage_id'] ?? 0);
+    $wonStage = (int)ops_val("SELECT id FROM pipeline_stages WHERE pipeline_id=? AND kind='WON' ORDER BY seq, id LIMIT 1", [(int)($l['pipeline_id'] ?? 0)]);
+    if (!$stageId || (($sr = stage_row($stageId)) && ($sr['kind'] ?? '') !== 'WON') || !$sr) $stageId = $wonStage ?: (int)$l['stage_id'];
     $pdo->prepare("UPDATE leads SET status='CONVERTED', stage_id=?, partner_id=?, converted_partner_id=?,
                    converted_inquiry_id=?, converted_at=?, converted_by=?, stage_since=?, updated_at=? WHERE id=?")
         ->execute([$stageId, $partnerId, $partnerId, $inqId, date('c'),
@@ -1371,10 +1393,16 @@ function leads_bulk($action, array $ids) {
             // Same eligibility the preview showed: skip a lead that is already
             // closed rather than overwrite a conversion with a loss.
             if (!leads_bulk_eligible('lost', $id)['ok']) continue;
-            $problem = lead_lost_problem(lead_row($id), (string)($_POST['lost_reason'] ?? ''), (string)($_POST['lost_note'] ?? ''));
+            $lr = lead_row($id);
+            $problem = lead_lost_problem($lr, (string)($_POST['lost_reason'] ?? ''), (string)($_POST['lost_note'] ?? ''));
             if ($problem !== '') return $problem;
-            db()->prepare("UPDATE leads SET status='LOST', lost_reason=?, lost_note=?, updated_at=? WHERE id=?")
-               ->execute([(string)$_POST['lost_reason'], substr(trim((string)$_POST['lost_note']), 0, 500), $now, $id]);
+            //  The same as losing one lead (test book SALA-013): it goes to its funnel's Lost stage,
+            //  with a stage-history row, so a later reopen returns it to the stage it left.
+            $lostStage = (int)ops_val("SELECT id FROM pipeline_stages WHERE pipeline_id=? AND kind='LOST' ORDER BY seq, id LIMIT 1", [(int)($lr['pipeline_id'] ?? 0)]);
+            db()->prepare("UPDATE leads SET status='LOST', lost_reason=?, lost_note=?, updated_at=?" . ($lostStage ? ", stage_id=?, stage_since=?" : '') . " WHERE id=?")
+               ->execute(array_merge([(string)$_POST['lost_reason'], mb_substr(trim((string)$_POST['lost_note']), 0, 500), $now],
+                                     $lostStage ? [$lostStage, $now] : [], [$id]));
+            if ($lostStage && ($ls = stage_row($lostStage))) lead_record_move($lr, $ls);
             if (function_exists('act_log')) act_log('LEAD', $id, 'STATUS', 'Marked lost in a bulk update');
             if (function_exists('ads_queue_lead')) ads_queue_lead($id, 'Marked lost in a bulk update');
             $n++;
@@ -1434,7 +1462,13 @@ function ops_leads($route, $method) {
         if (!empty($_POST['preview'])) {
             $plan = leads_bulk_plan($action, (array)($_POST['ids'] ?? []));
             $verb = $action === 'lost' ? 'marked lost' : 'reassigned';
-            flash('Preview — nothing changed yet. ' . bulk_plan_summary($plan, $verb, Tl('lead')), 'info');
+            //  Name the leads by their reference, not a bare count that reads like a number (SALA-013).
+            $refOf = fn($id) => (string)(ops_val("SELECT ref FROM leads WHERE id=?", [(int)$id]) ?: ('#' . (int)$id));
+            $names = function (array $ids) use ($refOf) { $r = array_map($refOf, array_slice($ids, 0, 12)); return implode(', ', $r) . (count($ids) > 12 ? ' and ' . (count($ids) - 12) . ' more' : ''); };
+            $n = (int)$plan['apply_count'];
+            $txt = $n ? $n . ' ' . ($n === 1 ? Tl('lead') : Tlp('lead')) . ' will be ' . $verb . ': ' . $names($plan['apply']) . '.' : 'None of the ticked ' . Tlp('lead') . ' would change.';
+            foreach ($plan['skip'] as $s) $txt .= ' ' . $refOf($s['id']) . ' is left alone (' . $s['reason'] . ').';
+            flash('Preview — nothing changed yet. ' . $txt, 'info');
             redirect_back('/leads?v=list');
         }
         $msg = leads_bulk($action, (array)($_POST['ids'] ?? []));
@@ -1544,7 +1578,7 @@ function ops_leads($route, $method) {
         if (!$f) { http_response_code(404); echo 'Not found'; return true; }
         $bin = base64_decode((string)$f['file_data']);
         header('Content-Type: ' . ($f['mime'] ?: 'application/octet-stream'));
-        header('Content-Disposition: attachment; filename="' . preg_replace('/[^A-Za-z0-9._-]/', '_', $f['file_name']) . '"');
+        header('Content-Disposition: ' . download_disposition((string)$f['file_name']));
         header('Content-Length: ' . strlen($bin));
         echo $bin; return true;
     }
@@ -1563,9 +1597,10 @@ function ops_leads($route, $method) {
             foreach ($files['tmp_name'] as $i => $tmp) {
                 if (!$tmp || !is_uploaded_file($tmp)) continue;
                 $size = (int)($files['size'][$i] ?? 0);
-                if ($size <= 0 || $size > LEAD_FILE_MAX) { $skipped[] = $files['name'][$i] . ' (over ' . round(LEAD_FILE_MAX / 1048576) . ' MB)'; continue; }
+                if ($size <= 0) { $skipped[] = $files['name'][$i] . ' (the file is empty)'; continue; }
+                if ($size > LEAD_FILE_MAX) { $skipped[] = $files['name'][$i] . ' (over ' . round(LEAD_FILE_MAX / 1048576) . ' MB)'; continue; }
                 db()->prepare("INSERT INTO lead_files (lead_id,kind,file_name,mime,file_data,note,uploaded_by,uploaded_at) VALUES (?,?,?,?,?,?,?,?)")
-                    ->execute([(int)$l['id'], $kind, substr((string)$files['name'][$i], 0, 200),
+                    ->execute([(int)$l['id'], $kind, mb_substr((string)$files['name'][$i], 0, 200),
                         (string)($files['type'][$i] ?? ''), base64_encode((string)file_get_contents($tmp)),
                         $note, user_name(current_user()), date('c')]);
                 $n++;
@@ -1579,6 +1614,8 @@ function ops_leads($route, $method) {
         $f = ops_one("SELECT * FROM lead_files WHERE id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$f) { flash('File not found.', 'error'); redirect('/leads'); }
         db()->prepare("DELETE FROM lead_files WHERE id=?")->execute([(int)$f['id']]);
+        //  Removing is written in the lead's history, as attaching is (test book SALA-008).
+        if (function_exists('act_log')) act_log('LEAD', (int)$f['lead_id'], 'FILE', 'File removed: ' . $f['file_name'] . ' (by ' . user_name(current_user()) . ')');
         flash('Attachment removed.');
         redirect('/lead?id=' . (int)$f['lead_id']);
     }
@@ -1678,17 +1715,20 @@ function ops_leads($route, $method) {
             redirect('/lead-edit?id=' . $id);
         }
         if ($dep !== 'MANMONTH') $site = '';
+        //  The same checks as when the lead was created (test book SALA-003).
+        if (trim((string)($_POST['company_name'] ?? '')) === '') { flash('A lead needs a company or person to chase.', 'error'); redirect('/lead-edit?id=' . $id); }
+        if (($fe = lead_fields_err($_POST)) !== '') { flash($fe, 'error'); redirect('/lead-edit?id=' . $id); }
         db()->prepare("UPDATE leads SET company_name=?, contact_name=?, contact_email=?, contact_phone=?,
                        source=?, requirement=?, value=?, expected_close=?, owner_user_id=?, owner_name=?,
                        next_action_on=?, next_action=?, pref_contact=?,
                        deputation_kind=?, manpower_count=?, manpower_skills=?, site_location=?,
                        updated_at=? WHERE id=?")
-            ->execute([substr(trim((string)($_POST['company_name'] ?? '')), 0, 200),
-                substr(trim((string)($_POST['contact_name'] ?? '')), 0, 150),
+            ->execute([mb_substr(trim((string)($_POST['company_name'] ?? '')), 0, 200),
+                mb_substr(trim((string)($_POST['contact_name'] ?? '')), 0, 150),
                 substr(trim((string)($_POST['contact_email'] ?? '')), 0, 200),
                 substr(trim((string)($_POST['contact_phone'] ?? '')), 0, 60),
                 (string)($_POST['source'] ?? ''), (string)($_POST['requirement'] ?? ''),
-                (float)($_POST['value'] ?? 0), (string)($_POST['expected_close'] ?? ''),
+                (float)str_replace(',', '', (string)($_POST['value'] ?? 0)), (string)($_POST['expected_close'] ?? ''),
                 $keepOwnerId, substr($ownerNm, 0, 150),
                 (string)($_POST['next_action_on'] ?? ''),
                 substr(trim((string)($_POST['next_action'] ?? '')), 0, 255),

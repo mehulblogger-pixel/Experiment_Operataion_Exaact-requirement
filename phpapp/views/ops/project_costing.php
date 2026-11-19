@@ -782,7 +782,7 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
             if (in_array($h['status'],['DRAFT','REJECTED'],true) && !empty($lines) && function_exists('pc_preview_levels')):
               $pvL = pc_preview_levels($h); $pvTogether = function_exists('crm_approval_mode') && crm_approval_mode() === 'together'; ?>
         <div class="pc-prev" style="flex:1 1 100%;background:var(--soft);border:1px solid var(--line);border-radius:9px;padding:9px 12px;font-size:13px">
-          <b>When submitted it goes to</b> <span class="muted">— value <?= $e(fmoney_short(pc_value($h))) ?> before GST<?= count($pvL) > 1 ? ($pvTogether ? ', the others at the same time and the last one after them' : ', one level after another') : '' ?></span>
+          <b>When submitted it goes to</b> <span class="muted">— value <?= $e(fmoney(pc_value($h))) ?> before GST<?= count($pvL) > 1 ? ($pvTogether ? ', the others at the same time and the last one after them' : ', one level after another') : '' ?></span>
           <ol style="margin:6px 0 0;padding-left:20px;line-height:1.6"><?php foreach ($pvL as $w): ?><li><?= $e($w) ?></li><?php endforeach; ?></ol>
           <span class="muted" style="font-size:11.5px">The levels follow the value: change the roles and this changes with them. They are fixed when you submit.</span>
         </div>

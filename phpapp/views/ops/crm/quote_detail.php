@@ -26,9 +26,14 @@
     <?php endif; ?>
     <a class="btn<?= $st === 'ACCEPTED' ? ' secondary' : '' ?>" href="/quote-pdf?id=<?= (int)$q['id'] ?>">⬇ PDF (for client)</a>
     <a class="btn secondary" href="/quote-doc?id=<?= (int)$q['id'] ?>">Word (editable)</a>
+    <?php if (function_exists('crm_quote_pdf_unprintable') && crm_quote_pdf_unprintable($q, $lines ?? [])): ?>
+      <span class="pill p-warn" style="white-space:normal" title="The PDF's font has only English letters">This <?= e(Tl('quote')) ?> has Gujarati / Hindi letters or symbols that the PDF cannot print (they show as “?”). Send the <b>Word</b> document, or save it as PDF from Word.</span>
+    <?php endif; ?>
     <?php //  "📎 Documents" and "← back" were drawn twice — here and in the row below / the back pill
           //  above the page (owner, 14 Nov 2026: "There are two document tabs"). Once each now. ?>
-    <?php if ($canEdit && in_array($st, ['DRAFT','PENDING_APPROVAL','REJECTED'], true)): ?><a class="btn secondary" href="/quote-edit?id=<?= (int)$q['id'] ?>">Edit</a><?php endif; ?>
+    <?php //  A re-edit the Super Admin granted on a closed quotation shows its own Edit button (SALB-061).
+          $reEdit = in_array($st, ['ACCEPTED','LOST'], true) && trim((string)($q['unlocked_until'] ?? '')) !== '' && strtotime((string)$q['unlocked_until']) > time() && !quote_is_locked($q); ?>
+    <?php if ($canEdit && (in_array($st, ['DRAFT','PENDING_APPROVAL','REJECTED'], true) || $reEdit)): ?><a class="btn secondary" href="/quote-edit?id=<?= (int)$q['id'] ?>"><?= $reEdit ? 'Edit (re-opened until ' . e(fdate(substr((string)$q['unlocked_until'], 0, 10))) . ')' : 'Edit' ?></a><?php endif; ?>
   </div>
 </div>
 
@@ -186,7 +191,7 @@
 <?php if (!empty($locked)): ?>
 <div class="panel" style="border:1px solid var(--warn)">
   <b>🔒 Locked.</b> <span class="muted"><?= e($lockReason ?? '') ?></span>
-  <?php if ($st === 'SENT' || trim((string)($q['sent_at'] ?? '')) !== ''): ?>
+  <?php if (($st === 'SENT' || trim((string)($q['sent_at'] ?? '')) !== '') && $st !== 'ACCEPTED' && (int)($q['is_current'] ?? 1) === 1): ?>
     <div style="margin-top:8px">
       <button class="btn small" type="button" onclick="document.getElementById('revbox').style.display='block';document.getElementById('revbox').scrollIntoView({behavior:'smooth'})">Raise a revision</button>
       <span class="muted" style="margin-left:6px">A revision keeps the same <?= e(Tl('quote')) ?> number, takes the next revision number,
@@ -289,13 +294,15 @@
         <button class="btn small secondary" type="submit" title="You sent it yourself — mark it sent without e-mailing the client again">✓ I have sent it — mark sent</button></form>
     <?php endif; ?>
   <?php endif; ?>
-  <?php if ($canDecide && in_array($st, ['DRAFT','REJECTED','PENDING_APPROVAL','APPROVED','SENT','EXPIRED'], true)): ?>
+  <?php if ($canDecide && in_array($st, ['DRAFT','SENT'], true)):   // docs/03: only Draft → Lost and Sent → Lost ?>
     <button class="btn small danger" type="button" onclick="document.getElementById('lostbox').style.display='block'">Mark lost</button>
   <?php endif; ?>
   <?php // Revising is how a sent quotation is changed, so this is deliberately NOT
         // gated on the edit lock — otherwise the only correct action would be the
         // one greyed out. ?>
-  <?php if (!empty($canRevise) && in_array($st, ['SENT','APPROVED','ACCEPTED','LOST','REJECTED','EXPIRED'], true)): ?>
+  <?php //  An accepted quotation is final (docs/03): the won order stays with Accounts. Only the
+        //  latest revision can be revised (test book SALB-053 / SALB-055). ?>
+  <?php if (!empty($canRevise) && in_array($st, ['SENT','APPROVED','LOST','REJECTED','EXPIRED'], true) && (int)($q['is_current'] ?? 1) === 1): ?>
     <button class="btn small secondary" type="button" onclick="document.getElementById('revbox').style.display='block'" style="margin-left:auto">Revise (new rev)</button>
   <?php endif; ?>
 <?php $qActs = trim((string)ob_get_clean());
@@ -935,6 +942,7 @@
   </div>
   <div class="panel">
     <h3 class="tab-sub" style="margin-top:0">Follow-ups</h3>
+    <?php $canFU = can('crm.quote.send') || can('crm.quote.create') || is_master();   // view-only people see them, without buttons (SALB-047) ?>
     <?php if ($followups): ?>
     <?php // Row cards, not a table. This panel is half the page wide and six
           // editable columns could not fit in it — the table ran outside the
@@ -968,7 +976,7 @@
         </div>
         <?php endforeach; ?>
       </div>
-      <div style="margin-top:10px"><button class="btn small" type="submit">Save follow-ups</button></div>
+      <?php if ($canFU): ?><div style="margin-top:10px"><button class="btn small" type="submit">Save follow-ups</button></div><?php endif; ?>
     </form>
     <style>
       .fu-list{display:flex;flex-direction:column;gap:10px}
@@ -989,12 +997,14 @@
     <?php else: ?>
       <p class="muted">Follow-ups are scheduled automatically once the <?= e(Tl('quote')) ?> is marked <b>sent</b> — day 3, 6, 9, fortnight and month. You can also add one by hand.</p>
     <?php endif; ?>
+    <?php if ($canFU): ?>
     <form method="post" action="/quote-followup?id=<?= (int)$q['id'] ?>" style="display:flex;gap:6px;flex-wrap:wrap;align-items:end;margin-top:8px;border-top:1px solid var(--line);padding-top:10px">
       <input type="hidden" name="do" value="add">
       <div class="ff" style="margin:0"><label>Add a follow-up on</label><input class="form-control" type="date" name="due_date" value="<?= e(date('Y-m-d')) ?>"></div>
       <div class="ff" style="margin:0;flex:1;min-width:160px"><label>Note</label><input class="form-control" name="note" required placeholder="e.g. call the purchase head"></div>
       <button class="btn small secondary" type="submit">+ Add</button>
     </form>
+    <?php endif; ?>
   </div>
 </div>
   </div>
@@ -1055,7 +1065,7 @@
           <?php foreach ($fileKinds as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?>
         </select></div>
       <div class="ff"><label>Files <span class="muted">— several at once, 8 MB each</span></label>
-        <input class="form-control" type="file" name="files[]" multiple></div>
+        <input class="form-control" type="file" name="files[]" multiple data-max-bytes="<?= (int) QUOTE_FILE_MAX ?>"></div>
       <div class="ff"><label>Note</label><input class="form-control" name="note" placeholder="e.g. approved QAP rev 2"></div>
       <div class="ff po-only" style="display:none"><label>PO number</label><input class="form-control" name="po_number" value="<?= e($q['po_number'] ?? '') ?>"></div>
       <div class="ff po-only" style="display:none"><label>PO date</label><input class="form-control" type="date" name="po_date" value="<?= e($q['po_date'] ?? '') ?>"></div>

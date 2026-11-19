@@ -84,11 +84,15 @@ function pipe_stages($pipelineId) {
 function pipe_problems($pipelineId) {
     $st = pipe_stages($pipelineId);
     $why = [];
-    $open = $won = $lost = 0;
+    $open = $won = $lost = 0; $first = null;
     foreach ($st as $s) {
         if (!(int)$s['active']) continue;
+        if ($first === null) $first = $s;
         if ($s['kind'] === 'WON') $won++; elseif ($s['kind'] === 'LOST') $lost++; else $open++;
     }
+    //  Test book SALA-036: one "won" stage, and the funnel starts with a stage in play.
+    if ($won > 1) $why[] = 'It has ' . $won . ' “won” stages — keep one, so a win is counted once.';
+    if ($first && $first['kind'] !== 'OPEN') $why[] = 'Its first stage “' . $first['name'] . '” is a ' . strtolower($first['kind']) . ' stage — new deals would open already closed. Put an open stage first.';
     if (!$won)  $why[] = 'It has no “won” stage, so no deal on it can ever be marked won.';
     if (!$lost) $why[] = 'It has no “lost” stage, so a deal that falls through has nowhere to go and no reason gets recorded.';
     if (!$open) $why[] = 'Every stage closes the deal — there is nothing in play.';

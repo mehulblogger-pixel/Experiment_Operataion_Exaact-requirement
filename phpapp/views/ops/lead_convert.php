@@ -26,6 +26,11 @@
     <div class="ff-wide"><label>…or the name for the new one</label>
       <input class="form-control" name="company_name" value="<?= e($l['company_name']) ?>" maxlength="200"></div>
     <div><label>State <span class="muted">(for tax on the invoice side)</span></label><input class="form-control" name="state" maxlength="60"></div>
+    <?php if (trim((string)($l['sbu'] ?? '')) === ''): //  The enquiry needs a business unit; this lead has none. ?>
+    <div><label><?= e(ucfirst(Tl('sbu'))) ?> for the <?= e(Tl('inquiry')) ?> *</label>
+      <select class="form-control" name="sbu" required><option value="">— choose —</option>
+        <?php foreach ((function_exists('lk_options_or') ? lk_options_or('sbu', OPS_SBUS) : OPS_SBUS) as $sk => $sv): ?><option value="<?= e($sk) ?>"><?= e($sv) ?></option><?php endforeach; ?></select></div>
+    <?php endif; ?>
   </div>
 
   <h3>What comes across</h3>
