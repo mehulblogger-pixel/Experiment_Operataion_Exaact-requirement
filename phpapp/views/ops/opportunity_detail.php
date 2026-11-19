@@ -543,7 +543,7 @@
 <?php // The ONE log form (views/ops/_log_form.php) — the same one the lead page and
       // Sales → Today use (owner, 19 Nov 2026). A deal had no way to log a call.
       if ($canEdit): $lfBack = (string) ($_GET['back'] ?? '');
-        if (!preg_match('#^/[a-z0-9\-/?=&%._]*$#i', $lfBack) || strpos($lfBack, '//') !== false) $lfBack = '';
+        $lfBack = function_exists('sx_safe_back') ? sx_safe_back($lfBack, '') : '';
         $lf = ['kind' => 'OPPORTUNITY', 'id' => (int) $o['id'], 'office' => (int) ($o['office_id'] ?? 0), 'who' => (string) ($o['contact_name'] ?? ''),
                'back' => $lfBack !== '' ? $lfBack : '/opportunity?id=' . (int) $o['id'] . '#log', 'open' => !empty($_GET['log'])]; ?>
   <div class="panel" style="margin-top:16px"><?php include __DIR__ . '/_log_form.php'; ?></div>

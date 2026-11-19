@@ -193,7 +193,7 @@
   <?php // The ONE log form (views/ops/_log_form.php) — the same one the deal page
         // and Sales → Today use (owner, 19 Nov 2026).
         $lfBack = (string) ($_GET['back'] ?? '');
-        if (!preg_match('#^/[a-z0-9\-/?=&%._]*$#i', $lfBack) || strpos($lfBack, '//') !== false) $lfBack = '';
+        $lfBack = function_exists('sx_safe_back') ? sx_safe_back($lfBack, '') : '';
         $lf = ['kind' => 'LEAD', 'id' => (int) $l['id'], 'office' => (int) ($l['office_id'] ?? 0), 'who' => (string) ($l['contact_name'] ?? ''),
                'pref' => (string) ($l['pref_contact'] ?? ''), 'back' => $lfBack !== '' ? $lfBack : '/lead?id=' . (int) $l['id'] . '#lead=contacts',
                'open' => !$contacts || !empty($_GET['log'])];

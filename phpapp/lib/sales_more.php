@@ -220,6 +220,12 @@ function sx_log_save(array $t, array $b) {
     return ['ok' => true, 'next' => $nextOn];
 }
 
+//  A return address from the page itself: only a path on this site (a
+//  "#section" is allowed), never another site — else the default.
+function sx_safe_back($back, $default) {
+    $back = (string) $back;
+    return ($back !== '' && preg_match('~^/[a-z0-9\-/?=&%._#]*$~i', $back) && strpos($back, '//') === false) ? $back : $default;
+}
 //  Where "📝 Log" goes: the record's own page, its log form open, and back
 //  to where the person came from once saved.
 function sx_log_url($kind, $id, $back = '/sales-today') {
@@ -438,7 +444,7 @@ function ops_sales_more($route, $method) {
             if (!$t) { http_response_code(404); view('notfound'); return true; }
             ops_require($t['can'], 'Logging on this record needs the right to edit it.');
             $back = (string) ($_POST['back'] ?? $_GET['back'] ?? '/sales-today');
-            if (!preg_match('#^/[a-z0-9\-/?=&%._]*$#i', $back) || strpos($back, '//') !== false) $back = '/sales-today';
+            $back = sx_safe_back($back, '/sales-today');
             if ($method === 'POST') {
                 $r = sx_log_save($t, $_POST);
                 if (!empty($r['ok'])) { flash('Logged on ' . $t['ref'] . '.' . ($r['next'] !== '' ? ' Next follow-up ' . fdate($r['next']) . '.' : ' No next step set.')); redirect($back); }

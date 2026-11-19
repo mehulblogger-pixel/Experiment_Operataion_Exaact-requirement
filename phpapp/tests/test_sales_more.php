@@ -150,6 +150,8 @@ try {
     }
     $rr = bbv_route('sales-log', 'GET', $f['master'], 0, [], ['deal' => (string) $o['id']]);
     t_ok(($rr['view'] ?? '') !== 'ops/sx_log', 'one form · /sales-log no longer shows a second, different form');
+    t_eq([sx_safe_back('/lead?id=7#lead=contacts', '/x'), sx_safe_back('//evil.example/', '/x'), sx_safe_back('https://evil.example', '/x'), sx_safe_back('', '/x')],
+         ['/lead?id=7#lead=contacts', '/x', '/x', '/x'], 'one form · after Save you go back to the lead itself (a #section is kept); never to another site');
     t_eq(sx_log_url('LEAD', 7, '/sales-today'), '/lead?id=7&log=1&back=%2Fsales-today#lead=contacts', 'one form · Today\'s 📝 Log opens the lead\'s own form, and comes back to Today');
     $lp = bbv_route('lead', 'GET', $f['master'], 0, [], ['id' => (string) $r['id'], 'log' => '1']);
     t_ok(strpos($lp['out'], 'Log a conversation') !== false && strpos($lp['view'] ?? '', 'lead_detail') !== false, 'one form · the lead page shows the one log form');

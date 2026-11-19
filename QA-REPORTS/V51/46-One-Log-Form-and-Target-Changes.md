@@ -63,7 +63,17 @@ When the deal page first had the form, its **Activity list below went blank**: t
 
 ## 5. Tests
 
-ROBOT_PLACEHOLDER
+| Check | Result |
+|---|---|
+| Automatic tests, Sales parts 2–3 (now including the one form and target changes) | **61/61 ✅** |
+| Every other test file touching the lead page, deal page, phone tables or Sales | **all 21 files pass** · leads 149 ✅ · Sales 510 ✅ · deals ✅ · activities ✅ · one firm record 21/21 ✅ |
+| Robot: the 98 screen-by-screen cases | **identical to the last update** — nothing got worse |
+| Robot: the Sales cases that use the log form | **SAL-020 "log a contact"**: all 3 steps pass (step 3 used to fail). **SAL-160**: same as before. **SAL-180**: only steps 8–9 fail, both about who sends an approved quote — the "approvals & sending" work you put on hold (before this update steps 4, 8 and 9 failed) |
+
+**Found and fixed by the robot before this zip**
+
+- After **Save this contact** on a lead opened from the Pipeline board, you were taken to Today instead of back to the lead. Now you return to where you started, and an automatic test checks this.
+- The robot's own "open a Sales tile" step didn't know the Sales area now opens on "Start here", with Leads under the "Records" tab. The robot was updated; the app was not changed for this.
 
 ## 6. Your check list on opstest (8 checks)
 
