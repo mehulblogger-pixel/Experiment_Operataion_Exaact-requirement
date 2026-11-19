@@ -1620,9 +1620,10 @@ function pc_ctc_from_rate($rate, $margin, array $h, $dpm = 0) {
     $load = (float)($h['overhead_pct'] ?? 0) + (float)($h['insurance_pct'] ?? 0) + (float)($h['baddebt_pct'] ?? 0) + (float)($h['contingency_pct'] ?? 0);
     $neg = (float)($h['negotiation_pct'] ?? 0);
     $before = $rate / (1 + $neg / 100);                      // the rate before the negotiation padding
-    //  The margin is taken on the rate BEFORE the padding, exactly as the forward direction does
-    //  (pc_line_calc), so CTC → rate → CTC comes back to the same CTC (test book SALA-069).
-    $mayCost = $before * (1 - $tm / 100);
+    //  Owner, 13 Nov 2026: when the client's rate is FIXED the margin asked is the margin the costing
+    //  shows at that rate (there is nothing left to negotiate). "Cost + my margin" adds the negotiation
+    //  padding on top instead. The two questions differ on purpose (test book SALA-069: by design).
+    $mayCost = $rate * (1 - $tm / 100);
     $direct = strtoupper((string)($h['load_on'] ?? 'COST')) === 'RATE' ? $mayCost - $before * $load / 100 : $mayCost / (1 + $load / 100);
     if (strtoupper((string)($h['basis'] ?? 'LONG')) === 'DAILY') {
         $dpm = (float)$dpm; if ($dpm < 1 || $dpm > 31) $dpm = ch_days_per_month();

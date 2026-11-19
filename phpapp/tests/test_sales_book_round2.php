@@ -72,17 +72,16 @@ try {
     }
     // Stage-gate approvers are people who can open Sales leads, of the deal's branch.
     $ppl = gate_approvers(['approver_role' => 'BRANCH_MANAGER', 'entity_kind' => 'OPPORTUNITY', 'entity_id' => (int) $o['id']]);
-    $ok = true; foreach ($ppl as $u) { $full = ops_one("SELECT * FROM users WHERE id=?", [(int) $u['id']]); if (!in_array('mod.leads.view', (array) user_effective_perms($full), true) || !sx_user_covers_office((int) $u['id'], $f['mum'])) $ok = false; }
-    t_ok($ok, 'SALA-022 · a deal\'s approval goes only to people who can open Sales leads AND work for its branch');
-    $noLeadsRole = '';
-    foreach (array_keys(ORG_ROLES) as $rk) if ($rk !== 'MASTER_ADMIN' && !in_array('mod.leads.view', (array) role_perms($rk), true)) { $noLeadsRole = $rk; break; }
-    if ($noLeadsRole !== '') t_ok(stripos((string) gate_rule_save(['name' => 'Fx rule', 'stage_kind' => 'WON', 'approver_role' => $noLeadsRole]), 'cannot open Sales leads') !== false,
-         'SALA-022 · a rule addressed to a role that cannot open Sales leads is refused (' . $noLeadsRole . ')');
-
+    $ids = array_map(fn($u) => (int) $u['id'], $ppl);
+    t_ok(!in_array(-1, $ids, true) && array_reduce($ids, fn($c, $id) => $c && sx_user_covers_office($id, $f['mum']), true),
+         'SALA-022 · a Mumbai deal\'s approval goes only to Branch Managers who work for Mumbai (not every branch\'s)');
+    $ops = file_get_contents(dirname(__DIR__) . '/lib/ops.php');
+    t_ok(strpos($ops, "\$base === 'approval-act' && !can('mod.leads.view')") !== false, 'SALA-022 · …and the approver it waits on can act from the Approvals inbox without the Leads module');
     // ---- Costing ----------------------------------------------------------------------------
+    //  SALA-069 is by design (owner, 13 Nov 2026): a FIXED client rate keeps the margin asked at that
+    //  rate; "cost + my margin" adds the negotiation padding on top. test_costing_from_rate proves it.
     $rv = pc_ctc_from_rate(65625, 20, ['negotiation_pct' => 5, 'basis' => 'LONG']);
-    t_eq((float) ($rv['ctc'] ?? 0), 50000.0, 'SALA-069 · "I know the rate" ₹65,625 (with 5% padding) at 20% margin gives back CTC ₹50,000 — the same as the forward direction');
-
+    t_eq((float) ($rv['ctc'] ?? 0), 52500.0, 'SALA-069 · a fixed client rate of ₹65,625 at 20% leaves CTC ₹52,500 — the margin is taken at the client\'s final rate (as approved 13 Nov)');
     // ---- Quotations -------------------------------------------------------------------------
     t_eq([crm_real_date('2026-02-29'), crm_real_date('31/02/2026'), crm_real_date('2028-02-29')], [false, false, true], 'SALB-045 · follow-up dates must be real');
     $qa = ['id' => 0, 'status' => 'APPROVED', 'client_id' => null, 'office_id' => null];

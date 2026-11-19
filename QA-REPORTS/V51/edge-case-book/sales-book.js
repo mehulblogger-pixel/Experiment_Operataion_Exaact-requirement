@@ -15,7 +15,7 @@ const PARTS = [
 // Status of each finding, by its place (1, 2, …) in that part's findings file.
 const STATUS = {
   //  "now" = fixed in this update; "earlier" = fixed in update 69287af or before.
-  SALA: { now: [2, 3, 4, 5, 6, 7, 8, 11, 12, 13, 18, 20, 21, 22, 24, 25, 26, 27, 33],
+  SALA: { now: [2, 3, 4, 5, 6, 7, 8, 11, 12, 13, 18, 20, 21, 22, 24, 25, 27, 33], design: [26],
           earlier: [1, 9, 10, 14, 15, 16, 17, 19, 23, 28, 29, 30, 31, 32, 34] },
   SALB: { now: [4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24], earlier: [1, 2, 3, 25], ask: [11] },
   SALC: { earlier: Array.from({ length: 23 }, (_, i) => i + 1) },
@@ -28,7 +28,7 @@ const ANSWERED = {
   'EC-SALA-003': 'Done: a negative lead value is refused, on the new-lead form and on edit.',
   'EC-SALA-011': 'Done: the customer made from a lead gets the lead\'s branch, and the enquiry the business unit (asked on the convert screen when the lead has none).',
   'EC-SALC-088': 'Done for the branch (as EC-SALA-011). Payment terms are still entered on the customer\'s record.',
-  'EC-SALA-022': 'Done: a deal\'s approval goes only to people who can open Sales leads and work for its branch; a rule for a role without Sales access is refused.',
+  'EC-SALA-022': 'Done: a deal\'s approval goes only to people of its branch, and the person it waits on (e.g. the Business Unit Head) can approve it from the Approvals inbox even without the Leads module.',
   'EC-SALA-036': 'Done: two Won stages, or a Won stage first, is flagged and cannot be made the default; new deals always open on an open stage.',
   'EC-SALB-052': 'Done the way docs/03 draws it: only a Draft or a Sent quotation is marked lost by hand; the screen says what to do with the others.',
   'EC-SALB-053': 'Done: an accepted quotation is final and is not revised (the won order stays with Accounts).',
@@ -40,13 +40,13 @@ const who = (p) => { const u = personas[p] && personas[p][0]; return u ? `${u.na
 const read = (f) => fs.existsSync(f) ? fs.readFileSync(f, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)) : [];
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const str = (v) => Array.isArray(v) ? v.join('; ') : (v == null ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v));
-const LABEL = { now: ['Fixed in this update', 'st-now'], earlier: ['Fixed in update 69287af or before', 'st-earlier'], ask: ['Waiting for your decision', 'st-ask'], open: ['Not fixed yet — next round', 'st-open'] };
+const LABEL = { design: ['Checked — works as you approved (13 Nov): a FIXED client rate keeps the margin at that rate; "cost + my margin" adds the negotiation padding on top', 'st-earlier'], now: ['Fixed in this update', 'st-now'], earlier: ['Fixed in update 69287af or before', 'st-earlier'], ask: ['Waiting for your decision', 'st-ask'], open: ['Not fixed yet — next round', 'st-open'] };
 
 const parts = PARTS.map(([code, name]) => {
   const cases = read(path.join(SRC, code + '.jsonl'));
   const st = STATUS[code] || {};
   const findings = read(path.join(SRC, code + '-findings.jsonl')).map((f, i) => {
-    const n = i + 1; const s = (st.now || []).includes(n) ? 'now' : (st.earlier || []).includes(n) ? 'earlier' : (st.ask || []).includes(n) ? 'ask' : 'open';
+    const n = i + 1; const s = (st.design || []).includes(n) ? 'design' : (st.now || []).includes(n) ? 'now' : (st.earlier || []).includes(n) ? 'earlier' : (st.ask || []).includes(n) ? 'ask' : 'open';
     return { ...f, n, status: s };
   });
   return { code, name, cases, findings };
@@ -99,9 +99,9 @@ Written for the test copy (opstest) with dummy data only${release ? `, update <b
 <h2>How to use this book</h2>
 <p>1. Use the test copy only, never the live site. 2. Each case says <b>who</b> to log in as, what to set up <b>before you start</b>, then each step: <b>Do this</b> → <b>You should see</b>. Tick ☐ when it matches. 3. Where a case shows a coloured box, it found a problem: <span class="pill st-now">green</span> fixed in this update (check it now works), <span class="pill st-earlier">blue</span> fixed earlier, <span class="pill st-ask">amber</span> waiting for your decision, <span class="pill st-open">red</span> not fixed yet. In a case with a green box, a step that says “Seen: …” describes the old, wrong behaviour; what you should see now is the “Correct: …” part (or the plain rule in the green box). 4. Dates in the cases are worked out for Thursday 19 Nov 2026; on another day count the same way. 5. No passwords are written here; use the test logins you already have.</p>
 <h2>What the testing found</h2>
-<table class="sum"><thead><tr><th>Part</th><th class="n">Cases</th><th class="n">Problems found</th><th class="n">Fixed now</th><th class="n">Fixed earlier</th><th class="n">Your decision</th><th class="n">Not yet</th></tr></thead><tbody>
-${parts.map(p => `<tr><td>${esc(p.name)}</td><td class="n">${p.cases.length}</td><td class="n">${p.findings.length}</td>${['now', 'earlier', 'ask', 'open'].map(s => `<td class="n">${p.findings.filter(f => f.status === s).length}</td>`).join('')}</tr>`).join('')}
-<tr><th>All Sales</th><th class="n">${totalCases}</th><th class="n">${allF.length}</th><th class="n">${count('now')}</th><th class="n">${count('earlier')}</th><th class="n">${count('ask')}</th><th class="n">${count('open')}</th></tr>
+<table class="sum"><thead><tr><th>Part</th><th class="n">Cases</th><th class="n">Problems found</th><th class="n">Fixed now</th><th class="n">Fixed earlier</th><th class="n">Works as approved</th><th class="n">Your decision</th><th class="n">Not yet</th></tr></thead><tbody>
+${parts.map(p => `<tr><td>${esc(p.name)}</td><td class="n">${p.cases.length}</td><td class="n">${p.findings.length}</td>${['now', 'earlier', 'design', 'ask', 'open'].map(s => `<td class="n">${p.findings.filter(f => f.status === s).length}</td>`).join('')}</tr>`).join('')}
+<tr><th>All Sales</th><th class="n">${totalCases}</th><th class="n">${allF.length}</th><th class="n">${count('now')}</th><th class="n">${count('earlier')}</th><th class="n">${count('design')}</th><th class="n">${count('ask')}</th><th class="n">${count('open')}</th></tr>
 </tbody></table>
 <p>Serious (“high”) problems: ${sevCount('high')} found, ${sevCount('high', 'now') + sevCount('high', 'earlier')} fixed. The ones not yet fixed are listed in the table below so nothing is lost.</p>
 </div>

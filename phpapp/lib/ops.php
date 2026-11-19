@@ -3709,6 +3709,13 @@ function ops_module_gate($route, $peek = false) {
     if ($mod === 'vouchers' && !can('mod.vouchers.view') && current_user()
         && !(function_exists('licence_blocks') && licence_blocks('mod.vouchers.view'))
         && voucher_route_owner_safe($base)) return;
+    // Test book SALA-022 — the approver a deal or lead request is waiting on (e.g. the Business Unit
+    // Head, owner 17 Nov 2026) acts on it from the Approvals inbox without holding the Leads module;
+    // gate_act() still checks that it is waiting on THIS person. Nothing else of Leads opens.
+    if ($base === 'approval-act' && !can('mod.leads.view') && current_user() && function_exists('gate_can_act')) {
+        $gr = ops_one("SELECT * FROM stage_gate_requests WHERE id=?", [(int)($_POST['id'] ?? 0)]);
+        if ($gr && gate_can_act($gr)) return;
+    }
     if ($mod && !can("mod.$mod.view")) {
         // MILESTONE 12. Two different "no"s still need two different sentences —
         // telling somebody to ask their administrator for a module the company

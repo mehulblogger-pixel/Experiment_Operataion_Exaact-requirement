@@ -39,7 +39,12 @@
 
 ## 2. Every smaller problem fixed
 
-All 82 problems in the Sales test book are now fixed, except the one waiting for your answer (contract value with or without GST, your Sales pack A2). This update fixes the last 39.
+All 82 problems in the Sales test book are now dealt with:
+
+- **38** fixed in this update;
+- **42** fixed earlier;
+- **1** checked and found to work as you approved;
+- **1** waiting for your answer: contract value with or without GST (your Sales pack A2).
 
 ### Leads
 
@@ -69,16 +74,17 @@ All 82 problems in the Sales test book are now fixed, except the one waiting for
   - Two "Won" stages, or a "Won" stage first, are flagged, and such a funnel cannot be made the default.
   - New deals always open on an open stage.
 - **Deal approvals**
-  - They go only to people who can open Sales leads **and** work for the deal's branch.
-  - A rule for a role without Sales access is refused.
+  - They go only to people of the deal's branch. Before, a role-wide rule named both branches' managers.
+  - The person a deal waits on, for example the Business Unit Head, can now approve it from **Approvals** even without access to Leads. Before, the deal was stuck.
   - "Withdraw the request" shows only to the person who asked.
 - An existing **enquiry** cannot be switched to a blocked customer.
 
 ### Costing
 
-- **"I know the rate" and "CTC → rate" now agree.**
-  - *Example:* CTC ₹50,000 at a 20% margin with 5% padding gives a rate of ₹65,625, and ₹65,625 gives back CTC **₹50,000**.
-  - Before, the reverse direction gave ₹52,499.
+- **"I know the rate" versus "CTC → rate": checked, works as you approved on 13 Nov. Not changed.**
+  - With a **fixed client rate**, the margin you ask for is kept at that final rate, because nothing is left to negotiate.
+  - With **"cost + my margin"**, the negotiation padding is added on top, so you have room to give it away.
+  - *Example:* CTC ₹50,000 at 20% plus 5% padding is quoted at ₹65,625. A fixed rate of ₹65,625 at 20% affords CTC ₹52,500, because the 5% padding then becomes extra margin. Both are correct for their question.
 - The approval box and the print sheet show the value to the paisa, e.g. ₹5,00,000.03, so the approval level is clear.
 - ✕ on a role of a locked costing now says why nothing happened.
 - A quotation made from a costing for a **typed (not yet registered) customer** keeps the customer's name.
@@ -127,5 +133,5 @@ All 82 problems in the Sales test book are now fixed, except the one waiting for
 6. On a deal of a **blocked** customer, the red banner shows, and "Create quotation" is refused.
 7. On an **accepted** quotation there is **no Revise**. On an approved, not-sent one there is **no Mark lost**.
 8. Quotation → **+ Add line**. The new line says "Line item", not "Open order (ARC)".
-9. Costing → "I know the rate": type ₹65,625 with 5% padding and a 20% margin. CTC = ₹50,000.
+9. As the Business Unit Head, open **Approvals** with a deal waiting on you. Approve it. The deal moves.
 10. **Branch GSTIN**: answer the question above.
