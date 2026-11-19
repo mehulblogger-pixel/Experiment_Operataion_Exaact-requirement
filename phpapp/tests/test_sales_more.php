@@ -155,6 +155,8 @@ try {
     t_ok(strpos($lp['out'], 'Log a conversation') !== false && strpos($lp['view'] ?? '', 'lead_detail') !== false, 'one form · the lead page shows the one log form');
     $dp = bbv_route('opportunity', 'GET', $f['master'], 0, [], ['id' => (string) $o['id']]);
     t_ok(strpos($dp['out'], 'Log a conversation') !== false, 'one form · the deal page shows the same form (it had none)');
+    t_ok(strpos($dp['out'], (string) $O['ref'] . ' opened') !== false && strpos($dp['out'], 'Site visit') !== false,
+         'one form · the deal\'s own Activity list still shows below the form (the form must not disturb the page)');
     $src = file_get_contents(dirname(__DIR__) . '/views/ops/lead_detail.php');
     t_ok(strpos($src, 'action="/lead-contact"') === false && strpos($src, "_log_form.php") !== false, 'one form · the lead page no longer carries its own separate form');
     t_ok(!$opened(bbv_route('sales-settings', 'GET', $f['neha'], 0), 'ops/sx_settings'), 'screen · a coordinator cannot open Sales settings');

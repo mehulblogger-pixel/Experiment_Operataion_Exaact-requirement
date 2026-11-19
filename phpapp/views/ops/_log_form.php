@@ -11,7 +11,7 @@
 //                'back' (where to return), 'open' (bool: start unfolded)].
 if (!function_exists('sx_outcomes')) return;
 $lfOut = sx_outcomes();
-$lfDates = []; foreach ($lfOut as $k => $o) $lfDates[$k] = sx_add_working_days($o['days'], (int) ($lf['office'] ?? 0));
+$lfDates = []; foreach ($lfOut as $lfK => $lfO) $lfDates[$lfK] = sx_add_working_days($lfO['days'], (int) ($lf['office'] ?? 0));
 $lfToday = date('Y-m-d'); $lfN = 'lf' . (int) $lf['id'];
 $lfIcons = ['CALL' => '📞', 'WHATSAPP' => '💬', 'EMAIL' => '✉️', 'MEETING' => '🤝', 'VISIT' => '🚗', 'NOTE' => '📝'];
 $lfPref = (string) ($lf['pref'] ?? ''); $lfSel = isset(LEAD_CONTACT_METHODS[$lfPref]) ? $lfPref : 'CALL';
@@ -31,10 +31,10 @@ $lfPref = (string) ($lf['pref'] ?? ''); $lfSel = isset(LEAD_CONTACT_METHODS[$lfP
     <input type="hidden" name="<?= $lf['kind'] === 'LEAD' ? 'lead' : 'deal' ?>" value="<?= (int) $lf['id'] ?>">
     <input type="hidden" name="back" value="<?= e((string) ($lf['back'] ?? '')) ?>">
     <div class="lf-lab">1 · How</div>
-    <div class="lf-pick"><?php foreach (LEAD_CONTACT_METHODS as $k => $v): ?><label><input type="radio" name="method" value="<?= e($k) ?>"<?= $lfSel === $k ? ' checked' : '' ?>> <?= ($lfIcons[$k] ?? '') . ' ' . e($v) ?></label><?php endforeach; ?></div>
+    <div class="lf-pick"><?php foreach (LEAD_CONTACT_METHODS as $lfK => $lfV): ?><label><input type="radio" name="method" value="<?= e($lfK) ?>"<?= $lfSel === $lfK ? ' checked' : '' ?>> <?= ($lfIcons[$lfK] ?? '') . ' ' . e($lfV) ?></label><?php endforeach; ?></div>
     <div class="lf-lab">2 · What happened</div>
-    <div class="lf-pick" data-lf-out="<?= e($lfN) ?>"><?php foreach ($lfOut as $k => $o): ?>
-      <label><input type="radio" name="outcome" value="<?= e($k) ?>" data-date="<?= e($lfDates[$k] ?? '') ?>"> <?= e($o['label']) ?> <small><?= $o['days'] ? '→ ' . (int) $o['days'] . ' working day' . ($o['days'] === 1 ? '' : 's') : '→ you pick' ?></small></label>
+    <div class="lf-pick" data-lf-out="<?= e($lfN) ?>"><?php foreach ($lfOut as $lfK => $lfO): ?>
+      <label><input type="radio" name="outcome" value="<?= e($lfK) ?>" data-date="<?= e($lfDates[$lfK] ?? '') ?>"> <?= e($lfO['label']) ?> <small><?= $lfO['days'] ? '→ ' . (int) $lfO['days'] . ' working day' . ($lfO['days'] === 1 ? '' : 's') : '→ you pick' ?></small></label>
     <?php endforeach; ?></div>
     <div class="form-grid">
       <div class="ff ff-wide"><label for="<?= $lfN ?>-note">What was said</label>
@@ -55,11 +55,11 @@ $lfPref = (string) ($lf['pref'] ?? ''); $lfSel = isset(LEAD_CONTACT_METHODS[$lfP
           <input class="form-control" type="date" name="occurred_on" id="<?= $lfN ?>-when" value="<?= e($lfToday) ?>" max="<?= e($lfToday) ?>"></div>
         <div class="ff"><label for="<?= $lfN ?>-time">Time it took</label>
           <select class="form-control" name="time_spent" id="<?= $lfN ?>-time"><option value="0">—</option>
-            <?php foreach ([15 => '15 minutes', 30 => 'Half an hour', 45 => '45 minutes', 60 => '1 hour', 90 => '1½ hours', 120 => '2 hours', 240 => 'Half a day', 480 => 'A full day'] as $m => $t): ?><option value="<?= $m ?>"><?= e($t) ?></option><?php endforeach; ?></select></div>
+            <?php foreach ([15 => '15 minutes', 30 => 'Half an hour', 45 => '45 minutes', 60 => '1 hour', 90 => '1½ hours', 120 => '2 hours', 240 => 'Half a day', 480 => 'A full day'] as $lfM => $lfT): ?><option value="<?= $lfM ?>"><?= e($lfT) ?></option><?php endforeach; ?></select></div>
         <?php if ($lf['kind'] === 'LEAD' && defined('LEAD_PREF_CONTACT')): ?>
         <div class="ff"><label for="<?= $lfN ?>-pref">They prefer to be reached by</label>
           <select class="form-control" name="pref_contact" id="<?= $lfN ?>-pref"><option value="">— no preference noted —</option>
-            <?php foreach (LEAD_PREF_CONTACT as $k => $v): ?><option value="<?= e($k) ?>"<?= $lfPref === $k ? ' selected' : '' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>
+            <?php foreach (LEAD_PREF_CONTACT as $lfK => $lfV): ?><option value="<?= e($lfK) ?>"<?= $lfPref === $lfK ? ' selected' : '' ?>><?= e($lfV) ?></option><?php endforeach; ?></select></div>
         <?php endif; ?>
       </div>
     </details>
