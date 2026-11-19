@@ -6,7 +6,7 @@ fs.mkdirSync(BOOK, { recursive: true });
 
 // Book order and plain names for each helper's part.
 const PARTS = [
-  ['E2E', 'Whole journeys'], ['SALA', 'Sales — leads, enquiries, costing'], ['SALB', 'Sales — quotations'],
+  ['E2E', 'Whole journeys'], ['SALA', 'Sales — leads, enquiries, costing'], ['SALB', 'Sales — quotations'], ['SALC', 'Sales — Simple Sales, deals, targets, one firm record'],
   ['MON', 'Money'], ['OPS', 'Operations'], ['REP', 'Reports'], ['QUAA', 'Quality — NCR, CAPA, complaints'],
   ['QUAB', 'Quality — audits, competence, equipment'], ['REC', 'Recruitment & Directory'],
   ['MKT', 'Marketplace & portals'], ['ADM', 'Admin, sign-in & Insights'],

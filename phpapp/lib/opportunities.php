@@ -343,6 +343,9 @@ function opp_create(array $b) {
     opp_migrate();
     $name = trim((string)($b['name'] ?? ''));
     if ($name === '') return ['err' => 'Give the ' . Tl('opportunity') . ' a name — what is the piece of business?'];
+    //  Only in an office this person works for (test book SALA-017).
+    if ((int)($b['office_id'] ?? 0) && current_user() && function_exists('scope_office_allows') && !scope_office_allows((int)$b['office_id']))
+        return ['err' => 'You can open ' . Tl('opportunity') . 's only for your own office / branch.'];
     $pid = (int)($b['partner_id'] ?? 0);
     $pname = trim((string)($b['partner_name'] ?? ''));
     if (!$pid && $pname === '') return ['err' => 'Say which customer, or who it is for.'];
@@ -575,6 +578,11 @@ function opp_update($oppId, array $b) {
     // of the deal leaves the rest alone. `??` falls back only when the key is
     // ABSENT, so a box the user genuinely emptied still posts '' and is still
     // cleared — the full form behaves exactly as it did.
+    //  The same checks as when the deal was opened (test book SALA-019 / SALA-017).
+    if (array_key_exists('name', $b) && trim((string)$b['name']) === '') return 'Give the ' . Tl('opportunity') . ' a name — what is the piece of business?';
+    $newOff = (int)($b['office_id'] ?? $o['office_id']);
+    if ($newOff && $newOff !== (int)$o['office_id'] && function_exists('scope_office_allows') && !scope_office_allows($newOff))
+        return 'You can move ' . Tla('opportunity') . ' only to an office / branch you work for.';
     db()->prepare("UPDATE opportunities SET name=?, value=?, expected_close=?, requirement=?, competitor=?,
                    contact_name=?, contact_email=?, contact_phone=?, owner_user_id=?, owner_name=?, office_id=?, sbu=?,
                    next_action_on=?, next_action=?, updated_at=? WHERE id=?")
@@ -593,8 +601,10 @@ function opp_link_quote($oppId, $quoteId) {
     opp_migrate();
     $o = opp_row($oppId);
     if (!$o) return 'That ' . Tl('opportunity') . ' no longer exists.';
-    $q = opp_try(fn() => ops_one("SELECT id, quote_no FROM quotations WHERE id=?", [(int)$quoteId]), null);
+    $q = opp_try(fn() => ops_one("SELECT id, quote_no, office_id FROM quotations WHERE id=?", [(int)$quoteId]), null);
     if (!$q) return 'That quotation no longer exists.';
+    if (!empty($q['office_id']) && function_exists('scope_office_allows') && !scope_office_allows((int)$q['office_id']))
+        return 'That ' . Tl('quote') . ' belongs to another office / branch.';
     if (opp_try(fn() => ops_val("SELECT id FROM opportunity_quotes WHERE opportunity_id=? AND quotation_id=?",
                                 [(int)$oppId, (int)$quoteId]), null)) return 'It is already attached.';
     db()->prepare("INSERT INTO opportunity_quotes (opportunity_id,quotation_id,linked_by,linked_at) VALUES (?,?,?,?)")
@@ -607,6 +617,10 @@ function opp_link_quote($oppId, $quoteId) {
 
 function opp_unlink_quote($oppId, $quoteId) {
     opp_migrate();
+    //  An accepted quotation is how this deal was won and is already with Accounts;
+    //  detaching it would let the same sale be sent to Accounts a second time.
+    $st = (string)opp_try(fn() => ops_val("SELECT status FROM quotations WHERE id=?", [(int)$quoteId]), '');
+    if ($st === 'ACCEPTED') return 'An accepted ' . Tl('quote') . ' is how this ' . Tl('opportunity') . ' was won, so it stays attached (one sale, one contract).';
     db()->prepare("DELETE FROM opportunity_quotes WHERE opportunity_id=? AND quotation_id=?")
        ->execute([(int)$oppId, (int)$quoteId]);
     return '';
@@ -657,6 +671,9 @@ function opp_from_lead($leadId, array $b = []) {
     if (!function_exists('lead_row')) return ['err' => 'Leads are not available on this installation.'];
     $l = lead_row($leadId);
     if (!$l) return ['err' => 'That lead no longer exists.'];
+    //  Only a lead of an office this person works for (test book SALA-031).
+    if (!empty($l['office_id']) && current_user() && function_exists('scope_office_allows') && !scope_office_allows((int)$l['office_id']))
+        return ['err' => 'That lead belongs to another office / branch.'];
     $existing = opp_try(fn() => ops_val("SELECT id FROM opportunities WHERE lead_id=?", [(int)$leadId]), null);
     if ($existing) return ['id' => (int)$existing, 'existing' => true];
 
@@ -1182,7 +1199,7 @@ function ops_opportunities($route, $method) {
                                 function_exists('gate_open_request') ? gate_open_request('OPPORTUNITY', (int)$o['id']) : null),
             'gateWaiting' => function_exists('gate_open_request') && ($gq = gate_open_request('OPPORTUNITY', (int)$o['id']))
                                 ? gate_waiting_on($gq) : '',
-            'offices' => ops_all("SELECT id, name FROM offices WHERE is_active=1 ORDER BY name"),
+            'offices' => array_values(array_filter(ops_all("SELECT id, name FROM offices WHERE is_active=1 ORDER BY name") ?: [], fn($of) => !function_exists('scope_office_allows') || scope_office_allows((int)$of['id']) || (int)$of['id'] === (int)($o['office_id'] ?? 0))),
             // The customer, which used to be settable only at creation. A deal
             // opened from a lead has none until the lead is converted, and
             // without this there was no screen anywhere that could supply one.
@@ -1260,7 +1277,7 @@ function ops_opportunities($route, $method) {
         }
         view('ops/opportunity_form', [
             'pipelines' => pipelines_all('OPPORTUNITY'), 'prefill' => $prefill, 'form_err' => $formErr,
-            'offices' => ops_all("SELECT id, name FROM offices WHERE is_active=1 ORDER BY name"),
+            'offices' => array_values(array_filter(ops_all("SELECT id, name FROM offices WHERE is_active=1 ORDER BY name") ?: [], fn($of) => !function_exists('scope_office_allows') || scope_office_allows((int)$of['id']))),
             'clients' => ops_all("SELECT id, display_name, legal_name FROM business_partners WHERE is_client=1 AND " . partner_office_sql() . " AND status='ACTIVE' ORDER BY COALESCE(display_name, legal_name) LIMIT 800"),
             'sources' => function_exists('lk_options_or') && defined('LEAD_SOURCES') ? lk_options_or('lead_source', LEAD_SOURCES) : [],
         ]);
@@ -1316,6 +1333,10 @@ function ops_opportunities($route, $method) {
 
     if ($route === 'opportunity-raise-order' && $method === 'POST') {
         $id = (int)($_POST['id'] ?? 0);
+        //  The same rule the deal page uses to show the button (canOrder): a work
+        //  order is Operations' work, so it needs the Work orders edit right.
+        ops_require(function_exists('licence_enabled') && licence_enabled('operations') && (can('mod.calls.edit') || is_master_of('calls')),
+            'Raising the work order is for Operations (the Work orders right). Send the won deal to Accounts instead.');
         $r = opp_raise_order($id, $_POST);
         if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/opportunity?id=' . $id); }
         flash('Order ' . $r['code'] . ' raised'

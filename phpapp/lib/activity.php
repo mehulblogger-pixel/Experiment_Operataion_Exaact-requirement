@@ -719,7 +719,11 @@ function act_render_timeline($entityKind, $entityId, $title = 'History', $limit 
            . e(fdate(substr((string)$r['occurred_at'], 0, 10)))
            . '<br><span style="font-size:11px">' . e(substr((string)$r['occurred_at'], 11, 5)) . '</span></td>'
            . '<td><span class="pill ' . ($r['auto'] ? 'p-mut' : 'p-ok') . '" style="font-size:10px">'
-           . e(ACT_KINDS[$r['kind']] ?? $r['kind']) . '</span> <strong>' . e($r['subject']) . '</strong>'
+           . e(ACT_KINDS[$r['kind']] ?? $r['kind']) . '</span>'
+           //  Which way (a call they made to us, or we to them), when it was recorded.
+           . (!$r['auto'] && ($r['direction'] ?? '') !== '' && (ACT_DIRECTIONS[$r['direction']] ?? '') !== '' ? ' <span class="muted" style="font-size:11px">' . e(ACT_DIRECTIONS[$r['direction']]) . '</span>' : '')
+           //  The subject, unless it only repeats the kind ("Telephone call Telephone call").
+           . (trim((string)$r['subject']) !== '' && strcasecmp(trim((string)$r['subject']), (string)(ACT_KINDS[$r['kind']] ?? $r['kind'])) !== 0 ? ' <strong>' . e($r['subject']) . '</strong>' : '')
            . (trim((string)$r['body']) !== '' ? '<div class="muted" style="font-size:12.5px;white-space:pre-wrap">' . e($r['body']) . '</div>' : '')
            . (trim((string)($r['with_whom'] ?? '')) !== '' ? '<div class="muted" style="font-size:11.5px">with ' . e($r['with_whom']) . '</div>' : '')
            . (trim((string)($r['outcome'] ?? '')) !== '' ? ' <span class="pill p-warn" style="font-size:10px">' . e($r['outcome']) . '</span>' : '')

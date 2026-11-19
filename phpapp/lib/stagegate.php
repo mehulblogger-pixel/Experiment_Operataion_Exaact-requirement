@@ -419,7 +419,9 @@ function ops_approvals($route, $method) {
         if (!empty($r['err'])) flash($r['err'], 'error');
         else flash($r['decision'] === 'APPROVED' ? 'Approved — the deal has moved.'
                  : ($r['decision'] === 'REJECTED' ? 'Sent back, with your reason recorded.' : 'Request withdrawn.'), 'success');
-        redirect((string)($_POST['back'] ?? '/approvals'));
+        //  Back to a page of this site only — never to an address posted from outside (test book SALA-024).
+        $back = (string)($_POST['back'] ?? '');
+        redirect(($back !== '' && $back[0] === '/' && strpos($back, '//') === false && strpos($back, '\\') === false) ? $back : '/approvals');
     }
 
     $status = (string)($_GET['f'] ?? 'PENDING');

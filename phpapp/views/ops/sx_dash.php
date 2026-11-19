@@ -34,8 +34,9 @@ $bars = function (array $rows, $vKey, $labKey, $color, $fmt) {
     <div class="sxcard"><h2>💼 Pipeline by stage · open deals today</h2>
       <?php if (!$dd['stages']): ?><p class="sxempty">No open deals.</p><?php else: ?>
       <div class="tbl"><table class="sxt"><tr><th>Stage</th><th class="n">Deals</th><th class="n">Value</th><th class="n">Win %</th><th class="n">Weighted</th></tr>
-        <?php foreach ($dd['stages'] as $s): ?><tr><td><?= e($s['name']) ?></td><td class="n"><?= (int) $s['n'] ?></td><td class="n"><?= e(sx_money($s['v'])) ?></td><td class="n"><?= (int) $s['p'] ?>%</td><td class="n"><?= e(sx_money($s['w'])) ?></td></tr><?php endforeach; ?>
-      </table></div><?php endif; ?></div>
+        <?php foreach ($dd['stages'] as $s): ?><tr><td><?= e($s['name']) ?></td><td class="n"><?= (int) $s['n'] ?></td><td class="n"><?= e(sx_money($s['v'])) ?></td><td class="n"><?= (int) $s['p'] ?>%<?php $ep = $s['v'] > 0 ? (int) round($s['w'] * 100 / $s['v']) : 0; if ($s['v'] > 0 && $ep !== (int) $s['p']): ?><br><small class="muted" title="Some deals here have their own chance of winning, set on the deal">deals: <?= $ep ?>%</small><?php endif; ?></td><td class="n"><?= e(sx_money($s['w'])) ?></td></tr><?php endforeach; ?>
+      </table></div>
+      <p class="muted" style="font-size:12px;margin:6px 0 0">Weighted = value × chance of winning. A deal's own chance (set on the deal) is used where there is one; otherwise the stage's win %.</p><?php endif; ?></div>
     <div class="sxcard"><h2>📅 Won vs target, by month</h2>
       <?php $mx = max(array_map(fn($m) => max($m['won'], $m['target']), $dd['months']) ?: [0]) ?: 1; ?>
       <div class="sxbars">

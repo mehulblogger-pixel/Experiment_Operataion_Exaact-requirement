@@ -145,8 +145,14 @@ function sx_lead_save(array $b, $confirm) {
     if ($officeId && function_exists('scope_allows') && !scope_allows($officeId)) $officeId = (int) ($u['home_office_id'] ?? 0);
     //  A manager may hand it to someone; otherwise the office's salesperson, else me.
     $owner = sx_can_see_all() && (int) ($b['owner_user_id'] ?? 0) ? (int) $b['owner_user_id'] : sx_owner_for_office($officeId);
+    //  Never hand a lead to someone who cannot open that office's leads.
+    if ($owner && $officeId && !sx_user_covers_office($owner, $officeId)) {
+        if ((int) ($b['owner_user_id'] ?? 0) === $owner) return ['err' => 'That person does not work for this office, so they could not open the lead. Pick someone of this office.'];
+        $owner = (int) ($u['id'] ?? 0);
+    }
     $next = trim((string) ($b['next_action_on'] ?? ''));
-    if ($next !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $next)) $next = '';
+    if ($next !== '' && !sx_is_date($next)) return ['err' => 'The first follow-up date is not a real date.'];
+    if ($next !== '' && $next < date('Y-m-d')) return ['err' => 'The first follow-up cannot be in the past.'];
     if ($next === '') $next = sx_add_working_days(1, $officeId);
     $r = lead_create([
         'company_name' => $company, 'contact_name' => trim((string) ($b['contact_name'] ?? '')), 'contact_phone' => $phone,
@@ -187,6 +193,9 @@ function sx_log_save(array $t, array $b) {
     $nextOn = trim((string) ($b['next_action_on'] ?? ''));
     if ($nextOn !== '' && !sx_is_date($nextOn)) return ['err' => 'The next follow-up date is not a real date.'];
     if ($nextOn === '' && $oc !== '' && $outs[$oc]['days'] > 0) $nextOn = sx_add_working_days($outs[$oc]['days'], $t['office']);
+    //  "0 days" in Sales settings means the person picks the date (e.g. the meeting's own date).
+    if ($nextOn === '' && $oc !== '' && $outs[$oc]['days'] === 0 && !empty($t['open']))
+        return ['err' => 'For "' . $outs[$oc]['label'] . '" pick the date in "By when" (for a meeting: the meeting date).'];
     if ($nextOn !== '' && $nextOn < date('Y-m-d')) return ['err' => 'The next follow-up cannot be in the past.'];
     $nextAct = trim((string) ($b['next_action'] ?? ''));
     if ($nextAct === '' && $nextOn !== '') $nextAct = 'Follow up';
@@ -205,7 +214,9 @@ function sx_log_save(array $t, array $b) {
     } else {
         $o = $t['row'];
         $who = trim((string) ($b['with_whom'] ?? ''));
-        act_log('OPPORTUNITY', $t['id'], $method, $who !== '' ? $who : LEAD_CONTACT_METHODS[$method], [
+        //  The line's title: who it was with, else what happened, else the first words of the note.
+        $subj = $who !== '' ? $who : ($outLabel !== '' ? $outLabel : mb_substr(strtok($note, "\n") ?: '', 0, 80));
+        act_log('OPPORTUNITY', $t['id'], $method, $subj !== '' ? $subj : LEAD_CONTACT_METHODS[$method], [
             'body' => $note, 'outcome' => $outLabel, 'with_whom' => $who, 'direction' => $dir, 'duration_mins' => $mins,
             'occurred_at' => ($when === '' || $when === date('Y-m-d')) ? date('c') : $when . 'T12:00:00',
             'partner_id' => ($o['partner_id'] ?? null) ?: null, 'office_id' => $o['office_id'] ?? '', 'sbu' => $o['sbu'] ?? '']);
@@ -288,10 +299,10 @@ function sx_avg_days_to_pay() {
 function sx_renewals_list($days) {
     $t = date('Y-m-d');
     try {
-        return ops_all("SELECT c.*, COALESCE(NULLIF(bp.display_name,''), bp.legal_name) client_name FROM partner_contracts c
+        return sx_scope_contracts(ops_all("SELECT c.*, COALESCE(NULLIF(bp.display_name,''), bp.legal_name) client_name, bp.home_branch_id client_branch FROM partner_contracts c
                         LEFT JOIN business_partners bp ON bp.id=c.partner_id
                         WHERE COALESCE(c.is_active,1)=1 AND COALESCE(c.end_date,'')<>'' AND c.end_date>=? AND c.end_date<=? ORDER BY c.end_date",
-                        [date('Y-m-d', strtotime('-30 days')), date('Y-m-d', strtotime("+$days days"))]) ?: [];
+                        [date('Y-m-d', strtotime('-30 days')), date('Y-m-d', strtotime("+$days days"))]) ?: []);
     } catch (Throwable $e) { return []; }
 }
 
@@ -328,13 +339,25 @@ function sxt_save(array $post, array $months) {
     sx_more_migrate();
     $cur = sxt_grid($months); $n = 0; $me = user_name(current_user()); $changed = [];
     $people = sx_target_people();
+    $GLOBALS['sxt_skipped'] = ['bad' => [], 'clash' => []];
+    $fmt = fn($x) => $x === null ? '' : (string) (0 + $x);
     foreach ((array) ($post['t'] ?? []) as $uid => $row) {
         $uid = (int) $uid; if (!isset($people[$uid])) continue;
         foreach ((array) $row as $ym => $v) {
             if (!in_array($ym, $months, true)) continue;
-            $v = trim(str_replace(',', '', (string) $v)); if ($v === '' && !isset($cur[$uid][$ym])) continue;
-            $amt = max(0, round((float) $v, 2));
+            $v = trim(str_replace([',', '₹', ' '], '', (string) $v));
+            $label = $people[$uid] . ' ' . date('M Y', strtotime($ym . '-01'));
+            //  The figure the page showed when it was opened. Unchanged on this
+            //  page → leave it alone (someone else may have changed it since).
+            $shown = isset($post['o'][$uid][$ym]) ? trim((string) $post['o'][$uid][$ym]) : null;
+            if ($shown !== null && $v === $shown) continue;
+            if ($v === '' && !isset($cur[$uid][$ym])) continue;
+            //  Whole rupees, never negative, never text.
+            if ($v !== '' && (!is_numeric($v) || (float) $v < 0)) { $GLOBALS['sxt_skipped']['bad'][] = $label; continue; }
+            $amt = (float) round((float) $v);
             if (isset($cur[$uid][$ym]) && abs($cur[$uid][$ym] - $amt) < 0.005) continue;
+            //  Changed here, but also changed by someone else since this page was opened.
+            if ($shown !== null && $fmt($cur[$uid][$ym] ?? null) !== $shown) { $GLOBALS['sxt_skipped']['clash'][] = $label; continue; }
             if (!isset($cur[$uid][$ym]) && $amt == 0.0) continue;
             $prev = isset($cur[$uid][$ym]) ? (float) $cur[$uid][$ym] : null;
             db()->prepare("INSERT INTO sales_targets (user_id, ym, amount, prev_amount, set_by, set_at, seen_at) VALUES (?,?,?,?,?,?,'')")
@@ -415,7 +438,8 @@ function sx_quote_gst_split(array $q) {
     if ($amt <= 0 || empty($q['client_id']) || !function_exists('books_is_igst')) return null;
     $ours = function_exists('books_our_state') ? (string) books_our_state() : '';
     $theirs = function_exists('books_their_state') ? (string) books_their_state((int) $q['client_id']) : '';
-    if ($ours === '' || $theirs === '') return ['mode' => 'UNKNOWN', 'rows' => []];
+    //  Say which state is missing: ours (the invoice's own setting) or the client's.
+    if ($ours === '' || $theirs === '') return ['mode' => 'UNKNOWN', 'rows' => [], 'missing' => $ours === '' ? 'ours' : 'theirs'];
     $nm = function ($c) { $m = defined('GST_STATES') ? GST_STATES : []; return (string) ($m[$c] ?? $m[str_pad($c, 2, '0', STR_PAD_LEFT)] ?? $c); };
     $ours = $nm($ours); $theirs = $nm($theirs);
     if (books_is_igst((int) $q['client_id'], $q['office_id'] ?? null))
@@ -472,6 +496,8 @@ function ops_sales_more($route, $method) {
 
         case 'sales-orders':
             $who = sx_person();
+            //  Accounts follow every order of their offices, not only their own (they own none).
+            if (!sx_can_see_all() && function_exists('ar_can') && ar_can()) $who = 0;
             $p = in_array($_GET['p'] ?? '', ['fy', 'quarter', 'month', '90'], true) ? $_GET['p'] : 'fy';
             [$from, $to, $plab] = sx_period($p);
             view('ops/sx_orders', ['rows' => sx_orders($who, $from, $to), 'p' => $p, 'plab' => $plab, 'ar' => function_exists('ar_can') && ar_can(),
@@ -496,6 +522,10 @@ function ops_sales_more($route, $method) {
                 $n = sxt_save($_POST, $months);
                 $notes = $GLOBALS['sxt_mail_notes'] ?? [];
                 $bad = array_values(array_filter($notes, fn($x) => strncmp($x, 'Could not', 9) === 0));
+                $sk = $GLOBALS['sxt_skipped'] ?? ['bad' => [], 'clash' => []];
+                if ($sk['bad']) $notes[] = $bad[] = 'Not saved — type a whole amount of 0 or more for: ' . implode(', ', $sk['bad']) . '.';
+                if ($sk['clash']) $notes[] = $bad[] = 'Not saved — someone else changed these after you opened the page: ' . implode(', ', $sk['clash']) . '. Check the figures now shown and change them again if needed.';
+                if (!$n && ($sk['bad'] || $sk['clash'])) { flash(implode(' ', $notes), 'warning'); redirect('/sales-targets'); }
                 flash($n ? "$n target" . ($n === 1 ? '' : 's') . ' saved. Earlier figures stay in the history. ' . implode(' ', $notes) : 'Nothing changed.', $bad ? 'warning' : 'success');
                 redirect('/sales-targets');
             }
@@ -513,15 +543,29 @@ function ops_sales_more($route, $method) {
                 foreach ((array) ($_POST['oc_label'] ?? []) as $i => $l) {
                     $l = trim((string) $l); if ($l === '') continue;
                     $k = strtoupper(preg_replace('/[^A-Za-z0-9_]/', '', (string) ($_POST['oc_key'][$i] ?? ''))) ?: strtoupper(substr(preg_replace('/[^A-Za-z0-9]+/', '_', $l), 0, 24));
-                    $rows[] = ['k' => trim($k, '_'), 'label' => mb_substr($l, 0, 80), 'days' => max(0, min(365, (int) ($_POST['oc_days'][$i] ?? 0)))];
+                    //  A label in Hindi/Gujarati gives no letters for a key: number it instead.
+                    $k = trim($k, '_'); if ($k === '') $k = 'OUTCOME_' . (count($rows) + 1);
+                    $base = $k; $j = 2; while (in_array($k, array_column($rows, 'k'), true)) $k = $base . '_' . $j++;
+                    $rows[] = ['k' => $k, 'label' => mb_substr($l, 0, 80), 'days' => max(0, min(365, (int) ($_POST['oc_days'][$i] ?? 0)))];
                 }
                 if (!$rows) { flash('Keep at least one outcome.', 'error'); redirect('/sales-settings'); }
                 setting_set('sales_outcomes', json_encode($rows, JSON_UNESCAPED_UNICODE));
                 setting_set('sales_weekly_off', implode(',', array_map('intval', array_filter((array) ($_POST['off'] ?? []), fn($d) => (int) $d >= 0 && (int) $d <= 6))));
                 setting_set('sales_stale_days', (string) max(1, min(365, (int) ($_POST['stale'] ?? 15))));
                 $map = [];
-                foreach ((array) ($_POST['own'] ?? []) as $oid => $uid) if ((int) $uid) $map[(string) (int) $oid] = (int) $uid;
+                $skipped = [];
+                foreach ((array) ($_POST['own'] ?? []) as $oid => $uid) {
+                    if (!(int) $uid) continue;
+                    //  Only someone who works for that office (their own office scope) can own its leads.
+                    if (!sx_user_covers_office((int) $uid, (int) $oid)) { $skipped[] = (int) $oid; continue; }
+                    $map[(string) (int) $oid] = (int) $uid;
+                }
                 setting_set('sales_owner_by_office', json_encode($map));
+                if ($skipped) {
+                    $nm = []; foreach ((function_exists('offices_list') ? offices_list() : []) as $o) if (in_array((int) $o['id'], $skipped, true)) $nm[] = $o['name'] ?? ('#' . $o['id']);
+                    flash('Saved — but not for ' . implode(', ', $nm ?: $skipped) . ': the person picked does not work for that office (check their office access in Users).', 'warning');
+                    redirect('/sales-settings');
+                }
                 //  setting_set() records who changed which setting on the audit chain.
                 flash('Sales settings saved.');
                 redirect('/sales-settings');

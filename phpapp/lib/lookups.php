@@ -1057,6 +1057,10 @@ function lk_forms_for_type($typeId) {
         $en = $r['entity'];
         $out[$en] = $targets[$en] ?? ucfirst($en);
     }
+    //  Lists the app's own forms read directly (not through a custom field).
+    $builtIn = ['contact_buying_role' => ['partner_contact' => 'Client / vendor → Contacts']];
+    $t = lk_type_by_id($typeId);
+    foreach ($builtIn[$t['type_key'] ?? ''] ?? [] as $en => $lab) $out[$en] = $lab;
     return $out;
 }
 // Put a list on a form: add a dropdown custom field pointing at it, unless one

@@ -655,7 +655,10 @@ function pc_line_calc($line, $header) {
         if ($rate <= 0) $rate = ($tm > 0 && $tm < 100) ? $loaded / (1 - $tm / 100) : $loaded;
     }
     $neg = (float)($header['negotiation_pct'] ?? 0);
-    $proposed = $rate * (1 + $neg / 100);
+    //  The rate the client is quoted is a figure in paise (as on the quotation line),
+    //  so the revenue is that rate × the quantity — a fixed rate of ₹50,000 stays
+    //  ₹50,000 and 10 man-months are ₹5,00,000, not ₹5,00,000.03 (test book SALA-058).
+    $proposed = round($rate * (1 + $neg / 100), 2);
 
     $boq = max(0, (float)($line['boq_qty'] ?? 0));
     // The one-time cost is per person (the form always said so): it counts once

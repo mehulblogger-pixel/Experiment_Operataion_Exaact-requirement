@@ -1,0 +1,664 @@
+{
+ "routes": {
+  "/sales-home": {
+   "cases": [
+    "EC-SALC-001",
+    "EC-SALC-003",
+    "EC-SALC-005",
+    "EC-SALC-006",
+    "EC-SALC-007",
+    "EC-SALC-066",
+    "EC-SALC-096"
+   ],
+   "buttons": {
+    "Sales home tile": [
+     "EC-SALC-001"
+    ],
+    "Sales home": [
+     "EC-SALC-003",
+     "EC-SALC-096"
+    ],
+    "Today": [
+     "EC-SALC-003",
+     "EC-SALC-096"
+    ],
+    "Pipeline board": [
+     "EC-SALC-003"
+    ],
+    "Sales dashboard": [
+     "EC-SALC-003"
+    ],
+    "New lead": [
+     "EC-SALC-003"
+    ],
+    "Orders & payments": [
+     "EC-SALC-003"
+    ],
+    "Renewals": [
+     "EC-SALC-003"
+    ],
+    "Targets": [
+     "EC-SALC-003"
+    ],
+    "Sales settings": [
+     "EC-SALC-003"
+    ],
+    "➕ New lead": [
+     "EC-SALC-005"
+    ],
+    "📝 Log activity": [
+     "EC-SALC-005"
+    ],
+    "💼 New deal": [
+     "EC-SALC-005"
+    ],
+    "🧾 New quote": [
+     "EC-SALC-005"
+    ],
+    "💰 Orders won": [
+     "EC-SALC-005"
+    ],
+    "🖨 Print a quote": [
+     "EC-SALC-005"
+    ],
+    "Where to go tiles": [
+     "EC-SALC-005"
+    ],
+    "👤 Me": [
+     "EC-SALC-006"
+    ],
+    "Everyone": [
+     "EC-SALC-006"
+    ],
+    "person chips": [
+     "EC-SALC-006"
+    ],
+    "Fix ›": [
+     "EC-SALC-007"
+    ],
+    "OK, seen": [
+     "EC-SALC-066"
+    ],
+    "Open Targets": [
+     "EC-SALC-066"
+    ]
+   }
+  },
+  "/sales": {
+   "cases": [
+    "EC-SALC-002",
+    "EC-SALC-004",
+    "EC-SALC-095"
+   ],
+   "buttons": {
+    "Start here": [
+     "EC-SALC-002"
+    ],
+    "Records": [
+     "EC-SALC-002",
+     "EC-SALC-004",
+     "EC-SALC-095"
+    ]
+   }
+  },
+  "/sales-today": {
+   "cases": [
+    "EC-SALC-008",
+    "EC-SALC-009",
+    "EC-SALC-010",
+    "EC-SALC-011",
+    "EC-SALC-012",
+    "EC-SALC-013",
+    "EC-SALC-014",
+    "EC-SALC-015",
+    "EC-SALC-101"
+   ],
+   "buttons": {
+    "🔴 Overdue": [
+     "EC-SALC-008"
+    ],
+    "🟠 Due today": [
+     "EC-SALC-008"
+    ],
+    "🟡 This week": [
+     "EC-SALC-008",
+     "EC-SALC-009"
+    ],
+    "❗ No next step": [
+     "EC-SALC-008"
+    ],
+    "💤 Stale deals": [
+     "EC-SALC-008",
+     "EC-SALC-010"
+    ],
+    "Who has what today": [
+     "EC-SALC-011"
+    ],
+    "person chips": [
+     "EC-SALC-011"
+    ],
+    "💰 Payments to collect": [
+     "EC-SALC-012",
+     "EC-SALC-013"
+    ],
+    "💰 Overdue ₹": [
+     "EC-SALC-012"
+    ],
+    "💬 WhatsApp": [
+     "EC-SALC-014"
+    ],
+    "📞 Call": [
+     "EC-SALC-014"
+    ],
+    "🔁 Renewals due": [
+     "EC-SALC-015"
+    ],
+    "(empty states)": [
+     "EC-SALC-101"
+    ],
+    "deal / lead name links": "navigation only",
+    "invoice links": "navigation only",
+    "contract links": "navigation only"
+   }
+  },
+  "/sales-log": {
+   "cases": [
+    "EC-SALC-016",
+    "EC-SALC-017",
+    "EC-SALC-018",
+    "EC-SALC-020",
+    "EC-SALC-021",
+    "EC-SALC-022",
+    "EC-SALC-023",
+    "EC-SALC-024",
+    "EC-SALC-027",
+    "EC-SALC-028",
+    "EC-SALC-029",
+    "EC-SALC-030",
+    "EC-SALC-031",
+    "EC-SALC-100"
+   ],
+   "buttons": {
+    "📝 Log": [
+     "EC-SALC-016"
+    ],
+    "Save this contact": [
+     "EC-SALC-016",
+     "EC-SALC-020",
+     "EC-SALC-023",
+     "EC-SALC-027",
+     "EC-SALC-028",
+     "EC-SALC-029",
+     "EC-SALC-030",
+     "EC-SALC-100"
+    ],
+    "2 · What happened": [
+     "EC-SALC-017",
+     "EC-SALC-018"
+    ],
+    "By when": [
+     "EC-SALC-021"
+    ],
+    "More details": [
+     "EC-SALC-022",
+     "EC-SALC-031"
+    ],
+    "When": [
+     "EC-SALC-022"
+    ],
+    "Meeting fixed → you pick": [
+     "EC-SALC-023"
+    ],
+    "Next thing to do": [
+     "EC-SALC-024"
+    ]
+   }
+  },
+  "/sales-settings": {
+   "cases": [
+    "EC-SALC-019",
+    "EC-SALC-043",
+    "EC-SALC-070",
+    "EC-SALC-071",
+    "EC-SALC-072",
+    "EC-SALC-073",
+    "EC-SALC-074",
+    "EC-SALC-075"
+   ],
+   "buttons": {
+    "Weekly off": [
+     "EC-SALC-019"
+    ],
+    "New leads go to": [
+     "EC-SALC-043"
+    ],
+    "Save Sales settings": [
+     "EC-SALC-043",
+     "EC-SALC-070",
+     "EC-SALC-071",
+     "EC-SALC-072",
+     "EC-SALC-073",
+     "EC-SALC-074"
+    ],
+    "Change stages and win % ›": [
+     "EC-SALC-075"
+    ],
+    "Lead sources": [
+     "EC-SALC-075"
+    ],
+    "Reasons for losing": [
+     "EC-SALC-075"
+    ],
+    "Buying roles": [
+     "EC-SALC-075"
+    ],
+    "Public holidays": [
+     "EC-SALC-075"
+    ],
+    "Who approves quotes": [
+     "EC-SALC-075"
+    ],
+    "Lead sources / Reasons for losing / Buying roles / Public holidays / Who approves quotes": "navigation only (checked in the stages case)"
+   }
+  },
+  "/opportunity": {
+   "cases": [
+    "EC-SALC-025",
+    "EC-SALC-026"
+   ],
+   "buttons": {
+    "📝 Log": [
+     "EC-SALC-025"
+    ],
+    "Save this contact": [
+     "EC-SALC-025"
+    ],
+    "More details": [
+     "EC-SALC-025"
+    ],
+    "Activity": [
+     "EC-SALC-026"
+    ]
+   }
+  },
+  "/lead": {
+   "cases": [
+    "EC-SALC-032",
+    "EC-SALC-099"
+   ],
+   "buttons": {
+    "📝 Log": [
+     "EC-SALC-032"
+    ],
+    "They prefer to be reached by": [
+     "EC-SALC-099"
+    ],
+    "Save this contact": [
+     "EC-SALC-099"
+    ]
+   }
+  },
+  "/sales-lead": {
+   "cases": [
+    "EC-SALC-033",
+    "EC-SALC-034",
+    "EC-SALC-035",
+    "EC-SALC-036",
+    "EC-SALC-037",
+    "EC-SALC-038",
+    "EC-SALC-039",
+    "EC-SALC-040",
+    "EC-SALC-041",
+    "EC-SALC-042",
+    "EC-SALC-097",
+    "EC-SALC-098"
+   ],
+   "buttons": {
+    "Save lead": [
+     "EC-SALC-033",
+     "EC-SALC-034",
+     "EC-SALC-035",
+     "EC-SALC-036",
+     "EC-SALC-037",
+     "EC-SALC-038",
+     "EC-SALC-042",
+     "EC-SALC-097",
+     "EC-SALC-098"
+    ],
+    "Save anyway": [
+     "EC-SALC-035",
+     "EC-SALC-036"
+    ],
+    "Save anyway & add another": [
+     "EC-SALC-035"
+    ],
+    "Save & add another": [
+     "EC-SALC-039"
+    ],
+    "Cancel": [
+     "EC-SALC-039"
+    ],
+    "First follow-up": [
+     "EC-SALC-040"
+    ],
+    "Office": [
+     "EC-SALC-041"
+    ],
+    "Give it to": [
+     "EC-SALC-041",
+     "EC-SALC-042"
+    ],
+    "Full lead form ›": "navigation only"
+   }
+  },
+  "/sales-board": {
+   "cases": [
+    "EC-SALC-044",
+    "EC-SALC-045"
+   ],
+   "buttons": {
+    "pipeline chips": [
+     "EC-SALC-044"
+    ],
+    "person chips": [
+     "EC-SALC-044"
+    ],
+    "cards": [
+     "EC-SALC-044"
+    ],
+    "See them ›": [
+     "EC-SALC-045"
+    ]
+   }
+  },
+  "/sales-dashboard": {
+   "cases": [
+    "EC-SALC-046",
+    "EC-SALC-047",
+    "EC-SALC-048",
+    "EC-SALC-049",
+    "EC-SALC-050",
+    "EC-SALC-051"
+   ],
+   "buttons": {
+    "This financial year": [
+     "EC-SALC-046",
+     "EC-SALC-048"
+    ],
+    "This quarter": [
+     "EC-SALC-047"
+    ],
+    "This month": [
+     "EC-SALC-047"
+    ],
+    "Last 90 days": [
+     "EC-SALC-047"
+    ],
+    "Pipeline by stage": [
+     "EC-SALC-049"
+    ],
+    "🎯 Target": [
+     "EC-SALC-050"
+    ],
+    "✅ Achievement": [
+     "EC-SALC-050"
+    ],
+    "👤 Me": [
+     "EC-SALC-051"
+    ],
+    "Everyone": [
+     "EC-SALC-051"
+    ],
+    "Team leaderboard": [
+     "EC-SALC-051"
+    ],
+    "card links (Leads, Deals won, Pipeline)": "navigation only",
+    "Team leaderboard names": "navigation only",
+    "Top 10 deal links": "navigation only"
+   }
+  },
+  "/sales-orders": {
+   "cases": [
+    "EC-SALC-052",
+    "EC-SALC-053",
+    "EC-SALC-054",
+    "EC-SALC-055",
+    "EC-SALC-056"
+   ],
+   "buttons": {
+    "This FY": [
+     "EC-SALC-052",
+     "EC-SALC-054"
+    ],
+    "Status": [
+     "EC-SALC-053"
+    ],
+    "Quarter": [
+     "EC-SALC-054"
+    ],
+    "Month": [
+     "EC-SALC-054"
+    ],
+    "90 days": [
+     "EC-SALC-054"
+    ],
+    "person chips": [
+     "EC-SALC-055"
+    ],
+    "📅 Received this month": [
+     "EC-SALC-056"
+    ],
+    "quotation / client links": "navigation only"
+   }
+  },
+  "/sales-renewals": {
+   "cases": [
+    "EC-SALC-057",
+    "EC-SALC-058",
+    "EC-SALC-059",
+    "EC-SALC-060"
+   ],
+   "buttons": {
+    "Next 30 days": [
+     "EC-SALC-057"
+    ],
+    "Next 60 days": [
+     "EC-SALC-057"
+    ],
+    "Next 90 days": [
+     "EC-SALC-057"
+    ],
+    "Next 180 days": [
+     "EC-SALC-057"
+    ],
+    "⛔ Ended": [
+     "EC-SALC-058"
+    ],
+    "🟠 Ending in 30 days": [
+     "EC-SALC-058"
+    ],
+    "🟡 Later": [
+     "EC-SALC-058"
+    ],
+    "💰 Their value": [
+     "EC-SALC-058"
+    ],
+    "Renewals": [
+     "EC-SALC-059"
+    ],
+    "🧾 Renewal quote": [
+     "EC-SALC-060"
+    ],
+    "contract / client links": "navigation only"
+   }
+  },
+  "/sales-targets": {
+   "cases": [
+    "EC-SALC-061",
+    "EC-SALC-062",
+    "EC-SALC-063",
+    "EC-SALC-064",
+    "EC-SALC-065",
+    "EC-SALC-067",
+    "EC-SALC-068",
+    "EC-SALC-069"
+   ],
+   "buttons": {
+    "Save targets": [
+     "EC-SALC-061",
+     "EC-SALC-062",
+     "EC-SALC-063",
+     "EC-SALC-064",
+     "EC-SALC-065",
+     "EC-SALC-067",
+     "EC-SALC-068",
+     "EC-SALC-069"
+    ]
+   }
+  },
+  "/quote": {
+   "cases": [
+    "EC-SALC-076",
+    "EC-SALC-077",
+    "EC-SALC-078",
+    "EC-SALC-079",
+    "EC-SALC-080"
+   ],
+   "buttons": {
+    "(display only)": [
+     "EC-SALC-076",
+     "EC-SALC-077",
+     "EC-SALC-078",
+     "EC-SALC-079",
+     "EC-SALC-080"
+    ]
+   }
+  },
+  "/clients": {
+   "cases": [
+    "EC-SALC-081",
+    "EC-SALC-082",
+    "EC-SALC-083"
+   ],
+   "buttons": {
+    "💼 Sales view": [
+     "EC-SALC-081",
+     "EC-SALC-082",
+     "EC-SALC-083"
+    ],
+    "Standard": [
+     "EC-SALC-081"
+    ],
+    "360": [
+     "EC-SALC-081"
+    ],
+    "name link": "navigation only"
+   }
+  },
+  "/partner-new": {
+   "cases": [
+    "EC-SALC-084",
+    "EC-SALC-085",
+    "EC-SALC-089"
+   ],
+   "buttons": {
+    "Save": [
+     "EC-SALC-084",
+     "EC-SALC-085",
+     "EC-SALC-089"
+    ]
+   }
+  },
+  "/quick-add": {
+   "cases": [
+    "EC-SALC-086"
+   ],
+   "buttons": {
+    "(retired)": [
+     "EC-SALC-086"
+    ]
+   }
+  },
+  "/partner": {
+   "cases": [
+    "EC-SALC-087"
+   ],
+   "buttons": {
+    "+ Add contact": [
+     "EC-SALC-087"
+    ],
+    "Buying role": [
+     "EC-SALC-087"
+    ]
+   }
+  },
+  "/lead-convert": {
+   "cases": [
+    "EC-SALC-088"
+   ],
+   "buttons": {
+    "Yes — make them a customer": [
+     "EC-SALC-088"
+    ]
+   }
+  },
+  "/opportunity-new": {
+   "cases": [
+    "EC-SALC-090"
+   ],
+   "buttons": {
+    "Open the deal": [
+     "EC-SALC-090"
+    ]
+   }
+  },
+  "/settings": {
+   "cases": [
+    "EC-SALC-091"
+   ],
+   "buttons": {
+    "Numbering → Deals": [
+     "EC-SALC-091"
+    ]
+   }
+  },
+  "/opportunities": {
+   "cases": [
+    "EC-SALC-092"
+   ],
+   "buttons": {
+    "Deals": [
+     "EC-SALC-092"
+    ]
+   }
+  },
+  "/workspace/setup/modules": {
+   "cases": [
+    "EC-SALC-093",
+    "EC-SALC-094"
+   ],
+   "buttons": {
+    "Save switches": [
+     "EC-SALC-093",
+     "EC-SALC-094"
+    ]
+   }
+  },
+  "/partner-import": {
+   "cases": [
+    "EC-SALC-102"
+   ],
+   "buttons": {
+    "Import": [
+     "EC-SALC-102"
+    ],
+    "Add customer": [
+     "EC-SALC-102"
+    ],
+    "Add a branch company": [
+     "EC-SALC-102"
+    ]
+   }
+  }
+ }
+}

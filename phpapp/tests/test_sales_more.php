@@ -199,6 +199,133 @@ try {
     t_ok(strpos($tlh, 'Next: Site visit') !== false, 'timeline · the deal\'s Activity list shows the next step that was logged');
     $all = feat_catalog_keys();
     t_ok(isset($all['sales-lead'], $all['sales-orders'], $all['sales-renewals'], $all['sales-targets'], $all['sales-settings']), 'switches · each new screen is in Modules & features with its own switch');
+    // ---- Fixes from the Sales test book (SALC), 19 Nov 2026 -------------------------------
+    t_eq([sx_user_covers_office($f['kiran'], $f['mum']), sx_user_covers_office($f['kiran'], $f['ahm']), sx_user_covers_office($f['meera'], $f['ahm']),
+          sx_user_covers_office($f['rakesh'], $f['ahm']), sx_user_covers_office($f['master'], $f['ahm'])], [true, false, false, true, true],
+         'office · who works for which office: Mumbai BM → Mumbai only; Mumbai Finance → not Ahmedabad; central Finance and Master → all');
+    bbv_as($f['master']);
+    $rg = sx_lead_save(['company_name' => 'Fx Give ' . uniqid(), 'office_id' => $f['ahm'], 'owner_user_id' => $f['kiran']], true);
+    t_ok(!empty($rg['err']) && empty($rg['ok']), 'new lead · an Ahmedabad lead cannot be given to the Mumbai branch manager (they could not open it): ' . ($rg['err'] ?? ''));
+    $rp = sx_lead_save(['company_name' => 'Fx Past ' . uniqid(), 'next_action_on' => date('Y-m-d', strtotime('-2 days'))], true);
+    t_ok(!empty($rp['err']), 'new lead · a first follow-up in the past is refused by the server too');
+    t_ok(!empty(sx_lead_save(['company_name' => 'Fx Feb ' . uniqid(), 'next_action_on' => '2027-02-30'], true)['err']), 'new lead · 30 Feb is refused');
+    bbv_route('sales-settings', 'POST', $f['master'], 0, ['oc_label' => ['Fx hot', 'फ़ॉलो अप करें', 'Fx pick'], 'oc_key' => ['FX_HOT', '', 'FX_PICK'], 'oc_days' => ['2', '3', '0'],
+              'off' => ['0'], 'stale' => '15', 'own' => [$f['mum'] => $f['kiran'], $f['ahm'] => $f['kiran']]]);
+    $sc = &settings_cache();   // the screen ran as its own request: read back what it stored
+    foreach (['sales_outcomes', 'sales_owner_by_office', 'sales_weekly_off', 'sales_stale_days'] as $k) { $v = ops_val("SELECT svalue FROM settings WHERE skey=?", [$k]); if ($v !== false && $v !== null) $sc[$k] = $v; }
+    unset($sc);
+    t_eq(sx_owner_map(), [(string) $f['mum'] => (int) $f['kiran']], 'settings · "New leads go to" refuses a person who does not work for that office (Ahmedabad skipped, Mumbai kept)');
+    $ocs = sx_outcomes();
+    t_ok(count($ocs) === 3 && isset($ocs['OUTCOME_2']) && $ocs['OUTCOME_2']['label'] === 'फ़ॉलो अप करें', 'settings · an outcome written only in Hindi is kept (given a numbered key), not dropped');
+    // Targets: whole rupees, no minus, and an older open page cannot undo another manager's change.
+    $g = sxt_grid($months); $cur0 = (string) (0 + $g[$f['kiran']][$m0]);
+    t_eq(sxt_save(['t' => [$f['kiran'] => [$m0 => '700000']], 'o' => [$f['kiran'] => [$m0 => '480000']]], $months), 0, 'targets · a box changed on an older page, after someone else changed it, is not saved');
+    t_eq(count($GLOBALS['sxt_skipped']['clash']), 1, 'targets · …and the person is told which month to check');
+    t_eq(sxt_save(['t' => [$f['kiran'] => [$m0 => $cur0, $m1 => '670000']], 'o' => [$f['kiran'] => [$m0 => '480000', $m1 => (string) (0 + $g[$f['kiran']][$m1])]]], $months), 1,
+         'targets · the boxes not touched on that page are left alone; the one changed is saved');
+    t_eq(sxt_grid($months)[$f['kiran']][$m0], (float) $cur0, 'targets · the other manager\'s figure stands');
+    t_eq(sxt_save(['t' => [$f['kiran'] => [$m1 => '-5000']]], $months), 0, 'targets · a minus figure is not saved…');
+    t_eq(count($GLOBALS['sxt_skipped']['bad']), 1, 'targets · …and the person is told');
+    sxt_save(['t' => [$f['kiran'] => [$m1 => '600000.56']]], $months);
+    t_eq(sxt_grid($months)[$f['kiran']][$m1], 600001.0, 'targets · whole rupees (₹6,00,000.56 → ₹6,00,001), so History and the e-mail show what is stored');
+    // WhatsApp only for a mobile.
+    t_eq([sx_wa('022 2345 6789'), sx_wa('98250 55555'), sx_wa('+91 98250-55555'), sx_wa('09825055555'), sx_wa('+44 7700 900123'), sx_wa('12345')],
+         ['', 'https://wa.me/919825055555', 'https://wa.me/919825055555', 'https://wa.me/919825055555', 'https://wa.me/447700900123', ''],
+         'WhatsApp · a landline gets Call only; an Indian mobile in any format, or a foreign number with its +code, gets WhatsApp');
+    // Renewals follow the office of the contract.
+    db()->prepare("INSERT INTO partner_contracts (partner_id, contract_number, title, value, start_date, end_date, is_active, branch_id) VALUES (?,?,?,?,?,?,1,?)")
+        ->execute([$pid, 'FX-R-AHM', 'Fx', 100000, date('Y-m-d', strtotime('-300 days')), date('Y-m-d', strtotime('+15 days')), $f['ahm']]);
+    $made['c'][] = (int) db()->lastInsertId();
+    t_ok(in_array('FX-R-AHM', array_column(sx_renewals_list(90), 'contract_number'), true), 'renewals · the Master Admin sees an Ahmedabad contract');
+    bbv_as($f['kiran']);
+    t_ok(!in_array('FX-R-AHM', array_column(sx_renewals_list(90), 'contract_number'), true) && !in_array('FX-R-AHM', array_column(sx_renewals(), 'contract_number'), true),
+         'renewals · the Mumbai branch manager does not (Renewals screen and Today)');
+    bbv_as($f['master']);
+    // Finance sees every order of their offices on Orders & payments.
+    $ro = bbv_route('sales-orders', 'GET', $f['rakesh'], 0);
+    t_ok(strpos($ro['out'] ?? '', 'FX-Q-1') !== false, 'orders · Finance sees the company\'s orders (not only "their own", which is none)');
+    // "0 days" = the person picks the date.
+    $_GET = ['deal' => (string) $o['id']]; $td = sx_log_target(); $_GET = [];
+    $rz = sx_log_save($td, ['method' => 'MEETING', 'outcome' => 'FX_PICK']);
+    t_ok(!empty($rz['err']) && strpos($rz['err'], 'By when') !== false, 'log · an outcome set to "you pick" (e.g. Meeting fixed) needs the date: ' . ($rz['err'] ?? ''));
+    // Deal timeline: which way, and no "Telephone call Telephone call".
+    sx_log_save($td, ['method' => 'CALL', 'outcome' => 'FX_HOT', 'direction' => 'IN']);
+    ob_start(); act_render_timeline('OPPORTUNITY', (int) $o['id'], 'Activity'); $tlh2 = ob_get_clean();
+    t_ok(strpos($tlh2, 'Incoming') !== false && strpos($tlh2, '<strong>Telephone call</strong>') === false && strpos($tlh2, 'Fx hot') !== false,
+         'timeline · the deal shows "Incoming" and what happened, and never repeats "Telephone call"');
+    // Data health counts only what this person can open.
+    db()->prepare("INSERT INTO quotations (quote_no, rev, is_current, client_id, client_name, subtotal, status, office_id, created_at, updated_at) VALUES ('FX-Q-AHM',0,1,?,?,1,'PENDING_APPROVAL',?,?,?)")
+        ->execute([$pid, 'Fx', $f['ahm'], date('c'), date('c')]);
+    $made['q'][] = (int) db()->lastInsertId();
+    $hq = fn() => (int) sx_health(0)[3][1];
+    $mHas = $hq(); bbv_as($f['kiran']); $kHas = $hq(); bbv_as($f['master']);
+    db()->prepare("UPDATE quotations SET office_id=? WHERE quote_no='FX-Q-AHM'")->execute([$f['mum']]);
+    bbv_as($f['kiran']); $kHas2 = $hq(); bbv_as($f['master']);
+    t_eq($kHas2 - $kHas, 1, 'data health · an Ahmedabad quote waiting is not counted for the Mumbai branch manager; once it is Mumbai\'s, it is');
+    // GST split says which state is missing.
+    $sp2 = sx_quote_gst_split(['gst_amount' => 18, 'gst_pct' => 18, 'client_id' => $pid]);
+    t_ok($sp2 === null || $sp2['mode'] !== 'UNKNOWN' || in_array($sp2['missing'] ?? '', ['ours', 'theirs'], true), 'quote GST · when a state is missing it says whose (ours or the client\'s)');
+    $idx = file_get_contents(dirname(__DIR__) . '/index.php');
+    t_ok(strpos($idx, "kind === 'contact' && (\$b['buying_role']") !== false, 'buying role · a contact\'s buying role must be one of the list (checked on save)');
+    t_ok(isset(lk_forms_for_type((int) (lk_type('contact_buying_role')['id'] ?? 0))['partner_contact']) || !lk_type('contact_buying_role'), 'buying role · Masters says it is used on Client / vendor → Contacts');
+    // ---- The serious findings of the earlier Sales test-book parts (SALA / SALB) -----------------
+    $mkU = function ($key, $role, $office) use ($f) {
+        db()->prepare("INSERT INTO users (username, first_name, last_name, role, is_active, home_office_id, scope_offices) VALUES (?,?,?,?,1,?,'')")
+            ->execute([$f['tag'] . '_' . $key, ucfirst($key), 'T', $role, $office]);
+        return (int) db()->lastInsertId();
+    };
+    $bdm = $mkU('bdmx', 'BUSINESS_DEV_MANAGER', $f['mum']); $mktm = $mkU('mktmx', 'MARKETING_MANAGER', $f['mum']);
+    $calls0 = (int) ops_val("SELECT COUNT(*) FROM calls");
+    $rro = bbv_route('opportunity-raise-order', 'POST', $bdm, 0, ['id' => (string) $o['id']]);
+    t_ok((int) ops_val("SELECT COUNT(*) FROM calls") === $calls0 && stripos(json_encode($rro), 'Operations') !== false,
+         'SALA-026 · a salesperson without the Work orders right cannot raise a work order by posting the form');
+    bbv_as($f['master']);
+    opp_link_quote((int) $o['id'], $qid);
+    t_ok(opp_unlink_quote((int) $o['id'], $qid) !== '' && (int) ops_val("SELECT COUNT(*) FROM opportunity_quotes WHERE opportunity_id=? AND quotation_id=?", [$o['id'], $qid]) === 1,
+         'SALA-027 · an accepted quotation cannot be detached from its deal (one sale, one contract)');
+    $qa = (int) ops_val("SELECT id FROM quotations WHERE quote_no='FX-Q-AHM'");
+    db()->prepare("UPDATE quotations SET office_id=? WHERE id=?")->execute([$f['ahm'], $qa]);
+    bbv_as($f['kiran']);
+    t_ok(stripos(opp_link_quote((int) $o['id'], $qa), 'another office') !== false, 'SALA-028 · a Mumbai person cannot attach an Ahmedabad quotation to a deal');
+    bbv_as($f['master']);
+    $calc = pc_line_calc(['rate_manual' => round(50000 / 1.05, 2), 'boq_qty' => 10, 'basis' => 'MAN_MONTH', 'headcount' => 1], ['negotiation_pct' => 5]);
+    t_eq([$calc['proposed'], $calc['revenue']], [50000.0, 500000.0], 'SALA-058 · a fixed client rate of ₹50,000 with 5% negotiation gives exactly ₹5,00,000 for 10 man-months (not ₹5,00,000.03)');
+    $d0 = (int) ops_val("SELECT COUNT(*) FROM approval_delegations");
+    $rdl = bbv_route('quote-delegations', 'POST', $mktm, 0, ['do' => 'save', 'delegator_user_id' => (string) $f['kiran'], 'delegate_user_id' => (string) $bdm,
+                     'from_date' => date('Y-m-d'), 'to_date' => date('Y-m-d', strtotime('+3 days')), 'reason' => 'Fx']);
+    t_ok((int) ops_val("SELECT COUNT(*) FROM approval_delegations") === $d0 && stripos(json_encode($rdl), 'only your own') !== false,
+         'SALB-036 · an approver cannot hand ANOTHER approver\'s authority to someone (only their own)');
+    bbv_route('quote-delegations', 'POST', $mktm, 0, ['do' => 'save', 'delegator_user_id' => (string) $mktm, 'delegate_user_id' => (string) $f['kiran'],
+              'from_date' => date('Y-m-d'), 'to_date' => date('Y-m-d', strtotime('+3 days')), 'reason' => 'Fx leave']);
+    t_eq((int) ops_val("SELECT COUNT(*) FROM approval_delegations"), $d0 + 1, 'SALB-036 · …but can still name someone to cover their OWN approvals');
+    db()->prepare("DELETE FROM approval_delegations WHERE delegator_user_id=?")->execute([$mktm]);
+    $m0c = (int) ops_val("SELECT COUNT(*) FROM billing_milestones WHERE quote_id=?", [$qa]);
+    db()->prepare("UPDATE quotations SET status='DRAFT' WHERE id=?")->execute([$qa]);
+    $rms = bbv_route('quote-milestones', 'POST', $f['kiran'], 0, ['quote_id' => (string) $qa, 'ms_title' => ['Advance'], 'ms_pct' => ['100']]);
+    t_ok((int) ops_val("SELECT COUNT(*) FROM billing_milestones WHERE quote_id=?", [$qa]) === $m0c && stripos(json_encode($rms), 'outside your office') !== false,
+         'SALB-074 · a Mumbai person cannot change the billing schedule of an Ahmedabad quotation');
+    db()->prepare("DELETE FROM opportunity_quotes WHERE opportunity_id=?")->execute([$o['id']]);
+    bbv_as($f['kiran']);
+    $la = lead_create(['company_name' => 'Fx Branch ' . uniqid(), 'office_id' => (string) $f['ahm']]);
+    t_ok(!empty($la['err']) && empty($la['id']), 'SALA-001 · a Mumbai person cannot open a lead in Ahmedabad (it would be hidden from them at once)');
+    $oa = opp_create(['name' => 'Fx Branch deal', 'partner_name' => 'Fx', 'office_id' => $f['ahm']]);
+    t_ok(!empty($oa['err']) && empty($oa['id']), 'SALA-017 · …nor a deal in Ahmedabad');
+    $lm = lead_create(['company_name' => 'Fx Own ' . uniqid(), 'office_id' => (string) $f['mum']]);
+    t_ok(!empty($lm['id']), 'SALA-001 · …but can in their own office'); $made['l'][] = (int) ($lm['id'] ?? 0);
+    bbv_as($f['master']);
+    $lAhm = lead_create(['company_name' => 'Fx Ahm Lead ' . uniqid(), 'office_id' => (string) $f['ahm']]); $made['l'][] = (int) ($lAhm['id'] ?? 0);
+    bbv_as($f['kiran']);
+    t_ok(!empty(opp_from_lead((int) $lAhm['id'])['err']), 'SALA-031 · "Work this as a deal" refuses another branch\'s lead');
+    bbv_as($f['master']);
+    t_ok(opp_update((int) $o['id'], ['name' => '  ']) !== '' && trim((string) opp_row((int) $o['id'])['name']) !== '', 'SALA-019 · a deal cannot be saved with an empty name');
+    if (function_exists('crm_migrate')) crm_migrate();
+    db()->prepare("INSERT INTO quote_followups (quote_id, due_date, status) VALUES (?,?, 'OPEN')")->execute([$qa, date('Y-m-d')]);
+    $fu = (int) db()->lastInsertId();
+    $rfu = bbv_route('followup-compose', 'GET', $f['kiran'], 0, [], ['id' => (string) $fu]);
+    t_ok(stripos(json_encode($rfu), 'outside your office') !== false, 'SALB-046 · a Mumbai person cannot download the follow-up e-mail of an Ahmedabad quotation');
+    db()->prepare("DELETE FROM quote_followups WHERE id=?")->execute([$fu]);
+    $src2 = file_get_contents(dirname(__DIR__) . '/lib/stagegate.php');
+    t_ok(strpos($src2, "redirect((string)(\$_POST['back'] ?? '/approvals'))") === false, 'SALA-024 · after an approval step the app goes back only to a page of this site');
 } finally {
     $_GET = []; $_POST = [];
     foreach ($keep as $k => $v) setting_set($k, $v === null ? '' : $v);

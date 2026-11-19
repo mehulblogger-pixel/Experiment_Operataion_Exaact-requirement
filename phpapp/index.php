@@ -1770,6 +1770,9 @@ if ($route === 'partner-add' && $method === 'POST') {
     if (isset($map[$kind])) {
         [$table, $fields, $tab] = $map[$kind];
         if ($kind === 'address' && !empty($b['city'])) $b['city'] = normalise_city($b['city']); // light spell-normalise
+        // A contact's buying role must be one of the editable list (Masters → Buying role).
+        if ($kind === 'contact' && ($b['buying_role'] ?? '') !== '' && function_exists('lk_options_or')
+            && !isset(lk_options_or('contact_buying_role', defined('CONTACT_BUYING_ROLES') ? CONTACT_BUYING_ROLES : [])[(string)$b['buying_role']])) $b['buying_role'] = '';
         // §3 — a contract number identifies one contract. The same number under
         // this same client is a rate contract being extended; under a different
         // client it is a duplicate, and every expiry and quantity check

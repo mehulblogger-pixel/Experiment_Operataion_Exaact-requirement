@@ -25,7 +25,7 @@ foreach ($rows as $r) { $left = (int) round((strtotime($r['end_date']) - $t) / 8
           <td class="nw"><?= e(fdate($r['end_date'])) ?></td>
           <td><span class="sxp <?= $left < 0 ? 'p-bad' : ($left <= 30 ? 'p-warn' : ($left <= 60 ? 'p-week' : 'p-mut')) ?>"><?= $left < 0 ? 'ended ' . -$left . ' d ago' : ($left === 0 ? 'ends today' : $left . ' days') ?></span></td>
           <td class="n"><?= (float) $r['value'] > 0 ? e(sx_money($r['value'])) : '—' ?></td>
-          <td class="nw"><?php if ($r['partner_id']): ?><a class="sxc" href="/quote-new?client=<?= (int) $r['partner_id'] ?>">🧾 Renewal <?= e(Tl('quote')) ?></a><?php endif; ?></td></tr>
+          <td class="nw"><?php if ($r['partner_id'] && (can('crm.quote.create') || can('mod.quotes.edit') || is_master_of('quotes'))): ?><a class="sxc" href="/quote-new?client=<?= (int) $r['partner_id'] ?>">🧾 Renewal <?= e(Tl('quote')) ?></a><?php endif; ?></td></tr>
       <?php endforeach; ?>
     </table></div><?php endif; ?></div>
 </div>

@@ -609,6 +609,10 @@ function lead_create(array $b) {
         else     $partnerId = 0;   // a stale id is not a customer; fall back to the typed name
     }
     if ($company === '') return ['err' => 'A lead needs a company or person to chase. Pick one from the master, or type a name.'];
+    //  A person opens leads only in an office they work for — else the lead is saved and
+    //  at once "outside your office" to its own maker (test book SALA-001).
+    if (($b['office_id'] ?? '') !== '' && current_user() && function_exists('scope_office_allows') && !scope_office_allows((int)$b['office_id']))
+        return ['err' => 'You can open leads only for your own office / branch. Pick your office, or ask that office to open it.'];
     $b['partner_id'] = $partnerId ?: null;
 
     $pipe = (int)($b['pipeline_id'] ?? 0) ?: (int)(pipeline_default()['id'] ?? 0);
@@ -1593,7 +1597,8 @@ function ops_leads($route, $method) {
             // The client master, so a company we already know is picked, not
             // re-typed. Individuals and brand-new companies are still typed.
             'clients' => function_exists('clients_list') ? clients_list() : [],
-            'offices' => ops_all("SELECT id, name FROM offices ORDER BY name"),
+            //  Only the offices this person works for (docs/02: BDM, KAM and ME work in their own office).
+            'offices' => array_values(array_filter(ops_all("SELECT id, name FROM offices ORDER BY name") ?: [], fn($of) => !function_exists('scope_office_allows') || scope_office_allows((int)$of['id']))),
             'sources' => function_exists('lk_options_or') ? lk_options_or('lead_source', LEAD_SOURCES) : LEAD_SOURCES,
             // Allocating at the moment of creation. Reported from a real test:
             // a lead was added and the only way to give it to somebody was

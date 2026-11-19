@@ -46,7 +46,12 @@ function sx_person() {
 function sx_people() {
     try {
         $ids = [];
-        foreach (ops_all("SELECT DISTINCT owner_user_id u FROM leads WHERE owner_user_id IS NOT NULL UNION SELECT DISTINCT owner_user_id u FROM opportunities WHERE owner_user_id IS NOT NULL") ?: [] as $r) if ((int) $r['u']) $ids[] = (int) $r['u'];
+        //  Only people who own leads or deals in offices I can see (a branch manager
+        //  is not shown another branch's salespeople with empty counts).
+        $sc = function_exists('scope_office_allows');
+        foreach (ops_all("SELECT DISTINCT owner_user_id u, office_id o FROM leads WHERE owner_user_id IS NOT NULL UNION SELECT DISTINCT owner_user_id u, office_id o FROM opportunities WHERE owner_user_id IS NOT NULL") ?: [] as $r)
+            if ((int) $r['u'] && (!$sc || scope_office_allows(((int) ($r['o'] ?? 0)) ?: null))) $ids[] = (int) $r['u'];
+        $ids = array_values(array_unique($ids));
         if (!$ids) return [];
         $in = implode(',', array_map('intval', $ids));
         $out = [];
@@ -97,9 +102,31 @@ function sx_renewals($days = null) {
     $days = $days ?? (function_exists('contract_warn_days') ? contract_warn_days() : 30);
     $t = sx_today(); $to = date('Y-m-d', strtotime("+$days days"));
     try {
-        return ops_all("SELECT c.*, COALESCE(bp.display_name, bp.legal_name) client_name FROM partner_contracts c LEFT JOIN business_partners bp ON bp.id=c.partner_id
-                        WHERE COALESCE(c.is_active,1)=1 AND COALESCE(c.end_date,'')<>'' AND c.end_date>=? AND c.end_date<=? ORDER BY c.end_date", [$t, $to]) ?: [];
+        return sx_scope_contracts(ops_all("SELECT c.*, COALESCE(bp.display_name, bp.legal_name) client_name, bp.home_branch_id client_branch FROM partner_contracts c LEFT JOIN business_partners bp ON bp.id=c.partner_id
+                        WHERE COALESCE(c.is_active,1)=1 AND COALESCE(c.end_date,'')<>'' AND c.end_date>=? AND c.end_date<=? ORDER BY c.end_date", [$t, $to]) ?: []);
     } catch (Throwable $e) { return []; }
+}
+
+//  A contract belongs to its branch (else its client's home branch); a person
+//  sees only those of the offices they cover — the contract register's own rule.
+function sx_scope_contracts(array $rows) {
+    if (!function_exists('scope_office_allows')) return $rows;
+    return array_values(array_filter($rows, fn($r) => scope_office_allows(($r['branch_id'] ?? null) ?: (($r['client_branch'] ?? null) ?: null))));
+}
+//  Does this user's office scope cover that office? (Same rules as their own login.)
+function sx_user_covers_office($uid, $officeId) {
+    if (!(int) $officeId) return true;
+    $u = ops_one("SELECT * FROM users WHERE id=?", [(int) $uid]); if (!$u) return false;
+    $role = !empty($u['is_superuser']) ? 'MASTER_ADMIN' : strtoupper((string) ($u['role'] ?? ''));
+    if ($role === 'MASTER_ADMIN') return true;
+    $so = trim((string) ($u['scope_offices'] ?? ''));
+    if ($so === 'ALL') return true;
+    if ($so === '' && function_exists('role_defaults')) {
+        $rk = function_exists('role_effective_key') ? role_effective_key($role) : $role;
+        if ((role_defaults($rk)['offices'] ?? '') === 'ALL') return true;
+    }
+    if ($so !== '') return in_array((int) $officeId, array_map('intval', array_filter(explode(',', $so))), true);
+    return (int) ($u['home_office_id'] ?? 0) === (int) $officeId;
 }
 
 //  Everything the Today screen and the Home cards need, for one person.
@@ -240,15 +267,22 @@ function sx_health($who) {
           + count(array_filter($deals, fn($o) => $o['expected_close'] && substr($o['expected_close'], 0, 10) < $t));
     $noStep = count(array_filter(array_merge($deals, $leads), fn($r) => trim((string) ($r['next_action_on'] ?? '')) === ''));
     $q = 0; $lostNo = 0;
+    //  Counted only within the offices (and, for one person, the records) this
+    //  person can open — so "Fix ›" leads to a register that shows them.
+    $sc = fn($o) => !function_exists('scope_office_allows') || scope_office_allows(((int) $o) ?: null);
     try {
-        $q = (int) ops_val("SELECT COUNT(*) FROM quotations WHERE COALESCE(is_current,1)=1 AND status IN ('PENDING_APPROVAL','EXPIRED')");
-        $lostNo = (int) ops_val("SELECT COUNT(*) FROM opportunities WHERE status='LOST' AND COALESCE(lost_reason,'')=''" . ($who ? " AND owner_user_id=" . (int) $who : ''));
+        foreach (ops_all("SELECT office_id, owner_id FROM quotations WHERE COALESCE(is_current,1)=1 AND status IN ('PENDING_APPROVAL','EXPIRED')") ?: [] as $r)
+            if ($sc($r['office_id'] ?? 0) && (!$who || (int) ($r['owner_id'] ?? 0) === (int) $who)) $q++;
+        foreach (ops_all("SELECT office_id FROM opportunities WHERE status='LOST' AND COALESCE(lost_reason,'')=''" . ($who ? " AND owner_user_id=" . (int) $who : '')) ?: [] as $r)
+            if ($sc($r['office_id'] ?? 0)) $lostNo++;
     } catch (Throwable $e) {}
     $gst = 0;
-    try { foreach (ops_all("SELECT gstin FROM business_partners WHERE COALESCE(gstin,'')<>''") ?: [] as $p) if (!preg_match('/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/', strtoupper(trim($p['gstin'])))) $gst++; } catch (Throwable $e) {}
+    try { foreach (ops_all("SELECT gstin, home_branch_id FROM business_partners WHERE COALESCE(gstin,'')<>''") ?: [] as $p)
+            if ($sc($p['home_branch_id'] ?? 0) && !preg_match('/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/', strtoupper(trim($p['gstin'])))) $gst++; } catch (Throwable $e) {}
+    $today = !function_exists('feat_on') || feat_on('/sales-today');   // switched off → the Pipeline board
     return [
-        ['Deals with a ⚠ health warning (late follow-up or past close date)', $late, '/sales-today'],
-        ['Open deals / leads with no next step', $noStep, '/sales-today#none'],
+        ['Deals with a ⚠ health warning (late follow-up or past close date)', $late, $today ? '/sales-today' : '/sales-board'],
+        ['Open deals / leads with no next step', $noStep, $today ? '/sales-today#none' : '/sales-board'],
         ['Customers with a GSTIN that does not look right', $gst, '/clients'],
         ['Quotes waiting for approval or expired', $q, '/quotes'],
         ['Lost deals without a reason', $lostNo, '/opportunities?status=LOST'],
@@ -256,7 +290,16 @@ function sx_health($who) {
 }
 
 // ---- Links ------------------------------------------------------------------
-function sx_wa($phone) { $d = preg_replace('/\D+/', '', (string) $phone); if (strlen($d) === 10) $d = '91' . $d; return strlen($d) >= 11 ? 'https://wa.me/' . $d : ''; }
+//  WhatsApp only for a mobile: an Indian 10-digit number starting 6–9 (a
+//  landline such as 022 2345 6789 gets Call only). Other countries' numbers,
+//  given with their own code (+44 …), are passed through.
+function sx_wa($phone) {
+    $raw = trim((string) $phone); $d = preg_replace('/\D+/', '', $raw);
+    if (strlen($d) === 11 && $d[0] === '0') $d = substr($d, 1);
+    if (strlen($d) === 12 && substr($d, 0, 2) === '91') $d = substr($d, 2);
+    if (strlen($d) === 10) return preg_match('/^[6-9]/', $d) ? 'https://wa.me/91' . $d : '';
+    return ($raw !== '' && $raw[0] === '+' && strlen($d) >= 11) ? 'https://wa.me/' . $d : '';
+}
 function sx_tel($phone) { $d = preg_replace('/[^\d+]+/', '', (string) $phone); return strlen(preg_replace('/\D/', '', $d)) >= 10 ? 'tel:' . $d : ''; }
 
 // ---- Route --------------------------------------------------------------------
@@ -273,7 +316,10 @@ function ops_sales_simple($route, $method) {
             $pipe = function_exists('opp_board') ? opp_board((int) ($_GET['pipeline'] ?? 0)) : null;
             [$leads] = sx_open_items($who);
             $orders = ['n' => 0, 'v' => 0.0];
-            try { [$fa, $fb] = fy_range(active_fy());
+            //  The same orders, for the same people and offices, as Orders & payments.
+            if (function_exists('sx_orders')) { try { [$fa, $fb] = fy_range(active_fy()); $or = sx_orders($who, $fa, $fb);
+                  $orders = ['n' => count($or), 'v' => array_sum(array_map(fn($q) => (float) $q['subtotal'], $or))]; } catch (Throwable $e) {} }
+            else try { [$fa, $fb] = fy_range(active_fy());
                   $r = ops_one("SELECT COUNT(*) n, COALESCE(SUM(subtotal),0) v FROM quotations WHERE COALESCE(is_current,1)=1 AND status='ACCEPTED' AND COALESCE(accepted_date, updated_at, '')>=? AND COALESCE(accepted_date, updated_at, '')<=?", [$fa, $fb . 'T23:59:59']);
                   $orders = ['n' => (int) $r['n'], 'v' => (float) $r['v']]; } catch (Throwable $e) {}
             view('ops/sx_board', $base + ['board' => $pipe, 'leads' => $leads, 'orders' => $orders,
@@ -319,7 +365,7 @@ function sx_client_sales_cols(array $ids) {
             $pid = (int) $c['partner_id'];
             if ($out[$pid]['contact'] === '') { $out[$pid]['contact'] = (string) $c['name']; $out[$pid]['phone'] = (string) (($c['mobile'] ?? '') ?: ($c['phone'] ?? '')); }
         }
-        foreach (ops_all("SELECT partner_id, MAX(occurred_at) t FROM activities WHERE partner_id IN ($in) GROUP BY partner_id") ?: [] as $a)
+        foreach (ops_all("SELECT partner_id, MAX(occurred_at) t FROM activities WHERE partner_id IN ($in) AND COALESCE(auto,0)=0 GROUP BY partner_id") ?: [] as $a)
             $out[(int) $a['partner_id']]['touch'] = (string) $a['t'];
     } catch (Throwable $e) {}
     if ($ar) foreach ($ids as $pid) { try { $bo = books_outstanding($pid); $out[$pid]['owed'] = (float) (is_array($bo) ? ($bo['outstanding'] ?? 0) : $bo); } catch (Throwable $e) {} }

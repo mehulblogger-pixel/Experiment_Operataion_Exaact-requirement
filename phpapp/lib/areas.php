@@ -111,7 +111,9 @@ function ops_area_def($area) {
             $t($sxOk && can('mod.clients.view'), '🏢', T_REG('client'), '/clients?view=sales', 'The one customer list — open deals, won this year, owed, last contact.');
             $t($fx('leads_can_view') && leads_can_view(), '🎯', 'Leads', '/leads', 'A company worth pursuing — before any specific job.',
                 $num(fn() => $fx('leads_due_count') ? leads_due_count() : 0), 'amber');
-            $t($fx('opp_can_view') && opp_can_view(), '💡', TP('opportunity'), '/opportunities', 'A live deal you are working to win or lose.');
+            //  The deals and pipelines screens sit behind the Leads module's own route
+            //  gate (ops_route_module_map), so the tile asks the same question.
+            $t($fx('opp_can_view') && opp_can_view() && can('mod.leads.view'), '💡', TP('opportunity'), '/opportunities', 'A live deal you are working to win or lose.');
             $t(can('mod.inquiries.view'), '📨', THP('inquiry'), '/inquiries', 'A specific request to quote — a ' . strtolower(Tl('quote')) . ' is raised from it.',
                 $num(fn() => $fx('inquiries_due_count') ? inquiries_due_count() : 0), 'amber');
             $t(can('mod.quotes.view'), '📝', THP('quote'), '/quotes', 'Quotations, revisions and approvals.',
@@ -129,7 +131,7 @@ function ops_area_def($area) {
             $t($fx('gate_can_view') && gate_can_view(), '🛂', 'Approvals', '/approvals', 'Deals held at a stage gate.',
                 $num(fn() => $fx('gate_pending_count') ? gate_pending_count() : 0), 'amber');
             // Sales dashboard now lives under Insights (one dashboards home).
-            $t($fx('pipe_can_view') && pipe_can_view(), '🪜', 'Pipelines & funnels', '/pipelines', 'Stages and conversion.');
+            $t($fx('pipe_can_view') && pipe_can_view() && can('mod.leads.view'), '🪜', 'Pipelines & funnels', '/pipelines', 'Stages and conversion.');
             $t($fx('roi_available') && roi_available() && $fx('roi_can') && roi_can(), '💸', 'Advertising return', '/ads-roi', 'Spend against leads produced.');
             break;
 

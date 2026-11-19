@@ -43,12 +43,15 @@ $tiles = [
   <div class="sxhead"><div class="sxlab" style="margin:0">⚡ Right now<?= $who && $whoKey !== 'me' ? ' · ' . e($people[$who] ?? '') : ($who ? '' : ' · everyone') ?></div>
     <?php sx_person_chips('sales-home', $whoKey, $people, $seeAll); ?></div>
   <div class="sxkpis" style="margin-top:8px">
-    <?php sx_kpi('red', '🔴 Overdue follow-ups', (string) $c['overdue'], '→ open Today', '/sales-today' . $q);
-          sx_kpi('orange', '🟠 Due today', (string) $c['today'], 'deals + leads', '/sales-today' . $q);
+    <?php //  With "Today" switched off the figures still show; they open the nearest screen that is on.
+          $tOn = !function_exists('feat_on') || feat_on('/sales-today');
+          $tUrl = fn($frag = '', $alt = '/sales-board') => $tOn ? '/sales-today' . $q . $frag : ($alt !== '' && (!function_exists('feat_on') || feat_on($alt)) ? $alt . ($alt === '/sales-board' ? $q : '') : '');
+          sx_kpi('red', '🔴 Overdue follow-ups', (string) $c['overdue'], $tOn ? '→ open Today' : 'deals + leads', $tUrl());
+          sx_kpi('orange', '🟠 Due today', (string) $c['today'], 'deals + leads', $tUrl());
           sx_kpi('blue', '💼 Open pipeline', sx_short($openV), count($d['open_deals']) . ' open deals', '/sales-board' . $q);
           sx_kpi('green', '🏆 Won this FY', sx_short($wonFy), 'since the start of the year', '/sales-dashboard' . $q);
-          if ($d['ar']) sx_kpi('brown', '💰 Overdue payments', sx_short($d['overdue_amt']), $d['overdue_n'] . ' invoice' . ($d['overdue_n'] === 1 ? '' : 's'), '/sales-today' . $q . '#pay');
-          sx_kpi('pink', '🔁 Renewals due', (string) count($d['renewals']), 'in ' . (function_exists('contract_warn_days') ? contract_warn_days() : 30) . ' days', '/sales-today' . $q . '#renew'); ?>
+          if ($d['ar']) sx_kpi('brown', '💰 Overdue payments', sx_short($d['overdue_amt']), $d['overdue_n'] . ' invoice' . ($d['overdue_n'] === 1 ? '' : 's'), $tUrl('#pay', ''));
+          sx_kpi('pink', '🔁 Renewals due', (string) count($d['renewals']), 'in ' . (function_exists('contract_warn_days') ? contract_warn_days() : 30) . ' days', $tUrl('#renew', '/sales-renewals')); ?>
   </div>
 
   <div class="sxlab">🧭 Your daily routine · 4 steps, 15 minutes</div>

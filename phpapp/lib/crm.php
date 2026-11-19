@@ -2298,6 +2298,10 @@ function crm_quote_scope_gate($route) {
     if ($route === 'quote-file' || $route === 'quote-file-delete') {
         $id = (int)ops_val("SELECT quote_id FROM quote_files WHERE id=?", [$id]);
     }
+    //  A follow-up names ITS OWN number, not the quotation's (test book SALB-046).
+    if ($route === 'followup-compose') {
+        $id = (int)ops_val("SELECT quote_id FROM quote_followups WHERE id=?", [$id]);
+    }
     if ($id <= 0) return;
     $q = ops_one("SELECT office_id, sbu FROM quotations WHERE id=?", [$id]);
     if (!$q) return;                            // no such quote — the route's own 404 answers
@@ -4364,6 +4368,21 @@ function ops_quote_delegations($method) {
     if (function_exists('appr_migrate')) appr_migrate();
     if ($method === 'POST') {
         $do = (string)($_POST['do'] ?? '');
+        //  docs/02 19a: an approver (crm.quote.approve) sets cover for THEIR OWN
+        //  approvals only; a master or settings.manage may set it for anyone.
+        $mine = (int)(current_user()['id'] ?? 0);
+        $forAnyone = is_master_of('quotes') || can('settings.manage');
+        if ($do === 'save' && !$forAnyone && (int)($_POST['delegator_user_id'] ?? 0) !== $mine) {
+            flash('You can name someone to cover only your own approvals. Ask an administrator to set cover for another approver.', 'error');
+            redirect('/quote-delegations');
+        }
+        if ($do === 'revoke' && !$forAnyone) {
+            $d = function_exists('appr_delegation') ? appr_delegation((int)($_POST['id'] ?? 0)) : null;
+            if ($d && (int)($d['delegator_user_id'] ?? 0) !== $mine) {
+                flash('Only the approver it covers, or an administrator, can end this cover.', 'error');
+                redirect('/quote-delegations');
+            }
+        }
         if ($do === 'save') {
             [$ok, $msg] = appr_delegation_save(0, ['entity' => 'QUOTE'] + $_POST);
             flash($msg, $ok ? 'success' : 'error');
@@ -4380,6 +4399,7 @@ function ops_quote_delegations($method) {
         'entities'   => ['QUOTE' => 'Quotations'],
         'onlyEntity' => 'QUOTE',
         'title'      => 'Who covers for a quotation approver',
+        'onlyMe'     => (is_master_of('quotes') || can('settings.manage')) ? 0 : (int)(current_user()['id'] ?? 0),
     ]);
     return true;
 }

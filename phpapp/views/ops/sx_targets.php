@@ -16,7 +16,7 @@ $curYm = date('Y-m');
       <?php foreach ($people as $uid => $nm): $tY = array_sum($grid[$uid] ?? []); $wY = array_sum($won[$uid] ?? []); $pc = $tY > 0 ? (int) round($wY * 100 / $tY) : null; ?>
         <tr><td><b><?= e($nm) ?></b><br><span class="muted" style="font-size:11.5px">won ↓</span></td>
           <?php foreach ($months as $m): $tv = $grid[$uid][$m] ?? null; $wv = (float) ($won[$uid][$m] ?? 0); ?>
-            <td class="n" style="min-width:96px"><?php if ($can): ?><input class="form-control sxnum" name="t[<?= (int) $uid ?>][<?= e($m) ?>]" inputmode="decimal" value="<?= $tv !== null ? e((string) (0 + $tv)) : '' ?>" aria-label="<?= e($nm . ' ' . $m) ?> target"><?php else: ?><?= $tv !== null ? e(sx_short($tv)) : '—' ?><?php endif; ?>
+            <td class="n" style="min-width:96px"><?php if ($can): ?><input class="form-control sxnum" name="t[<?= (int) $uid ?>][<?= e($m) ?>]" inputmode="numeric" value="<?= $tv !== null ? e((string) (0 + $tv)) : '' ?>" aria-label="<?= e($nm . ' ' . $m) ?> target"><input type="hidden" name="o[<?= (int) $uid ?>][<?= e($m) ?>]" value="<?= $tv !== null ? e((string) (0 + $tv)) : '' ?>"><?php else: ?><?= $tv !== null ? e(sx_short($tv)) : '—' ?><?php endif; ?>
               <?php $ch = $changes[$uid][$m] ?? []; if (count($ch) > 1): $was = $ch[count($ch) - 2]; $last = $ch[count($ch) - 1]; ?>
                 <div style="font-size:11px;margin-top:3px"><span class="sxp p-week" title="Changed <?= e(fdate(substr((string) $last['set_at'], 0, 10))) ?> by <?= e($last['set_by']) ?> — was <?= e(sx_money($was['amount'])) ?>">↻ was <?= e(sx_short($was['amount'])) ?></span></div>
               <?php endif; ?>

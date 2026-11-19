@@ -80,7 +80,7 @@ $c = $d['counts']; $q = $whoKey !== 'me' ? '?who=' . rawurlencode((string) $whoK
       <div class="tbl"><table class="sxt">
         <?php foreach ($d['renewals'] as $r): $left = (int) round((strtotime($r['end_date']) - strtotime(date('Y-m-d'))) / 86400); ?>
           <tr><td><a href="/contract?id=<?= (int) $r['id'] ?>"><?= e($r['contract_number'] ?: $r['title']) ?></a> · <?= e($r['client_name'] ?? '') ?></td><td class="n"><?= (float) $r['value'] > 0 ? e(sx_money($r['value'])) : '' ?></td>
-            <td><span class="sxp <?= $left <= 15 ? 'p-warn' : 'p-week' ?>">in <?= $left ?> days</span></td></tr>
+            <td><span class="sxp <?= $left <= 15 ? 'p-warn' : 'p-week' ?>"><?= $left <= 0 ? 'ends today' : ($left === 1 ? 'tomorrow' : 'in ' . $left . ' days') ?></span></td></tr>
         <?php endforeach; ?>
       </table></div><?php endif; ?></div>
   </div>

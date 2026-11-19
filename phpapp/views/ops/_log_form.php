@@ -17,6 +17,8 @@ $lfIcons = ['CALL' => '📞', 'WHATSAPP' => '💬', 'EMAIL' => '✉️', 'MEETIN
 $lfPref = (string) ($lf['pref'] ?? ''); $lfSel = isset(LEAD_CONTACT_METHODS[$lfPref]) ? $lfPref : 'CALL';
 ?>
 <style>
+/* On a phone the sticky top bar must not cover the form's first choices. */
+.lf{scroll-margin-top:84px}
 .lf-pick{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 4px}
 .lf-pick label{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--line);border-radius:999px;padding:7px 12px;font-size:13.5px;font-weight:600;cursor:pointer;min-height:40px;margin:0;background:var(--card)}
 .lf-pick input{accent-color:var(--brand)}

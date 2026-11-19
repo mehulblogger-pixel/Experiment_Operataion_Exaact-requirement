@@ -73,7 +73,8 @@
     "EC-SALB-020",
     "EC-SALB-029",
     "EC-SALB-052",
-    "EC-SALB-056"
+    "EC-SALB-056",
+    "EC-SALB-082"
    ],
    "buttons": {
     "Overview / History / Sites & docs / Jobs & order tabs": "navigation only",
@@ -163,6 +164,9 @@
     "⬇ PDF / Word": [
      "EC-SALB-056",
      "EC-SALB-057"
+    ],
+    "(GST split lines under the totals — display only)": [
+     "EC-SALB-082"
     ]
    }
   },
@@ -234,7 +238,8 @@
     "EC-SALB-049",
     "EC-SALB-050",
     "EC-SALB-051",
-    "EC-SALB-052"
+    "EC-SALB-052",
+    "EC-SALB-083"
    ],
    "buttons": {
     "to=PENDING_APPROVAL": [
@@ -252,7 +257,8 @@
     ],
     "to=ACCEPTED": [
      "EC-SALB-049",
-     "EC-SALB-051"
+     "EC-SALB-051",
+     "EC-SALB-083"
     ],
     "to=LOST": [
      "EC-SALB-050",
@@ -631,5 +637,6 @@
     ]
    }
   }
- }
+ },
+ "note": "Refreshed 19 Nov 2026 on 7debc6c: new cases EC-SALB-082 (GST split) and EC-SALB-083 (new-name client numbering)."
 }

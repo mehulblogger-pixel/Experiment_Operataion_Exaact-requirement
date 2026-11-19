@@ -44,11 +44,11 @@
     "EC-SALA-005",
     "EC-SALA-009",
     "EC-SALA-010",
-    "EC-SALA-016"
+    "EC-SALA-016",
+    "EC-SALA-080"
    ],
    "buttons": {
     "Overview / Contacts / Quotes / Documents / History / Actions (tabs)": "navigation only",
-    "Log a contact": "navigation only",
     "More — change stage, mark lost…": "navigation only",
     "Make the quote → / + Make a quote": "navigation only (quotation screens belong to SALB)",
     "+ Project costing": [
@@ -62,6 +62,12 @@
     ],
     "Delete / Delete this lead": [
      "EC-SALA-012"
+    ],
+    "📝 Log a conversation": [
+     "EC-SALA-005"
+    ],
+    "(Overview card on a phone)": [
+     "EC-SALA-080"
     ]
    }
   },
@@ -139,23 +145,37 @@
   },
   "lead-delete": {
    "cases": [
-    "EC-SALA-012"
+    "EC-SALA-012",
+    "EC-SALA-081"
    ],
    "buttons": {
     "Delete this lead": [
-     "EC-SALA-012"
+     "EC-SALA-012",
+     "EC-SALA-081"
     ]
    }
   },
   "lead-contact": {
    "cases": [
-    "EC-SALA-005"
+    "EC-SALA-005",
+    "EC-SALA-079"
    ],
    "buttons": {
+    "📝 Log a conversation (opens the one form)": [
+     "EC-SALA-005"
+    ],
     "Save this contact": [
+     "EC-SALA-005",
+     "EC-SALA-079"
+    ],
+    "How / What happened chips": [
+     "EC-SALA-005"
+    ],
+    "More details (optional)": [
      "EC-SALA-005"
     ]
-   }
+   },
+   "note": "The lead page's \"Log a contact\" form was replaced on 19 Nov 2026 by the ONE \"📝 Log a conversation\" form; it saves through /sales-log. The old /lead-contact address still answers a post (EC-SALA-005 finding)."
   },
   "lead-files": {
    "cases": [
@@ -192,7 +212,7 @@
     "EC-SALA-033"
    ],
    "buttons": {
-    "+ New opportunity": "navigation only",
+    "+ New deal": "navigation only",
     "⬇ CSV": [
      "EC-SALA-033"
     ],
@@ -210,9 +230,11 @@
   },
   "opportunity": {
    "cases": [
+    "EC-SALA-023",
     "EC-SALA-028",
     "EC-SALA-029",
-    "EC-SALA-023"
+    "EC-SALA-078",
+    "EC-SALA-079"
    ],
    "buttons": {
     "Overview / Quotes / History / Actions (tabs)": "navigation only",
@@ -229,7 +251,14 @@
     "Withdraw the request": [
      "EC-SALA-023"
     ],
-    "All approvals": "navigation only"
+    "All approvals": "navigation only",
+    "📝 Log a conversation": [
+     "EC-SALA-078"
+    ],
+    "Save this contact": [
+     "EC-SALA-078",
+     "EC-SALA-079"
+    ]
    }
   },
   "opportunity-new": {
@@ -238,7 +267,7 @@
     "EC-SALA-018"
    ],
    "buttons": {
-    "Open the opportunity": [
+    "Open the deal": [
      "EC-SALA-017",
      "EC-SALA-018"
     ],
@@ -260,7 +289,8 @@
   },
   "opportunity-delete": {
    "cases": [
-    "EC-SALA-032"
+    "EC-SALA-032",
+    "EC-SALA-081"
    ],
    "buttons": {
     "Delete": [
@@ -962,5 +992,5 @@
    }
   }
  },
- "note": "Routes marked (extra) are the project-costing screens named in the task but absent from SALA.txt (the route file has no costing routes)."
+ "note": "Routes marked (extra) are the project-costing screens named in the task but absent from SALA.txt (the route file has no costing routes). Refreshed 19 Nov 2026 on 7debc6c: Opportunity → Deal on screen; one log form; new cases EC-SALA-078…081."
 }

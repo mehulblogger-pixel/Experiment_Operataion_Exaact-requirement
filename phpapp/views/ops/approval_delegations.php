@@ -70,8 +70,9 @@ $state = function ($r) use ($today) {
     <div class="ff-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
       <div class="ff"><label>Who is away *</label>
         <select class="form-control searchable" name="delegator_user_id" required>
-          <option value="">—</option>
-          <?php foreach ($people as $u): ?><option value="<?= (int) $u['id'] ?>"><?= $who($u) ?></option><?php endforeach; ?>
+          <?php $onlyMeId = (int) ($onlyMe ?? 0);   // an approver sets cover for themselves only ?>
+          <?php if (!$onlyMeId): ?><option value="">—</option><?php endif; ?>
+          <?php foreach ($people as $u): if ($onlyMeId && (int) $u['id'] !== $onlyMeId) continue; ?><option value="<?= (int) $u['id'] ?>"<?= $onlyMeId ? ' selected' : '' ?>><?= $who($u) ?></option><?php endforeach; ?>
         </select></div>
       <div class="ff"><label>Who acts for them *</label>
         <select class="form-control searchable" name="delegate_user_id" required>

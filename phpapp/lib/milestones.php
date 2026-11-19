@@ -483,6 +483,11 @@ function ops_milestones($route, $method) {
     if ($route === 'quote-milestones') {
         $q = crm_quote_get((int)($_POST['quote_id'] ?? 0));
         if (!$q) { http_response_code(404); view('notfound'); return true; }
+        //  The quotation's own two rules, as for every other change to it: its office /
+        //  branch, and who works on an assigned quotation (test book SALB-074).
+        ops_require(!function_exists('scope_allows') || scope_allows($q['office_id'] ?? null, $q['sbu'] ?? null), 'This quotation is outside your office / branch scope.');
+        if (function_exists('crm_quote_can_work') && !crm_quote_can_work($q))
+            ops_require(false, function_exists('crm_assignee_words') ? crm_assignee_words((int)(crm_quote_owner_user_id($q) ?? 0), Tl('quote')) : 'This quotation is assigned to someone else.');
         ops_require(ms_can_edit_quote($q), 'This ' . Tl('quote') . "'s billing schedule cannot be changed now — once it has gone to the customer, a change is a revision.");
         $back = '/quote?id=' . (int)$q['id'] . '#milestones';
         [$rows, $ret] = !empty($_POST['ms_clear']) ? [[], 0.0] : ms_from_post($_POST);
