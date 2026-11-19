@@ -137,6 +137,8 @@ function opp_rename_first_stage() {
         if ((string) (setting_get('opp_stage_rename_v1', '') ?? '') === '') {
             db()->exec("UPDATE pipeline_stages SET name='New deal' WHERE name='Enquiry received'
                         AND pipeline_id IN (SELECT id FROM pipelines WHERE entity_kind='OPPORTUNITY')");
+            //  …and the pipeline itself, where it still has the old default name.
+            db()->exec("UPDATE pipelines SET name='Deal pipeline' WHERE entity_kind='OPPORTUNITY' AND name='Opportunity pipeline'");
             setting_set('opp_stage_rename_v1', date('c'));
         }
     } catch (Throwable $e) { /* tried again on the next boot */ }

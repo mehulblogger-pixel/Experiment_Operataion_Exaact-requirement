@@ -181,6 +181,7 @@ try {
     db()->prepare("DELETE FROM settings WHERE skey='opp_stage_rename_v1'")->execute(); $sc = &settings_cache(); unset($sc['opp_stage_rename_v1']);
     opp_rename_first_stage();
     t_eq((string) ops_val("SELECT name FROM pipeline_stages WHERE id=?", [$stg]), 'New deal', 'stage · a deal stage still called "Enquiry received" becomes "New deal"');
+    t_eq((int) ops_val("SELECT COUNT(*) FROM pipelines WHERE entity_kind='OPPORTUNITY' AND name='Opportunity pipeline'"), 0, 'stage · a deal pipeline still called "Opportunity pipeline" becomes "Deal pipeline"');
     db()->prepare("DELETE FROM pipeline_stages WHERE id=?")->execute([$stg]);
     $all = feat_catalog_keys();
     t_ok(isset($all['sales-lead'], $all['sales-orders'], $all['sales-renewals'], $all['sales-targets'], $all['sales-settings']), 'switches · each new screen is in Modules & features with its own switch');
