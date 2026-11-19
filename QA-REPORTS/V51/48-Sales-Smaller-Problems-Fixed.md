@@ -7,7 +7,7 @@
 3. *Branch GST — "Yes if required at all."*
 4. *"Fix all smaller problems."*
 
-**This zip** (update **@@RELEASE@@**) replaces update 69287af and contains everything in it.
+**This zip** (update **329f18f**) replaces update 69287af and contains everything in it.
 
 ---
 
@@ -119,9 +119,9 @@ All 82 problems in the Sales test book are now dealt with:
 
 | Check | Result |
 |---|---|
-| New automatic tests for this round (one per problem, with the book's example) | **@@T_R2@@** |
-| Every other test file for Sales, leads, deals, quotations, costing, approvals, contracts, clients, invoices, switches | **@@T_REL@@** |
-| Robot: the screen-by-screen cases | **@@ROBOT@@** |
+| New automatic tests for this round (one per problem, with the book's example) | **35 / 35 ✅** |
+| Every other test file for Sales, leads, deals, quotations, costing, approvals, contracts, clients, invoices, switches | **5,613 checks, 0 failed ✅** (Sales 596, quotations 265, costing 444, approvals 627, stage gates 1,297, pipelines 256, contracts 403, clients 249, invoices 81, branch scope 263 + 559, and the rest). On the first run four older checks failed. They showed that two of my changes went against your earlier decisions (costing 13 Nov; Business Unit Head approvals). Both were corrected, as described above, before this zip. |
+| Robot: the screen-by-screen cases | **104 cases: none got worse.** One case (SAL-160) stopped at the new "business unit" question on "They said yes". The robot was taught to answer it, and the case is now exactly as before. |
 
 ## 4. Your check list on opstest (10 checks)
 
