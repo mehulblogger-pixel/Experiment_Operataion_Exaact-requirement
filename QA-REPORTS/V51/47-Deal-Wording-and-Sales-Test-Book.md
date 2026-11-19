@@ -5,7 +5,7 @@
 1. *"It must be deal but check opportunity is mentioned … In pipeline it is mentioned as enquiry. Email when target changed are not triggered."*
 2. *"Yes change it and provide me all edge cases particularly for sales a detailed testing."*
 
-**This zip** (update **@@RELEASE@@**) replaces update 906e79f. It contains everything in that update plus the changes below.
+**This zip** (update **69287af**) replaces update 906e79f. It contains everything in that update plus the changes below.
 
 ---
 
@@ -134,9 +134,9 @@ The book lists **43 questions**. Nothing was changed for them. The ones that mat
 
 | Check | Result |
 |---|---|
-| Automatic tests for this work (Sales parts 2–3, including every fix above, each with a "still allowed" check) | **@@T_MORE@@** |
-| Every other test file for Sales, leads, deals, quotations, costing, approvals, contracts, clients, switches | **@@T_REL@@** |
-| Robot: the screen-by-screen cases | **@@ROBOT@@** |
+| Automatic tests for this work (Sales parts 2–3, including every fix above, each with a "still allowed" check) | **111 / 111 ✅** |
+| Every other test file for Sales, leads, deals, quotations, costing, approvals, contracts, clients, switches | **5,204 checks, 0 failed ✅** (Sales 561, quotations 265, costing 444, approvals 627, stage gates 1,297, contracts 403, clients 249, branch scope 263 + 559, leads 149, and the rest) |
+| Robot: the screen-by-screen cases | **104 cases: none got worse.** Five Sales cases that failed last time now pass (SAL-005 deals list, SAL-120, SAL-134, SAL-136, SAL-182 deal numbering); SAL-135 improved. The remaining failures are the same as before (mostly the "approvals & sending" work you put on hold) |
 
 ## 5. Your check list on opstest (12 checks)
 
