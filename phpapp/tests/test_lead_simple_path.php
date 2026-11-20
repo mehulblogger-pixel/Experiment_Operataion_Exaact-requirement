@@ -11,8 +11,11 @@ try {
     leads_migrate();
     t_eq(LEAD_STATUS['CONVERTED'], 'Won — customer', 'a won lead reads "Won — customer", not "Converted"');
     $view = (string) file_get_contents(__DIR__ . '/../views/ops/lead_detail.php');
-    t_ok(strpos($view, '<ol class="lead-steps"') !== false, 'the lead page shows the three plain steps');
-    foreach (['Talk to them', 'Their answer', 'Log your first contact', "Make the <?= e(Tl('quote')) ?> →", 'More — change stage, mark lost'] as $w)
+    //  Owner, 20 Nov 2026 — the page redesigned from the owner's own picture: the three
+    //  plain steps became the stage path (your stages → Quotation → Won → Lost), and
+    //  "More — change stage, mark lost" became the status pill's "Change the stage" menu.
+    t_ok(strpos($view, 'rec_steps($steps)') !== false && strpos($view, "ucfirst(\$Q)") !== false, 'the lead page shows where it is: the stage path, with the quotation as a step');
+    foreach (['Log your first contact', "Make the <?= e(\$Q) ?>", 'Change the stage', 'Mark how far it has got', 'Close it'] as $w)
         t_ok(strpos($view, $w) !== false, 'the lead page says "' . $w . '"');
     t_ok(strpos($view, 'data-tab-go') !== false, 'the main button opens the right tab itself');
     t_ok(strpos($view, '$hasNext') !== false, 'a new lead does not draw nine empty "thread" boxes above its next step');

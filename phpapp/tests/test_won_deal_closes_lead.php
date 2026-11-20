@@ -46,7 +46,8 @@ try {
     t_eq(lead_row($l3)['status'], 'CONVERTED', 'opening it closes it as Converted');
 
     $view = (string) file_get_contents(__DIR__ . '/../views/ops/lead_detail.php');
-    t_ok(strpos($view, '<details class="fold" data-tab="History" open>') !== false, 'the History tab shows its content straight away (it was folded shut)');
+    t_ok(strpos($view, "'id=\"history\"'") !== false && strpos($view, "rec_card_open('History (") !== false,
+         'the history shows straight away — the latest on Overview, all of it under More (never folded shut)');
 } finally {
     if ($own && $pdo->inTransaction()) $pdo->rollBack();
 }

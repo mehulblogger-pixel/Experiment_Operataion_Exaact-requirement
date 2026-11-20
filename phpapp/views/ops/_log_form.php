@@ -15,6 +15,10 @@ $lfDates = []; foreach ($lfOut as $lfK => $lfO) $lfDates[$lfK] = sx_add_working_
 $lfToday = date('Y-m-d'); $lfN = 'lf' . (int) $lf['id'];
 $lfIcons = ['CALL' => '📞', 'WHATSAPP' => '💬', 'EMAIL' => '✉️', 'MEETING' => '🤝', 'VISIT' => '🚗', 'NOTE' => '📝'];
 $lfPref = (string) ($lf['pref'] ?? ''); $lfSel = isset(LEAD_CONTACT_METHODS[$lfPref]) ? $lfPref : 'CALL';
+//  A quick action ("Log call", "Send e-mail", "Add note" — owner, 20 Nov 2026) opens
+//  this same form with its "How" already ticked: $lf['method'] or ?log=EMAIL.
+$lfAsk = strtoupper((string) ($lf['method'] ?? ($_GET['log'] ?? '')));
+if (isset(LEAD_CONTACT_METHODS[$lfAsk])) $lfSel = $lfAsk;
 ?>
 <style>
 /* On a phone the sticky top bar must not cover the form's first choices. */

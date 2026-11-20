@@ -50,7 +50,10 @@ register_shutdown_function(function () use ($needles) {
     $err = error_get_last();
     echo json_encode(['flash' => array_values($_SESSION['flash'] ?? []), 'done' => $GLOBALS['__sales_worker_done'],
                       'error' => $GLOBALS['__sales_worker_error'] ?? (($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) ? $err['message'] : null),
-                      'has' => $has, 'len' => strlen($html)]) . "\n";
+                      'has' => $has, 'len' => strlen($html),
+                      //  What a refused POST kept for the next page load (form_stash), so a
+                      //  test can hand it back as that next load's session.
+                      'retry' => $_SESSION['form_retry'] ?? null]) . "\n";
 });
 // A shared start line (env SALES_WORKER_START_AT, unix seconds with fraction):
 // several workers started together finish booting at different moments, so for a

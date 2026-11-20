@@ -58,7 +58,9 @@ try {
     $pdo->prepare("INSERT INTO quotations (quote_no, rev, is_current, client_name, status, created_at) VALUES (?,0,1,'Loose','DRAFT',?)")->execute(['BR-LOOSE-' . getmypid(), date('c')]);
     t_eq(crm_quote_deal_link(crm_quote_get((int)$pdo->lastInsertId())), null, 'a quotation on no deal keeps its usual place');
     $lv = (string)file_get_contents(__DIR__ . '/../views/ops/lead_detail.php');
-    t_ok(strpos($lv, "if (!empty(\$oppId)): ?> · <a href=\"/opportunity?id=<?= (int)\$oppId ?>\"><b>its deal</b></a>") !== false, 'a won lead keeps a link to its deal');
+    //  Lead page v3 (owner, 20 Nov 2026): the won banner looks the deal up itself (the old
+    //  link read a value only set on an open lead, so it never showed on a won one).
+    t_ok(strpos($lv, '<a href="/opportunity?id=<?= (int)$anyDeal ?>">') !== false && strpos($lv, ' Its deal</a>') !== false, 'a won lead keeps a link to its deal');
 
     t_section('1.5 — one parent in the trail');
     nav_under('quote', 'leads', ['label' => 'L-9 · Acme', 'url' => '/lead?id=9']);

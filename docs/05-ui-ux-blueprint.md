@@ -315,3 +315,32 @@ of its biggest competitive advantages.
 - **Phone-first / desk-first split** (from `00-README.md`) still holds: inspectors
   are phone-first in the field; coordinators, managers and finance are desk-first on
   a laptop. Design for both; never average them into one middle.
+
+## The record page kit — the standard layout for one record (owner, 20 Nov 2026)
+
+The owner approved the lead page drawn from their own picture and asked for it to
+be "made universal ... for all the screen". It is the standard for every screen
+that shows ONE record (lead first; deal, quotation, enquiry, project costing and
+order next). Look and feel only — it decides nothing about who may do what.
+
+- **Header card:** an icon tile, the record's name, its number and branch, a
+  **status pill** (tap it to move the stage when the person may), the contact line,
+  and ✏️ Edit · 📎 Attach · ⋯ More. A person who may not change the record sees the
+  status as a plain label.
+- **Three equal fact boxes** (value, date, who) — always the same height.
+- **Stage path:** the company's own stages, then the next document (Quotation),
+  then Won, then Lost (a red ✕ only when it closed there).
+- **Icon tabs:** Overview · Details · Contacts · Quotes · More (with counts). Only
+  the tabs a record has are shown.
+- **Cards** with a title row and one action at its right (Edit, View all).
+  Label / value rows share one label width; long words (e-mails) wrap inside.
+- **Overview** carries the one next step and its single main button, four equal
+  quick actions, a summary, the latest history. On a laptop cards sit in pairs of
+  the same height; on a phone they stack in one column.
+- **Closed records:** a locked card says why it closed (never editable — reopening
+  is the way to change it); a won record shows a green banner with links onward.
+  Figures that only mean something while open (e.g. "How promising") are hidden.
+- Built with `views/ops/_rec_ui.php` (helpers and the one line-icon set) and the
+  "RECORD PAGE KIT" block in `assets/css/app.css`. Never set a column count as an
+  inline `grid-template-columns` — pass `--n` instead (the phone stylesheet
+  collapses inline grids to one column).

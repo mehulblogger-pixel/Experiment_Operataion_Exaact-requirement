@@ -1791,6 +1791,41 @@
   // the URL hash so a refresh or a shared link lands on the same one. With no
   // JavaScript every panel simply shows, so nothing is ever hidden from
   // someone who cannot run this.
+  // ---- Jump to a tab, then to something on it ------------------------------
+  //  <a data-tab-go="Contacts" href="#log"> opens the "Contacts" tab, then
+  //  scrolls to #log (opening it when it is a <details>). data-log-method="CALL"
+  //  also ticks that "How" in the one log form, so "Log call" lands ready to type.
+  document.addEventListener('click', function (ev) {
+    var a = ev.target && ev.target.closest ? ev.target.closest('[data-tab-go]') : null;
+    if (!a) return;
+    var want = a.getAttribute('data-tab-go'), btn = null;
+    Array.prototype.forEach.call(document.querySelectorAll('.tabbar [role="tab"]'), function (b) {
+      var sp = b.querySelector('span:not(.tabcnt)');
+      if (!btn && ((sp ? sp.textContent : b.textContent) || '').trim() === want) btn = b;
+    });
+    if (!btn) return;
+    ev.preventDefault();
+    btn.click();
+    var href = a.getAttribute('href') || '', t = null;
+    if (href.charAt(0) === '#' && href.length > 1) { try { t = document.querySelector(href); } catch (e) { t = null; } }
+    var m = a.getAttribute('data-log-method');
+    setTimeout(function () {
+      try {
+        if (t) {
+          if (t.tagName === 'DETAILS') t.open = true;
+          var inner = t.querySelector ? t.querySelector('details') : null;
+          if (m) {
+            var r = (t.tagName === 'DETAILS' ? t : (inner || t)).querySelector('input[name="method"][value="' + m + '"]');
+            if (r) { r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); }
+          }
+          t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          var f = t.querySelector ? t.querySelector('textarea, input:not([type=hidden]):not([type=radio])') : null;
+          if (f && m) f.focus({ preventScroll: true });
+        }
+      } catch (e) {}
+    }, 40);
+  });
+
   function initSectionTabs() {
     var wraps = document.querySelectorAll('[data-tabs]');
     Array.prototype.forEach.call(wraps, function (wrap) {
@@ -1807,7 +1842,10 @@
       var groups = [], byLabel = {};
       panels.forEach(function (p) {
         var lab = p.getAttribute('data-tab') || 'More';
-        if (!byLabel[lab]) { byLabel[lab] = { label: lab, panels: [], count: 0 }; groups.push(byLabel[lab]); }
+        if (!byLabel[lab]) { byLabel[lab] = { label: lab, panels: [], count: 0, icon: '' }; groups.push(byLabel[lab]); }
+        //  A record page (views/ops/_rec_ui.php) gives each tab a line icon; the
+        //  markup is a fixed icon from the server, never anything a user typed.
+        if (!byLabel[lab].icon && p.getAttribute('data-tab-icon')) byLabel[lab].icon = p.getAttribute('data-tab-icon');
         byLabel[lab].panels.push(p);
         var c = parseInt(p.getAttribute('data-count') || '0', 10); if (c > 0) byLabel[lab].count += c;
       });
@@ -1824,7 +1862,7 @@
       var key = wrap.getAttribute('data-tabs-key') || 'tab';
       var slug = function (s) { return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); };
       var bar = document.createElement('div');
-      bar.className = 'tabbar';
+      bar.className = 'tabbar' + (wrap.getAttribute('data-tabs-class') ? ' ' + wrap.getAttribute('data-tabs-class') : '');
       bar.setAttribute('role', 'tablist');
       var btns = [];
       groups.forEach(function (g, i) {
@@ -1833,7 +1871,8 @@
         b.className = 'tabbtn';
         b.setAttribute('role', 'tab');
         var safe = g.label.replace(/&/g, '&amp;').replace(/</g, '&lt;');
-        b.innerHTML = '<span>' + safe + '</span>' + (g.count > 0 ? ' <span class="tabcnt">' + g.count + '</span>' : '');
+        b.innerHTML = (g.icon ? '<svg class="rec-i" viewBox="0 0 24 24" aria-hidden="true">' + g.icon + '</svg>' : '')
+          + '<span>' + safe + '</span>' + (g.count > 0 ? ' <span class="tabcnt">' + g.count + '</span>' : '');
         b.addEventListener('click', function () { show(i, true); });
         bar.appendChild(b);
         btns.push(b);
@@ -2204,6 +2243,9 @@
       Array.prototype.forEach.call(els, function (el, i) {
         var v = list ? list[i] : val;
         if (v === undefined || v === null || el.type === 'hidden' || el.type === 'file' || el.type === 'password') return;
+        //  A page that puts the typing back itself (the lead page's edit form) marks its area,
+        //  so the other forms on it are not filled with what was typed into that one.
+        if (el.closest && el.closest('[data-retry-skip]')) return;
         if (el.type === 'checkbox' || el.type === 'radio') {
           var want = list ? list.map(String).indexOf(String(el.value)) >= 0 : String(v) === String(el.value);
           if (el.checked !== want) { el.checked = want; done++; }

@@ -460,11 +460,14 @@ function ops_sales_more($route, $method) {
             if ($method === 'POST') {
                 $r = sx_lead_save($_POST, !empty($_POST['confirm']));
                 if (!empty($r['ok'])) {
+                    [$fn, $fsk] = function_exists('lead_attach_uploads') ? lead_attach_uploads((int) $r['id'], $_FILES['files'] ?? null, (string) ($_POST['file_kind'] ?? 'REQUIREMENT'), '') : [0, []];
                     $who = $r['owner'] && (int) $r['owner'] !== (int) (current_user()['id'] ?? 0) ? ' It is with ' . user_name(ops_one("SELECT * FROM users WHERE id=?", [$r['owner']])) . '.' : '';
-                    flash('Lead ' . $r['ref'] . ' saved.' . $who . ' First follow-up ' . fdate($r['next']) . '.');
+                    flash('Lead ' . $r['ref'] . ' saved.' . $who . ' First follow-up ' . fdate($r['next']) . '.'
+                        . ($fn ? ' ' . $fn . ' file(s) attached.' : '') . ($fsk ? ' Not attached: ' . implode(', ', $fsk) . '.' : ''), $fsk ? 'warning' : 'success');
                     redirect(!empty($_POST['another']) ? '/sales-lead' : '/lead?id=' . $r['id']);
                 }
                 $old = $_POST; $dupes = $r['dupes'] ?? []; $err = $r['err'] ?? '';
+                if (!empty($_FILES['files']['name'][0])) $err = trim($err . ' Choose the file(s) again — a browser never keeps a chosen file when the page comes back.');
             }
             $u = current_user();
             view('ops/sx_lead', ['old' => $old, 'dupes' => $dupes, 'err' => $err,

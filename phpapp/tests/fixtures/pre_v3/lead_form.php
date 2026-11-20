@@ -1,0 +1,230 @@
+<?php
+// Prefill order: what was typed and bounced back beats what arrived in the URL.
+// Somebody whose session timed out mid-form gets their twenty fields returned,
+// not an empty screen and an apology.
+$p = $prefill ?? [];
+$val = function ($k, $d = '') use ($p) { return form_old($k, $p[$k] ?? $d); };
+$me  = current_user();
+?>
+<div class="master-head"><div><h1>New lead</h1>
+  <p class="sub" style="margin:2px 0 0">Somebody worth chasing. If they become a customer, everything here comes across — you will not type it again.</p></div></div>
+
+<?php if ($dup): ?>
+<div class="panel" style="margin-top:16px;border-left:3px solid var(--warn)">
+  <b>We may already know them.</b>
+  <p style="margin:6px 0 0">
+    <?php if ($dup['kind'] === 'partner'): ?>
+      <a href="/client?id=<?= (int)$dup['row']['id'] ?>"><?= e($dup['row']['display_name'] ?? $dup['row']['legal_name']) ?></a>
+      is already on the customer master — matched on <?= e($dup['by']) ?>.
+      Chasing them as a new lead builds a second relationship with the same company.
+    <?php else: ?>
+      There is already an open lead <a href="/lead?id=<?= (int)$dup['row']['id'] ?>"><?= e($dup['row']['ref']) ?></a>
+      for <?= e($dup['row']['company_name']) ?>.
+    <?php endif; ?>
+  </p>
+</div>
+<?php endif; ?>
+
+<?php if (form_is_retry()): ?>
+  <div class="msg msg-warning mt-4">Nothing was lost — everything you typed is below. Press <b>Create it</b> again.</div>
+<?php endif; ?>
+
+<form method="post" action="/lead-new" class="panel mt-4">
+  <div class="form-sec"><h3>Who they are</h3>
+    <p>The minimum that makes a lead chaseable. Everything here comes across if they become a customer.</p></div>
+  <div class="form-grid">
+    <?php // Company from the master, or a person's name typed in. Picking a
+          // company on the master links the lead straight to that customer, so
+          // it is never re-typed or mis-spelled — the same client picker the
+          // quotation screen uses. A person or a company we do not yet know is
+          // typed into the box, and stays a plain lead with no master link. ?>
+    <div class="ff ff-wide ff-req"><label for="lead-partner">Company or person <a href="#" class="addlink" data-qa="client" data-target="select[name='partner_id']">+ Add new</a></label>
+      <div class="pair-2">
+        <select class="form-control searchable" name="partner_id" id="lead-partner">
+          <option value="">— pick a company on the master —</option>
+          <?php foreach (($clients ?? []) as $cl): ?>
+            <option value="<?= (int)$cl['id'] ?>" <?= $val('partner_id') === (string)$cl['id'] ? 'selected' : '' ?>>
+              <?= e($cl['display_name'] ?: $cl['legal_name']) ?></option>
+          <?php endforeach; ?>
+        </select>
+        <input class="form-control" name="company_name" id="lead-company" maxlength="200"
+               value="<?= e($val('company_name')) ?>" placeholder="…or type a new company / person's name">
+      </div>
+      <div class="ff-help">Already a customer? Pick them on the left. Someone new — a company or a person — type the name on the right.</div>
+    </div>
+    <div class="ff"><label>Contact name</label>
+      <input class="form-control" name="contact_name" maxlength="150" value="<?= e($val('contact_name')) ?>"></div>
+    <div class="ff"><label>E-mail</label>
+      <input class="form-control" type="email" inputmode="email" name="contact_email" maxlength="200"
+             value="<?= e($val('contact_email')) ?>"></div>
+    <div class="ff"><label>Telephone</label>
+      <input class="form-control" type="tel" inputmode="tel" name="contact_phone" maxlength="60"
+             value="<?= e($val('contact_phone')) ?>"></div>
+    <div class="ff"><label>Where they came from</label>
+      <select class="form-control" name="source"><option value="">—</option>
+        <?php foreach ($sources as $k=>$v): ?>
+          <option value="<?= e($k) ?>" <?= $val('source') === (string)$k ? 'selected' : '' ?>><?= e($v) ?></option>
+        <?php endforeach; ?>
+      </select></div>
+  </div>
+
+  <div class="form-sec"><h3>What they want</h3></div>
+  <div class="form-grid">
+    <div class="ff ff-wide"><label>The requirement</label>
+      <textarea class="form-control" name="requirement" rows="3"
+        placeholder="Scope, quantities, the standard — anything that decides whether this is worth chasing"><?= e($val('requirement')) ?></textarea></div>
+    <div class="ff"><label>Value they are worth <span class="muted">(estimate, <?= e(cur_sym()) ?>)</span></label>
+      <input class="form-control" type="number" inputmode="decimal" step="0.01" min="0" name="value"
+             value="<?= e($val('value')) ?>"></div>
+    <div class="ff"><label>Expected to close</label>
+      <input class="form-control" type="date" name="expected_close" value="<?= e($val('expected_close')) ?>"></div>
+  </div>
+
+  <?php // Field #7 — manpower-deputation intake. Man-day needs no site; man-month
+        //   places people on the customer's site, so the site details become required.
+        //   The site block is shown/hidden and required-toggled by the type (JS below,
+        //   and re-enforced on the server in lead_create/lead-edit). ?>
+  <div class="form-sec"><h3>Manpower deputation <span class="muted" style="font-weight:400">— if this lead is for deputing people</span></h3></div>
+  <div class="form-grid">
+    <div class="ff"><label for="dep-kind">Type of deputation</label>
+      <select class="form-control" name="deputation_kind" id="dep-kind">
+        <option value="">— not a manpower deputation —</option>
+        <?php foreach (LEAD_DEPUTATION as $k => $lbl): ?>
+          <option value="<?= e($k) ?>" <?= (string)$val('deputation_kind') === $k ? 'selected' : '' ?>><?= e($lbl) ?></option>
+        <?php endforeach; ?>
+      </select></div>
+    <div class="ff"><label>How many people</label>
+      <input class="form-control" type="number" inputmode="numeric" step="1" min="0" name="manpower_count"
+             value="<?= e($val('manpower_count') ?: '') ?>" placeholder="e.g. 3"></div>
+    <div class="ff ff-wide"><label>Skills / qualifications needed</label>
+      <textarea class="form-control" name="manpower_skills" rows="2"
+        placeholder="Disciplines, certifications, experience — e.g. 2× NDT Level II (UT/RT), 1× welding inspector CSWIP"><?= e($val('manpower_skills')) ?></textarea></div>
+    <div class="ff ff-wide" id="dep-site" style="display:none">
+      <label>Site details <span class="muted">(where the people will be placed)</span> <span id="dep-site-req" class="msg-error" style="display:none">— required for a man-month deputation</span></label>
+      <input class="form-control" name="site_location" id="dep-site-input" maxlength="300"
+             value="<?= e($val('site_location')) ?>" placeholder="Plant / location, city — where the deputation is based"></div>
+  </div>
+  <script>
+    (function(){
+      var sel = document.getElementById('dep-kind'), site = document.getElementById('dep-site'),
+          inp = document.getElementById('dep-site-input'), req = document.getElementById('dep-site-req');
+      if (!sel || !site) return;
+      function sync(){
+        var mm = sel.value === 'MANMONTH';
+        // Man-month → the site is shown and required; man-day / none → hidden and optional.
+        site.style.display = mm ? '' : 'none';
+        if (req) req.style.display = mm ? '' : 'none';
+        if (inp) inp.required = mm;
+      }
+      sel.addEventListener('change', sync); sync();
+    })();
+  </script>
+
+  <div class="form-sec"><h3>Who chases it, and what happens next</h3>
+    <p>A lead nobody owns is a lead nobody rings.</p></div>
+  <div class="form-grid">
+    <?php // Allocating at creation. Before this the only way to hand a lead to
+          // somebody was "Assign to me" on the register — which does the
+          // opposite of allocating it to a colleague. ?>
+    <div class="ff"><label>Allocated to</label>
+      <select class="form-control searchable" name="owner_user_id">
+        <?php $sel = $val('owner_user_id', (string)($me['id'] ?? '')); ?>
+        <?php foreach (($users ?? []) as $u): ?>
+          <option value="<?= (int)$u['id'] ?>" <?= (string)$u['id'] === (string)$sel ? 'selected' : '' ?>>
+            <?= e(trim($u['first_name'] . ' ' . $u['last_name']) ?: $u['username']) ?><?php
+              if ((int)$u['id'] === (int)($me['id'] ?? 0)) echo ' — me'; ?></option>
+        <?php endforeach; ?>
+      </select>
+      <div class="ff-help">Defaults to you. Change it if somebody else will chase this one.</div></div>
+
+    <div class="ff"><label>Branch</label>
+      <select class="form-control" name="office_id"><option value="">— mine —</option>
+        <?php foreach ($offices as $o): ?>
+          <option value="<?= (int)$o['id'] ?>" <?= $val('office_id') === (string)$o['id'] ? 'selected' : '' ?>><?= e($o['name']) ?></option>
+        <?php endforeach; ?>
+      </select></div>
+
+    <div class="ff"><label>Pipeline</label>
+      <select class="form-control" name="pipeline_id">
+        <?php foreach ($pipelines as $pl): ?>
+          <option value="<?= (int)$pl['id'] ?>" <?= $val('pipeline_id') === (string)$pl['id'] ? 'selected' : '' ?>><?= e($pl['name']) ?></option>
+        <?php endforeach; ?>
+      </select></div>
+
+    <?php // Pick from the list or type your own. A plain text box gave us twenty
+          // spellings of "send profile" and nothing countable; a locked dropdown
+          // would block the one action nobody predicted. A datalist is both. ?>
+    <div class="ff"><label>Next thing to do</label>
+      <input class="form-control" name="next_action" maxlength="255" list="next-actions"
+             value="<?= e($val('next_action')) ?>" placeholder="Pick one, or type your own">
+      <datalist id="next-actions">
+        <?php foreach (($nextActions ?: [
+              'Send the capability statement','Call to qualify','Arrange a meeting','Send a quotation',
+              'Ask for the specification','Site visit','Follow up on the quotation','Send credentials and approvals',
+          ]) as $k => $v): ?>
+          <option value="<?= e(is_string($k) && !is_int($k) ? $v : $v) ?>"></option>
+        <?php endforeach; ?>
+      </datalist>
+      <div class="ff-help">Kept as a list under <a href="/masters" target="_blank">Masters</a>, so the same words are
+        used by everybody and the follow-up report adds up.</div></div>
+
+    <div class="ff"><label>By when</label>
+      <input class="form-control" type="date" name="next_action_on" value="<?= e($val('next_action_on')) ?>"></div>
+  </div>
+
+  <p class="t-sm t-mut mt-3">A lead with no e-mail and no telephone number scores badly on purpose — it is a lead
+    nobody can chase.</p>
+
+  <?php // Form Designer — render any field this company added, and apply their
+        // label / order / hide / required overrides to the built-in ones.
+        if (function_exists('fd_extra_fields')) echo fd_extra_fields('lead', 0); ?>
+  <div class="form-actions">
+    <button class="btn" type="submit">Create it</button>
+    <a class="btn secondary" href="/leads">Cancel</a>
+  </div>
+</form>
+
+<script>
+// Company from the master, OR a typed name — the two are one decision, so they
+// cannot both be filled. Picking a customer on the master takes over the name
+// box (its own name is what gets saved); clearing the picker hands the box back.
+(function () {
+  var sel  = document.getElementById('lead-partner');
+  var name = document.getElementById('lead-company');
+  if (!sel || !name) return;
+  function sync() {
+    var picked = sel.value !== '';
+    if (picked) {
+      var opt = sel.options[sel.selectedIndex];
+      name.value = opt ? opt.textContent.trim() : name.value;
+      name.readOnly = true;
+      name.classList.add('readonly-field');
+      name.removeAttribute('required');
+      name.placeholder = 'Using the customer picked on the left';
+    } else {
+      if (name.readOnly) name.value = '';   // only clear what WE filled
+      name.readOnly = false;
+      name.classList.remove('readonly-field');
+      name.setAttribute('required', 'required');
+      name.placeholder = '…or type a new company / person’s name';
+    }
+  }
+  sel.addEventListener('change', sync);
+  sync();   // honour a bounced-back partner_id on a retry
+
+  // Picking a customer also flows their primary contact in from the client
+  // master — the same person entered under the Directory, not re-typed here.
+  var cf={name:document.querySelector('[name="contact_name"]'),
+          email:document.querySelector('[name="contact_email"]'),
+          phone:document.querySelector('[name="contact_phone"]')};
+  Object.keys(cf).forEach(function(k){ if(cf[k]) cf[k].addEventListener('input',function(){ cf[k].dataset.af=''; }); });
+  function put(el,v){ if(!el) return; v=v||''; if((el.value||'')!=='' && el.dataset.af!=='1') return; el.value=v; el.dataset.af=v!==''?'1':''; }
+  function pull(){ var id=sel.value; if(!id) return;
+    fetch('/partner-contact?id='+encodeURIComponent(id),{headers:{'X-Requested-With':'fetch'}})
+      .then(function(r){return r.json();})
+      .then(function(d){ var c=(d&&d.contact)||{}; put(cf.name,c.name); put(cf.email,c.email); put(cf.phone,c.mobile); })
+      .catch(function(){});
+  }
+  sel.addEventListener('change', pull);
+})();
+</script>

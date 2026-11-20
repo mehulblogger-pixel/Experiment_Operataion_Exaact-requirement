@@ -25,7 +25,8 @@ try {
     t_eq((string)lead_row($lid)['next_action'], 'Send the quotation', 'the lead\'s follow-up still carries the latest next step');
     t_eq([lead_minutes_words(15), lead_minutes_words(90), lead_minutes_words(240)], ['15 minutes', '1 hour 30 minutes', 'Half a day'], 'time is said in words');
     $view = (string)file_get_contents(__DIR__ . '/../views/ops/lead_detail.php');
-    t_ok(strpos($view, 'class="ct-list"') !== false && strpos($view, '＋ Log a contact') !== false, 'the Contacts tab lists the contacts, with "＋ Log a contact" above them');
+    t_ok(strpos($view, 'data-tab="Contacts"') !== false && strpos($view, "include __DIR__ . '/_log_form.php'") !== false && strpos($view, 'foreach ($contacts as $a)') !== false,
+         'the Contacts tab lists the contacts, with the one log form above them');
     t_ok(strpos((string)file_get_contents(__DIR__ . '/../lib/leads.php'), "'#lead=contacts'") !== false, 'after saving, the person lands on that list');
 } finally {
     if ($own && $pdo->inTransaction()) $pdo->rollBack();

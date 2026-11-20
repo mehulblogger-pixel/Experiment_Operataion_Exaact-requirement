@@ -29,7 +29,7 @@ $me  = current_user();
   <div class="msg msg-warning mt-4">Nothing was lost — everything you typed is below. Press <b>Create it</b> again.</div>
 <?php endif; ?>
 
-<form method="post" action="/lead-new" class="panel mt-4">
+<form method="post" action="/lead-new" class="panel mt-4" enctype="multipart/form-data">
   <div class="form-sec"><h3>Who they are</h3>
     <p>The minimum that makes a lead chaseable. Everything here comes across if they become a customer.</p></div>
   <div class="form-grid">
@@ -170,6 +170,17 @@ $me  = current_user();
 
     <div class="ff"><label>By when</label>
       <input class="form-control" type="date" name="next_action_on" value="<?= e($val('next_action_on')) ?>"></div>
+  </div>
+
+  <div class="form-sec"><h3>Attach files <span class="muted" style="font-weight:400">(optional)</span></h3>
+    <p>The customer's enquiry, specifications, drawings or e-mails — up to <?= (int) round(LEAD_FILE_MAX / 1048576) ?> MB each. They are kept under the lead's Documents and carried onto its quotation.</p></div>
+  <div class="form-grid">
+    <div class="ff ff-wide"><label for="lf-new-files">File(s)</label>
+      <input id="lf-new-files" type="file" name="files[]" multiple data-max-bytes="<?= (int) LEAD_FILE_MAX ?>"></div>
+    <div class="ff"><label for="lf-new-kind">What is it?</label>
+      <select id="lf-new-kind" class="form-control" name="file_kind"><?php foreach (LEAD_FILE_KINDS as $fk => $fl): ?><option value="<?= e($fk) ?>"<?= $fk === 'REQUIREMENT' ? ' selected' : '' ?>><?= e($fl) ?></option><?php endforeach; ?></select></div>
+    <div class="ff"><label for="lf-new-note">Note <span class="muted">(optional)</span></label>
+      <input id="lf-new-note" class="form-control" name="file_note" maxlength="255" placeholder="e.g. Rev 2"></div>
   </div>
 
   <p class="t-sm t-mut mt-3">A lead with no e-mail and no telephone number scores badly on purpose — it is a lead

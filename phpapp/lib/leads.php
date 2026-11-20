@@ -822,6 +822,29 @@ function lead_files($leadId) {
                         FROM lead_files WHERE lead_id=? ORDER BY id", [(int)$leadId]);
     } catch (Throwable $e) { return []; }
 }
+//  Files sent with a lead — from its Documents panel, or with the new-lead forms
+//  ("Attach files (optional)", owner 20 Nov 2026). One place stores them, so the
+//  8 MB ceiling, the kinds and the History line are the same wherever they come in.
+//  Returns [attached count, skipped "name (why)" list].
+function lead_attach_uploads($leadId, $files, $kind = '', $note = '') {
+    $kind = isset(LEAD_FILE_KINDS[$kind]) ? $kind : 'ATTACHMENT';
+    $note = trim((string)$note);
+    $n = 0; $skipped = [];
+    if (!$files || !is_array($files['tmp_name'] ?? null)) return [0, []];
+    foreach ($files['tmp_name'] as $i => $tmp) {
+        if (!$tmp || !is_uploaded_file($tmp)) continue;
+        $size = (int)($files['size'][$i] ?? 0);
+        if ($size <= 0) { $skipped[] = $files['name'][$i] . ' (the file is empty)'; continue; }
+        if ($size > LEAD_FILE_MAX) { $skipped[] = $files['name'][$i] . ' (over ' . round(LEAD_FILE_MAX / 1048576) . ' MB)'; continue; }
+        db()->prepare("INSERT INTO lead_files (lead_id,kind,file_name,mime,file_data,note,uploaded_by,uploaded_at) VALUES (?,?,?,?,?,?,?,?)")
+            ->execute([(int)$leadId, $kind, mb_substr((string)$files['name'][$i], 0, 200),
+                (string)($files['type'][$i] ?? ''), base64_encode((string)file_get_contents($tmp)),
+                $note, user_name(current_user()), date('c')]);
+        $n++;
+    }
+    if ($n && function_exists('act_log')) act_log('LEAD', (int)$leadId, 'FILE', $n . ' ' . strtolower(LEAD_FILE_KINDS[$kind]) . ' file(s) attached');
+    return [$n, $skipped];
+}
 // Copy a lead's attachments onto a quote raised from it, once each. Called when
 // a quote is created/prefilled from a lead, so the papers stay with the quote
 // for future reference. `carried_to_quote` guards against copying on a revision.
@@ -1317,6 +1340,9 @@ function leads_dt_columns() {
         // SQL without duplicating the rules there — and two copies of a rule is
         // how the two drift apart. It stays unsortable rather than half-right.
         'score' => ['label' => 'Score', 'num' => true, 'render' => function ($l) {
+            //  "How promising" means something only while it is being chased (owner, 20 Nov 2026:
+            //  a lost lead still read 35/100). A won or lost lead shows a dash.
+            if (($l['status'] ?? 'OPEN') !== 'OPEN') return '<span class="muted">—</span>';
             $sc = lead_score($l);
             return '<span class="pill ' . ($sc['score'] >= 60 ? 'p-ok' : ($sc['score'] >= 35 ? 'p-warn' : 'p-mut'))
                  . '">' . (int)$sc['score'] . '</span>';
@@ -1505,7 +1531,7 @@ function ops_leads($route, $method) {
             }
             $csv = [['Ref','Company','Contact','Stage','Status','Value','Owner','Branch','Source','Expected close','Days in stage','Score','Created on','Carried forward from']];
             foreach ($rowsCsv as $r) {
-                $sc = lead_score($r);
+                $sc = ($r['status'] ?? 'OPEN') === 'OPEN' ? lead_score($r) : ['score' => ''];
                 $csv[] = [$r['ref'], $r['company_name'], $r['contact_name'], $r['stage_name'], LEAD_STATUS[$r['status']] ?? $r['status'],
                           (float)$r['value'], $r['owner_name'], $r['office_name'], $r['source'],
                           $r['expected_close'], lead_days_in_stage($r), $sc['score'],
@@ -1589,24 +1615,7 @@ function ops_leads($route, $method) {
     if ($route === 'lead-files' && $method === 'POST') {
         $l = lead_row($_GET['id'] ?? 0);
         if (!$l) { http_response_code(404); view('notfound'); return true; }
-        $kind = in_array($_POST['kind'] ?? '', array_keys(LEAD_FILE_KINDS), true) ? $_POST['kind'] : 'ATTACHMENT';
-        $note = trim($_POST['note'] ?? '');
-        $n = 0; $skipped = [];
-        $files = $_FILES['files'] ?? null;
-        if ($files && is_array($files['tmp_name'])) {
-            foreach ($files['tmp_name'] as $i => $tmp) {
-                if (!$tmp || !is_uploaded_file($tmp)) continue;
-                $size = (int)($files['size'][$i] ?? 0);
-                if ($size <= 0) { $skipped[] = $files['name'][$i] . ' (the file is empty)'; continue; }
-                if ($size > LEAD_FILE_MAX) { $skipped[] = $files['name'][$i] . ' (over ' . round(LEAD_FILE_MAX / 1048576) . ' MB)'; continue; }
-                db()->prepare("INSERT INTO lead_files (lead_id,kind,file_name,mime,file_data,note,uploaded_by,uploaded_at) VALUES (?,?,?,?,?,?,?,?)")
-                    ->execute([(int)$l['id'], $kind, mb_substr((string)$files['name'][$i], 0, 200),
-                        (string)($files['type'][$i] ?? ''), base64_encode((string)file_get_contents($tmp)),
-                        $note, user_name(current_user()), date('c')]);
-                $n++;
-            }
-        }
-        if ($n && function_exists('act_log')) act_log('LEAD', (int)$l['id'], 'FILE', $n . ' ' . strtolower(LEAD_FILE_KINDS[$kind]) . ' file(s) attached');
+        [$n, $skipped] = lead_attach_uploads((int)$l['id'], $_FILES['files'] ?? null, (string)($_POST['kind'] ?? ''), (string)($_POST['note'] ?? ''));
         flash($n ? ($n . ' file(s) attached.' . ($skipped ? ' Skipped: ' . implode(', ', $skipped) : '')) : ('Nothing uploaded.' . ($skipped ? ' Skipped: ' . implode(', ', $skipped) : '')), $n ? 'success' : 'error');
         redirect('/lead?id=' . (int)$l['id']);
     }
@@ -1623,8 +1632,9 @@ function ops_leads($route, $method) {
     if ($route === 'lead-new') {
         if ($method === 'POST') {
             $r = lead_create($_POST);
-            if (!empty($r['err'])) { form_stash('lead-new', $_POST); flash($r['err'], 'error'); redirect('/lead-new'); }
-            flash('Lead ' . $r['ref'] . ' created.');
+            if (!empty($r['err'])) { form_stash('lead-new', $_POST); flash($r['err'] . (!empty($_FILES['files']['name'][0]) ? ' Choose the file(s) again — a browser never keeps a chosen file after a refused save.' : ''), 'error'); redirect('/lead-new'); }
+            [$fn, $fsk] = lead_attach_uploads((int)$r['id'], $_FILES['files'] ?? null, (string)($_POST['file_kind'] ?? 'REQUIREMENT'), (string)($_POST['file_note'] ?? ''));
+            flash('Lead ' . $r['ref'] . ' created.' . ($fn ? ' ' . $fn . ' file(s) attached.' : '') . ($fsk ? ' Not attached: ' . implode(', ', $fsk) . '.' : ''), $fsk ? 'warning' : 'success');
             redirect('/lead?id=' . $r['id']);
         }
         // Warn about a company we already know, before anything is typed twice.
@@ -1697,7 +1707,14 @@ function ops_leads($route, $method) {
         // which every "my leads" filter and every reminder reads — stayed empty.
         // A lead you cannot allocate is a lead nobody is accountable for.
         $ownerId = ($_POST['owner_user_id'] ?? '') !== '' ? (int)$_POST['owner_user_id'] : null;
-        if ($ownerId && !ops_one("SELECT id FROM users WHERE id=? AND is_active=1", [$ownerId])) { flash('That person is not an active user.', 'error'); redirect('/lead?id=' . $id); }
+        //  A refused save stays on the lead with the edit form open and everything typed
+        //  kept (owner, 20 Nov 2026 — it used to land on a page that does not exist).
+        $refuse = function ($msg) use ($id) {
+            form_stash('lead', $_POST + ['_edit' => '1']);
+            flash($msg, 'error');
+            redirect('/lead?id=' . $id . '&edit=1#lead=details');
+        };
+        if ($ownerId && !ops_one("SELECT id FROM users WHERE id=? AND is_active=1", [$ownerId])) $refuse('That person is not an active user.');
         // The details save keeps the CURRENT owner; a different one is handled below.
         $cur = lead_row($id) ?: [];
         $keepOwnerId = (int)($cur['owner_user_id'] ?? 0) ?: null; $ownerNm = (string)($cur['owner_name'] ?? '');
@@ -1707,17 +1724,15 @@ function ops_leads($route, $method) {
         if (!isset(LEAD_DEPUTATION[$dep])) $dep = '';
         $site = trim((string)($_POST['site_location'] ?? ''));
         if ($dep === 'MANMONTH' && $site === '') {
-            flash('A man-month deputation places people on the customer’s site, so the site details are required. Add them, or choose man-day.', 'error');
-            redirect('/lead-edit?id=' . $id);
+            $refuse('A man-month deputation places people on the customer’s site, so the site details are required. Add them, or choose man-day.');
         }
         if ($dep === 'MANMONTH' && (int)($_POST['manpower_count'] ?? 0) < 1) {
-            flash('A man-month deputation places people on the customer’s site — say how many (at least 1).', 'error');
-            redirect('/lead-edit?id=' . $id);
+            $refuse('A man-month deputation places people on the customer’s site — say how many (at least 1).');
         }
         if ($dep !== 'MANMONTH') $site = '';
         //  The same checks as when the lead was created (test book SALA-003).
-        if (trim((string)($_POST['company_name'] ?? '')) === '') { flash('A lead needs a company or person to chase.', 'error'); redirect('/lead-edit?id=' . $id); }
-        if (($fe = lead_fields_err($_POST)) !== '') { flash($fe, 'error'); redirect('/lead-edit?id=' . $id); }
+        if (trim((string)($_POST['company_name'] ?? '')) === '') $refuse('A lead needs a company or person to chase.');
+        if (($fe = lead_fields_err($_POST)) !== '') $refuse($fe);
         db()->prepare("UPDATE leads SET company_name=?, contact_name=?, contact_email=?, contact_phone=?,
                        source=?, requirement=?, value=?, expected_close=?, owner_user_id=?, owner_name=?,
                        next_action_on=?, next_action=?, pref_contact=?,
