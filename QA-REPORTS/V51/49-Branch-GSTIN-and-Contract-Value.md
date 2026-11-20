@@ -5,7 +5,7 @@
 1. *"Yes add Branch GSTIN. Company can have only one office or can have multiple office across India. So code it accordingly."*
 2. *"No GST inclusion in contract value."*
 
-**This zip** (update **@@RELEASE@@**) replaces update 329f18f and contains everything in it.
+**This zip** (update **9999868**) replaces update 329f18f and contains everything in it.
 
 ---
 
@@ -76,9 +76,9 @@ Your two answers are recorded in the book against SALB-062 and SALB-082.
 
 | Check | Result |
 |---|---|
-| New automatic tests: branch GSTIN (one office, several offices, site office under a branch, wrong GSTIN, other PAN, issued invoice unchanged) and contract value | **@@T_NEW@@** |
-| Every other test file for Sales, quotations, contracts, invoices, GST/Tally, branches | **@@T_REL@@** |
-| Robot: the screen-by-screen cases | **@@ROBOT@@** |
+| New automatic tests: branch GSTIN (one office, several offices, site office under a branch, wrong GSTIN, other PAN, issued invoice unchanged) and contract value | **22 / 22 ✅** |
+| Every other test file for Sales, quotations, contracts, invoices, GST/Tally, branches | **6,213 checks, 0 failed ✅** (Sales 596, quotations 265, contracts 403, invoices 81, books 141, GST 39, Tally 37, billing 134, credit notes 59, offices 238, organisation 138, branch scope 263 + 581, approvals 627, stage gates 1,297, and the rest) |
+| Robot: the screen-by-screen cases | **103 cases: none got worse.** SAL-160 (lead → deal → quotation → contract) now passes every step it can check, and FLOW-01 passes two more steps |
 
 ## 5. Your check list on opstest (8 checks)
 
