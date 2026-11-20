@@ -1731,7 +1731,7 @@ if ($route === 'partner-add' && $method === 'POST') {
         $contractId = ($b['contract_id'] ?? '') !== '' ? (int)$b['contract_id'] : null;
         if (!$contractId && $quote && !empty($quote['contract_id'])) $contractId = (int)$quote['contract_id'];
         $title = trim((string)($b['title'] ?? '')) ?: (string)($quote['subject'] ?? '');
-        $value = ($b['value'] ?? '') !== '' ? $b['value'] : ($quote ? $quote['total_amount'] : null);
+        $value = ($b['value'] ?? '') !== '' ? $b['value'] : ($quote ? crm_quote_value_before_gst($quote) : null);   // before GST (owner, 20 Nov 2026)
 
         $pdo->prepare("INSERT INTO partner_purchase_orders (partner_id,contract_id,quotation_id,sbu,po_number,po_type,title,value,start_date,end_date,notes) VALUES (?,?,?,?,?,?,?,?,?,?,?)")
             ->execute([$p['id'], $contractId, $qid ?: null, $poSbu, $b['po_number'] ?? '', $b['po_type'] ?? 'REGULAR',
@@ -1749,7 +1749,8 @@ if ($route === 'partner-add' && $method === 'POST') {
             $res = po_pull_quote_lines($poId, $qid);
             $n = !empty($res['ok']) ? (int)$res['count'] : 0;
             if ($n && ($b['value'] ?? '') === '') {
-                $sum = (float)ops_val("SELECT COALESCE(SUM(total_amount),0) FROM po_line_items WHERE purchase_order_id=?", [$poId]);
+                //  The order's value before GST: the lines' base amounts (a line with no base kept its total).
+                $sum = (float)ops_val("SELECT COALESCE(SUM(CASE WHEN COALESCE(base_amount,0)>0 THEN base_amount ELSE total_amount END),0) FROM po_line_items WHERE purchase_order_id=?", [$poId]);
                 if ($sum > 0) $pdo->prepare("UPDATE partner_purchase_orders SET value=? WHERE id=?")->execute([$sum, $poId]);
             }
         }

@@ -5,9 +5,11 @@
   // profile), the same source the quote letterhead and GST export already use.
   $co       = function_exists('company_profile') ? company_profile() : [];
   $company  = trim((string)($co['legal_name'] ?? '')) ?: (trim((string)($co['brand'] ?? '')) ?: (function_exists('app_name') ? app_name() : 'Company'));
-  $coGstin  = (string)($co['gstin'] ?? '');
+  //  The GSTIN this invoice was billed under (the branch's own when it has one), as stamped on it.
+  $coGstin  = trim((string)($inv['supplier_gstin'] ?? '')) ?: (string)($co['gstin'] ?? '');
   $coPan    = (string)($co['pan'] ?? '');
   $coState  = (string)($co['state'] ?? '');
+  if (trim((string)($inv['supplier_state'] ?? '')) !== '' && defined('GST_STATE_CODES')) $coState = (string)(GST_STATE_CODES[$inv['supplier_state']] ?? $coState);
   $coAddr   = (string)($co['address'] ?? '');
   $office   = $office ?? null;
   $isDraft = ($inv['status'] ?? '') === 'DRAFT';

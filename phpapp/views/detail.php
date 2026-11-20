@@ -244,7 +244,7 @@ function addr_name($a) { return (lk_options_or('address_type', ADDRESS_TYPES)[$a
                   data-contract="<?= (int)($pq['contract_id'] ?? 0) ?>"
                   data-contractno="<?= e((string)($pq['contract_number'] ?? '')) ?>"
                   data-sbu="<?= e((string)($pq['sbu'] ?? '')) ?>"
-                  data-value="<?= e((string)$pq['total_amount']) ?>"
+                  data-value="<?= e((string)crm_quote_value_before_gst($pq)) ?>"
                   data-title="<?= e((string)($pq['subject'] ?? '')) ?>"
                   data-lines="<?= (int)$pq['line_count'] ?>">
             <?= e($pq['quote_no']) ?><?= (int)$pq['rev'] ? ' R' . (int)$pq['rev'] : '' ?>
@@ -266,7 +266,7 @@ function addr_name($a) { return (lk_options_or('address_type', ADDRESS_TYPES)[$a
     <div class="ff ff-wide"><label><?= e(TP('sbu')) ?> — revenue (tick one or more)</label>
       <div class="checkgrid"><?php foreach (lk_options_or('sbu', OPS_SBUS) as $k=>$v): ?><label class="chk"><input type="checkbox" class="po-sbu" name="po_sbu[]" value="<?= e($k) ?>"> <?= e($v) ?></label><?php endforeach; ?></div></div>
     <div class="ff"><label>Title</label><input class="form-control" id="po_title" name="title"></div>
-    <div class="ff"><label>Value <span class="muted">— from the <?= e(Tl('quote')) ?> if one is named</span></label><input class="form-control" type="number" step="0.01" id="po_value" name="value"></div>
+    <div class="ff"><label>Value before GST <span class="muted">— from the <?= e(Tl('quote')) ?> if one is named</span></label><input class="form-control" type="number" step="0.01" id="po_value" name="value"></div>
     <?php // Owner, 9 Nov 2026 — the order's own dates and remarks were read on save
           // but never asked for. Offered from the contract it is under. ?>
     <div class="ff"><label>PO valid from</label><input class="form-control" type="date" id="po_start" name="start_date"></div>

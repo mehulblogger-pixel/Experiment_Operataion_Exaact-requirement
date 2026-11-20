@@ -202,7 +202,7 @@ function books_quote_pdf_b64($q) {
     return (string)booksbridge_try(function () use ($q) {
         $tpl = booksbridge_try(fn() => ops_one("SELECT * FROM crm_templates WHERE kind='QUOTE_DOC' ORDER BY is_default DESC, id DESC"), null);
         $sig = function_exists('quote_signature') ? quote_signature($q) : [];
-        $lh  = function_exists('quote_letterhead') ? quote_letterhead() : [];
+        $lh  = function_exists('quote_letterhead') ? quote_letterhead($q['office_id'] ?? null) : [];
         $pdf = quote_pdf_build($q, crm_quote_lines((int)$q['id']), $tpl ?: [], $sig, $lh);
         return ($pdf && strlen($pdf) < 4_000_000) ? base64_encode($pdf) : '';
     }, '');

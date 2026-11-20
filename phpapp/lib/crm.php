@@ -1233,6 +1233,13 @@ function crm_quote_pdf_unprintable(array $q, array $lines = []) {
     }
     return false;
 }
+//  A quotation's value BEFORE GST — what a contract registered from it is worth (owner, 20 Nov
+//  2026, Sales pack A2). The subtotal; for an older record that kept only a total, total − GST.
+function crm_quote_value_before_gst(array $q) {
+    $sub = (float)($q['subtotal'] ?? 0);
+    if ($sub > 0) return round($sub, 2);
+    return round(max(0, (float)($q['total_amount'] ?? 0) - (float)($q['gst_amount'] ?? 0)), 2);
+}
 //  '' or a real calendar date in YYYY-MM-DD (29 Feb 2026 and 31/02/2026 are not).
 function crm_real_date($d) {
     $d = trim((string)$d);
@@ -3154,7 +3161,7 @@ function ops_crm_quotes($route, $method) {
     if ($route === 'quote-pdf') {
         $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
         $tpl = ops_one("SELECT * FROM crm_templates WHERE kind='QUOTE_DOC' ORDER BY is_default DESC, id DESC");   // for doc/format numbers
-        $pdf = quote_pdf_build($q, crm_quote_lines($q["id"]), $tpl ?: [], quote_signature($q), quote_letterhead());
+        $pdf = quote_pdf_build($q, crm_quote_lines($q["id"]), $tpl ?: [], quote_signature($q), quote_letterhead($q['office_id'] ?? null));
         $fname = 'Quote-' . preg_replace('/[^A-Za-z0-9_.-]/', '', $q['quote_no'] . ($q['rev'] > 0 ? '-R' . $q['rev'] : '')) . '.pdf';
         header('Content-Type: application/pdf');
         header('Content-Disposition: attachment; filename="' . $fname . '"');
@@ -3370,7 +3377,7 @@ function ops_crm_quotes($route, $method) {
         // The contract's value is the money actually committed — the client's PO
         // when there is one, the quotation when there is not.
         $cValue = (isset($_POST['value']) && trim((string)$_POST['value']) !== '') ? (float)$_POST['value']
-                : (($pf['value'] ?? null) !== null ? (float)$pf['value'] : (float)$q['total_amount']);
+                : (($pf['value'] ?? null) !== null ? (float)$pf['value'] : crm_quote_value_before_gst($q));   // before GST (owner, 20 Nov 2026 — A2)
         $contractId = $q['contract_id'] ?: null;
         // A won deal gets ONE contract. If this quotation already carries a LIVE
         // contract (open or awaiting approval) and a DIFFERENT number is being
@@ -3514,7 +3521,7 @@ function ops_crm_quotes($route, $method) {
         // go out with it already attached.
         $att = [];
         $tpl = ops_one("SELECT * FROM crm_templates WHERE kind='QUOTE_DOC' ORDER BY is_default DESC, id DESC");
-        $pdf = quote_pdf_build($q, crm_quote_lines($q['id']), $tpl ?: [], quote_signature($q), quote_letterhead());
+        $pdf = quote_pdf_build($q, crm_quote_lines($q['id']), $tpl ?: [], quote_signature($q), quote_letterhead($q['office_id'] ?? null));
         if ($pdf) $att[] = ['name' => 'Quote-' . preg_replace('/[^A-Za-z0-9_.-]/', '', $q['quote_no'] . ($q['rev'] > 0 ? '-R' . $q['rev'] : '')) . '.pdf',
                             'data' => $pdf, 'type' => 'application/pdf'];
         foreach (crm_quote_files($q['id']) as $f) {
@@ -4680,11 +4687,12 @@ function quote_signature($q = null) {
     return ['img' => $img ? base64_decode($img) : '', 'name' => setting_get('quote_sig_name', ''), 'desig' => setting_get('quote_sig_desig', '')];
 }
 // Customisable letterhead for the client PDF (company logo / name / address / contact).
-function quote_letterhead() {
+function quote_letterhead($officeId = null) {
     $logo = setting_get('quote_lh_logo', '');
     // GSTIN comes from the single "Your company" profile so it prints on every
-    // document without being typed here as well.
-    $gstin = setting_get('company_gstin', '');
+    // document without being typed here as well — or, for a quotation of a branch
+    // with its own GST registration, that branch's GSTIN (owner, 20 Nov 2026).
+    $gstin = ($officeId && function_exists('books_our_gstin')) ? books_our_gstin($officeId) : setting_get('company_gstin', '');
     // The company brand colour for the header band / accents (hex, e.g. #1E40AF).
     $band = brand_color_rgb(setting_get('report_brand_color', ''));
     // Anything left blank here is taken from Admin → Company profile, so a
@@ -4714,7 +4722,7 @@ function crm_send_quote_email($q) {
     if (($q['contact_email'] ?? '') === '') return [false, 'no customer e-mail on the quotation (it was not e-mailed).'];
     $att = [];
     $tpl = ops_one("SELECT * FROM crm_templates WHERE kind='QUOTE_DOC' ORDER BY is_default DESC, id DESC");
-    $pdf = quote_pdf_build($q, crm_quote_lines($q["id"]), $tpl ?: [], quote_signature($q), quote_letterhead());
+    $pdf = quote_pdf_build($q, crm_quote_lines($q["id"]), $tpl ?: [], quote_signature($q), quote_letterhead($q['office_id'] ?? null));
     if ($pdf) $att[] = ['name' => 'Quote-' . preg_replace('/[^A-Za-z0-9_.-]/', '', $q['quote_no'] . ((int)($q['rev'] ?? 0) > 0 ? '-R' . (int)$q['rev'] : '')) . '.pdf', 'data' => $pdf, 'type' => 'application/pdf'];   // same name as the download (SALB-043)
     $et = ops_one("SELECT * FROM crm_templates WHERE kind='EMAIL_QUOTE' AND active=1 ORDER BY is_default DESC, id DESC");
     $subject = ($et && $et['subject']) ? crm_fill_email($et['subject'], $q) : ('Quotation ' . $q['quote_no'] . ' — ' . app_name());

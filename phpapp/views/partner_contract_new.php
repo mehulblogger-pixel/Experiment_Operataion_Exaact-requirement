@@ -41,9 +41,9 @@ $nlc = count($liveContracts);
       <select class="form-control searchable" id="ct_quote" name="quotation_id">
         <option value="">— none / recorded directly —</option>
         <?php foreach ($awaiting as $aq): ?>
-          <option value="<?= (int)$aq['id'] ?>" data-value="<?= e((string)$aq['total_amount']) ?>" data-title="<?= e($aq['subject'] ?? '') ?>">
+          <option value="<?= (int)$aq['id'] ?>" data-value="<?= e((string)crm_quote_value_before_gst($aq)) ?>" data-title="<?= e($aq['subject'] ?? '') ?>">
             <?= e($aq['quote_no']) ?><?= (int)$aq['rev'] ? ' R' . (int)$aq['rev'] : '' ?>
-            · <?= e(cur_sym()) ?><?= nf((float)$aq['total_amount'], 0) ?>
+            · <?= e(cur_sym()) ?><?= nfm(crm_quote_value_before_gst($aq)) ?> before GST
             · <?= e(lk_options_or('quote_status', QUOTE_STATUS)[$aq['status']] ?? $aq['status']) ?>
             <?= $aq['subject'] ? ' — ' . e(mb_strimwidth($aq['subject'], 0, 40, '…')) : '' ?>
           </option>
@@ -52,7 +52,7 @@ $nlc = count($liveContracts);
       <?php if (!$awaiting): ?><small class="muted">Every <?= e(Tl('quote')) ?> for this <?= e(Tl('client')) ?> already has a contract number.</small><?php endif; ?></div>
     <div class="ff"><label>Title</label><input class="form-control" id="ct_title" name="title" value="<?= e($preTitle) ?>"></div>
     <div class="ff"><label><?= e(T("sbu")) ?></label><select class="form-control searchable" name="sbu"><option value="">—</option><?php foreach (lk_options_or('sbu', OPS_SBUS) as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
-    <div class="ff"><label>Value</label><input class="form-control" type="number" step="0.01" id="ct_value" name="value"></div>
+    <div class="ff"><label>Value before GST</label><input class="form-control" type="number" step="0.01" id="ct_value" name="value"></div>
     <div class="ff"><label>Start date</label><input class="form-control" type="date" name="start_date" value="<?= e(date('Y-m-d')) ?>"></div>
     <?php // Without an end date a contract never expires, and the expiry warnings
           // and the scheduling gate have nothing to work from. It was missing here. ?>

@@ -192,7 +192,8 @@ function tally_compute(array $r, array $cfg) {
     if (empty($r['client_id']))  $issues[] = 'the client is not on the party master';
 
     $theirState = tally_gstin_state($gstin) ?: tally_state_code($r['state'] ?? '');
-    $ourState   = $cfg['state_code'];
+    //  The billing branch's own state when it has its own GSTIN (owner, 20 Nov 2026), else ours.
+    $ourState   = (!empty($r['office_id']) && function_exists('books_our_state')) ? books_our_state((int)$r['office_id']) : $cfg['state_code'];
     if ($ourState === '')  $issues[] = 'our own state is not set (Ledger names & tax below)';
     if ($theirState === '' && $pct > 0) $issues[] = 'the client has no GSTIN and no state — IGST or CGST+SGST cannot be decided';
 

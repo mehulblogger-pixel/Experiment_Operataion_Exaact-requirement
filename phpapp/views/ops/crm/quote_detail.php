@@ -717,7 +717,7 @@
                   <small class="muted">Only companies linked to <?= e($q['client_name'] ?: 'this client') ?> as parent / subsidiary appear here.</small></div>
                 <div class="ff"><label>Contract number</label><input class="form-control" name="contract_number" placeholder="their number, or auto">
                   <label class="chk" style="margin-top:6px"><input type="checkbox" name="auto_contract" value="1"> Generate automatically</label></div>
-                <div class="ff"><label>Value (<?= e(cur_sym()) ?>)</label><input class="form-control" type="number" step="0.01" name="value" placeholder="their PO value (optional)"></div>
+                <div class="ff"><label>Value before GST (<?= e(cur_sym()) ?>)</label><input class="form-control" type="number" step="0.01" name="value" placeholder="their PO value, before GST (optional)"></div>
                 <div class="ff"><label>Start</label><input class="form-control" type="date" name="start_date"></div>
                 <div class="ff"><label>End</label><input class="form-control" type="date" name="end_date"></div>
               </div>
@@ -742,7 +742,7 @@
       $pfNote   = function_exists('contract_prefill_note') ? contract_prefill_note($pf) : '';
       $pfBranch = (int)($pf['branch_id'] ?? 0) ?: (int)($q['office_id'] ?? 0);
       $pfBranchName = $pfBranch ? (string)ops_val("SELECT name FROM offices WHERE id=?", [$pfBranch]) : '';
-      $pfValue  = ($pf['value'] ?? null) !== null ? (float)$pf['value'] : (float)($q['total_amount'] ?? 0);
+      $pfValue  = ($pf['value'] ?? null) !== null ? (float)$pf['value'] : crm_quote_value_before_gst($q);   // before GST (owner, 20 Nov 2026)
       $existing = $clientContracts ?? [];
     ?>
     <p class="sub">One click registers it. The number is generated, and the value, dates and branch come across from
@@ -814,7 +814,7 @@
             <?php endforeach; ?>
           </select>
           <small class="muted">Set once; the calls, jobs and invoice all inherit it.</small></div>
-        <div class="ff"><label>Value (<?= e(cur_sym()) ?>)</label>
+        <div class="ff"><label>Value before GST (<?= e(cur_sym()) ?>)</label>
           <input class="form-control" type="number" step="0.01" name="value" value="<?= e(number_format($pfValue, 2, '.', '')) ?>">
           <small class="muted"><?= !empty($pf['from']['value']) ? 'From ' . e($pf['from']['value']) . '.' : 'From this ' . e(Tl('quote')) . '.' ?></small></div>
         <?php if (!empty($pf['choices'])): ?>

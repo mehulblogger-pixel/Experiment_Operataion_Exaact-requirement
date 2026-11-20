@@ -32,6 +32,10 @@ function orgadmin_migrate() {
     ensure_column('offices', 'sort_order', 'INT DEFAULT 0');
     ensure_column('offices', 'address', "VARCHAR(255) DEFAULT ''");
     ensure_column('offices', 'phone', "VARCHAR(60) DEFAULT ''");
+    //  Owner, 20 Nov 2026 — "Yes add Branch GSTIN … only one office or multiple offices across India".
+    //  A branch with its own GST registration bills under it; empty = the parent branch's, else the
+    //  company's (Admin → Company profile + Settings → Tally → Our state). See office_gst_registration().
+    ensure_column('offices', 'gstin', "VARCHAR(20) DEFAULT ''");
     // Seed a sensible starting point once: the managing office is the head
     // office. Guarded by a setting rather than by the value itself, so an admin
     // who deliberately demotes it does not get it flipped back on the next boot.
@@ -102,6 +106,18 @@ function person_quick_create($name, $email = '', $designation = '', $officeId = 
 // Adding an office from wherever one is being asked for. Same table the
 // Organisation screen owns, so it appears there — and in every other dropdown —
 // the moment it is saved. Returns the new id, or 0 if there was nothing to add.
+//  '' when the GSTIN typed for a branch is acceptable (empty is: the branch then bills under its
+//  parent's or the company's registration), else the plain reason it is not.
+function office_gstin_problem($gstin) {
+    $g = strtoupper(preg_replace('/\s+/', '', (string)$gstin));
+    if ($g === '') return '';
+    if (!preg_match('/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/', $g)) return 'That GSTIN does not look right — it is 15 characters, e.g. 27ABCDE1234F1Z5.';
+    if (defined('GST_STATE_CODES') && !isset(GST_STATE_CODES[substr($g, 0, 2)])) return 'Its first two digits (' . substr($g, 0, 2) . ') are not an Indian state code.';
+    $co = strtoupper(preg_replace('/\s+/', '', (string)(function_exists('setting_get') ? setting_get('company_gstin', '') : '')));
+    if (strlen($co) === 15 && substr($co, 2, 10) !== substr($g, 2, 10))
+        return 'Its PAN (' . substr($g, 2, 10) . ') is not the company\'s (' . substr($co, 2, 10) . ') — every branch GSTIN of one company carries the same PAN.';
+    return '';
+}
 function office_quick_create($name, $code = '', $city = '', $type = 'BRANCH') {
     $name = trim((string)$name);
     if ($name === '') return 0;
@@ -1201,7 +1217,15 @@ function ops_hierarchy_screen($method) {
                 flash(TH('office') . ' updated.');
             } else {
                 db()->prepare("INSERT INTO offices (code,name,city,region,office_type,parent_office_id,head_user_id,address,phone,is_active,sort_order,is_ahmedabad) VALUES (?,?,?,?,?,?,?,?,?,?,?,0)")->execute($vals);
+                $id = (int)db()->lastInsertId();
                 flash(TH('office') . ' added.');
+            }
+            //  The branch's own GSTIN (optional). Checked, never guessed: 15 characters, a real state
+            //  code, and the same PAN as the company's GSTIN (one legal entity, many registrations).
+            if (array_key_exists('o_gstin', $_POST) && $id) {
+                $gErr = office_gstin_problem((string)$_POST['o_gstin']);
+                if ($gErr !== '') flash($gErr . ' The branch GSTIN was not saved; everything else was.', 'warning');
+                else db()->prepare("UPDATE offices SET gstin=? WHERE id=?")->execute([strtoupper(preg_replace('/\s+/', '', (string)$_POST['o_gstin'])), $id]);
             }
 
         } elseif ($do === 'office-move') {                  // one-click re-parent

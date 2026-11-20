@@ -436,7 +436,7 @@ function sxt_won(array $months) {
 function sx_quote_gst_split(array $q) {
     $amt = (float) ($q['gst_amount'] ?? 0); $pct = (float) ($q['gst_pct'] ?? 0);
     if ($amt <= 0 || empty($q['client_id']) || !function_exists('books_is_igst')) return null;
-    $ours = function_exists('books_our_state') ? (string) books_our_state() : '';
+    $ours = function_exists('books_our_state') ? (string) books_our_state($q['office_id'] ?? null) : '';   // the branch's own state when it has its own GSTIN
     $theirs = function_exists('books_their_state') ? (string) books_their_state((int) $q['client_id']) : '';
     //  Say which state is missing: ours (the invoice's own setting) or the client's.
     if ($ours === '' || $theirs === '') return ['mode' => 'UNKNOWN', 'rows' => [], 'missing' => $ours === '' ? 'ours' : 'theirs'];

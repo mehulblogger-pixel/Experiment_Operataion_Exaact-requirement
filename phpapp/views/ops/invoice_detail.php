@@ -6,7 +6,8 @@
   <b style="font-size:14px"><?= e($co['legal_name'] ?: $co['brand']) ?></b>
   <?php if (!empty($co['address'])): ?><div class="muted" style="font-size:12.5px;white-space:pre-line"><?= e($co['address']) ?></div><?php endif; ?>
   <div class="muted" style="font-size:12.5px">
-    <?php if (!empty($co['gstin'])): ?>GSTIN: <?= e($co['gstin']) ?><?php endif; ?>
+    <?php $invGstin = trim((string)($inv['supplier_gstin'] ?? '')) ?: (string)($co['gstin'] ?? ''); ?>
+    <?php if ($invGstin !== ''): ?>GSTIN: <?= e($invGstin) ?><?= strcasecmp($invGstin, (string)($co['gstin'] ?? '')) !== 0 ? ' (branch registration)' : '' ?><?php endif; ?>
     <?php if (!empty($co['state'])): ?> · <?= e($co['state']) ?><?php endif; ?>
     <?php $cl = function_exists('company_contact_line') ? company_contact_line() : ''; if ($cl !== ''): ?> · <?= e($cl) ?><?php endif; ?>
   </div>

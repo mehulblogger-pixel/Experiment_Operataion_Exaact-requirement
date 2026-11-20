@@ -644,6 +644,21 @@ non-manager's quotation or work order.
 A deliberate two-signature model: **endorse** (a manager) then **approve** (the branch
 manager), with segregation enforced (approver ≠ endorser unless master).
 
+**A contract's value is BEFORE GST** (owner, 20 Nov 2026 — Sales pack A2: "No GST inclusion in
+contract value"). When it is registered from a quotation the value offered is the quotation's
+subtotal (a ₹10,00,000 + 18% quotation gives a ₹10,00,000 contract, not ₹11,80,000); a client PO
+named on it gives its own value, typed before GST, and a PO filled from a quotation's lines takes
+the lines' amounts before GST. GST is added on each invoice. Contracts registered before this
+date keep the value they were registered with (never rewritten).
+
+**Whose GST registration** (owner, 20 Nov 2026 — "Yes add Branch GSTIN … only one office or
+multiple offices across India"): an office may carry its own GSTIN (`offices.gstin`, optional,
+validated: 15 characters, a real state code, the company's PAN). A quotation, an invoice and the
+Tally export of an office use that office's registration, else the nearest parent office's, else
+the company's (`office_gst_registration()`); its first two digits are "our state" for the
+CGST + SGST / IGST decision. An invoice stamps the GSTIN and state it was billed under while it is
+a draft (`invoices.supplier_gstin`, `supplier_state`); an issued invoice is never rewritten.
+
 A contract added from the **client record** (Contract Numbers → "＋ Add a contract", a pop-up;
 owner, 9 Nov 2026) enters the same way: **PENDING**, with the company's next contract number when
 none is typed, the client's branch, and who asked for it recorded. No new status.

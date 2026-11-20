@@ -549,7 +549,7 @@ function po_quote_status($po) {
 function quotations_for_po($clientId) {
     $clientId = (int)$clientId;
     if (!$clientId) return [];
-    $rows = ops_all("SELECT q.id, q.quote_no, q.rev, q.status, q.subject, q.total_amount, q.sbu,
+    $rows = ops_all("SELECT q.id, q.quote_no, q.rev, q.status, q.subject, q.total_amount, q.subtotal, q.gst_amount, q.sbu,
                             q.contract_id, q.contract_number
                      FROM quotations q
                      WHERE q.client_id=? AND q.is_current=1 AND q.status NOT IN ('LOST','REJECTED')
@@ -563,7 +563,7 @@ function quotations_for_po($clientId) {
 function quotations_awaiting_contract($clientId) {
     $clientId = (int)$clientId;
     if (!$clientId) return [];
-    return ops_all("SELECT id, quote_no, rev, status, subject, total_amount, created_at
+    return ops_all("SELECT id, quote_no, rev, status, subject, total_amount, subtotal, gst_amount, created_at
                     FROM quotations
                     WHERE client_id=? AND is_current=1
                       AND (contract_number='' OR contract_number IS NULL)
@@ -1785,7 +1785,9 @@ function contract_prefill($quoteId = 0, $poId = 0) {
 
     if ($q) {
         $label = Tl('quote') . ' ' . quote_label($q);
-        if ($out['value'] === null && (float)($q['total_amount'] ?? 0) > 0) { $out['value'] = (float)$q['total_amount']; $out['from']['value'] = $label; }
+        //  Owner, 20 Nov 2026 (Sales pack A2): a contract's value is BEFORE GST — the quotation's subtotal.
+        $qv = function_exists('crm_quote_value_before_gst') ? crm_quote_value_before_gst($q) : (float)($q['subtotal'] ?? 0);
+        if ($out['value'] === null && $qv > 0) { $out['value'] = $qv; $out['from']['value'] = $label . ' (before GST)'; }
         if ($out['title'] === '' && trim((string)($q['subject'] ?? '')) !== '') { $out['title'] = (string)$q['subject']; $out['from']['title'] = $label; }
         // A contract runs from the day the client accepted, so that date is the
         // honest start. No end date is invented: a quotation's own validity period

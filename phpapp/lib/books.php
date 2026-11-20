@@ -180,6 +180,10 @@ function books_migrate() {
     // Module 09 — the overdue-invoice reminder marks each invoice it has chased,
     // so a daily sweep does not re-nag the same one every morning.
     if (function_exists('ensure_column')) ensure_column('invoices', 'reminded_at', "VARCHAR(30) DEFAULT ''");
+    //  The GSTIN this invoice is billed under (the branch's own, else the company's), stamped
+    //  while it is a draft and frozen once issued — so a later change of a branch's GSTIN never
+    //  rewrites an invoice already sent (owner, 20 Nov 2026: branch GSTIN).
+    if (function_exists('ensure_column')) ensure_column('invoices', 'supplier_gstin', "VARCHAR(20) DEFAULT ''");
 
     // TDS the customer will withhold — captured on the invoice so the bill can show
     // the net payable, not only at receipt time. Additive & defaulted to 0, so every
@@ -306,10 +310,34 @@ function books_next_number($table, $col, $series, $fy) {
 // deciding IGST from two different settings is how an invoice and the ledger
 // entry made from it end up disagreeing, and that disagreement is only found
 // when the return is filed.
-function books_our_state() {
+//  The GST registration an office bills under (owner, 20 Nov 2026 — "Yes add Branch GSTIN. Company
+//  can have only one office or can have multiple office across India"): the office's own GSTIN,
+//  else the nearest parent office's (a site office under the Mumbai branch bills as Mumbai), else
+//  null = the company's registration (Admin → Company profile GSTIN, Settings → Tally → Our state).
+//  A one-office company never fills a branch GSTIN, so nothing changes for it.
+function office_gst_registration($officeId) {
+    $id = (int)$officeId; $seen = [];
+    while ($id && !isset($seen[$id]) && count($seen) < 20) {
+        $seen[$id] = 1;
+        $o = books_try(fn() => ops_one("SELECT id, name, gstin, parent_office_id, address FROM offices WHERE id=?", [$id]), null);
+        if (!$o) break;
+        $g = strtoupper(trim((string)($o['gstin'] ?? '')));
+        if ($g !== '' && function_exists('tally_gstin_state') && ($st = tally_gstin_state($g)) !== '')
+            return ['gstin' => $g, 'state_code' => $st, 'office_id' => (int)$o['id'], 'office_name' => (string)$o['name'], 'address' => (string)($o['address'] ?? '')];
+        $id = (int)($o['parent_office_id'] ?? 0);
+    }
+    return null;
+}
+function books_our_state($officeId = null) {
+    if ($officeId && ($reg = office_gst_registration($officeId))) return (string)$reg['state_code'];
     if (!function_exists('tally_settings')) return '';
     $cfg = tally_settings();
     return (string)($cfg['state_code'] ?? '');
+}
+//  The GSTIN printed as ours on a document of this office.
+function books_our_gstin($officeId = null) {
+    if ($officeId && ($reg = office_gst_registration($officeId))) return (string)$reg['gstin'];
+    return strtoupper(trim((string)(function_exists('setting_get') ? setting_get('company_gstin', '') : '')));
 }
 
 function books_their_state($partnerId) {
@@ -320,7 +348,7 @@ function books_their_state($partnerId) {
 }
 
 function books_is_igst($partnerId, $officeId = null) {
-    $sup  = books_our_state();
+    $sup  = books_our_state($officeId);   // the billing branch's own state when it has its own GSTIN
     $cust = books_their_state($partnerId);
     // Neither known: do not guess. 0 means CGST+SGST, the local case, and
     // books_issue_missing() refuses to issue until somebody sets the state — so
@@ -578,11 +606,12 @@ function books_invoice_create(array $b) {
         books_series($off), current_fy(), (string)($b['kind'] ?? 'TAX'), $pid,
         (string)($p['display_name'] ?: $p['legal_name']), $off, (string)($b['sbu'] ?? ''),
         $date, $due, (string)($b['payment_terms'] ?? ''), $days,
-        books_their_state($pid), books_our_state(), (string)$p['gstin'], $igst,
+        books_their_state($pid), books_our_state($off), (string)$p['gstin'], $igst,
         (string)($b['po_number'] ?? ''), (string)($b['contract_number'] ?? ''),
         (int)($b['quotation_id'] ?? 0) ?: null,
         (string)($b['notes'] ?? ''), $u ? user_name($u) : '', date('c'), date('c')]);
     $id = (int)db()->lastInsertId();
+    books_try(fn() => db()->prepare("UPDATE invoices SET supplier_gstin=? WHERE id=?")->execute([books_our_gstin($off), $id]), null);
     // Optional TDS rate (the customer's withholding) and marketplace-voucher
     // provenance — additive columns, set here so callers need not touch the header
     // INSERT. Both default to 0/unset for an ordinary manual invoice.
@@ -616,8 +645,9 @@ function books_set_office($invoiceId, $officeId) {
     if (!$off || !books_try(fn() => ops_val("SELECT id FROM offices WHERE id=? AND is_active=1", [$off]), 0))
         return 'Choose an active branch to bill from.';
     $igst = books_is_igst((int)$inv['partner_id'], $off);
-    db()->prepare("UPDATE invoices SET office_id=?, series=?, is_igst=?, updated_at=? WHERE id=?")
-       ->execute([$off, books_series($off), $igst, date('c'), (int)$inv['id']]);
+    db()->prepare("UPDATE invoices SET office_id=?, series=?, is_igst=?, supplier_state=?, updated_at=? WHERE id=?")
+       ->execute([$off, books_series($off), $igst, books_our_state($off), date('c'), (int)$inv['id']]);
+    books_try(fn() => db()->prepare("UPDATE invoices SET supplier_gstin=? WHERE id=?")->execute([books_our_gstin($off), (int)$inv['id']]), null);
     if (function_exists('act_log')) act_log('INVOICE', (int)$inv['id'], 'BRANCH_SET', 'Billing branch set');
     return '';
 }
