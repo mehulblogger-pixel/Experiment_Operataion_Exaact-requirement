@@ -13,7 +13,7 @@ And the three fixes you agreed earlier:
 - "Full lead form ›" keeps what you typed in the quick form;
 - files can be attached when a lead is created.
 
-**This zip** (update **__STAMP__**) replaces update 9999868 and contains everything in it.
+**This zip** (update **cec7530**) replaces update 9999868 and contains everything in it.
 
 ---
 
