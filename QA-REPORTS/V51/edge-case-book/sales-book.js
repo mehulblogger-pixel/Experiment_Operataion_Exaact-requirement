@@ -14,10 +14,9 @@ const PARTS = [
 ];
 // Status of each finding, by its place (1, 2, …) in that part's findings file.
 const STATUS = {
-  //  "now" = fixed in this update; "earlier" = fixed in update 69287af or before.
-  SALA: { now: [2, 3, 4, 5, 6, 7, 8, 11, 12, 13, 18, 20, 21, 22, 24, 25, 27, 33], design: [26],
-          earlier: [1, 9, 10, 14, 15, 16, 17, 19, 23, 28, 29, 30, 31, 32, 34] },
-  SALB: { now: [4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24], earlier: [1, 2, 3, 25], ask: [11] },
+  //  "now" = fixed in this update; "earlier" = fixed in update 329f18f or before.
+  SALA: { earlier: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 27, 28, 29, 30, 31, 32, 33, 34], design: [26] },
+  SALB: { now: [11], earlier: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25] },
   SALC: { earlier: Array.from({ length: 23 }, (_, i) => i + 1) },
 };
 // Questions that this update has answered (they are no longer asked).
@@ -33,6 +32,8 @@ const ANSWERED = {
   'EC-SALB-052': 'Done the way docs/03 draws it: only a Draft or a Sent quotation is marked lost by hand; the screen says what to do with the others.',
   'EC-SALB-053': 'Done: an accepted quotation is final and is not revised (the won order stays with Accounts).',
   'EC-SALB-060': 'Done: once sent, documents can no longer be removed; only a master can still add one (e.g. the client\'s PO).',
+  'EC-SALB-062': 'Your answer (20 Nov): no GST in the contract value. Done — a contract from a ₹10,00,000 + 18% quotation is ₹10,00,000; GST is added on each invoice.',
+  'EC-SALB-082': 'Your answer (20 Nov): yes, branch GSTIN. Done — a branch with its own GSTIN (Admin → Organisation) quotes and bills under it; Mumbai → Pune shows CGST + SGST.',
   'EC-SALB-011': 'Done: the subject box takes up to 255 letters and says so; a longer one is refused with its length instead of being cut.',
 };
 const personas = JSON.parse(fs.readFileSync(path.join(S, 'personas.json'), 'utf8'));
@@ -40,7 +41,7 @@ const who = (p) => { const u = personas[p] && personas[p][0]; return u ? `${u.na
 const read = (f) => fs.existsSync(f) ? fs.readFileSync(f, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)) : [];
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const str = (v) => Array.isArray(v) ? v.join('; ') : (v == null ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v));
-const LABEL = { design: ['Checked — works as you approved (13 Nov): a FIXED client rate keeps the margin at that rate; "cost + my margin" adds the negotiation padding on top', 'st-earlier'], now: ['Fixed in this update', 'st-now'], earlier: ['Fixed in update 69287af or before', 'st-earlier'], ask: ['Waiting for your decision', 'st-ask'], open: ['Not fixed yet — next round', 'st-open'] };
+const LABEL = { design: ['Checked — works as you approved (13 Nov): a FIXED client rate keeps the margin at that rate; "cost + my margin" adds the negotiation padding on top', 'st-earlier'], now: ['Fixed in this update', 'st-now'], earlier: ['Fixed in update 329f18f or before', 'st-earlier'], ask: ['Waiting for your decision', 'st-ask'], open: ['Not fixed yet — next round', 'st-open'] };
 
 const parts = PARTS.map(([code, name]) => {
   const cases = read(path.join(SRC, code + '.jsonl'));
