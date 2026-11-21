@@ -53,9 +53,9 @@ try {
 
     // Browser Back + send again: the page is fetched afresh, so the form carries a NEW key with the
     // same details. Within 15 minutes, by the same person, it is not saved — the form says so.
-    $r3 = $drive($MEX, 'inquiry-new', 'POST', [], $post(['form_once' => 'inq-key-2']), ['Save it as a separate', '/inquiry-edit?id=' . $made]);
+    $r3 = $drive($MEX, 'inquiry-new', 'POST', [], $post(['form_once' => 'inq-key-2']), ['Save it as a separate', '/inquiry?id=' . $made]);
     t_eq($count(), 1, 'Back + send again (a fresh key, same client and subject, minutes later) does not make a second inquiry');
-    t_ok(!empty($r3['has']['Save it as a separate']) && !empty($r3['has']['/inquiry-edit?id=' . $made]), '…the form says it was already saved, links to it, and offers "Save it as a separate inquiry"');
+    t_ok(!empty($r3['has']['Save it as a separate']) && !empty($r3['has']['/inquiry?id=' . $made])  /* Stage 3: the link opens the inquiry page */, '…the form says it was already saved, links to it, and offers "Save it as a separate inquiry"');
     // Ticked: it really is a separate inquiry — saved.
     $drive($MEX, 'inquiry-new', 'POST', [], $post(['form_once' => 'inq-key-2', 'dup_ok' => '1']));
     t_eq($count(), 2, 'with "Save it as a separate inquiry" ticked, it is saved — nothing legitimate is blocked');

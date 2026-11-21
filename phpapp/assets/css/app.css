@@ -2006,3 +2006,48 @@ details[open]>summary .chev{transform:rotate(45deg)}
   .sxl-kv{grid-template-columns:minmax(0,1fr)}
   .sxl-reg{padding:8px}
 }
+
+/* ============================================================================
+   SALES — ENQUIRIES AND DEALS (owner, 21 Nov 2026: Stage 3 of the Sales
+   redesign — inquiries register, the inquiry's read-only page, its form, the
+   deals register, the deal page and the new-deal form). Look only, built on
+   the Sales workspace, the record-page kit and the leads block above; what a
+   person may see or do is decided by the handlers.
+   ============================================================================ */
+/* the register's row actions say their words (Open, Quote, Open Q-…) — only Delete is an icon */
+.sxq .sxl-reg td .sxw-ib span{position:static}
+.sxq .sxl-reg td .sxw-ib.bad span{position:absolute;left:-9999px}
+.sxq .sxl-reg td .sxw-acts{flex-wrap:wrap;justify-content:flex-end;gap:4px}
+.sxw-ib.p{background:var(--btn-bg);border-color:var(--btn-bg);color:var(--on-brand)}
+.sxw-ib.bad{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 35%,var(--line))}
+button.sxw-ib{cursor:pointer;font-family:inherit}
+.sxq-acts{flex-wrap:wrap;gap:8px}
+.sxq-acts .sxw-bt,.sxq-acts .sxw-bt.p{min-height:38px}
+.rec-ban.bad{background:var(--bad-bg);border-color:color-mix(in srgb,var(--bad) 30%,transparent)}
+.rec-ban.info{background:var(--info-bg);border-color:color-mix(in srgb,var(--info) 30%,transparent)}
+/* the held-for-approval banner's buttons */
+.sxd-gate{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.sxd-gate-f{display:flex;gap:8px;flex-wrap:wrap;align-items:center;flex:1;min-width:0}
+.sxd-gate-f .form-control{flex:1;min-width:200px;min-height:38px}
+.sxd-gate .btn.small{min-height:38px}
+.sxd .sxw-col header small{display:block}
+.sxd form.rec-card{display:block}
+@media (max-width:640px){
+  .sxq .sxl-reg td .sxw-acts{justify-content:flex-start}
+  .sxd-gate-f .form-control{min-width:0;width:100%}
+  .sxd-gate,.sxd-gate-f{flex-direction:column;align-items:stretch}
+  .sxd-gate .btn.small{width:100%}
+}
+.sxd .rec-card .btn.small,.sxq .rec-card .btn.small,.sxd .rec-ban .btn.small{min-height:36px}
+.sxd .rec-grid>.rec-card,.sxq .rec-grid>.rec-card{align-self:start}
+.sxq .sxl-reg td a b{white-space:nowrap}
+/* the inquiry header carries real buttons (Project costing, Quote): they sit under the contact, never squeeze it */
+.sxq .rec-who{flex-wrap:wrap;grid-template-columns:minmax(0,1fr)}
+.sxq .rec-who>div:first-child{min-width:0;flex:1 1 260px}
+.sxq .sxq-acts{flex:1 1 auto;justify-content:flex-end}
+@media (max-width:640px){ .sxq .sxq-acts{justify-content:flex-start;width:100%} .sxq .sxq-acts .sxw-bt{flex:1 1 auto} }
+.sxd .sxl-board .sxw-bd{min-width:calc(var(--n,6) * 150px)}
+@media (max-width:640px){ .sxd .sxl-board .sxw-bd{min-width:0} }
+/* Stage 3: the loss-reasons card keeps the record-card look (it also carries .panel, the class the register used) */
+.sxd .rec-card.panel{border-radius:var(--rec-r);padding:16px;box-shadow:none;margin:0 0 12px}
+.sxd-won{margin:0 0 12px}

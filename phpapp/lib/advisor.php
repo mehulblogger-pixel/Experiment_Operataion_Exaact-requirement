@@ -336,7 +336,7 @@ function adv_inquiries_unquoted() {
         'stop' => 'Nothing automatic — an inquiry is never dropped for you. This is the daily working list for whoever quotes.',
         'who' => 'Whoever prepares quotations, reviewed by the sales manager',
         'link' => '/inquiries', 'link_label' => 'Open the inquiries register',
-        'rows' => array_slice($rows, 0, 12), 'row_url' => '/inquiry-edit?id=',
+        'rows' => array_slice($rows, 0, 12), 'row_url' => '/inquiry?id=',
     ];
 }
 

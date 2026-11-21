@@ -132,7 +132,7 @@ $val = fn($k, $d = '') => htmlspecialchars((string)($r[$k] ?? $d), ENT_QUOTES);
   <div class="panel" style="margin-top:16px">
     <p style="margin:0"><b>No rules, so nothing is gated.</b></p>
     <p class="muted" style="margin:6px 0 0;max-width:640px">
-      Every deal moves the moment somebody drags it, exactly as before. The commonest first rule is one line:
+      Every deal moves the moment somebody moves it on (Move it, on the deal page), exactly as before. The commonest first rule is one line:
       <b>wins above your average deal size need the sales head to agree</b> — it costs the team one click on the
       few deals that set the forecast, and nothing at all on the rest.
     </p>

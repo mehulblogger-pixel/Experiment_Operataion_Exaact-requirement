@@ -1,0 +1,554 @@
+<?php
+  $open = $o['status'] === 'OPEN';
+  $curStageName = '';
+  foreach ($stages as $s) if ((int)$s['id'] === (int)$o['stage_id']) $curStageName = $s['name'];
+  $effLbl = function_exists('act_effort_label') ? act_effort_label($effort ?? []) : '';
+  $custName = $o['client_name'] ?: ($o['partner_name'] ?: '');
+?>
+<?= function_exists('chain_strip') ? chain_strip('OPPORTUNITY', (int)$o['id'], 'OPPORTUNITY', (int)$o['id']) : '' ?>
+<div class="master-head"><div>
+  <h1><?= e($o['name']) ?></h1>
+  <p class="sub" style="margin:2px 0 0"><?= e($o['ref']) ?>
+    <span class="pill <?= $o['status']==='WON'?'p-ok':($o['status']==='LOST'?'p-bad':'p-warn') ?>"><?= e(OPP_STATUS[$o['status']] ?? $o['status']) ?></span>
+    · <?= $o['partner_id'] ? '<a href="/ledger?id=' . (int)$o['partner_id'] . '">' . e($custName) . '</a>' : e($custName ?: 'no customer yet') ?>
+    <?= $curStageName ? ' · ' . e($curStageName) : '' ?>
+  </p></div>
+  <?php // Delete — administrators only, and only while it is safe to remove: not
+        //   won, and no quotation linked. Otherwise it is part of the record. ?>
+  <?php if ((is_admin_level() || is_master()) && $o['status'] !== 'WON' && !count($quotes)): ?>
+  <form method="post" action="/opportunity-delete" onsubmit="return confirm('Delete <?= e(Tl('opportunity')) ?> <?= e($o['ref']) ?>? This cannot be undone. (Lost deals are kept as history — consider marking it lost instead.)')">
+    <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
+    <button class="btn small danger" type="submit">Delete</button></form>
+  <?php endif; ?>
+</div>
+
+<?php if (!empty($tradeBlock)): ?>
+  <div class="msg msg-error" style="margin-top:12px">⛔ <?= e($tradeBlock) ?> No <?= e(Tl('quote')) ?> can be made for this <?= e(Tl('opportunity')) ?> until that changes.</div>
+<?php endif; ?>
+<?php if (!empty($gate)):
+  $gTo = function_exists('stage_row') ? stage_row((int)$gate['to_stage_id']) : null; ?>
+  <div class="msg msg-warning" style="margin-top:12px">
+    <b>Held for approval.</b>
+    The move to <b><?= e((string)($gTo['name'] ?? 'the next step')) ?></b> was requested by
+    <?= e((string)$gate['requested_by'] ?: 'somebody') ?>
+    <?= trim((string)$gate['requested_at']) !== '' ? 'on ' . e(fdate(substr((string)$gate['requested_at'], 0, 10))) : '' ?>
+    and is waiting on <b><?= e((string)$gateWaiting) ?></b>. Until then the deal stays where it is, and it is not in the won figures.
+    <?php if (trim((string)$gate['note']) !== ''): ?><div style="margin-top:4px">“<?= e((string)$gate['note']) ?>”</div><?php endif; ?>
+    <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <?php if (!empty($gateCanAct)): ?>
+        <form method="post" action="/approval-act" style="display:inline-flex;gap:6px;align-items:center">
+          <input type="hidden" name="id" value="<?= (int)$gate['id'] ?>">
+          <input type="hidden" name="back" value="/opportunity?id=<?= (int)$o['id'] ?>">
+          <input class="form-control" style="width:220px" name="remarks" placeholder="Remark (required to send back)" maxlength="500">
+          <button class="btn small" name="decision" value="APPROVED">Approve the move</button>
+          <button class="btn small secondary" name="decision" value="REJECTED">Send back</button>
+        </form>
+      <?php elseif ((int)($gate['requested_by_id'] ?? 0) === (int)(current_user()['id'] ?? 0) || is_master()):   // only who may withdraw it sees the button (SALA-023) ?>
+        <form method="post" action="/approval-act" style="display:inline"
+              onsubmit="return confirm('Withdraw this request? The deal stays where it is.')">
+          <input type="hidden" name="id" value="<?= (int)$gate['id'] ?>">
+          <input type="hidden" name="back" value="/opportunity?id=<?= (int)$o['id'] ?>">
+          <button class="btn small secondary" name="decision" value="CANCELLED">Withdraw the request</button>
+        </form>
+      <?php endif; ?>
+      <a class="btn small secondary" href="/approvals">All approvals</a>
+    </div>
+  </div>
+<?php endif; ?>
+
+<?php // ---- Where it is now, and the one next thing ------------------------- ?>
+<div class="nowband">
+  <?php if ($o['status'] === 'WON'): ?>
+    <div class="step">Won — <?= e($custName ?: 'the customer') ?> said yes. 🎉</div>
+    <?php if (!empty($o['call_id'])): ?>
+      <p class="next">The work order is raised — <a href="/call?id=<?= (int)$o['call_id'] ?>"><b>open it</b></a>.</p>
+    <?php elseif (function_exists('opp_won_next')): ?>
+      <p class="next"><?= e(opp_won_next($o)) ?></p>
+    <?php endif; ?>
+    <?php if (empty($o['call_id']) && empty($o['contract_id']) && trim((string)($o['sent_to_accounts_at'] ?? '')) === ''): ?>
+    <?php if (function_exists('leads_can_reopen') && leads_can_reopen()): ?>
+      <details style="margin-top:8px"><summary class="muted" style="font-size:12.5px;cursor:pointer">Reopen this deal</summary>
+        <form method="post" action="/opportunity-reopen" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px">
+          <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
+          <input class="form-control" name="reason" required maxlength="300" placeholder="Why — written in its history" style="flex:1;min-width:220px">
+          <button class="btn small secondary" type="submit">Reopen</button>
+        </form></details>
+    <?php endif; ?>
+    <?php endif; ?>
+  <?php elseif ($o['status'] === 'LOST'): ?>
+    <div class="step">Closed — this one did not happen.</div>
+    <p class="next">Reason: <b><?= e($lostReasons[$o['lost_reason']] ?? $o['lost_reason']) ?></b><?= $o['lost_to'] ? ' — lost to ' . e($o['lost_to']) : '' ?><?= $o['lost_note'] ? '. ' . e($o['lost_note']) : '' ?>.</p>
+    <?php if (function_exists('leads_can_reopen') && leads_can_reopen()): ?>
+      <details style="margin-top:8px"><summary class="muted" style="font-size:12.5px;cursor:pointer">Reopen this deal</summary>
+        <form method="post" action="/opportunity-reopen" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px">
+          <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
+          <input class="form-control" name="reason" required maxlength="300" placeholder="Why — written in its history" style="flex:1;min-width:220px">
+          <button class="btn small secondary" type="submit">Reopen</button>
+        </form></details>
+    <?php endif; ?>
+  <?php else: ?>
+    <div class="step">This deal is at <b><?= e($curStageName ?: '—') ?></b>.<?php if ($stalled): ?> <span class="pill p-bad" style="font-size:11.5px"><?= (int)$days ?> days here — overdue</span><?php endif; ?></div>
+    <?php if (!empty($quoteNow) && !in_array($quoteNow['status'], ['LOST', 'EXPIRED'], true)): ?>
+      <p class="next"><?= e($quoteNow['text']) ?> <a href="/quote?id=<?= (int)$quoteNow['id'] ?>"><b>Open <?= e(Tl('quote')) ?> <?= e($quoteNow['label']) ?> →</b></a></p>
+    <?php endif; ?>
+    <p class="next"><?php if (trim((string)$o['next_action']) !== ''): ?>
+        <b>Next:</b> <?= e($o['next_action']) ?><?= $o['next_action_on'] ? ' <span class="muted">by ' . e(fdate($o['next_action_on'])) . '</span>' : '' ?>
+      <?php elseif (!empty($quoteNow) && !in_array($quoteNow['status'], ['LOST', 'EXPIRED'], true)): ?>
+      <?php else: ?>
+        <span class="muted">No next step noted — move it on below, or note the next step in Edit.</span>
+      <?php endif; ?></p>
+    <?php if ($canEdit): ?>
+      <div class="cta">
+        <a class="btn small secondary" href="#move">Move it on</a>
+        <?php if ($o['lead_id']): ?><a class="btn small secondary" href="/lead?id=<?= (int)$o['lead_id'] ?>">See the lead</a><?php endif; ?>
+      </div>
+    <?php endif; ?>
+  <?php endif; ?>
+</div>
+
+<div data-tabs data-tabs-key="opp" data-tabs-order="Overview,Quotes,History,Actions">
+<?php // ---- The essentials, plainly ---------------------------------------- ?>
+<div class="panel" data-tab="Overview" style="margin-top:16px">
+  <div class="kv-grid">
+    <div><span class="k">Worth about</span><span><?= (float)$o['value'] ? e(fmoney($o['value'])) : '—' ?></span></div>
+    <div><span class="k">Likely value</span><span><b><?= e(fmoney(opp_weighted($o))) ?></b> <span class="muted" style="font-size:12px">(<?= (int)($o['probability'] ?: $o['stage_prob']) ?>% chance)</span></span></div>
+    <div><span class="k">Hoped to close</span><span><?= $o['expected_close'] ? e(fdate($o['expected_close'])) : '—' ?></span></div>
+    <div><span class="k">Handled by</span><span><?= e($o['owner_name'] ?: '—') ?></span></div>
+    <div><span class="k">Branch</span><span><?= e($o['office_name'] ?: '—') ?></span></div>
+    <div><span class="k">At this step for</span><span><?= (int)$days ?> days</span></div>
+    <?php if (trim((string)$o['competitor']) !== ''): ?>
+      <div><span class="k">Up against</span><span><?= e($o['competitor']) ?></span></div>
+    <?php endif; ?>
+    <?php if ($o['lead_id']): ?>
+      <div><span class="k">Came from</span><span><a href="/lead?id=<?= (int)$o['lead_id'] ?>">the lead</a></span></div>
+    <?php endif; ?>
+    <?php if ($effLbl !== ''): ?>
+      <div><span class="k"><?= $o['status'] === 'WON' ? 'Effort to win' : 'Effort so far' ?></span><span><?= e($effLbl) ?></span></div>
+    <?php endif; ?>
+  </div>
+  <?php if (trim((string)$o['requirement']) !== ''): ?>
+    <h4 style="margin:14px 0 4px">What they want</h4>
+    <p style="white-space:pre-wrap;margin:0"><?= e($o['requirement']) ?></p>
+  <?php endif; ?>
+</div>
+
+<?php // ---- Project costing on this deal ------------------------------------
+  if (!empty($costingCan)): $pcRow = $costing ?? null; $back = '/opportunity?id=' . (int)$o['id']; ?>
+<div class="panel" data-tab="Overview" style="margin-top:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+  <span class="muted">🧮 Project costing:</span>
+  <?php if ($pcRow): ?>
+    <a class="btn small secondary" href="/project-costing?id=<?= (int)$pcRow['id'] ?>"><b><?= e($pcRow['code']) ?></b> — <?= e($pcRow['title']) ?></a>
+    <span class="muted" style="font-size:12.5px">revenue <?= fmoney_short($pcRow['exp_revenue']) ?></span>
+    <?php $pcLock = function_exists('pc_unlink_block_deal') ? pc_unlink_block_deal((int)$o['id']) : '';
+          if ($pcLock !== ''): ?>
+      <span class="muted" style="margin-left:auto;font-size:12.5px" title="<?= e($pcLock) ?>">🔒 Stays linked — this deal <?= !empty($o['contract_id']) ? 'has a contract' : (trim((string)($o['sent_to_accounts_at'] ?? '')) !== '' ? 'is with Accounts' : 'has been won') ?></span>
+    <?php else: ?>
+    <form method="post" action="/project-costing-attach" style="display:inline;margin-left:auto" onsubmit="return confirm('Unlink this costing from the deal?')">
+      <input type="hidden" name="costing_id" value="<?= (int)$pcRow['id'] ?>"><input type="hidden" name="opportunity_id" value="0"><input type="hidden" name="back" value="<?= e($back) ?>">
+      <button class="btn small btn-ghost">Unlink</button>
+    </form>
+    <?php endif; ?>
+  <?php else: ?>
+    <form method="post" action="/project-costing-new" style="display:inline">
+      <input type="hidden" name="opportunity_id" value="<?= (int)$o['id'] ?>"><input type="hidden" name="client_id" value="<?= (int)($o['client_id'] ?? 0) ?>">
+      <input type="hidden" name="title" value="<?= e(trim((string)($o['name'] ?? '')) ?: ($o['ref'] ?? 'Costing')) ?>">
+      <button class="btn small primary">＋ Create costing for this deal</button>
+    </form>
+    <?php if (!empty($costingUnlinked)): ?>
+    <form method="post" action="/project-costing-attach" style="display:inline-flex;gap:6px;align-items:center">
+      <input type="hidden" name="opportunity_id" value="<?= (int)$o['id'] ?>"><input type="hidden" name="back" value="<?= e($back) ?>">
+      <select name="costing_id" class="form-control" style="padding:5px 8px;font-size:13px"><option value="">attach existing…</option>
+        <?php foreach ($costingUnlinked as $u): ?><option value="<?= (int)$u['id'] ?>"><?= e($u['code'].' — '.$u['title']) ?></option><?php endforeach; ?>
+      </select><button class="btn small secondary">Attach</button>
+    </form>
+    <?php endif; ?>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
+<?php // ---- Quotations on this deal ---------------------------------------- ?>
+<div class="panel" data-tab="Quotes" style="margin-top:16px">
+  <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:10px">
+    <h3 style="margin:0">Quotations on this deal <span class="muted" style="font-weight:400;font-size:13px">(<?= count($quotes) ?>)</span></h3>
+    <?php if ($canEdit && $open): ?>
+      <form method="post" action="/opportunity-new-quote" style="margin:0">
+        <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
+        <button class="btn small"<?= (empty($o['partner_id']) && trim((string)$o['partner_name']) === '') ? ' disabled title="Type the customer\'s name on the deal first"' : '' ?>>＋ Create a new quotation</button>
+      </form>
+    <?php endif; ?>
+  </div>
+  <p class="muted" style="font-size:13px;margin:8px 0 0">Create a quotation straight from the deal — it carries the customer and the working value, and lands on the quote so you can add line items and submit. (Or attach an existing one below.) Keeping them all here stops the forecast counting the same business more than once.</p>
+
+  <?php // Owner, 13 Nov 2026 (bounce list 2.1): a deal no longer needs a customer RECORD
+        //   to quote. The yellow "Link the customer to raise a quotation" stop is gone;
+        //   what is left is a quiet, optional way to tie the deal to a customer who is
+        //   already on the master. ?>
+  <?php if ($canEdit && $open && empty($o['partner_id'])): ?>
+    <p class="muted" style="font-size:13px;margin:10px 0 0">
+      <?= e(trim((string)$o['partner_name']) !== '' ? $o['partner_name'] : 'This customer') ?> is not on the client master yet — that is fine.
+      The <?= e(Tl('quote')) ?> goes out in their name, and they are added to the master by itself when they accept it.</p>
+    <?php if (!empty($clients)): ?>
+      <details class="fold" style="margin-top:8px">
+        <summary>Already a customer? <span class="sub">pick them from the master</span></summary>
+        <div class="fold-body">
+          <form method="post" action="/opportunity-edit" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+            <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
+            <div class="ff" style="flex:1;min-width:220px"><label for="opp-cust-open">Customer</label>
+              <select id="opp-cust-open" name="partner_id" class="form-control searchable">
+                <option value="">— pick a customer —</option>
+                <?php foreach ($clients as $c): ?>
+                  <option value="<?= (int)$c['id'] ?>"><?= e($c['display_name'] ?: $c['legal_name']) ?></option>
+                <?php endforeach; ?>
+              </select></div>
+            <button class="btn small secondary" type="submit">Set the customer</button>
+          </form>
+        </div>
+      </details>
+    <?php endif; ?>
+  <?php endif; ?>
+  <?php if ($quotes): ?>
+    <table class="dt" style="margin-top:10px">
+      <caption class="sr-only">Quotations attached to this deal</caption>
+      <thead><tr><th scope="col">Quotation</th><th scope="col">Status</th><th scope="col" class="num">Value</th><?php if ($canEdit && $open): ?><th scope="col"></th><?php endif; ?></tr></thead>
+      <tbody>
+      <?php foreach ($quotes as $q): ?>
+        <tr>
+          <td><a href="/quote?id=<?= (int)$q['id'] ?>"><?= e($q['quote_no']) ?><?= (int)$q['rev'] ? ' r' . (int)$q['rev'] : '' ?></a></td>
+          <td><span class="pill p-mut"><?= e($q['status']) ?></span></td>
+          <td class="num"><?= e(fmoney($q['total_amount'])) ?></td>
+          <?php if ($canEdit && $open): ?>
+            <td><form method="post" action="/opportunity-quote" style="display:inline">
+              <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
+              <input type="hidden" name="quotation_id" value="<?= (int)$q['id'] ?>">
+              <input type="hidden" name="act" value="unlink">
+              <button class="btn small secondary">Detach</button>
+            </form></td>
+          <?php endif; ?>
+        </tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+  <?php else: ?>
+    <p class="muted" style="margin:10px 0 0">None yet — that's normal for a deal you are still working on.</p>
+  <?php endif; ?>
+
+  <?php if ($canEdit && $open && $openQuotes): ?>
+    <form method="post" action="/opportunity-quote" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+      <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
+      <div class="ff" style="flex:1;min-width:220px"><label for="oq">Attach a quotation</label>
+        <select id="oq" name="quotation_id" class="searchable">
+          <?php foreach ($openQuotes as $q): ?>
+            <option value="<?= (int)$q['id'] ?>"><?= e($q['quote_no']) ?><?= (int)$q['rev'] ? ' r' . (int)$q['rev'] : '' ?> — <?= e(fmoney($q['total_amount'])) ?> (<?= e($q['status']) ?>)</option>
+          <?php endforeach; ?>
+        </select></div>
+      <button class="btn small">Attach</button>
+    </form>
+  <?php endif; ?>
+  <?php // Generate a quotation-of-record even for an order won WITHOUT a quotation, so
+        //  the deal always CAN carry one. One is enough — once a quotation is on the
+        //  deal the button is greyed out (a second quote-of-record would be noise). ?>
+  <?php // Owner, 13 Nov 2026 (bounce list 2.5): "Create a new quotation" and "Generate
+        //  quotation" sat side by side and sounded the same. One at a time: while the deal
+        //  is open you CREATE its quotation (above); "Generate" is only for a deal already
+        //  WON without one, that wants a quotation for the record. ?>
+  <?php if ($canEdit && ($o['status'] ?? '') === 'WON' && !empty($o['partner_id']) && !$quotes): ?>
+      <form method="post" action="/opportunity-generate-quote" style="margin-top:12px">
+        <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
+        <button class="btn small secondary" type="submit">＋ Generate quotation</button>
+        <span class="muted" style="font-size:12px;margin-left:6px">This deal was won without a <?= e(Tl('quote')) ?>. This drafts one from it, for the record.</span>
+      </form>
+  <?php endif; ?>
+</div>
+
+<?php // ---- Won: to Accounts for a contract, or straight to a work order -----
+      // A won deal can go two ways. The governed path (recommended, and the same one
+      // a quoted win takes): hand it to Accounts, who register a contract — it runs
+      // the PENDING → endorse → approve → OPEN lifecycle, and the calls are raised
+      // from the OPEN contract. The quick path (kept for a one-off with no contract):
+      // raise the work order straight onto a call. Shown only when operations is
+      // installed. ?>
+<?php if ($o['status'] === 'WON' && $orderBlock !== 'not-installed'): ?>
+  <?php if (!empty($o['call_id'])): ?>
+    <div class="msg msg-success" style="margin-top:16px">
+      Order raised from this deal — <a href="/call?id=<?= (int)$o['call_id'] ?>"><b>open it</b></a>.
+    </div>
+  <?php elseif (!empty($contractRow)): ?>
+    <?php $cOpen = strtoupper((string)($contractRow['open_status'] ?? 'OPEN')) === 'OPEN'; ?>
+    <div class="msg <?= $cOpen ? 'msg-success' : 'msg-warning' ?>" style="margin-top:16px">
+      <b>Contract <?= e($contractRow['contract_number']) ?></b>
+      <?= $cOpen
+          ? ' is registered and open — raise inspection ' . e(Tlp('call')) . ' from it whenever the work comes in.'
+          : ' is registered and <b>waiting for approval</b>. ' . e(contract_waiting_words($contractRow)) . ' The ' . e(Tlp('call')) . ' are raised from it once it is open.' ?>
+      <?php if ($cOpen && (can('ops.call.create') || is_master())): ?>
+        <div style="margin-top:8px"><a class="btn small" href="/call-new?contract_id=<?= (int)$contractRow['id'] ?>">▶ Raise <?= e(Tl('call')) ?></a></div>
+      <?php endif; ?>
+    </div>
+  <?php elseif ($orderBlock !== ''): ?>
+    <div class="msg msg-warning" style="margin-top:16px"><?= e($orderBlock) ?>
+      <?php if (empty($o['partner_id']) && !empty($o['lead_id'])): ?>
+        <a href="/lead?id=<?= (int)$o['lead_id'] ?>"><b>Convert the lead</b></a> — it makes the customer and fills this in.
+      <?php endif; ?>
+      <?php // Owner, 13 Nov 2026 (bounce list 3.2): it said "Add them as a customer first" and
+            // offered no way to do it. One short form, right here — the same short record a
+            // won lead creates. A deal that came from a lead keeps "Convert the lead" above.
+            if (empty($o['partner_id']) && empty($o['lead_id']) && !empty($canAddCustomer)): ?>
+        <form method="post" action="/opportunity-add-customer" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+          <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
+          <div class="ff" style="flex:2;min-width:200px"><label for="opp-newcust">Customer name</label>
+            <input class="form-control" id="opp-newcust" name="company_name" maxlength="200" required value="<?= e($o['partner_name']) ?>"></div>
+          <div class="ff" style="flex:1;min-width:140px"><label for="opp-newstate">State <span class="muted">(for tax)</span></label>
+            <input class="form-control" id="opp-newstate" name="state" maxlength="60" placeholder="e.g. Gujarat"></div>
+          <?php if (($_GET['samename'] ?? '') === '1'): ?>
+            <label class="ff-check" style="flex-basis:100%"><input type="checkbox" name="confirm_new" value="1" required> It is a different company from the one already on file with this name</label>
+          <?php endif; ?>
+          <button class="btn small">＋ Add as a customer</button>
+        </form>
+      <?php endif; ?>
+      <?php if (empty($o['partner_id']) && $canEdit && !empty($clients)): ?>
+        <form method="post" action="/opportunity-edit" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+          <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
+          <div class="ff" style="flex:1;min-width:220px"><label for="opp-cust">Or pick one already on the master</label>
+            <select id="opp-cust" name="partner_id" class="searchable">
+              <option value="">—</option>
+              <?php foreach ($clients as $c): ?>
+                <option value="<?= (int)$c['id'] ?>"><?= e($c['display_name'] ?: $c['legal_name']) ?></option>
+              <?php endforeach; ?>
+            </select></div>
+          <button class="btn small">Set the customer</button>
+        </form>
+      <?php endif; ?>
+    </div>
+  <?php else: ?>
+    <?php // Won, customer on file, no call and no contract yet. ?>
+    <?php // Owner, 13 Nov 2026 (bounce list 2.2): a deal won THROUGH A QUOTATION goes to
+          // Accounts through that quotation — the contract is registered there. The deal
+          // used to go on offering "Send to Accounts", and one sale could get two contracts.
+          if (!empty($winQuote)):
+            $wqC = $winQuote['contract'] ?? null; $wqNo = trim((string)($winQuote['contract_number'] ?? ''));
+            $wqOs = $wqC ? strtoupper((string)($wqC['open_status'] ?? '') ?: 'OPEN') : ''; ?>
+      <div class="panel" data-tab="Actions" style="margin-top:16px;border-left:3px solid var(--ok)">
+        <b style="color:var(--ok)">✓ Won through <?= e(Tl('quote')) ?> <?= e($winQuote['label']) ?></b>
+        <p style="font-size:13.5px;margin:6px 0 0">
+          <?php if ($wqNo === ''): ?>
+            It is with Accounts — they register the contract on that <?= e(Tl('quote')) ?>. There is nothing to send from the deal.
+          <?php elseif ($wqOs === 'PENDING' && $wqC): ?>
+            Contract <b><?= e($wqNo) ?></b> is registered and waiting for approval. <?= e(contract_waiting_words($wqC)) ?>
+          <?php elseif ($wqOs === 'OPEN' || !$wqC): ?>
+            Contract <b><?= e($wqNo) ?></b> is open — the <?= e(Tlp('call')) ?> are raised from it.
+          <?php else: ?>
+            Contract <b><?= e($wqNo) ?></b> — <?= e(strtolower(CONTRACT_OPEN_STATES[$wqOs] ?? $wqOs)) ?>.
+          <?php endif; ?>
+        </p>
+        <?php if (can('mod.quotes.view') || is_master()): ?>
+          <div style="margin-top:8px"><a class="btn small secondary" href="/quote?id=<?= (int)$winQuote['id'] ?>#contract">Open <?= e(Tl('quote')) ?> <?= e($winQuote['label']) ?></a></div>
+        <?php endif; ?>
+      </div>
+    <?php elseif (!empty($o['sent_to_accounts_at'])): ?>
+      <div class="panel" data-tab="Actions" style="margin-top:16px;border-left:3px solid var(--ok)">
+        <b style="color:var(--ok)">✓ Handed to Accounts — awaiting contract registration</b>
+        <p class="muted" style="font-size:13px;margin:6px 0 0">Sent on <?= e(fdate(substr((string)$o['sent_to_accounts_at'], 0, 10))) ?>.
+          Accounts register the contract, it is approved under your company's rule, then Operations raise the <?= e(Tlp('call')) ?> from it.
+          <?php if (!$canRegisterContract): ?>There is nothing more for Sales to do here.<?php endif; ?></p>
+        <?php if ($canRegisterContract): ?>
+          <form method="post" action="/opportunity-contract" style="margin-top:12px">
+            <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
+            <div style="font-weight:600;margin-bottom:8px">Register the contract <span class="muted" style="font-weight:400">— for <?= e($o['partner_name'] ?: 'this customer') ?>, agreed value <?= e(fmoney($o['value'])) ?></span></div>
+            <div class="form-grid" style="gap:12px 16px">
+              <div><label>Branch</label>
+                <select class="form-control" name="branch_id">
+                  <option value="">— <?= e($o['office_name'] ?: 'not set') ?> —</option>
+                  <?php foreach ($offices as $f): ?><option value="<?= (int)$f['id'] ?>" <?= (int)$f['id']===(int)$o['office_id']?'selected':'' ?>><?= e($f['name']) ?></option><?php endforeach; ?>
+                </select></div>
+              <div><label>Contract number</label><input class="form-control" name="contract_number" maxlength="80" placeholder="The number they gave, or auto">
+                <label class="ff-check" style="margin-top:4px"><input type="checkbox" name="auto_contract" value="1"> Auto-generate</label></div>
+              <div><label>Start date</label><input class="form-control" type="date" name="start_date"></div>
+              <div><label>End date</label><input class="form-control" type="date" name="end_date"></div>
+            </div>
+            <button class="btn" style="margin-top:12px">Register the contract</button>
+          </form>
+        <?php endif; ?>
+      </div>
+    <?php else: ?>
+      <div class="panel" data-tab="Actions" style="margin-top:16px;border-left:3px solid var(--brand)">
+        <h3 style="margin-top:0">Take this won deal forward</h3>
+        <form method="post" action="/opportunity-send-to-accounts" style="margin:0">
+          <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
+          <b>Won directly, or an order received without a quotation?</b>
+          <p class="muted" style="font-size:13px;margin:6px 0 10px">
+            Send it to <b>Accounts</b> to register the contract — no quotation needed. Accounts register it, it is
+            approved under your company's rule, then Operations raise the <?= e(Tlp('call')) ?> from the contract. This is the
+            same governed path a quoted win takes, so the sale still passes through Finance.</p>
+          <button class="btn">Send to Accounts to register the contract</button>
+        </form>
+      </div>
+    <?php endif; ?>
+
+    <?php // The quick path — a direct work order with no contract. Kept as a secondary,
+          // folded option; only for someone who can actually raise operations orders. ?>
+    <?php if ($canOrder): ?>
+    <details class="fold" data-tab="Actions" style="margin-top:12px">
+      <summary>Or raise a work order directly <span class="sub">a one-off with no contract — set the rate on the order</span></summary>
+      <div class="fold-body">
+      <form method="post" action="/opportunity-raise-order" style="border-left:3px solid var(--line);padding-left:12px">
+        <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
+        <p class="muted" style="font-size:13px;margin:0 0 10px">
+          Carries the customer, the agreed value and the branch straight onto the order.
+          <?php if ($orderQuote): ?>
+            It will carry <b><?= e($orderQuote['quote_no']) ?><?= (int)$orderQuote['rev'] ? ' r' . (int)$orderQuote['rev'] : '' ?></b>
+            (<?= e($orderQuote['status']) ?>, <?= e(fmoney($orderQuote['total_amount'])) ?>).
+          <?php else: ?>
+            <b>No quotation is attached</b>, so the order carries the estimate and somebody sets the rate on it, and it does not pass through Finance.
+          <?php endif; ?>
+        </p>
+        <div class="form-grid" style="gap:12px 16px">
+          <div><label>Executing branch</label>
+            <select class="form-control" name="executing_office_id">
+              <option value="">— <?= e($o['office_name'] ?: 'not set') ?> —</option>
+              <?php foreach ($offices as $f): ?><option value="<?= (int)$f['id'] ?>" <?= (int)$f['id']===(int)$o['office_id']?'selected':'' ?>><?= e($f['name']) ?></option><?php endforeach; ?>
+            </select></div>
+          <div><label>Contract number</label><input class="form-control" name="contract_number" maxlength="80" value="<?= e($orderQuote['contract_number'] ?? '') ?>" placeholder="If they gave one"></div>
+          <div><label>Wanted by</label><input class="form-control" type="date" name="inspection_required_date"></div>
+        </div>
+        <button class="btn secondary" style="margin-top:12px">Raise the work order</button>
+      </form>
+      </div>
+    </details>
+    <?php endif; ?>
+  <?php endif; ?>
+<?php endif; ?>
+
+<?php // ---- Move it to the next step --------------------------------------- ?>
+<?php if ($canEdit && $open): ?>
+<form method="post" action="/opportunity-move" class="panel" data-tab="Actions" style="margin-top:16px" id="move">
+  <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
+  <h3 style="margin-top:0">Move it to the next step</h3>
+  <p class="muted" style="margin:0 0 14px;font-size:13px">Pick the step this deal has genuinely reached and press <b>Move it</b>.
+    <b>Won</b> closes it as a sale and lets you raise the order. <b>Lost</b> closes it — and asks why.</p>
+  <div class="form-grid" style="gap:12px 16px">
+    <div><label for="opp-stage">Move it to</label>
+      <select class="form-control" name="stage_id" id="opp-stage">
+        <?php foreach ($stages as $s): ?>
+          <option value="<?= (int)$s['id'] ?>" data-kind="<?= e($s['kind']) ?>" <?= (int)$s['id']===(int)$o['stage_id']?'selected':'' ?>>
+            <?= e($s['name']) ?><?= (int)$s['probability'] ? ' (' . (int)$s['probability'] . '%)' : '' ?><?= $s['kind']==='WON' ? ' — closes it as a sale' : ($s['kind']==='LOST' ? ' — closes it as lost' : '') ?>
+          </option>
+        <?php endforeach; ?>
+      </select>
+      <span class="muted" style="font-size:12px">The one it is on now is where it stays if you change nothing.</span></div>
+  </div>
+  <div id="opp-lost" style="display:none;margin-top:10px;border-left:3px solid var(--bad,#dc2626);padding-left:12px">
+    <p class="muted" style="font-size:12.5px;margin:0 0 8px">You are closing this as <b>lost</b>. A reason is required — it is the only thing that makes a lost deal tell you anything later.</p>
+    <div class="form-grid" style="gap:12px 16px">
+      <div class="ff"><label>Why it was lost</label>
+        <select class="form-control" name="lost_reason"><option value="">choose a reason…</option>
+          <?php foreach ($lostReasons as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?>
+        </select></div>
+      <div><label>Lost to</label><input class="form-control" name="lost_to" maxlength="200" placeholder="Which competitor, if you know"></div>
+      <div class="ff-wide"><label>What actually happened</label><input class="form-control" name="lost_note" maxlength="500" placeholder="Optional, but useful"></div>
+    </div>
+  </div>
+  <button class="btn" style="margin-top:12px">Move it</button>
+</form>
+<script>
+(function () {
+  var sel = document.getElementById('opp-stage'), lost = document.getElementById('opp-lost');
+  if (!sel || !lost) return;
+  function sync() {
+    var o = sel.options[sel.selectedIndex];
+    lost.style.display = (o && o.getAttribute('data-kind') === 'LOST') ? 'block' : 'none';
+  }
+  sel.addEventListener('change', sync); sync();
+})();
+</script>
+<?php endif; ?>
+
+<?php // ---- Folded away: edit, and the history ------------------------------ ?>
+<?php if ($canEdit && $open): ?>
+<details class="fold" data-tab="Actions">
+  <summary>Edit the details</summary>
+  <div class="fold-body">
+    <form method="post" action="/opportunity-edit">
+      <input type="hidden" name="id" value="<?= (int)$o['id'] ?>">
+      <div class="form-grid" style="gap:12px 16px">
+        <div class="ff-wide"><label>Name</label><input class="form-control" name="name" value="<?= e($o['name']) ?>" maxlength="255"></div>
+        <div class="ff"><label for="opp-partner">Customer</label>
+          <select class="form-control searchable" id="opp-partner" name="partner_id">
+            <option value="">— not on the master yet —</option>
+            <?php foreach ($clients as $c): ?>
+              <option value="<?= (int)$c['id'] ?>" <?= (int)$c['id']===(int)$o['partner_id']?'selected':'' ?>><?= e($c['display_name'] ?: $c['legal_name']) ?></option>
+            <?php endforeach; ?>
+          </select>
+          <span class="muted" style="font-size:12px">A deal from a lead has none until the lead is converted. The order cannot be raised without it.</span></div>
+        <div><label>Worth about</label><input class="form-control" name="value" type="number" step="0.01" value="<?= e($o['value']) ?>"></div>
+        <div><label>Hoped to close</label><input class="form-control" type="date" name="expected_close" value="<?= e($o['expected_close']) ?>"></div>
+        <div class="ff"><label>Handled by</label>
+          <select class="form-control searchable" name="owner_user_id">
+            <option value="">— nobody yet —</option>
+            <?php foreach (($users ?? []) as $uu): ?>
+              <option value="<?= (int)$uu['id'] ?>" <?= (int)($o['owner_user_id'] ?? 0) === (int)$uu['id'] ? 'selected' : '' ?>>
+                <?= e(trim($uu['first_name'] . ' ' . $uu['last_name']) ?: $uu['username']) ?></option>
+            <?php endforeach; ?>
+          </select>
+          <?php if (trim((string)($o['owner_name'] ?? '')) !== '' && !(int)($o['owner_user_id'] ?? 0)): ?>
+            <div class="ff-help">Held against the typed name “<?= e($o['owner_name']) ?>”, not linked to a login. Pick the person to make it a real allocation.</div>
+          <?php endif; ?></div>
+        <?php if (($o['status'] ?? 'OPEN') === 'OPEN' && !empty($pipelines)): ?>
+          <div class="ff"><label>Set of steps</label>
+            <select class="form-control" name="pipeline_id">
+              <?php foreach ($pipelines as $pl): ?>
+                <option value="<?= (int)$pl['id'] ?>" <?= (int)$pl['id'] === (int)$o['pipeline_id'] ? 'selected' : '' ?>><?= e($pl['name']) ?></option>
+              <?php endforeach; ?>
+            </select>
+            <div class="ff-help">Changing this moves the deal to the first open step of the set you pick, and the move is written into its history.</div></div>
+        <?php endif; ?>
+        <div><label>Branch</label>
+          <select class="form-control" name="office_id"><option value="">—</option>
+            <?php foreach ($offices as $f): ?><option value="<?= (int)$f['id'] ?>" <?= (int)$f['id']===(int)$o['office_id']?'selected':'' ?>><?= e($f['name']) ?></option><?php endforeach; ?>
+          </select></div>
+        <div><label>Up against</label><input class="form-control" name="competitor" value="<?= e($o['competitor']) ?>" maxlength="200"></div>
+        <div><label>Contact</label><input class="form-control" name="contact_name" value="<?= e($o['contact_name']) ?>" maxlength="150"></div>
+        <div><label>Contact e-mail</label><input class="form-control" name="contact_email" value="<?= e($o['contact_email']) ?>" maxlength="200"></div>
+        <div><label>Contact phone</label><input class="form-control" name="contact_phone" value="<?= e($o['contact_phone']) ?>" maxlength="60"></div>
+        <div><label>Next thing to do</label><input class="form-control" name="next_action" value="<?= e($o['next_action']) ?>" maxlength="255"></div>
+        <div><label>By when</label><input class="form-control" type="date" name="next_action_on" value="<?= e($o['next_action_on']) ?>"></div>
+        <div class="ff-wide"><label>What they want</label><textarea class="form-control" name="requirement" rows="3"><?= e($o['requirement']) ?></textarea></div>
+      </div>
+      <div class="form-actions"><button class="btn" type="submit">Save</button></div>
+    </form>
+  </div>
+</details>
+<?php endif; ?>
+
+<?php // DEF-SAL-030 — the History tab is always there; a new deal says how it started. ?>
+<details class="fold" data-tab="History" open>
+  <summary>How it moved <span class="sub"><?= $history ? count($history) . ' move' . (count($history) === 1 ? '' : 's') : 'no moves yet' ?></span></summary>
+  <div class="fold-body">
+    <?php if (!$history): ?>
+    <p class="muted" style="margin:0">Opened<?= !empty($o['created_by']) ? ' by ' . e($o['created_by']) : '' ?><?= !empty($o['created_at']) ? ' on ' . e(fdate(substr((string)$o['created_at'], 0, 10))) : '' ?> — it has not moved to another step yet.</p>
+    <?php else: ?>
+    <table class="dt">
+      <caption class="sr-only">Step history</caption>
+      <thead><tr><th scope="col">When</th><th scope="col">From</th><th scope="col">To</th><th scope="col" class="num">Days there</th><th scope="col">By</th></tr></thead>
+      <tbody>
+      <?php foreach ($history as $h): ?>
+        <tr><td><?= e(fdate(substr((string)$h['moved_at'],0,10))) ?></td>
+            <td><?= e($h['from_name'] ?: '—') ?></td><td><?= e($h['to_name']) ?></td>
+            <td class="num"><?= (int)$h['days_in_previous'] ?></td><td><?= e($h['moved_by']) ?></td></tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+    <?php endif; ?>
+  </div>
+</details>
+</div><!-- /data-tabs (opp) -->
+
+<?php // Module 49 — the activity spine, shown where the record is read (as on lead / call /
+      // complaint / NCR). The controller already fetched this timeline; it was never rendered. ?>
+<?php // The ONE log form (views/ops/_log_form.php) — the same one the lead page and
+      // Sales → Today use (owner, 19 Nov 2026). A deal had no way to log a call.
+      if ($canEdit): $lfBack = (string) ($_GET['back'] ?? '');
+        $lfBack = function_exists('sx_safe_back') ? sx_safe_back($lfBack, '') : '';
+        $lf = ['kind' => 'OPPORTUNITY', 'id' => (int) $o['id'], 'office' => (int) ($o['office_id'] ?? 0), 'who' => (string) ($o['contact_name'] ?? ''),
+               'back' => $lfBack !== '' ? $lfBack : '/opportunity?id=' . (int) $o['id'] . '#log', 'open' => !empty($_GET['log'])]; ?>
+  <div class="panel" style="margin-top:16px"><?php include __DIR__ . '/_log_form.php'; ?></div>
+<?php endif; ?>
+<?php if (function_exists('act_render_timeline')) act_render_timeline('OPPORTUNITY', (int)$o['id'], 'Activity'); ?>

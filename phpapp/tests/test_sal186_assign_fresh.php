@@ -100,10 +100,11 @@ try {
     $iOpen = $mkI('OPEN'); $iQ = $mkI('OPEN'); $qQ = $mkIQ($iQ, 'SENT'); $iW = $mkI('OPEN'); $qW = $mkIQ($iW, 'ACCEPTED');
     $iL = $mkI('OPEN'); $qL = $mkIQ($iL, 'LOST'); $iD = $mkI('DROPPED');
     foreach ([$iQ, $iW, $iL] as $x) crm_inquiry_sync($x);
-    $n = ['href="/quote-new?inquiry=' . $iOpen . '">Quote<', 'href="/quote?id=' . $qQ . '"', 'href="/quote-new?inquiry=' . $iQ . '"', 'href="/quote?id=' . $qW . '"',
-          'href="/quote-new?inquiry=' . $iW . '"', 'href="/quote-new?inquiry=' . $iL . '">Quote again<', 'href="/quote-new?inquiry=' . $iD . '"'];
+    //  Stage 3: the register's buttons carry an icon before the word, so the word is checked on its own.
+    $n = ['href="/quote-new?inquiry=' . $iOpen . '"', 'href="/quote?id=' . $qQ . '"', 'href="/quote-new?inquiry=' . $iQ . '"', 'href="/quote?id=' . $qW . '"',
+          'href="/quote-new?inquiry=' . $iW . '"', 'href="/quote-new?inquiry=' . $iL . '"><span class="sxq-v">Quote again<', 'href="/quote-new?inquiry=' . $iD . '"', '<span>Quote</span></a>'];
     $g = $drive($MM, 'inquiries', 'GET', ['q' => $tag], [], $n);
-    t_ok(!empty($g['has'][$n[0]]), 'Open: "Quote"');
+    t_ok(!empty($g['has'][$n[0]]) && !empty($g['has'][$n[7]]), 'Open: "Quote"');
     t_ok(!empty($g['has'][$n[1]]) && !empty($g['has'][$n[2]]), 'Quoted: "Open Q-…" and a small "+ another"');
     t_ok(!empty($g['has'][$n[3]]) && empty($g['has'][$n[4]]), 'Won: "Open Q-…" only — no new quotation');
     t_ok(!empty($g['has'][$n[5]]), 'Lost: "Quote again"');

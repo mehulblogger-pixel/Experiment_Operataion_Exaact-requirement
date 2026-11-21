@@ -2110,6 +2110,34 @@ function inquiries_due_count($today = null) { return count(inquiries_due($today)
 // ---------------------------------------------------------------------------
 //  Handlers — Inquiries (§1)
 // ---------------------------------------------------------------------------
+//  Sales redesign Stage 3 (owner, 21 Nov 2026, approved backend item 3 and question 6):
+//  the Inquiries register moves onto the shared register (lib/datatable.php) that
+//  Leads and Deals use — paging, sorting, a column chooser and a CSV. Sort keys are
+//  declared here and nowhere else (the component whitelists them).
+function inq_dt_columns() {
+    $sbuL = function_exists('lk_options_or') ? lk_options_or('sbu', OPS_SBUS) : OPS_SBUS;
+    $srcL = function_exists('lk_options_or') ? lk_options_or('inquiry_source', INQUIRY_SOURCES) : INQUIRY_SOURCES;
+    return [
+        'no' => ['label' => T('inquiry'), 'sort' => 'i.id', 'render' => fn($r) =>
+            '<a href="/inquiry?id=' . (int)$r['id'] . '"><b>' . e($r['inquiry_no']) . '</b></a>'
+            . (!empty($r['origin_ref']) ? '<div class="muted" style="font-size:12px">from lead <a href="/lead?id=' . (int)$r['lead_id'] . '">' . e($r['origin_ref']) . '</a></div>' : '')],
+        'received' => ['label' => 'Received', 'sort' => "COALESCE(NULLIF(i.received_date,''), SUBSTR(i.created_at,1,10))", 'render' => fn($r) =>
+            trim((string)($r['received_date'] ?? '')) !== '' ? e(fdate($r['received_date'])) : '<span class="muted">—</span>'],
+        'client' => ['label' => ucfirst(Tl('client')) . ' · subject', 'sort' => "COALESCE(NULLIF(bp.display_name,''), i.client_name)", 'render' => fn($r) =>
+            '<b>' . e($r['client_disp'] ?: $r['client_name'] ?: '—') . '</b><div class="muted" style="font-size:12px">' . e($r['subject'] ?: '—') . '</div>'],
+        'status' => ['label' => 'Status', 'sort' => 'i.status', 'render' => fn($r) => ''],
+        'assigned' => ['label' => 'Assigned to', 'sort' => 'u.first_name', 'render' => function ($r) {
+            $who = trim((string)($r['owner_first'] ?? '') . ' ' . (string)($r['owner_last'] ?? '')) ?: (string)($r['owner_username'] ?? '');
+            if ($who === '') $who = trim((string)($r['lead_owner_name'] ?? ''));
+            return $who !== '' ? e($who) : '<span class="muted">Nobody yet</span>'; }],
+        'branch' => ['label' => 'Branch · ' . Tl('sbu'), 'sort' => 'o.name', 'render' => fn($r) =>
+            (!empty($r['office_name']) ? e($r['office_name']) : '<span class="muted" title="No branch set — every branch sees it">All branches</span>')
+            . '<div class="muted" style="font-size:12px">' . e($sbuL[$r['sbu']] ?? $r['sbu'] ?: '—') . '</div>'],
+        'source' => ['label' => 'Source', 'sort' => 'i.source', 'render' => fn($r) => e($srcL[$r['source']] ?? $r['source'])],
+        'actions' => ['label' => 'Actions', 'render' => fn($r) => ''],
+    ];
+}
+
 function ops_crm_inquiries($route, $method) {
     $pdo = db();
     if ($route === 'inquiries') {
@@ -2139,16 +2167,53 @@ function ops_crm_inquiries($route, $method) {
         // register shows where it came from.
         //  l.owner_name: an enquiry raised before 12 Nov from a lead whose owner
         //  was only a typed name still shows that name instead of a blank.
-        $rows = ops_all("SELECT i.*, bp.display_name client_disp, l.ref origin_ref, l.owner_name lead_owner_name, o.name office_name,
-                                u.first_name owner_first, u.last_name owner_last, u.username owner_username
-                         FROM crm_inquiries i
+        $from = " FROM crm_inquiries i
                          LEFT JOIN offices o ON o.id=i.office_id
                          LEFT JOIN business_partners bp ON bp.id=i.client_id
                          LEFT JOIN leads l ON l.id=i.lead_id
                          LEFT JOIN users u ON u.id=i.assigned_to
-                         WHERE " . implode(' AND ', $w) . " ORDER BY i.id DESC", $args);
-        view('ops/crm/inquiry_list', ['rows' => $rows, 'q' => $q, 'st' => $st, 'fy' => $fy['fy'], 'funnel' => $funnel,
+                         WHERE " . implode(' AND ', $w);
+        $select = "SELECT i.*, bp.display_name client_disp, l.ref origin_ref, l.owner_name lead_owner_name, o.name office_name,
+                                u.first_name owner_first, u.last_name owner_last, u.username owner_username" . $from;
+        //  Stage 3 (backend item 3): the register is paged, sorted and exported by the shared
+        //  component. The filters, the scope and the funnel above are exactly as before; the
+        //  CSV carries every row of the same filter (no paging), which is what the person
+        //  sees across the pages — never a row outside their branches and business units.
+        $cols = inq_dt_columns();
+        $dt   = dt_state('inquiries', $cols, ['default_sort' => 'no', 'default_dir' => 'desc', 'per' => 50]);
+        if (wants_csv()) {
+            $sbuL = lk_options_or('sbu', OPS_SBUS); $srcL = lk_options_or('inquiry_source', INQUIRY_SOURCES); $stL = crm_inquiry_status_opts();
+            $csv = [[T('inquiry'), 'Received', ucfirst(Tl('client')), 'Subject', 'Status', 'Assigned to', 'Branch', ucfirst(Tl('sbu')), 'Source', 'From lead', 'Drop reason']];
+            foreach (ops_all($select . " ORDER BY i.id DESC", $args) ?: [] as $r) {
+                $who = trim((string)($r['owner_first'] ?? '') . ' ' . (string)($r['owner_last'] ?? '')) ?: (string)($r['owner_username'] ?? '');
+                if ($who === '') $who = trim((string)($r['lead_owner_name'] ?? ''));
+                $csv[] = [$r['inquiry_no'], $r['received_date'], $r['client_disp'] ?: $r['client_name'], $r['subject'], $stL[$r['status']] ?? $r['status'],
+                          $who, $r['office_name'] ?: 'All branches', $sbuL[$r['sbu']] ?? $r['sbu'], $srcL[$r['source']] ?? $r['source'], $r['origin_ref'] ?? '',
+                          $r['status'] === 'DROPPED' ? (INQUIRY_DROP_REASONS[$r['drop_reason'] ?? ''] ?? '') : ''];
+            }
+            csv_download('inquiries-' . date('Y-m-d') . '.csv', $csv);
+        }
+        $total = (int)ops_val("SELECT COUNT(*)" . $from, $args);
+        $rows = ops_all($select . dt_sql_tail($dt, $cols, 'i.id DESC'), $args) ?: [];
+        view('ops/crm/inquiry_list', ['rows' => $rows, 'total' => $total, 'dt' => $dt, 'q' => $q, 'st' => $st, 'fy' => $fy['fy'], 'funnel' => $funnel,
             'dueCount' => inquiries_due_count(), 'sla' => inquiry_sla_days()]); return;
+    }
+    //  DEF-14 (owner, 21 Nov 2026) — the inquiry's own page, read-only. It opens with the
+    //  Inquiries VIEW right (the route's module gate) and the same branch and business-unit
+    //  scope as the register; editing, quoting and dropping keep their own rights.
+    if ($route === 'inquiry') {
+        $inq = crm_inquiry_get((int)($_GET['id'] ?? 0));
+        if (!$inq) { http_response_code(404); view('notfound'); return; }
+        ops_require(crm_inquiry_in_scope($inq), 'This ' . Tl('inquiry') . ' belongs to another branch.');
+        if (crm_inquiry_sync((int)$inq['id']) !== (string)$inq['status']) $inq = crm_inquiry_get((int)$inq['id']);
+        $orow = ops_one("SELECT i.id, bp.display_name client_disp, bp.code client_code, l.ref origin_ref, l.company_name origin_company, o.name office_name,
+                                u.first_name owner_first, u.last_name owner_last, u.username owner_username, l.owner_name lead_owner_name
+                         FROM crm_inquiries i LEFT JOIN business_partners bp ON bp.id=i.client_id LEFT JOIN leads l ON l.id=i.lead_id
+                         LEFT JOIN offices o ON o.id=i.office_id LEFT JOIN users u ON u.id=i.assigned_to WHERE i.id=?", [(int)$inq['id']]) ?: [];
+        view('ops/crm/inquiry_detail', ['inq' => $inq + $orow, 'statusOpts' => crm_inquiry_status_opts(),
+            'quotes' => ops_all("SELECT id, quote_no, rev, status, total_amount, subtotal, created_at FROM quotations WHERE inquiry_id=? AND COALESCE(is_current,1)=1 ORDER BY id DESC", [(int)$inq['id']]) ?: [],
+            'deal' => function_exists('opp_try') ? opp_try(fn() => ops_one("SELECT id, ref, name FROM opportunities WHERE inquiry_id=? ORDER BY id DESC LIMIT 1", [(int)$inq['id']]), null) : null]);
+        return;
     }
     if ($route === 'inquiry-new' || $route === 'inquiry-edit') {
         ops_require(can('mod.inquiries.edit'), 'You cannot add or edit inquiries.');
@@ -2157,7 +2222,7 @@ function ops_crm_inquiries($route, $method) {
             //  Opened on its own (not from the register): bring its outcome up to date first.
             if (crm_inquiry_sync((int)$inq['id']) !== (string)$inq['status']) $inq = crm_inquiry_get((int)$inq['id']); }
         if ($inq) ops_require(crm_inquiry_in_scope($inq), 'This ' . Tl('inquiry') . ' belongs to another branch.');
-        if ($method === 'POST' && $inq && !crm_inquiry_can_work($inq)) { flash(crm_assignee_words((int)$inq['assigned_to'], Tl('inquiry')), 'error'); redirect('/inquiry-edit?id=' . (int)$inq['id']); }
+        if ($method === 'POST' && $inq && !crm_inquiry_can_work($inq)) { flash(crm_assignee_words((int)$inq['assigned_to'], Tl('inquiry')), 'error'); redirect('/inquiry?id=' . (int)$inq['id']); }
         if ($method === 'POST') {
             $b = $_POST;
             // The same form sent twice (a double click, or Back and send again) saves once
@@ -2167,7 +2232,7 @@ function ops_crm_inquiries($route, $method) {
             $once = trim((string)($b['form_once'] ?? ''));
             if (!$inq && $once !== '' && !empty($_SESSION['inquiry_form_once'][$once])) {
                 flash('That ' . Tl('inquiry') . ' was already saved — here it is.', 'warning');
-                redirect('/inquiry-edit?id=' . (int)$_SESSION['inquiry_form_once'][$once]);
+                redirect('/inquiry?id=' . (int)$_SESSION['inquiry_form_once'][$once]);
             }
             $cid = ($b['client_id'] ?? '') !== '' ? (int)$b['client_id'] : null;
             // D-12 — no new enquiry for a customer who is blocked.
@@ -2240,7 +2305,8 @@ function ops_crm_inquiries($route, $method) {
                 $pdo->prepare("UPDATE crm_inquiries SET client_id=?,client_name=?,contact_name=?,contact_email=?,contact_mobile=?,subject=?,service_requirement=?,sbu=?,source=?,received_date=?,assigned_to=?,status=?,notes=? WHERE id=?")
                     ->execute(array_merge($vals, [$inq['id']]));
                 if (function_exists('ads_queue_inquiry')) ads_queue_inquiry((int)$inq['id'], 'Enquiry edited');
-                flash('Inquiry updated.'); redirect('/inquiries');
+                //  Stage 3 (backend item 5): back to the inquiry itself, not the register.
+                flash('Inquiry updated.'); redirect('/inquiry?id=' . (int)$inq['id']);
             } else {
                 $no = crm_next_inquiry_no();
                 $pdo->prepare("INSERT INTO crm_inquiries (inquiry_no,client_id,client_name,contact_name,contact_email,contact_mobile,subject,service_requirement,sbu,source,received_date,assigned_to,status,notes,created_by,created_at,office_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
@@ -2251,7 +2317,7 @@ function ops_crm_inquiries($route, $method) {
                 if ($once !== '') $_SESSION['inquiry_form_once'][$once] = $newId;
                 if (function_exists('ads_queue_inquiry')) ads_queue_inquiry($newId, 'Enquiry raised');
                 flash("$no created. You can now raise a quotation against it.");
-                redirect('/inquiries');
+                redirect('/inquiry?id=' . $newId);
             }
         }
         $originRef = ($inq && !empty($inq['lead_id'])) ? (string)ops_val("SELECT ref FROM leads WHERE id=?", [(int)$inq['lead_id']]) : '';
@@ -2268,7 +2334,7 @@ function ops_crm_inquiries($route, $method) {
         $inq = crm_inquiry_get((int)($_POST['id'] ?? 0));
         if (!$inq) { flash('That ' . Tl('inquiry') . ' no longer exists.', 'error'); redirect('/inquiries'); }
         ops_require(crm_inquiry_in_scope($inq), 'This ' . Tl('inquiry') . ' belongs to another branch.');
-        $back = '/inquiry-edit?id=' . (int)$inq['id'];
+        $back = '/inquiry?id=' . (int)$inq['id'];   // Stage 3: "Where it stands" lives on the inquiry page now
         if (!crm_inquiry_can_work($inq)) { flash(crm_assignee_words((int)$inq['assigned_to'], Tl('inquiry')), 'error'); redirect($back); }
         $me = user_name(current_user());
         if ($route === 'inquiry-drop') {
@@ -2684,7 +2750,7 @@ function ops_crm_quotes($route, $method) {
                 //  An assigned enquiry is quoted by its assignee or the people above them (option C), and its
                 //  quotation is assigned to the same person — so the same people work on it.
                 $inqRow = $inqId ? crm_inquiry_get($inqId) : null;
-                if ($inqRow && !crm_inquiry_can_work($inqRow)) { flash(crm_assignee_words((int)$inqRow['assigned_to'], Tl('inquiry')), 'error'); redirect('/inquiry-edit?id=' . (int)$inqId); }
+                if ($inqRow && !crm_inquiry_can_work($inqRow)) { flash(crm_assignee_words((int)$inqRow['assigned_to'], Tl('inquiry')), 'error'); redirect('/inquiry?id=' . (int)$inqId); }
                 $ownerId = ($inqRow && !empty($inqRow['assigned_to']) && ops_val("SELECT 1 FROM users WHERE id=? AND COALESCE(is_active,1)=1", [(int)$inqRow['assigned_to']]))
                          ? (int)$inqRow['assigned_to'] : (current_user()['id'] ?? null);
                 // The lead this was raised from, so it shows back on that lead.
@@ -2715,7 +2781,7 @@ function ops_crm_quotes($route, $method) {
         if ($refused !== null) { flash($refused, 'error'); [$posted, $pLines, $pLocs] = crm_quote_posted_form($_POST); }
         $preInq = (!$q && ($_GET['inquiry'] ?? '') !== '') ? crm_inquiry_get((int)$_GET['inquiry']) : null;
         if ($preInq && !crm_inquiry_in_scope($preInq)) $preInq = null;   // another branch's enquiry is not quoted from here
-        if ($preInq && !crm_inquiry_can_work($preInq)) { flash(crm_assignee_words((int)$preInq['assigned_to'], Tl('inquiry')), 'error'); redirect('/inquiry-edit?id=' . (int)$preInq['id']); }
+        if ($preInq && !crm_inquiry_can_work($preInq)) { flash(crm_assignee_words((int)$preInq['assigned_to'], Tl('inquiry')), 'error'); redirect('/inquiry?id=' . (int)$preInq['id']); }
         // Quoting straight off a lead. The lead carries the company, the contact
         // and the requirement, so none of it is re-typed; if the lead is linked
         // to a customer on the master, that customer is pre-selected.

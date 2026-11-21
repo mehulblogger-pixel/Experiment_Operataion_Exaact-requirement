@@ -141,7 +141,7 @@ function search_sources() {
                 'title'    => $r['inquiry_no'] . ' — ' . ($r['subject'] ?: 'no subject'),
                 'subtitle' => $r['client_name'] ?: '',
                 'meta'     => trim(($r['contact_name'] ?: '') . ' · ' . ($r['status'] ?: ''), ' ·'),
-                'url'      => '/inquiry-edit?id=' . (int)$r['id'],
+                'url'      => '/inquiry?id=' . (int)$r['id'],
             ], ops_all(
                 "SELECT id, inquiry_no, subject, client_name, contact_name, status
                  FROM crm_inquiries

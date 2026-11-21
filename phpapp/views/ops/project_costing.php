@@ -79,7 +79,7 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
     <?php $pcSub = trim((!empty($h['site']) ? $h['site'] : '') . (!empty($h['sbu']) ? (!empty($h['site']) ? ' · ' : '') . ($sbuOpts[$h['sbu']] ?? $h['sbu']) : '')); ?>
     <?php if ($pcSub !== ''): ?><p class="sub" style="margin:2px 0 0"><?= $e($pcSub) ?></p><?php endif; ?>
     <p class="sub" style="margin:2px 0 0">For:
-      <?php if ($forInq): ?><a href="/inquiry-edit?id=<?= (int)$forInq['id'] ?>">enquiry <?= $e($forInq['inquiry_no']) ?></a><?php endif; ?>
+      <?php if ($forInq): ?><a href="/inquiry?id=<?= (int)$forInq['id'] ?>">enquiry <?= $e($forInq['inquiry_no']) ?></a><?php endif; ?>
       <?php if ($forInq && $forLead): ?> · <?php endif; ?>
       <?php if ($forLead): ?><a href="/lead?id=<?= (int)$forLead['id'] ?>">lead <?= $e($forLead['ref']) ?> — <?= $e($forLead['company_name']) ?></a><?php endif; ?>
       <?php if (!$forInq && !$forLead): ?><span class="muted">no enquiry or lead tagged<?= !empty($h['opportunity_id']) ? ' (made from a deal)' : (!empty($h['quote_id']) ? ' (made for a quotation)' : '') ?></span><?php endif; ?>

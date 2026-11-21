@@ -80,7 +80,7 @@ const ACT_ENTITIES = [
     'PARTNER'   => ['Customer',        '/client?id='],
     'LEAD'      => ['Lead',            '/lead?id='],
     'OPPORTUNITY' => ['Deal',   '/opportunity?id='],
-    'INQUIRY'   => ['Inquiry',         '/inquiry-edit?id='],
+    'INQUIRY'   => ['Inquiry',         '/inquiry?id='],
     'QUOTE'     => ['Quotation',       '/quote?id='],
     'CALL'      => [null,               '/call?id='],   // labels for these two come from
     'JOB'       => [null,               '/job?id='],    // act_entities(), where T() can be called

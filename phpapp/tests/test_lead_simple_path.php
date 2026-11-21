@@ -44,8 +44,9 @@ try {
     t_ok(!empty($r['ok']) && !empty($r['inquiry_id']), 'ARMING · the lead becomes a customer and an enquiry');
     $inq = ops_one("SELECT status, assigned_to, office_id FROM crm_inquiries WHERE id=?", [(int) $r['inquiry_id']]);
     t_eq([$inq['status'], (int) $inq['assigned_to'], (int) $inq['office_id']], ['OPEN', $lata, $off], 'the enquiry is Open, assigned to the lead\'s owner, in their branch');
-    $list = (string) file_get_contents(__DIR__ . '/../views/ops/crm/inquiry_list.php');
-    t_ok(strpos($list, '<th>Assigned to</th><th>Branch</th>') !== false, 'the register has its own "Assigned to" and "Branch" columns');
+    //  Stage 3: the register is the shared one — its columns are listed in inq_dt_columns().
+    $cols = inq_dt_columns();
+    t_ok(($cols['assigned']['label'] ?? '') === 'Assigned to' && strpos((string) ($cols['branch']['label'] ?? ''), 'Branch') === 0, 'the register has its own "Assigned to" and "Branch" columns');
 
     t_section('Lead — a quotation made from it sits under it');
     $pdo->prepare("INSERT INTO quotations (quote_no, rev, is_current, lead_id, status, created_at) VALUES (?, 0, 1, ?, 'DRAFT', ?)")

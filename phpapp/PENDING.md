@@ -2,6 +2,28 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🧭 Sales Stage 3 — Enquiries and Deals built (21 Nov 2026, report 57); follow-ups and owner decisions
+
+- **Owner decision (1), 21 Nov: "Finance may open the deal" — NOT built yet, one question first.** Making the
+  Deals register and deal page open on "View deals" (`crm.deal.view`) alone, as asked, would ALSO let the
+  Branch Manager and the Business Unit Head open deals: since foundation A they hold "View deals" (it came from
+  their Quotations / Enquiries view, the old rule of `opp_can_view()`), and they already see deals on Sales home,
+  Today, the board and search, but are refused when they open one, because the deal routes still need Leads view.
+  The owner also said "no other role gains anything". Measured per role (default rights): holders of View deals
+  WITHOUT Leads view = Finance, Branch Manager, Business Unit Head. Needs the owner's answer: (a) all three open
+  deals (Finance gains; BM and BU Head gain the pages of deals they already see in lists), or (b) Finance only —
+  which needs a narrower rule than one switch (e.g. a separate "Open the deal pages" switch, given on day one to
+  Leads-view holders and Finance). Recommendation: (a). Nothing changed until answered.
+- **Owner decision (2), 21 Nov:** the customer ledger follows branches, BUT central finance (data scope = all
+  branches) sees every customer's ledger and details. Build in Stage 5, with the advisor's whole-customer figure.
+- **Owner decision (3), 21 Nov (Finance, DEF-07):** Received = payments + TDS **only where TDS was actually
+  deducted on that receipt** (never an assumed rate); credit notes shown separately. Build in Stage 5.
+- **Inquiry links now open the read-only page** (`/inquiry?id=`): the chain strip, activity list, search,
+  advisor and costing page. The edit form is one click further (Edit on the page) for the people who may work it.
+- **Inquiries CSV** is offered to everyone who can open the register, for exactly its rows (its branch and
+  business-unit scope). If the owner wants a separate "Download inquiries" switch like the leads / deals /
+  quotations ones, that is a new switch — ask first.
+
 ## 🧭 Sales Stage 2 — Leads built (21 Nov 2026, report 56); follow-ups
 
 - **Duplicate list shows other branches' lead numbers.** The quick lead's check (now also on the full
@@ -10,14 +32,14 @@ Living list of things explicitly deferred, so nothing is forgotten. Newest on to
   if the owner wants it limited to the person's branches, it is a one-line change in `sx_lead_dupes()`.
 - **Quick lead's 10-digit mobile rule** is still only on the quick lead (the full form accepts any
   telephone, e.g. a landline). Left as it was; ask before making them the same.
-- Q10 (whose records a person sees) is to be asked now that Stage 2 is built — see below.
+- Q10 (whose records a person sees) — decided by the owner 21 Nov ("Keep this"); build in Stage 6, see below.
 
 ## 🔐 "Who can do what" — batch B built (21 Nov 2026); follow-ups
 
 The new permission screen (`/who-can`, docs/02 19t) is built and tested; the old Roles screen
 (`/access`) stays reachable from it ("Old layout") for ONE release — remove the link and the
-tile-less route after the owner has used the new screen on opstest. Still waiting: Q10 ("whose
-records a person sees: own / team / branch / all"), decided after Stage 2. The person form's
+tile-less route after the owner has used the new screen on opstest. Q10 ("whose
+records a person sees: own / team / branch / all") was decided 21 Nov — build in Stage 6. The person form's
 permission grid could later be replaced by a link to this screen (one place to switch rights).
 
 ## 🔐 Permission foundation A — built 21 Nov 2026 (docs/02 19r, report 54)
@@ -29,15 +51,18 @@ stored as differences from the role (Q11); nobody gained or lost anything on day
 permissions and person screens. Follow-ups noted, not built:
 - Opening the Deals register still also needs Leads view (its route gate); making
   Deals fully separate would let today's Finance (quotations view) open deals — a
-  change of who can do what, so it waits for the owner.
+  change of who can do what. Owner decided 21 Nov that Finance may; one question
+  remains (Branch Manager / BU Head) — see "Sales Stage 3" above.
 - In a company that has only one of Sales / People & hiring, "View project costings"
   is now decided by the switch alone (it used to need the specific module ticked).
 - The customer ledger (/ledger) and the advisor still show the whole-customer figure.
 
-## 🔐 Permission screen Q10 — parked by the owner until after Stage 2 (21 Nov 2026)
+## 🔐 Permission screen Q10 — decided 21 Nov 2026, build in Stage 6
 
-"Whose records a person sees" (own / team / branch / all) as its own setting. Decide after
-Stage 2 (Leads). See EXAACT-Permission-Screen-Redesign-Proposal.pdf, question 10.
+Owner: "Keep this." A per-role setting, with a per-person override, for whose records a person sees:
+**Own** (only records they own) / **Team** (theirs and their reporting line's) / **Branch** (everything in
+their branches) / **All** (the whole company). Day one = today's behaviour for every role. Scheduled with
+Stage 6 and the "Who can do what" screen. See EXAACT-Permission-Screen-Redesign-Proposal.pdf, question 10.
 
 ## 📣 Advertising spend by branch — parked by the owner (21 Nov 2026)
 

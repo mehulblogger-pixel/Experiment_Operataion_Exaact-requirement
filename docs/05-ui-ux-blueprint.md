@@ -385,3 +385,19 @@ Sales bar and phone bottom bar ("SALES — LEADS" block in `app.css`):
   column that says what happens next, and the buttons at the end of the form — never
   floating over it on a phone. A possible duplicate is shown under step 1 with an
   explicit "save it anyway" choice; nothing typed is lost after a refused save.
+
+**Stage 3 — enquiries and deals (owner, 21 Nov 2026).** The inquiries register, the inquiry's
+new read-only page, the inquiry form, the deals register, the deal page and the new-deal form
+carry the Sales bar and phone bottom bar ("SALES — ENQUIRIES AND DEALS" block in `app.css`):
+- **Registers:** figure tiles that say their period; one control row; the inquiries register on
+  the shared register (paging, sorting, Columns, CSV); the deals board stacks on a phone and has
+  a pipeline picker; the year picker only where it applies (the list).
+- **Record pages** (inquiry, deal) use the record-page kit like the lead page: header card with
+  status, contact and actions; three fact boxes; the stage path (deal); tabs — inquiry: Overview,
+  Details, Quotes, History; deal: Overview, Quotes, Actions, History (the log form and timeline
+  now inside History). Quotation statuses are always words, never codes. What a won deal is
+  waiting on (the order raised, the contract's state, or "add the customer first" with its short
+  form) sits above the tabs so it shows whichever tab is open; a win lands on Actions (the next
+  step), a loss on Overview (why it was lost).
+- **Forms** (inquiry, new deal): numbered sections, an action bar that says where you land after
+  saving, the company's own extra fields above the buttons.

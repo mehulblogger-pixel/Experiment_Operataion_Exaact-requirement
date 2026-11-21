@@ -594,6 +594,12 @@ function opp_update($oppId, array $b) {
     // cleared — the full form behaves exactly as it did.
     //  The same checks as when the deal was opened (test book SALA-019 / SALA-017).
     if (array_key_exists('name', $b) && trim((string)$b['name']) === '') return 'Give the ' . Tl('opportunity') . ' a name — what is the piece of business?';
+    //  Sales redesign Stage 3 (owner, 21 Nov 2026, approved backend items 6 and 7): the deal's
+    //  boxes get the lead form's own checks — a value of 0 or more and real calendar dates —
+    //  and the business unit can be set (DEF-15), from the units this person's scope covers.
+    //  A unit the form did not send, or sent unchanged, is left as it is.
+    if (($fe = opp_form_err($b)) !== '') return $fe;
+    if (array_key_exists('sbu', $b) && (string)$b['sbu'] !== (string)($o['sbu'] ?? '') && ($se = opp_sbu_err($b['sbu'])) !== '') return $se;
     $newOff = (int)($b['office_id'] ?? $o['office_id']);
     if ($newOff && $newOff !== (int)$o['office_id'] && function_exists('scope_office_allows') && !scope_office_allows($newOff))
         return 'You can move ' . Tla('opportunity') . ' only to an office / branch you work for.';
@@ -1117,6 +1123,18 @@ function opp_dt_columns() {
     ];
 }
 
+// ---- The form's own checks (Sales redesign Stage 3, owner 21 Nov 2026) -------
+//  The deal form gets the checks the lead form already has (backend item 6): one
+//  rule for both, so a value or a date refused on a lead is refused on a deal.
+function opp_form_err(array $b) {
+    if (!function_exists('lead_fields_err')) return '';
+    return lead_fields_err(array_intersect_key($b, array_flip(['value', 'expected_close', 'next_action_on'])));
+}
+//  DEF-15 — a deal's business unit, from the same list the lead form offers
+//  (the company's units, narrowed to the units this person's data scope covers).
+function opp_sbu_options() { return function_exists('lead_sbu_options') ? lead_sbu_options() : (function_exists('lk_options_or') ? lk_options_or('sbu', OPS_SBUS) : OPS_SBUS); }
+function opp_sbu_err($sbu) { return function_exists('lead_sbu_err') ? lead_sbu_err($sbu) : ''; }
+
 // ---- Screens ----------------------------------------------------------------
 // M14 — ONE door for the whole module; see lead_scope_gate() for the reasoning.
 // Every opportunity route names its object as `id`; opportunity-from-lead names
@@ -1196,7 +1214,7 @@ function ops_opportunities($route, $method) {
             'o' => $o, 'quotes' => opp_quotes((int)$o['id']), 'history' => opp_history((int)$o['id']),
             'stages' => pipeline_stages((int)$o['pipeline_id']),
             'timeline' => function_exists('act_for_entity') ? act_for_entity('OPPORTUNITY', (int)$o['id'], 40) : [],
-            'lostReasons' => opp_lost_reasons(), 'canEdit' => $canEdit,
+            'lostReasons' => opp_lost_reasons(), 'canEdit' => $canEdit, 'sbus' => opp_sbu_options(),
             'costing' => function_exists('pc_for_opportunity') ? pc_for_opportunity((int)$o['id']) : null,
             'costingUnlinked' => function_exists('pc_unlinked') ? pc_unlinked(100, 'opportunity', (int)($o['client_id'] ?? 0)) : [],
             'costingCan' => function_exists('pc_can') && pc_can(),
@@ -1290,7 +1308,12 @@ function ops_opportunities($route, $method) {
         $prefill = $_GET;
         $formErr = '';
         if ($method === 'POST') {
-            $r = opp_create($_POST);
+            //  DEF-15 (owner, 21 Nov 2026): a deal's win % follows its stage — a typed one is
+            //  not taken (no form shows it). Items 6/7: the lead form's value and date checks,
+            //  and the business unit from the person's own units.
+            $post = $_POST; unset($post['probability']);
+            $r = ($fe = opp_form_err($post)) !== '' ? ['err' => $fe]
+               : (($se = opp_sbu_err($post['sbu'] ?? '')) !== '' ? ['err' => $se] : opp_create($post));
             if (empty($r['err'])) {
                 flash(T('opportunity') . ' ' . $r['ref'] . ' opened.');
                 redirect('/opportunity?id=' . $r['id']);
@@ -1300,6 +1323,8 @@ function ops_opportunities($route, $method) {
         }
         view('ops/opportunity_form', [
             'pipelines' => pipelines_all('OPPORTUNITY'), 'prefill' => $prefill, 'form_err' => $formErr,
+            'sbus' => opp_sbu_options(),
+            'stagesByPipe' => array_map(fn($pl) => pipeline_stages((int)$pl['id']), array_column(pipelines_all('OPPORTUNITY') ?: [], null, 'id')),
             'offices' => array_values(array_filter(ops_all("SELECT id, name FROM offices WHERE is_active=1 ORDER BY name") ?: [], fn($of) => !function_exists('scope_office_allows') || scope_office_allows((int)$of['id']))),
             'clients' => ops_all("SELECT id, display_name, legal_name FROM business_partners WHERE is_client=1 AND " . partner_office_sql() . " AND status='ACTIVE' ORDER BY COALESCE(display_name, legal_name) LIMIT 800"),
             'sources' => function_exists('lk_options_or') && defined('LEAD_SOURCES') ? lk_options_or('lead_source', LEAD_SOURCES) : [],
@@ -1334,7 +1359,8 @@ function ops_opportunities($route, $method) {
                        $who = trim((string)($o['client_name'] ?? '') ?: (string)($o['partner_name'] ?? ''));
                        return 'Won — ' . ($who !== '' ? $who : 'the customer') . ' said yes. ' . opp_won_next($o) . (!empty($r['lead_note']) ? ' ' . $r['lead_note'] : ''); })()
                  : ($r['status'] === 'LOST' ? 'Recorded as lost, with the reason.' : 'Moved.'));
-        redirect('/opportunity?id=' . $id);
+        //  Stage 3: a win lands on Actions (what to do next), a loss on Overview (why it was lost).
+        redirect('/opportunity?id=' . $id . ($r['status'] === 'WON' ? '#opp=actions' : ($r['status'] === 'LOST' ? '#opp=overview' : '')));
     }
 
     if ($route === 'opportunity-new-quote' && $method === 'POST') {

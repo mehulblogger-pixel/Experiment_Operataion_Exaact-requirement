@@ -42,7 +42,7 @@
 const CHAIN_STAGES = [
     'LEAD'        => ['Lead',        '🎯', '/lead?id='],
     'OPPORTUNITY' => ['Deal', '💡', '/opportunity?id='],
-    'INQUIRY'     => ['Enquiry',     '📨', '/inquiry-edit?id='],
+    'INQUIRY'     => ['Enquiry',     '📨', '/inquiry?id='],
     'QUOTE'       => ['Quotation',   '📝', '/quote?id='],
     'CALL'        => ['Order',       '📞', '/call?id='],
     'JOB'         => [null,          '🗂', '/job?id='],   // label from T('job') at read time

@@ -48,7 +48,9 @@ $b3have = 0;
 foreach (['call_detail', 'job_detail', 'lead_detail', 'opportunity_detail', 'invoice_detail',
           'receipt_detail', 'trace_thread'] as $b3v) {
     $f = __DIR__ . '/../views/ops/' . $b3v . '.php';
-    if (is_file($f) && strpos(file_get_contents($f), 'nowband') !== false) $b3have++;
+    //  The lead page (Stage 2) and the deal page (Stage 3) moved to the record-page kit, whose
+    //  next-action card is .rec-na — still a next-action band, in the approved design.
+    if (is_file($f) && (strpos(file_get_contents($f), 'nowband') !== false || strpos(file_get_contents($f), 'class="rec-na"') !== false)) $b3have++;
 }
 t_eq($b3have, 7, 'B4 · the record screens that already had a next-action band still have it');
 

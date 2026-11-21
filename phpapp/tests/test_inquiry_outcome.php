@@ -111,15 +111,16 @@ try {
     t_section('Enquiry outcome — the screens');
     //  Opened straight from a link (not via the register): the page brings itself up to date.
     $i6 = $made[] = $mkInq('Opened directly'); $mkQ($i6, 'ACCEPTED');
-    $g = $drive($MEX, 'inquiry-edit', 'GET', ['id' => $i6], [], ['Won — its ']);
+    $g = $drive($MEX, 'inquiry', 'GET', ['id' => $i6], [], ['Won — its ']);  // Stage 3: the read-only inquiry page
     t_ok(!empty($g['has']['Won — its ']) && $st($i6) === 'WON', 'an enquiry page opened directly shows Won at once — it does not wait for the register');
-    $g = $drive($MEX, 'inquiry-edit', 'GET', ['id' => $i1], [], ['name="status"', 'Where it stands', 'Won — its ', 'History of this ']);
+    $g = $drive($MEX, 'inquiry-edit', 'GET', ['id' => $i1], [], ['name="status"']);
     t_ok(empty($g['has']['name="status"']), 'the enquiry form has no status dropdown');
+    $g = $drive($MEX, 'inquiry', 'GET', ['id' => $i1], [], ['Where it stands', 'Won — its ', 'History of this ']);
     t_ok(!empty($g['has']['Where it stands']) && !empty($g['has']['Won — its ']) && !empty($g['has']['History of this ']), 'it says where the enquiry stands, and keeps its history');
-    $g = $drive($MEX, 'inquiry-edit', 'GET', ['id' => $i5], [], ['Drop this ', 'name="drop_reason"']);
+    $g = $drive($MEX, 'inquiry', 'GET', ['id' => $i5], [], ['Drop this ', 'name="drop_reason"']);
     t_ok(!empty($g['has']['Drop this ']) && !empty($g['has']['name="drop_reason"']), 'an open enquiry with no quotation offers "Drop this enquiry" with a reason to pick');
-    $g = $drive($MEX, 'inquiries', 'GET', ['fy' => 'ALL', 'q' => strtoupper($tag)], [], ['Enquiries</div>', 'Won</div>', 'of enquiries became orders', 'Hit rate']);
-    t_ok(!empty($g['has']['Enquiries</div>']) && !empty($g['has']['of enquiries became orders']) && !empty($g['has']['Hit rate']),
+    $g = $drive($MEX, 'inquiries', 'GET', ['fy' => 'ALL', 'q' => strtoupper($tag)], [], ['data-k="Enquiries"', 'data-k="Won"', 'of enquiries became orders', 'Hit rate']);
+    t_ok(!empty($g['has']['data-k="Enquiries"']) && !empty($g['has']['data-k="Won"']) && !empty($g['has']['of enquiries became orders']) && !empty($g['has']['Hit rate']),
         'the register shows what became of the enquiries — quoted, won, lost, dropped, and the hit rate');
     t_eq(ads_status_out('INQUIRY', ['status' => 'WON']), 'customer', 'the ads sync is told a won enquiry is a customer');
 } finally {
