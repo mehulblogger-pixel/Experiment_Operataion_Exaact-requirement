@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'f3a287e · 2026-11-21 03:05 UTC · 744 files';
+$RELEASE = '97e690e · 2026-11-21 03:09 UTC · 744 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -36,9 +36,9 @@ $EXPECT  = [
     'lib/access_state.php' => ['s'=>10685,'h'=>'4c7da7d6d793745e'],
     'lib/activity.php' => ['s'=>46874,'h'=>'e86aaefccb1bf465'],
     'lib/adspro.php' => ['s'=>28970,'h'=>'205ce39852f9f881'],
-    'lib/adsroi.php' => ['s'=>12887,'h'=>'2418d515c52e3905'],
+    'lib/adsroi.php' => ['s'=>15435,'h'=>'4cb44a2e208f40b2'],
     'lib/adssync.php' => ['s'=>28574,'h'=>'19472065bb76a5a6'],
-    'lib/advisor.php' => ['s'=>42552,'h'=>'a2d5c9a01e9815d7'],
+    'lib/advisor.php' => ['s'=>43087,'h'=>'43e4e5adf35f1fb8'],
     'lib/agreement.php' => ['s'=>30404,'h'=>'850a0f08f100b313'],
     'lib/ai.php' => ['s'=>26190,'h'=>'d08483ebea3044a0'],
     'lib/ai_formgen.php' => ['s'=>11931,'h'=>'3193de5d4fc90414'],
@@ -360,7 +360,7 @@ $EXPECT  = [
     'views/ops/access_notice.php' => ['s'=>2060,'h'=>'b25acc590f21d59a'],
     'views/ops/activities.php' => ['s'=>3751,'h'=>'22620c2f6225c534'],
     'views/ops/adspro.php' => ['s'=>13351,'h'=>'ab9092f4fbe2cbbc'],
-    'views/ops/adsroi.php' => ['s'=>8594,'h'=>'f3eaf082491fd7aa'],
+    'views/ops/adsroi.php' => ['s'=>10779,'h'=>'2fa2cee66405565d'],
     'views/ops/advisor.php' => ['s'=>9193,'h'=>'592527ab30f1be7d'],
     'views/ops/agency_staff.php' => ['s'=>3970,'h'=>'abaaf8e4f95477fc'],
     'views/ops/agreement.php' => ['s'=>1958,'h'=>'692efd73750ecab3'],
