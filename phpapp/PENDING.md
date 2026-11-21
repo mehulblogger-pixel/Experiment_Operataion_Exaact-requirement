@@ -2,6 +2,17 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## ✅ Sales redesign — closing check done (21 Nov 2026, report 63)
+
+Whole branch checked as one piece on the final code: 779 test files (27,712 checks pass; 12 fail, all
+identical on 9f4a530 and outside Sales — DEF-24 m8 ×3, m7 ×6, b4 term count, m2 staff form, lookup-link
+test), robot 104 cases (none worse: 46 / 23 / 24 / 10 / 1), 50 Sales screens × 8 sizes (clean), 965
+inventory items (none missing). Update zip `EXAACT-V51.1-Sales-Complete-TEST-COPY-update.zip`.
+Still open: DEF-24 + the m7 Sales download addresses under a plan limit (owner's OK); unassigned
+records for Own / Team (owner's answer); targets in ₹ lakh (ask); remove the old permission screen after
+one release; small controls outside the redesign (Sales menu "Command Centre →", client-register "360",
+Customer 360 buttons, two invoice buttons). Next: the test book, status document and product document.
+
 ## 🧭 Sales Stage 5 built (21 Nov 2026, report 59) — what is left for Stage 6 and later
 
 - **Delivered:** commits a88afc2 (BM / SBU Head leads and deals), 94af1f7 (quotation six tabs), 48af9e4 (Stage 5),
