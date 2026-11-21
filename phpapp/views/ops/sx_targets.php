@@ -25,15 +25,16 @@ $pages = max(1, (int) ceil($histN / $histPer));
   <?php else: ?>
   <form method="post" action="/sales-targets<?= e($fyq) ?>">
     <input type="hidden" name="fy" value="<?= e($fy) ?>">
-    <?php rec_card_open('Targets · ₹', 'target', $can ? '<button class="sxw-bt p" type="submit">Save targets</button>' : ''); ?>
-      <p class="muted" style="margin:0 0 8px;font-size:12.5px"><?= $can ? 'Type each figure in rupees and Save. <b>Leave a box empty for no target</b> — emptying a box records "no target"; the earlier figure stays in the history.' : 'Your manager sets these.' ?></p>
+    <input type="hidden" name="unit" value="lakh">
+    <?php rec_card_open($can ? 'Targets · amount in ₹ lakh' : 'Targets · ₹', 'target', $can ? '<button class="sxw-bt p" type="submit">Save targets</button>' : ''); ?>
+      <p class="muted" style="margin:0 0 8px;font-size:12.5px"><?= $can ? '<b>Type each amount in ₹ lakh</b> — e.g. 12.5 = ₹12,50,000; 0.75 = ₹75,000. The rupee figure shows under the box as you type. <b>Leave a box empty for no target</b> — emptying a box records "no target"; the earlier figure stays in the history.' : 'Your manager sets these.' ?></p>
       <div class="rec-scroll"><table class="rec-tbl sx5-tg">
         <thead><tr><th>Person</th><?php foreach ($months as $m): ?><th class="n"<?= $m === $curYm ? ' style="color:var(--brand)"' : '' ?>><?= e(date('M y', strtotime($m . '-01'))) ?></th><?php endforeach; ?><th class="n">Year</th><th class="n">Won</th><th class="n">%</th></tr></thead>
         <tbody>
         <?php foreach ($people as $uid => $nm): $tY = array_sum($grid[$uid] ?? []); $wY = array_sum($won[$uid] ?? []); $pc = $tY > 0 ? (int) round($wY * 100 / $tY) : null; ?>
           <tr><th scope="row"><b><?= e($nm) ?></b><br><span class="muted" style="font-size:11.5px;font-weight:400">won ↓</span></th>
             <?php foreach ($months as $m): $tv = $grid[$uid][$m] ?? null; $wv = (float) ($won[$uid][$m] ?? 0); ?>
-              <td class="n"><?php if ($can): ?><input class="form-control sxnum" name="t[<?= (int) $uid ?>][<?= e($m) ?>]" inputmode="numeric" value="<?= $tv !== null ? e((string) (0 + $tv)) : '' ?>" aria-label="<?= e($nm . ' ' . $m) ?> target"><input type="hidden" name="o[<?= (int) $uid ?>][<?= e($m) ?>]" value="<?= $tv !== null ? e((string) (0 + $tv)) : '' ?>"><?php else: ?><b><?= $tv !== null ? e(sx_short($tv)) : '<span class="muted">—</span>' ?></b><?php endif; ?>
+              <td class="n"><?php if ($can): ?><input class="form-control sxnum sxt-lakh" name="t[<?= (int) $uid ?>][<?= e($m) ?>]" inputmode="decimal" value="<?= e(sxt_lakh_text($tv)) ?>" aria-label="<?= e($nm . ' ' . date('M Y', strtotime($m . '-01'))) ?> target in rupees lakh" aria-describedby="sxtr-<?= (int) $uid ?>-<?= e($m) ?>"><input type="hidden" name="o[<?= (int) $uid ?>][<?= e($m) ?>]" value="<?= e(sxt_lakh_text($tv)) ?>"><div class="muted sxt-rs" id="sxtr-<?= (int) $uid ?>-<?= e($m) ?>" aria-live="polite" style="font-size:11px;margin-top:2px;white-space:nowrap"><?= $tv !== null ? e(sx_money($tv)) : '' ?></div><?php else: ?><b><?= $tv !== null ? e(sx_short($tv)) : '<span class="muted">—</span>' ?></b><?php endif; ?>
                 <?php $ch = $changes[$uid][$m] ?? []; if (count($ch) > 1): $was = $ch[count($ch) - 2]; $last = $ch[count($ch) - 1]; ?>
                   <div style="font-size:11px;margin-top:3px"><span class="sxw-due p-week" title="Changed <?= e(fdate(substr((string) $last['set_at'], 0, 10))) ?> by <?= e($last['set_by']) ?>">↻ was <?= $was['amount'] === null ? 'no target' : e(sx_short($was['amount'])) ?></span></div>
                 <?php endif; ?>
@@ -71,4 +72,21 @@ $pages = max(1, (int) ceil($histN / $histPer));
   <?php rec_card_close(); ?>
   <?php endif; ?>
 </div>
+<?php if (!empty($can) && $people): ?>
+<script>
+// Live rupee figure under each ₹ lakh box (12.5 → ₹12,50,000). Display only —
+// the server converts and stores rupees exactly as before.
+(function () {
+  function inr(n) { var s = String(Math.round(n)); var last = s.slice(-3), rest = s.slice(0, -3);
+    return '₹' + (rest ? rest.replace(/\B(?=(\d{2})+(?!\d))/g, ',') + ',' : '') + last; }
+  document.querySelectorAll('.sxt-lakh').forEach(function (box) {
+    var out = document.getElementById(box.getAttribute('aria-describedby'));
+    function show() { var v = box.value.replace(/[,₹\s]/g, '');
+      if (v === '') { out.textContent = 'no target'; return; }
+      var n = Number(v); out.textContent = (isFinite(n) && n >= 0) ? inr(n * 100000) : 'type a number of lakh, 0 or more'; }
+    box.addEventListener('input', show);
+  });
+})();
+</script>
+<?php endif; ?>
 <?php sxw_bottom('/sales-targets'); ?>

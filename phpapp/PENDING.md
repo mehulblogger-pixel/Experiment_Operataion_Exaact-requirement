@@ -2,6 +2,20 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🗳️ Owner's answers, 21 Nov 2026 (after the complete package) — built / parked
+
+- **Unassigned records for Own / Team — answer "a": BUILT.** An unassigned lead, deal or inquiry stays
+  visible to an Own / Team person inside their branches, so someone picks it up (docs/02 19z,
+  `tests/test_q10_scope.php`).
+- **DEF-24 — "Ok fix it": BUILT** (`lib/db.php` `db_driver()`; register 52). m7 and m8 now pass.
+- **Targets in ₹ lakh — "Yes in lakhs, but mention it": BUILT.** The Targets boxes take ₹ lakh, labelled
+  "amount in ₹ lakh" with an example and the rupee figure live under each box; stored in rupees as before.
+- **Old permission screen — PENDING (owner: "Let that be as it is").** The old Roles & permissions screen
+  (Admin → Roles, and User register → Permissions) stays as it is alongside "Who can do what". Not
+  removed; revisit only when the owner asks.
+- **Ad spend by branch — PENDING** (owner, earlier: "let us do it later"). Needs the owner's rule for
+  splitting a campaign's spend across branches.
+
 ## ✅ Sales redesign — closing check done (21 Nov 2026, report 63)
 
 Whole branch checked as one piece on the final code: 779 test files (27,712 checks pass; 12 fail, all
@@ -24,8 +38,7 @@ Customer 360 buttons, two invoice buttons). Next: the test book, status document
 
 - **Sales settings screen:** DONE (Batch E, 21 Nov) — the renewal window field is drawn. The handler already saves it
   (`renew_days` → setting `sales_renewal_days`, 7–365) and passes `renewDays` / `renewExample` to the view.
-- **Targets in ₹ lakh:** the approved picture shows the boxes in ₹ lakh; they stay in rupees (as before) so a
-  figure is never read 1,00,000 times too big or small. Ask the owner if lakh entry is wanted.
+- **Targets in ₹ lakh:** DONE 21 Nov (owner: "Yes in lakhs") — see the owner's answers above.
 - **Quotation page tabs (C2):** six tabs as approved. The live approval chain with Approve / Reject stays on
   Overview (the design puts "Your decision" and "Approval chain" there); the Approvals tab is the full read-only
   record across revisions.
@@ -79,7 +92,8 @@ Left for later stages, noted here so nothing is lost:
 
 The new permission screen (`/who-can`, docs/02 19t) is built and tested; the old Roles screen
 (`/access`) stays reachable from it ("Old layout") for ONE release — remove the link and the
-tile-less route after the owner has used the new screen on opstest. Q10 ("whose
+tile-less route after the owner has used the new screen on opstest. **Owner, 21 Nov 2026: "Let that be
+as it is" — the old screen (Admin → Roles, User register → Permissions) stays, pending.** Q10 ("whose
 records a person sees: own / team / branch / all") was built 21 Nov (Batch E, report 61). The person form's
 permission grid could later be replaced by a link to this screen (one place to switch rights).
 
@@ -105,9 +119,7 @@ Owner: "Keep this." Built as a per-role setting, with a per-person choice, on "W
 `tests/test_q10_scope.php`). Follow-ups, only if the owner asks:
 - Own / Team are not applied to Accounts' "awaiting a contract number" queue (a work queue, not a
   salesperson's list), nor to project costing's enquiry picker.
-- A record with no owner (an unassigned lead or enquiry) is hidden from a person set to Own / Team;
-  they still reach it through someone set to Branch. Ask the owner whether unassigned records should
-  stay visible to Own / Team people.
+- A record with no owner: DONE 21 Nov (owner answer "a") — visible to Own / Team inside their branches.
 - The person form (/user-edit) does not show the choice; it is on "Who can do what" only.
 
 ## 📣 Advertising spend by branch — parked by the owner (21 Nov 2026)
@@ -121,8 +133,8 @@ the campaign). Needs the owner's rule before any build. See QA-REPORTS/V51/52 (D
 ## 🧾 Sales defect register — open items (21 Nov 2026)
 
 The full list, with severity and who decides, is `QA-REPORTS/V51/52-Sales-Defect-Register.md`.
-Closing check (21 Nov, report 63): DEF-01 to DEF-23 and DEF-25 to DEF-34 fixed. Still open: DEF-24
-only (plan limits on background jobs, outside Sales — needs the owner's OK).
+Closing check (21 Nov, report 63): DEF-01 to DEF-23 and DEF-25 to DEF-34 fixed. DEF-24 fixed 21 Nov
+after the owner's OK — all 34 fixed.
 
 ## 🧾 Quote/contract model — "trace, don't force" (Aug 2026) — DONE
 

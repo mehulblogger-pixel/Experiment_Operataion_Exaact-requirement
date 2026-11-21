@@ -228,6 +228,21 @@ try {
     t_eq(count($GLOBALS['sxt_skipped']['bad']), 1, 'targets · …and the person is told');
     sxt_save(['t' => [$f['kiran'] => [$m1 => '600000.56']]], $months);
     t_eq(sxt_grid($months)[$f['kiran']][$m1], 600001.0, 'targets · whole rupees (₹6,00,000.56 → ₹6,00,001), so History and the e-mail show what is stored');
+    // Targets typed in ₹ lakh (owner, 21 Nov 2026), stored in rupees as before.
+    $cur1 = sxt_lakh_text(sxt_grid($months)[$f['kiran']][$m1] ?? null);
+    t_eq(sxt_save(['unit' => 'lakh', 't' => [$f['kiran'] => [$m1 => '12.5']], 'o' => [$f['kiran'] => [$m1 => $cur1]]], $months), 1, 'targets in lakh · 12.5 typed is saved');
+    t_eq(sxt_grid($months)[$f['kiran']][$m1], 1250000.0, 'targets in lakh · 12.5 lakh is stored as ₹12,50,000 (rupees, as before)');
+    t_eq(sxt_lakh_text(sxt_grid($months)[$f['kiran']][$m1]), '12.5', 'targets in lakh · and shows back as 12.5 in the box');
+    t_eq([sxt_lakh_text(735000), sxt_lakh_text(600001), sxt_lakh_text(0), sxt_lakh_text(null)], ['7.35', '6.00001', '0', ''], 'targets in lakh · an older ₹7,35,000 shows as 7.35; ₹6,00,001 as 6.00001 (nothing lost); no target stays empty');
+    t_eq(sxt_save(['unit' => 'lakh', 't' => [$f['kiran'] => [$m1 => '12.5']], 'o' => [$f['kiran'] => [$m1 => '12.5']]], $months), 0, 'targets in lakh · re-saving the page unchanged records nothing new');
+    t_eq(sxt_save(['unit' => 'lakh', 't' => [$f['kiran'] => [$m1 => '-1']], 'o' => [$f['kiran'] => [$m1 => '12.5']]], $months), 0, 'targets in lakh · a minus figure is refused…');
+    t_eq(count($GLOBALS['sxt_skipped']['bad']), 1, 'targets in lakh · …and the person is told');
+    t_eq(sxt_save(['unit' => 'lakh', 't' => [$f['kiran'] => [$m1 => 'twelve']], 'o' => [$f['kiran'] => [$m1 => '12.5']]], $months), 0, 'targets in lakh · text is refused');
+    $hRow = ops_one("SELECT amount, prev_amount FROM sales_targets WHERE user_id=? AND ym=? ORDER BY id DESC LIMIT 1", [$f['kiran'], $m1]);
+    t_eq([(float) $hRow['amount'], (float) $hRow['prev_amount']], [1250000.0, 600001.0], 'targets in lakh · history keeps rupees, before → after (₹6,00,001 → ₹12,50,000)');
+    $pg = bbv_route('sales-targets', 'GET', $f['master'], 0, [], []); $po = (string) ($pg['out'] ?? '');
+    t_ok(strpos($po, 'amount in ₹ lakh') !== false && strpos($po, 'e.g. 12.5 = ₹12,50,000') !== false, 'targets in lakh · the page says the amount is in ₹ lakh, with an example');
+    t_ok(strpos((string) file_get_contents(dirname(__DIR__) . '/views/ops/sx_targets.php'), '<input type="hidden" name="unit" value="lakh">') !== false, 'targets in lakh · the form tells the server its boxes are in lakh');
     // WhatsApp only for a mobile.
     t_eq([sx_wa('022 2345 6789'), sx_wa('98250 55555'), sx_wa('+91 98250-55555'), sx_wa('09825055555'), sx_wa('+44 7700 900123'), sx_wa('12345')],
          ['', 'https://wa.me/919825055555', 'https://wa.me/919825055555', 'https://wa.me/919825055555', 'https://wa.me/447700900123', ''],

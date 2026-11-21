@@ -429,8 +429,27 @@ function sxt_target_total($who, $from, $to) {
     return $sum;
 }
 //  Save only the cells that changed; each change is a new row (history kept).
+//  Targets are TYPED in ₹ lakh on the page (owner, 21 Nov 2026: "Yes in lakhs but
+//  mention somewhere that amount to be input in Lakhs") and STORED in rupees as
+//  before: 12.5 → ₹12,50,000. History, e-mails, the dashboard and every other
+//  screen keep reading rupees. A form that says unit=lakh is converted here; one
+//  without it (older callers) is rupees, unchanged.
+const SXT_LAKH = 100000;
+function sxt_lakh_text($rupees) {
+    if ($rupees === null) return '';
+    return rtrim(rtrim(number_format((float) $rupees / SXT_LAKH, 5, '.', ''), '0'), '.');
+}
+function sxt_from_lakh($v) {
+    $v = trim(str_replace([',', '₹', ' '], '', (string) $v));
+    if ($v === '' || !is_numeric($v)) return $v;              // empty = no target; text → refused below
+    return (string) (0 + round((float) $v * SXT_LAKH));
+}
 function sxt_save(array $post, array $months) {
     sx_more_migrate();
+    if (($post['unit'] ?? '') === 'lakh') {
+        foreach (['t', 'o'] as $k) foreach ((array) ($post[$k] ?? []) as $uid => $row)
+            foreach ((array) $row as $ym => $v) $post[$k][$uid][$ym] = sxt_from_lakh($v);
+    }
     $cur = sxt_grid($months); $n = 0; $me = user_name(current_user()); $changed = [];
     $people = sxt_people_for_setter(sx_target_people());
     $GLOBALS['sxt_skipped'] = ['bad' => [], 'clash' => []];
