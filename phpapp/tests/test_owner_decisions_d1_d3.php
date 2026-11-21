@@ -145,7 +145,8 @@ try {
     $r = opp_move($oid2, (int) $qs['stage']['id'], []);
     t_ok(!empty($r['ok']), 'D3 · a deal with its quotation moves to the quotation stage with no question');
     // Template step, not a name: each template's quotation step.
-    foreach (['manufacturing' => 'Offer submitted', 'services' => 'Proposal sent', 'construction' => 'Tender submitted', 'inspection' => 'Quotation sent'] as $k => $nm)
+    foreach (['manufacturing' => 'Offer submitted', 'services' => 'Proposal sent', 'construction' => 'Tender submitted', 'inspection' => 'Commercial proposal submitted',
+              'manpower' => 'Profiles / CVs submitted', 'recruitment' => 'Profiles submitted', 'audit' => 'Proposal submitted'] as $k => $nm)
         t_eq(INDUSTRY_TEMPLATES[$k]['funnel'][INDUSTRY_TEMPLATES[$k]['quote']][0], $nm, "D3 · template \"$k\": its quotation step is \"$nm\"");
     t_ok(INDUSTRY_TEMPLATES['staffing']['quote'] === null, 'D3 · a staffing funnel has no quotation step, so no such rule');
 } finally {

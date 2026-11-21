@@ -6,7 +6,7 @@
   //  the wizard always displayed January regardless of the stored month.
   $curFy = (int)(function_exists('fy_start_month') ? fy_start_month() : 4);
   $curInd = function_exists('industry_current') ? (string)industry_current() : '';
-  $industries = defined('INDUSTRY_TEMPLATES') ? INDUSTRY_TEMPLATES : [];
+  $industries = function_exists('industry_choices') ? industry_choices($curInd) : (defined('INDUSTRY_TEMPLATES') ? INDUSTRY_TEMPLATES : []);
   // Only a self-installed copy, whose administrator may still be on the password
   // from config.php, is asked here. Every company workspace has already settled
   // its owner's password: a self sign-up chose it on the sign-up page, and a

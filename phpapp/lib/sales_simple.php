@@ -349,7 +349,7 @@ function sx_health($who) {
         ['Deals with a ⚠ health warning (late follow-up or past close date)', $late, $today ? '/sales-today' : '/sales-board'],
         ['Open deals / leads with no next step', $noStep, $today ? '/sales-today#none' : '/sales-board'],
         ['Customers with a GSTIN that does not look right', $gst, '/clients'],
-        ['Quotes waiting for approval or expired', $q, '/quotes'],
+        [(function_exists('THP') ? THP('quote') : 'Quotes') . ' waiting for approval or expired', $q, '/quotes'],
         ['Lost deals without a reason', $lostNo, '/opportunities?status=LOST'],
         //  21 Nov 2026 (D3) — added at the end so the rows above keep their place.
         ['Customers without GSTIN and PAN (asked at their next invoice)', $noId, '/clients'],

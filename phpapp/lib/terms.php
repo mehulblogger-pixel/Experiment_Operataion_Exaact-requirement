@@ -122,6 +122,9 @@ const TERM_PACKS = [
     ],
     'inspection' => [
         'label' => 'Inspection & certification',
+        //  V2.1 (owner, 21 Nov 2026): kept for the companies already using it; new
+        //  companies are offered 'tpia' instead (term_packs_offered()).
+        'replaced_by' => 'tpia',
         'note'  => 'Third-party inspection, vendor surveillance, expediting, certification bodies.',
         'terms' => [
             'call'       => ['Inspection Call', 'Inspection Calls'],
@@ -178,6 +181,9 @@ const TERM_PACKS = [
     ],
     'manpower' => [
         'label' => 'Manpower supply & staffing',
+        //  V2.1 (owner, 21 Nov 2026): kept for the companies already using it; new
+        //  companies are offered 'techmanpower' instead (term_packs_offered()).
+        'replaced_by' => 'techmanpower',
         'note'  => 'Contract staffing, skilled and unskilled labour supply, deputation of people.',
         'terms' => [
             'call'     => ['Requirement', 'Requirements'],
@@ -193,6 +199,9 @@ const TERM_PACKS = [
     ],
     'recruitment' => [
         'label' => 'Recruitment agency',
+        //  V2.1 (owner, 21 Nov 2026): kept for the companies already using it; new
+        //  companies are offered 'recruitplace' instead (term_packs_offered()).
+        'replaced_by' => 'recruitplace',
         'note'  => 'Permanent placement, executive search and technical recruitment — requirement to CV to offer to placement.',
         'terms' => [
             'call'        => ['Requirement', 'Requirements'],
@@ -256,7 +265,90 @@ const TERM_PACKS = [
             'office'     => ['Laboratory', 'Laboratories'],
         ],
     ],
+
+    // ---- Industry templates V2.1 (owner approved 21 Nov 2026) --------------
+    //  One short word per idea (V2.1 §2). Words a pack leaves out keep the plain
+    //  default — "Client" stays "Client" in all four. Every word stays editable
+    //  under Admin → Terminology. The packs these replace are kept, unchanged,
+    //  for the companies already using them (see 'replaced_by' above).
+    'tpia' => [
+        'label' => 'Third-party inspection (TPIA) & testing',
+        'note'  => 'Third-party inspection agencies, vendor inspection, expediting, NDT and testing services.',
+        'terms' => [
+            'inquiry'    => ['Enquiry', 'Enquiries'],
+            'quote'      => ['Quotation', 'Quotations'],
+            //  A Purchase Order is not an Inspection Call: one order carries many
+            //  calls, and each call many assignments (V2.1 §4).
+            'order'      => ['Purchase Order', 'Purchase Orders'],
+            'call'       => ['Inspection Call', 'Inspection Calls'],
+            'job'        => ['Inspection Assignment', 'Inspection Assignments'],
+            'engineer'   => ['Inspector', 'Inspectors'],
+            'report'     => ['Inspection Report', 'Inspection Reports'],
+            'mfr_record' => ['Manufacturer Record', 'Manufacturer Records'],
+            'manday'     => ['Man-day', 'Man-days'],
+            'boss'       => ['PO / Contract No.', 'PO / Contract Nos.'],
+        ],
+    ],
+    'techmanpower' => [
+        'label' => 'Technical manpower & deputation',
+        'note'  => 'Deputation and supply of engineers, technicians and skilled staff, billed per month, day, hour or shift.',
+        'terms' => [
+            'inquiry'     => ['Enquiry', 'Enquiries'],
+            'quote'       => ['Quotation', 'Quotations'],
+            'order'       => ['Purchase Order', 'Purchase Orders'],
+            'call'        => ['Manpower Requirement', 'Manpower Requirements'],
+            'job'         => ['Deployment', 'Deployments'],
+            'engineer'    => ['Deployed Engineer', 'Deployed Engineers'],
+            //  Recruiting against a requirement (internal) — the staffing word,
+            //  kept from the shared pack (see test_recruit_terminology.php).
+            'requisition' => ['Job Order', 'Job Orders'],
+            'manday'      => ['Man-day', 'Man-days'],
+        ],
+    ],
+    'recruitplace' => [
+        'label' => 'Recruitment & placement agency',
+        'note'  => 'Permanent placement, executive search and technical recruitment, for a placement fee.',
+        'terms' => [
+            //  The naming clash, solved (V2.1 §6): the client's sales request is
+            //  the Enquiry; "Job Requisition" is ONLY the position being filled.
+            'inquiry'     => ['Enquiry', 'Enquiries'],
+            'quote'       => ['Fee Proposal', 'Fee Proposals'],
+            'order'       => ['Mandate', 'Mandates'],
+            'requisition' => ['Job Requisition', 'Job Requisitions'],
+            'engineer'    => ['Recruiter', 'Recruiters'],
+            'job'         => ['Placement', 'Placements'],
+        ],
+    ],
+    'audit' => [
+        'label' => 'Audit & assurance',
+        'note'  => 'ISO / management-system, supplier, vendor, process, internal and compliance audits.',
+        'terms' => [
+            //  Client = who pays; Auditee = the organisation audited, when it is
+            //  a different party (a supplier or vendor audit). The application's
+            //  own "Vendor" party is that organisation (V2.1 §7).
+            'vendor'   => ['Auditee', 'Auditees'],
+            'inquiry'  => ['Enquiry', 'Enquiries'],
+            'quote'    => ['Proposal', 'Proposals'],
+            'order'    => ['Engagement', 'Engagements'],
+            'call'     => ['Audit Assignment', 'Audit Assignments'],
+            'job'      => ['Audit Visit', 'Audit Visits'],
+            'engineer' => ['Auditor', 'Auditors'],
+            'report'   => ['Audit Report', 'Audit Reports'],
+            'manday'   => ['Audit Day', 'Audit Days'],
+        ],
+    ],
 ];
+
+// The packs offered for a NEW choice: every pack except one another pack has
+// replaced — unless it is the one this company already uses, which stays on
+// show so nobody's current wording disappears from the screen (V2.1, 21 Nov 2026).
+function term_packs_offered($current = null) {
+    $current = $current ?? (function_exists('setting_get') ? (string) setting_get('terms_pack', '') : '');
+    $out = [];
+    foreach (TERM_PACKS as $k => $p)
+        if (empty($p['replaced_by']) || $k === $current) $out[$k] = $p;
+    return $out;
+}
 
 // Apply a pack: fill the overrides with its words, leaving everything it does
 // not mention on the shipped default. Deliberately REPLACES rather than merges
@@ -479,7 +571,7 @@ function ops_terminology($method) {
     view('ops/terminology', [
         'groups' => function_exists('term_groups_licensed') ? term_groups_licensed() : term_groups(),
         'ov'     => term_overrides(),
-        'packs'  => TERM_PACKS,
+        'packs'  => term_packs_offered(),
         'pack'   => term_pack_current(),
     ]);
 }

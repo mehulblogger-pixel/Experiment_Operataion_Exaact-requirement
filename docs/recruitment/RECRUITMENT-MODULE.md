@@ -73,13 +73,23 @@ It is **not** a payroll system and not an HRMS. It stops the day somebody joins.
 
 *Updated: 2026-09-27*
 
-### 2.1 Industries — 13 ready-made templates
+### 2.1 Industries — 15 ready-made templates offered (V2.1, owner approved 21 Nov 2026)
 
-Inspection, testing & certification · Testing & calibration laboratory ·
-Manufacturing & engineering · Trading & distribution · Professional & consulting
-services · Construction, projects & infrastructure · IT & software services ·
-Healthcare & diagnostics · Education & training · Logistics & transport ·
-Real estate & facilities · Recruitment & staffing · General B2B
+**Third-party inspection (TPIA) & testing** (version 2) · **Technical manpower &
+deputation** · **Recruitment & placement agency** · **Audit & assurance** ·
+Testing & calibration laboratory · Manufacturing & engineering · Trading &
+distribution · Professional & consulting services · Construction, projects &
+infrastructure · IT & software services · Healthcare & diagnostics · Education &
+training · Logistics & transport · Real estate & facilities · General B2B
+
+The shared **Recruitment & staffing** template is replaced by the two separate
+ones above. It keeps working, unchanged, for a company already using it, and is
+not offered for a new choice (`industry_choices()`). Each template carries a
+version, stored when applied (`industry_template_version`, e.g. `inspection@2`).
+The four V2.1 templates share the lead stages New prospect → Contact attempted →
+Contact established → Qualified → Won — customer / Not pursued. All stages,
+percentages and lists are examples each company changes. Proposal:
+`EXAACT-Industry-Templates-V2.1` (gaps G1–G6 recorded there, not built).
 
 ### 2.2 Vocabulary packs — 12
 
@@ -89,7 +99,19 @@ customer's own people do not use:
 General business · Inspection & certification · Manufacturing & fabrication ·
 Trading & distribution · EPC & contracting · Field service & maintenance ·
 **Manpower supply & staffing** · **Recruitment agency** · Export & import ·
-Logistics & transport · Professional services · Testing laboratories
+Logistics & transport · Professional services · Testing laboratories ·
+**Third-party inspection (TPIA) & testing** · **Technical manpower & deputation** ·
+**Recruitment & placement agency** · **Audit & assurance** (V2.1)
+
+The V2.1 packs replace, for a new choice, "Inspection & certification",
+"Manpower supply & staffing" and "Recruitment agency"; those three stay on the
+Terminology screen only for the company already using one (`term_packs_offered()`).
+V2.1 words: TPIA — Enquiry, Quotation, Purchase Order, Inspection Call, Inspection
+Assignment, Inspector, Inspection Report; technical manpower — Client (not
+"Principal Employer"), Manpower Requirement, Deployment, Deployed Engineer, Job
+Order; recruitment — Enquiry, Fee Proposal, Mandate, Job Requisition, Recruiter;
+audit — Auditee (the audited party), Proposal, Engagement, Audit Assignment, Audit
+Visit, Auditor, Audit Report, Audit Day.
 
 ### 2.3 Business models — 4, and they are genuinely different
 

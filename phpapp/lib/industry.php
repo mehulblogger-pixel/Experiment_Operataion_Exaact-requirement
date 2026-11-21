@@ -43,20 +43,40 @@
 // sits at 20% for months and is lost on price; a subscription renewal starts at
 // 60% because the customer is already yours; a diagnostics account is won or
 // lost on an empanelment decision nobody controls.
+// The common lead stages of the V2.1 templates (owner approved 21 Nov 2026):
+// V2.0's order, with the owner's own names for the two closing stages kept —
+// "Won — customer" (12 Nov: "converted meant nothing to a user") and "Not
+// pursued" (both also printed on the Leads tiles). [name, kind, prob, days].
+const INDUSTRY_LEAD_STAGES_V21 = [
+    ['New prospect',          'OPEN', 0,  3],
+    ['Contact attempted',     'OPEN', 0,  3],
+    ['Contact established',   'OPEN', 0,  7],
+    ['Qualified',             'OPEN', 0, 14],
+    ['Won — customer',        'WON',  0,  0],
+    ['Not pursued',           'LOST', 0,  0],
+];
+
 const INDUSTRY_TEMPLATES = [
 
+    //  V2.1 (owner approved 21 Nov 2026): renamed for the TPIA buyer, without
+    //  "certification" (owner: "no certification"); the deal funnel ends at the
+    //  commercial award, not at inspection completion. Stages, percentages and
+    //  lists are examples — each company changes them after setup.
     'inspection' => [
-        'quote' => 2,   // D3: the funnel step at which a quotation has gone (index in 'funnel'; null = none)
-        'label' => 'Inspection, testing & certification',
-        'blurb' => 'Third-party inspection, NDT, vendor assessment, certification bodies.',
+        'quote' => 2,   // D3: the funnel step at which a quotation has gone (index in 'funnel'; null = none) — "Commercial proposal submitted"
+        'label' => 'Third-party inspection (TPIA) & testing',
+        'blurb' => 'Third-party inspection agencies, vendor inspection, expediting, NDT and testing services.',
+        'version' => 2,
+        //  Funnels created before V2.1 carry the old name; D3 still recognises them.
+        'old_labels' => ['Inspection, testing & certification'],
         'funnel' => [
-            ['New deal',           'OPEN',  10, 7],
-            ['Scope agreed',       'OPEN',  30, 10],
-            ['Quotation sent',     'OPEN',  50, 14],
-            ['Rate negotiation',   'OPEN',  70, 10],
-            ['PO / work order',    'OPEN',  90, 7],
-            ['Won',                'WON',  100, 0],
-            ['Lost',               'LOST',   0, 0],
+            ['Enquiry / RFQ received',        'OPEN',  10, 3],
+            ['Technical scope review',        'OPEN',  25, 5],
+            ['Commercial proposal submitted', 'OPEN',  50, 14],
+            ['Clarification / negotiation',   'OPEN',  70, 10],
+            ['PO / work order awaited',       'OPEN',  90, 14],
+            ['Won — order received',          'WON',  100, 0],
+            ['Lost',                          'LOST',   0, 0],
         ],
         'alt' => ['Annual contracts & renewals' => [
                 ['Contract due', 'OPEN', 30, 30],
@@ -65,17 +85,112 @@ const INDUSTRY_TEMPLATES = [
                 ['Renewed', 'WON', 100, 0],
                 ['Not renewed', 'LOST', 0, 0],
         ]],
-        'leads' => [
-            ['New enquiry',    'OPEN', 0,  3],
-            ['Contact made',   'OPEN', 0,  7],
-            ['Qualified',      'OPEN', 0, 14],
-            ['Won — customer', 'WON',  0,  0],
-            ['Not pursued',    'LOST', 0,  0],
+        'leads' => INDUSTRY_LEAD_STAGES_V21,
+        'sources' => ['Existing Client', 'Client Reference', 'EPC / PMC Reference', 'Tender / GeM Portal',
+                      'Vendor Registration / Empanelment', 'Website Enquiry', 'Direct Marketing',
+                      'Industry Networking', 'Cold Approach'],
+        'lost'    => ['Commercial Rates Too High', 'Technical Scope Not Accepted', 'Competitor Selected',
+                      'Existing Empanelled Agency Preferred', 'Manpower / Resource Unavailability',
+                      'Mobilisation Timeline Not Accepted', 'Tender Cancelled', 'Requirement Withdrawn',
+                      'No Response', 'Other'],
+    ],
+
+    //  V2.1 — technical manpower and deputation, separated from recruitment.
+    'manpower' => [
+        'quote' => 3,   // D3: the funnel step at which a quotation has gone (index in 'funnel'; null = none) — "Profiles / CVs submitted"
+        'label' => 'Technical manpower & deputation',
+        'blurb' => 'Deputation and supply of engineers, technicians and skilled staff, billed per month, day, hour or shift.',
+        'version' => 1,
+        'funnel' => [
+            ['Manpower requirement received',  'OPEN',  10, 3],
+            ['Requirement & scope qualified',  'OPEN',  25, 5],
+            ['Commercials / rates agreed',     'OPEN',  45, 7],
+            ['Profiles / CVs submitted',       'OPEN',  60, 7],
+            ['Client interview / selection',   'OPEN',  80, 10],
+            ['Won — PO / deployment work order received', 'WON', 100, 0],
+            ['Lost',                           'LOST',   0, 0],
         ],
-        'sources' => ['Existing client', 'Client referral', 'Tender portal', 'Empanelment',
-                      'Website enquiry', 'Trade exhibition', 'Cold approach', 'Repeat order'],
-        'lost'    => ['Rate too high', 'Competitor empanelled', 'Client cancelled the project',
-                      'No accreditation for that scope', 'No response', 'Awarded in-house'],
+        'alt' => ['Deployment extensions' => [
+                ['Extension due', 'OPEN', 45, 21],
+                ['Client confirmed', 'OPEN', 70, 14],
+                ['Rates agreed', 'OPEN', 85, 10],
+                ['Extended', 'WON', 100, 0],
+                ['Not extended', 'LOST', 0, 0],
+        ]],
+        'leads' => INDUSTRY_LEAD_STAGES_V21,
+        'sources' => ['Existing Client', 'Client Reference', 'EPC / PMC Reference', 'Tender / GeM Portal',
+                      'Vendor Registration / Empanelment', 'Website Enquiry', 'Direct Marketing',
+                      'Industry Networking', 'Cold Approach'],
+        'lost'    => ['Commercial Rates Too High', 'Statutory Cost Not Accepted', 'Suitable Personnel Unavailable',
+                      'Required Qualification / Certification Not Available', 'Competitor Selected',
+                      'Mobilisation Timeline Not Accepted', 'Requirement Withdrawn', 'No Response', 'Other'],
+    ],
+
+    //  V2.1 — recruitment and placement, separated from technical manpower.
+    'recruitment' => [
+        'quote' => 3,   // D3: the funnel step at which a quotation has gone (index in 'funnel'; null = none) — "Profiles submitted"
+        'label' => 'Recruitment & placement agency',
+        'blurb' => 'Permanent placement, executive search and technical recruitment, for a placement fee.',
+        'version' => 1,
+        'funnel' => [
+            ['Job requisition received',  'OPEN', 10, 3],
+            ['Mandate / fee terms agreed','OPEN', 25, 7],
+            ['Sourcing & shortlisting',   'OPEN', 40, 10],
+            ['Profiles submitted',        'OPEN', 50, 7],
+            ['Client interviews',         'OPEN', 65, 14],
+            ['Offer released',            'OPEN', 80, 7],
+            ['Offer accepted',            'OPEN', 90, 14],
+            ['Won — candidate joined',    'WON', 100, 0],
+            ['Lost',                      'LOST',  0, 0],
+        ],
+        //  Probabilities on this funnel are examples (V2.1 gives the stages only).
+        'alt' => ['Replacements' => [
+                ['Replacement due', 'OPEN', 30, 7],
+                ['Candidate re-sourced', 'OPEN', 50, 14],
+                ['Candidate shortlisted', 'OPEN', 70, 10],
+                ['Candidate selected', 'OPEN', 85, 14],
+                ['Joined', 'WON', 100, 0],
+                ['Replacement closed', 'LOST', 0, 0],
+        ]],
+        'leads' => INDUSTRY_LEAD_STAGES_V21,
+        'sources' => ['Existing Hiring Client', 'Client Reference', 'Website Enquiry', 'Job Portal',
+                      'Tender / Recruitment Mandate', 'Industry Networking', 'Direct Marketing', 'Cold Approach'],
+        'lost'    => ['Fee Percentage Not Accepted', 'Position Filled Internally', 'Another Recruitment Agency Selected',
+                      'Candidate Declined', 'Candidate Not Available', 'Requirement Withdrawn',
+                      'Position Put on Hold', 'No Response', 'Other'],
+    ],
+
+    //  V2.1 — audit and assurance: ISO / management-system, supplier, vendor,
+    //  process, internal and compliance audits. CA / statutory audit is a
+    //  separate, later template.
+    'audit' => [
+        'quote' => 3,   // D3: the funnel step at which a quotation has gone (index in 'funnel'; null = none) — "Proposal submitted"
+        'label' => 'Audit & assurance',
+        'blurb' => 'ISO / management-system, supplier, vendor, process, internal and compliance audits.',
+        'version' => 1,
+        'funnel' => [
+            ['Audit enquiry / RFP received',          'OPEN', 10, 3],
+            ['Scope & requirements reviewed',         'OPEN', 25, 5],
+            ['Auditor availability assessed',         'OPEN', 40, 5],
+            ['Proposal submitted',                    'OPEN', 55, 14],
+            ['Commercial clarification / negotiation','OPEN', 75, 10],
+            ['Won — engagement confirmed / PO received', 'WON', 100, 0],
+            ['Lost',                                  'LOST',  0, 0],
+        ],
+        //  Probabilities on this funnel are examples (V2.1 gives the stages only).
+        'alt' => ['Surveillance / next audit' => [
+                ['Next audit due', 'OPEN', 40, 30],
+                ['Proposal sent', 'OPEN', 60, 21],
+                ['Confirmed', 'OPEN', 85, 14],
+                ['Renewed', 'WON', 100, 0],
+                ['Not renewed', 'LOST', 0, 0],
+        ]],
+        'leads' => INDUSTRY_LEAD_STAGES_V21,
+        'sources' => ['Existing Client', 'Certification / Audit Reference', 'Vendor / Supplier Referral', 'Tender / RFP',
+                      'Website Enquiry', 'Industry Networking', 'Direct Marketing', 'Cold Approach'],
+        'lost'    => ['Audit Fee Too High', 'Competitor Selected', 'Auditor Availability',
+                      'Independence / Conflict of Interest', 'Scope or Qualification Mismatch',
+                      'Schedule Not Accepted', 'Audit Cancelled', 'No Response', 'Other'],
     ],
 
     'labs' => [
@@ -410,9 +525,13 @@ const INDUSTRY_TEMPLATES = [
                       'Deferred', 'No response'],
     ],
 
+    //  V2.1 (21 Nov 2026): split into 'manpower' and 'recruitment'. Kept, as it
+    //  was, for the companies already using it; not offered for a new choice
+    //  (industry_choices()).
     'staffing' => [
         'quote' => null,   // D3: the funnel step at which a quotation has gone (index in 'funnel'; null = none)
         'label' => 'Recruitment & staffing',
+        'replaced_by' => ['manpower', 'recruitment'],
         'blurb' => 'Permanent placement, contract staffing, payroll and manpower supply.',
         'funnel' => [
             ['Requirement received','OPEN', 15, 3],
@@ -485,6 +604,27 @@ function industry_can_company() {
 }
 
 function industry_current() { return (string)setting_get('industry_template', ''); }
+
+// V2.1 (owner approved 21 Nov 2026) — a template's version. Templates written
+// before V2.1 carry none and count as 1. Stored with the key when the template
+// is applied ("inspection@2"), so a later reader knows which edition of the
+// stages and words a company started from. Company changes are never touched
+// on an upgrade: applying creates, it never edits.
+function industry_version($key) { return (int) (INDUSTRY_TEMPLATES[$key]['version'] ?? 1); }
+function industry_stamp($key) { return $key . '@' . industry_version($key); }
+
+// The templates offered for a NEW choice: every template except one that a
+// V2.1 template has replaced ('staffing' → 'manpower' + 'recruitment') —
+// unless it is this company's current one, which stays on show so its own
+// choice never disappears from the screen.
+function industry_choices($current = null) {
+    $current = $current ?? industry_current();
+    $out = [];
+    foreach (INDUSTRY_TEMPLATES as $k => $t)
+        if (empty($t['replaced_by']) || $k === $current) $out[$k] = $t;
+    return $out;
+}
+function industry_offered($key) { return isset(industry_choices()[$key]); }
 
 function industry_label($key) { return INDUSTRY_TEMPLATES[$key]['label'] ?? ''; }
 
@@ -567,7 +707,8 @@ function industry_apply_pipelines($key) {
     $added += $unitsAdded;
 
     if (function_exists('act_log'))
-        act_log('', 0, 'SYSTEM', 'Industry template pipelines added: ' . $t['label'], ['auto' => 1]);
+        act_log('', 0, 'SYSTEM', 'Industry template pipelines added: ' . $t['label'] . ' (' . industry_stamp($key) . ')', ['auto' => 1]);
+    if (function_exists('setting_set')) setting_set('industry_pipelines_version', industry_stamp($key));
     return ['ok' => true, 'pipelines' => $made, 'list_values' => $added, 'units_added' => $unitsAdded, 'label' => $t['label']];
 }
 
@@ -610,6 +751,7 @@ function industry_set_company($key) {
         packs_save(implode(',', array_filter(array_merge($keep, [$accrPack]))));
     }
     setting_set('industry_template', $key);
+    setting_set('industry_template_version', industry_stamp($key));
     setting_set('industry_applied_at', date('c'));
     if (function_exists('act_log'))
         act_log('', 0, 'SYSTEM', 'Company industry set to ' . $t['label'] . ' — wording and accreditation rules', ['auto' => 1]);
@@ -624,7 +766,7 @@ function industry_set_company($key) {
 // general default covers the rest. Only 'inspection' also turns on the
 // accreditation pack — that is decided in industry_apply(), not here.
 const INDUSTRY_TERM_MAP = [
-    'inspection'    => 'inspection',
+    'inspection'    => 'tpia',          // V2.1 — the refined TPIA words
     'labs'          => 'labs',
     'manufacturing' => 'manufacturing',
     'trading'       => 'trading',
@@ -637,6 +779,9 @@ const INDUSTRY_TERM_MAP = [
     'realestate'    => 'general',
     'staffing'      => 'manpower',
     'generic'       => 'general',
+    'manpower'      => 'techmanpower',
+    'recruitment'   => 'recruitplace',
+    'audit'         => 'audit',
 ];
 
 // ============================================================================
@@ -663,6 +808,12 @@ const INDUSTRY_UNITS = [
     'logistics'     => ['TRIP' => 'Per trip', 'CONTAINER' => 'Per container', 'KG' => 'Kg', 'TONNE' => 'Tonne', 'CUM' => 'Cubic metre', 'PALLET' => 'Per pallet'],
     'realestate'    => ['SQFT' => 'Square foot', 'SQM' => 'Square metre', 'PER_MONTH' => 'Per month', 'NOS' => 'Nos'],
     'staffing'      => ['HOUR' => 'Per hour', 'PER_MONTH' => 'Per month'],
+    //  V2.1 — the first unit is the one a new line starts with. Man-day, Audit
+    //  day and Lump sum are standard units already on the list (only chosen as
+    //  the starting unit); Per hour and Per shift are added where missing.
+    'manpower'      => ['MANDAY' => 'Man-day', 'HOUR' => 'Per hour', 'SHIFT' => 'Per shift'],
+    'recruitment'   => ['LOT' => 'Per lot / lump sum'],
+    'audit'         => ['AUDIT_DAY' => 'Audit day', 'HOUR' => 'Per hour'],
     'generic'       => ['NOS' => 'Nos', 'HOUR' => 'Per hour', 'PER_MONTH' => 'Per month'],
 ];
 function industry_seed_units($key) {
@@ -731,6 +882,12 @@ function ops_industry($route, $method) {
 
     if ($route === 'industry-apply' && $method === 'POST') {
         $key = preg_replace('/[^a-z]/', '', (string)($_POST['key'] ?? ''));
+        // V2.1: a template another one has replaced is not a new choice.
+        if (isset(INDUSTRY_TEMPLATES[$key]) && !industry_offered($key)) {
+            $by = array_map('industry_label', (array) (INDUSTRY_TEMPLATES[$key]['replaced_by'] ?? []));
+            flash('"' . industry_label($key) . '" is no longer offered for a new choice — use ' . implode(' or ', $by) . ' instead.', 'error');
+            redirect('/industry');
+        }
         // The company's industry — wording and accreditation: an administrator,
         // and only once they have confirmed the changes they were shown.
         if (($_POST['do'] ?? '') === 'company') {
@@ -739,7 +896,7 @@ function ops_industry($route, $method) {
             $r = industry_set_company($key);
             if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/industry'); }
             flash('Your company\'s industry is now ' . $r['label'] . '. '
-                . (!empty($r['units_added']) ? 'Quotation and order lines now also offer ' . implode(', ', array_slice(array_values(INDUSTRY_UNITS[$key] ?? []), 0, 4)) . (count(INDUSTRY_UNITS[$key] ?? []) > 4 ? ' and more' : '') . '. ' : '')
+                . (!empty($r['units_added']) ? 'Quotation and order lines now offer ' . implode(', ', array_slice(array_values(INDUSTRY_UNITS[$key] ?? []), 0, 4)) . (count(INDUSTRY_UNITS[$key] ?? []) > 4 ? ' and more' : '') . '. ' : '')
                 . ($r['accreditation_pack'] !== '' ? 'The ' . INDUSTRY_ACCR_LABELS[$r['accreditation_pack']] . ' accreditation rules are ON.' : 'No accreditation rules are on.'));
             redirect('/industry?show=' . $key);
         }
@@ -755,7 +912,7 @@ function ops_industry($route, $method) {
     }
 
     view('ops/industry', [
-        'templates' => INDUSTRY_TEMPLATES,
+        'templates' => industry_choices(),
         'current'   => industry_current(),
         'appliedAt' => (string)setting_get('industry_applied_at', ''),
         'preview'   => industry_preview((string)($_GET['show'] ?? '') ?: (industry_current() ?: 'generic')),

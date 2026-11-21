@@ -422,7 +422,8 @@ function opp_quote_stage_pct($pipelineId = 0) {
     $tpl = null;
     $pname = $pipelineId ? (string) opp_try(fn() => ops_val("SELECT name FROM pipelines WHERE id=?", [(int) $pipelineId]), '') : '';
     if ($pname !== '') foreach (INDUSTRY_TEMPLATES as $t)
-        if (strpos($pname, (string) $t['label'] . ' — ') === 0) { $tpl = $t; break; }
+        foreach (array_merge([(string) $t['label']], (array) ($t['old_labels'] ?? [])) as $lbl)
+            if (strpos($pname, $lbl . ' — ') === 0) { $tpl = $t; break 2; }
     if (!$tpl) $tpl = INDUSTRY_TEMPLATES[(string) (function_exists('setting_get') ? setting_get('industry_template', '') : '')] ?? INDUSTRY_TEMPLATES['generic'] ?? null;
     if (!$tpl || !array_key_exists('quote', $tpl)) return (int) OPP_DEFAULT_STAGES[2][2];
     return $tpl['quote'] === null ? null : (int) $tpl['funnel'][(int) $tpl['quote']][2];

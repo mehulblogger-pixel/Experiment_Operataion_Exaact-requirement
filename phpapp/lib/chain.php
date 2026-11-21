@@ -57,6 +57,13 @@ function chain_stages() {
     $m = CHAIN_STAGES;
     $m['CALL'][0] = TH('call');
     $m['JOB'][0]  = TH('job');
+    //  Industry templates V2.1 (21 Nov 2026): a company that has renamed the
+    //  enquiry, quotation, report or deal (a recruitment agency's "Fee
+    //  Proposal", an auditor's "Audit Report") reads its own word on the strip.
+    //  With nothing renamed the strip keeps its shipped words.
+    $ov = function_exists('term_overrides') ? term_overrides() : [];
+    foreach (['INQUIRY' => 'inquiry', 'QUOTE' => 'quote', 'REPORT' => 'report', 'OPPORTUNITY' => 'opportunity'] as $st => $tk)
+        if (!empty($ov[$tk][0])) $m[$st][0] = TH($tk);
     return $m;
 }
 
