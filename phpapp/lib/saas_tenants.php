@@ -1162,11 +1162,12 @@ function saas_tenant_apply_bootstrap($key = '') {
             if (!empty($p['modules']) && is_array($p['modules']) && function_exists('saas_apply_modules_list')) {
                 // An explicit module list (a self-serve trial gets every module):
                 // switch exactly these on and make them the entitlement ceiling.
-                saas_apply_modules_list($p['modules']);
+                //  Entitlement first, then switch on — so the lists the modules bring see the plan.
                 $ent = array_values(array_filter(array_map('strtolower', $p['modules']),
                     fn($k) => defined('PRODUCT_MODULES') && isset(PRODUCT_MODULES[$k]) && empty(PRODUCT_MODULES[$k][3])));
                 setting_set('saas_entitled_modules', implode(',', $ent));
                 if (function_exists('licence_disabled')) licence_disabled(true);
+                saas_apply_modules_list($p['modules']);
             } elseif (function_exists('saas_apply_plan_modules')) saas_apply_plan_modules((string) ($p['plan'] ?? 'RECRUITMENT'));
         } catch (Throwable $e) {}
         // The storage allowance numbers in force when the company was created.

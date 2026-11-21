@@ -892,9 +892,12 @@ function saas_plan_delta_lines(array $mods, $seats, $packs, $period) {
 function saas_plan_switch_to(array $mods, $seats, $packs = 0) {
     setting_set('saas_storage_packs', (string) max(0, (int) $packs));
     setting_set('saas_paid_modules', implode(',', $mods));
-    saas_apply_modules_list($mods);
+    //  The entitlement is written BEFORE the modules are switched on, so the dropdown
+    //  lists a newly bought module brings (lk_register_module_lists(), run inside
+    //  saas_apply_modules_list) see the new plan and arrive at once (DEF-24 follow-up).
     setting_set('saas_entitled_modules', implode(',', $mods));
     if (function_exists('licence_disabled')) licence_disabled(true);
+    saas_apply_modules_list($mods);
     setting_set('saas_seat_limit', (string) (int) $seats);
     setting_set('saas_seat_floor', (string) (int) $seats);
 }
