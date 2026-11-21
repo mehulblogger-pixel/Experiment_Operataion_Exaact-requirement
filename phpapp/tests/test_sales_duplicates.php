@@ -87,6 +87,9 @@ t_ok(strpos($said($r), 'similar name is already on file') !== false, 'an enquiry
 t_as_admin();
 $lead = lead_create(['company_name' => 'Race Brothers Engineering', 'contact_name' => 'Asha', 'contact_email' => 'asha@race.test']);
 $lid = (int) $lead['id'];
+//  D2 (owner, 21 Nov 2026): only the person handling a lead (or their managers / an administrator) converts it —
+//  so the Business Director who presses Convert is the one handling it here.
+db()->prepare("UPDATE leads SET owner_user_id=? WHERE id=?")->execute([$BD, $lid]);
 $p1 = $partners(); $i1 = (int) ops_val("SELECT COUNT(*) FROM crm_inquiries");
 //  21 Nov 2026 (D1–D4): a NEW customer carries its tax identity — here a recorded exception.
 $c = $cmdFor($BD, 'lead-convert', 'POST', ['id' => $lid], ['id' => $lid, 'tax_status' => 'UNREGISTERED', 'pan' => 'AABPR' . sprintf('%04d', random_int(0, 9999)) . 'R', 'tax_reason' => 'test — below the GST threshold']);

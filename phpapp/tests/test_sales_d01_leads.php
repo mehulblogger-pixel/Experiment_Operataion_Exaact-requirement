@@ -59,7 +59,8 @@ foreach (['leads' => '+ New lead', 'opportunities' => 'New deal'] as $route => $
     t_ok(empty($r['has'][$mark]), "control: an inspector is still refused /$route");
 }
 $before = (int) ops_val("SELECT COUNT(*) FROM leads");
-$drive($ME, 'lead-new', 'POST', [], ['company_name' => 'D01 Prospect Pvt Ltd', 'contact_name' => 'Asha']);
+//  D4 (owner, 21 Nov 2026): the full lead form needs a mobile or an e-mail.
+$drive($ME, 'lead-new', 'POST', [], ['company_name' => 'D01 Prospect Pvt Ltd', 'contact_name' => 'Asha', 'contact_email' => 'asha@d01prospect.example']);
 t_eq((int) ops_val("SELECT COUNT(*) FROM leads"), $before + 1, 'a Marketing Executive records a new lead');
 
 // ---- configuring the pipelines stays company setup -----------------------------------
