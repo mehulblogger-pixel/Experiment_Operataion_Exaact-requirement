@@ -591,6 +591,13 @@ $qVal = quote_validity($q);
       <tr><td class="muted">Payment terms</td><td><?= e($q['payment_terms'] ?: '—') ?></td></tr>
       <tr><td class="muted">Advance</td><td><?= (float)$q['advance_pct'] ?>% <?= $q['advance_required']?'<span class="pill p-warn">required before scheduling</span>':'' ?></td></tr>
       <tr><td class="muted">Deliverable</td><td><?= $q['report_vs_payment']?'<span class="pill p-warn">Report only against payment</span>':'Standard' ?></td></tr>
+      <?php // Closing check (21 Nov 2026): the approved design's "Commercials and totals" shows the
+            // GST beside the before-GST figure on Overview, as the Lines tab does — display only.
+            $ovM = fn($v) => e(cur_sym()) . nf((float) $v, fmod((float) $v, 1) ? 2 : 0);
+            $ovSplit = function_exists('sx_quote_gst_split') ? sx_quote_gst_split($q) : null; ?>
+      <tr><td class="muted">Before GST</td><td><b><?= $ovM($q['subtotal']) ?></b></td></tr>
+      <tr><td class="muted">GST (<?= (float) $q['gst_pct'] ?>%)</td><td><?= $ovM($q['gst_amount']) ?><?php if ($ovSplit && ($ovSplit['mode'] ?? '') !== 'UNKNOWN' && !empty($ovSplit['rows'])): ?> <span class="muted" style="font-size:12px">— <?= e(implode(' + ', array_map(fn($r) => $r[0] . ' ' . cur_sym() . nf((float) $r[1], fmod((float) $r[1], 1) ? 2 : 0), $ovSplit['rows']))) ?></span><?php endif; ?></td></tr>
+      <tr><td class="muted">Total with GST</td><td><b><?= $ovM($q['total_amount']) ?></b></td></tr>
     </table>
   </div>
 </div>

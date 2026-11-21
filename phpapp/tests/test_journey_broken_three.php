@@ -124,7 +124,10 @@ try {
     t_ok(strpos((string)(opp_add_customer($fromLead, [])['err'] ?? ''), 'came from a lead') !== false, 'a deal that came from a lead still goes through the lead\'s own conversion');
     $noname = $mkOpp('No name', 0, ['partner_name' => '']);
     t_ok(!empty(opp_add_customer($noname, ['company_name' => ''])['err']), 'no name, no customer');
-    t_ok(strpos($opp, "ops_require(function_exists('leads_can_edit') && leads_can_edit(), 'Only someone who works leads and deals can add the customer.');") !== false,
+    //  21 Nov 2026 (owner: the Branch Manager and SBU Head open leads and deals READ ONLY, a88afc2):
+    //  the gate also asks leads_works_leads(), so a reader who holds Enquiries edit cannot add a
+    //  customer from a deal they may now only read.
+    t_ok(strpos($opp, "ops_require(function_exists('leads_can_edit') && leads_can_edit() && leads_works_leads(), 'Only someone who works leads and deals can add the customer.');") !== false,
         'who may: exactly the people who may already make a lead a customer — nobody new');
     $view = (string)file_get_contents(__DIR__ . '/../views/ops/opportunity_detail.php');
     t_ok(strpos($view, 'action="/opportunity-add-customer"') !== false && strpos($view, '＋ Add as a customer') !== false, 'the won deal shows the "＋ Add as a customer" form where it used to say only "add them first"');

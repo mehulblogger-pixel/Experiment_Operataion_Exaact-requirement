@@ -214,6 +214,12 @@ $BASELINE = [
     // users.manage.* gate; whocan_can() is either. Asked only inside /who-can,
     // which maps to the Users module like /user-edit. Same answer for a master.
     'whocan_can', 'whocan_can_people', 'whocan_can_roles',
+    // Sales Stage 5 (owner, 21 Nov 2026, Q2) — Category B. sx_contract_money_can()
+    // answers only "may this person see a renewal's contract value" (the same
+    // data.credit / data.revenue / finance.reconcile rights the contract page asks).
+    // It is asked only inside /sales-renewals, whose handler first requires sx_can(),
+    // which refuses without the Sales licence. Same answer for a master as before.
+    'sx_contract_money_can',
 ];
 $unclassified = array_values(array_diff($open, $BASELINE));
 t_ok(!$unclassified,

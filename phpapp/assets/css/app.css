@@ -2211,3 +2211,7 @@ button.sxw-ib{cursor:pointer;font-family:inherit}
 @media (max-width:640px){
   .sxs6-bar{justify-content:stretch}.sxs6-bar>span{flex-basis:100%}.sxs6-bar .btn,.sxs6-bar .sxw-bt{flex:1 1 auto}
 }
+
+/* Closing check (21 Nov 2026): the two lead forms' "attach files" box is at least 36 px tall,
+   like every other control on the Sales screens (the browser's own file box was 28 px). */
+#lf-new-files,#sl_files{min-height:36px;padding:6px 0;box-sizing:border-box}

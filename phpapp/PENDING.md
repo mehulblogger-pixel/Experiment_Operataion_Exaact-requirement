@@ -7,11 +7,11 @@ Living list of things explicitly deferred, so nothing is forgotten. Newest on to
 - **Delivered:** commits a88afc2 (BM / SBU Head leads and deals), 94af1f7 (quotation six tabs), 48af9e4 (Stage 5),
   27a855f (test), bc400d7 (stamp). Test-copy zip `EXAACT-V51.1-Sales-Stage5-TEST-COPY-update.zip`,
   SHA-256 76b93a4b89890694a424acf07f56cc539c0d9f7f691c560879582bed55e49cbc. Owner's 12-check list in report 59 §7.
-- **Robot book:** SAL-134 still expects the Branch Manager to be refused Leads, Deals and Pipelines; update its
-  expected answer to the owner's 21 Nov decision (read only; Pipelines changes still refused). No robot cases yet
+- **Robot book:** DONE (Batch E, 21 Nov) — SAL-134 now expects the Branch Manager to open Leads, Deals and
+  Pipelines read only (Pipelines changes still refused). No robot cases yet
   for Orders & payments, Renewals, Targets — add them with the Stage 6 robot pass.
 
-- **Sales settings screen (Stage 6):** draw the renewal window field. The handler already saves it
+- **Sales settings screen:** DONE (Batch E, 21 Nov) — the renewal window field is drawn. The handler already saves it
   (`renew_days` → setting `sales_renewal_days`, 7–365) and passes `renewDays` / `renewExample` to the view.
 - **Targets in ₹ lakh:** the approved picture shows the boxes in ₹ lakh; they stay in rupees (as before) so a
   figure is never read 1,00,000 times too big or small. Ask the owner if lakh entry is wanted.
@@ -27,10 +27,8 @@ Built to the approved design pack: register on the shared register (item 8), Wit
 (item 9, docs/03), decide quotations and sign contract openings from the Approvals inbox (items
 12–13), DEF-05, DEF-06 (quotations), DEF-18, DEF-23, /crm-reports renamed "Quotation report" (Q5).
 Left for later stages, noted here so nothing is lost:
-- DEF-06 on Orders & payments ("Orders won" and order values) — Stage 5, with DEF-07.
-- The quotation page's inner panels (approval chain, checklist, costing, contract) keep their
-  layout inside the new frame; regrouping them into the six tabs of the design is a further step
-  that needs the robot scripts (which click by wording) to be re-pointed first.
+- DONE (Stage 5): DEF-06 on Orders & payments, with DEF-07.
+- DONE (C2, 94af1f7): the quotation page is in the design's six tabs; robot scripts re-pointed.
 - The costing page, templates, approval rules and checklist keep their own page heads inside the
   Sales frame (restyled); their inner layout is unchanged.
 
@@ -46,9 +44,9 @@ Left for later stages, noted here so nothing is lost:
   deals (Finance gains; BM and BU Head gain the pages of deals they already see in lists), or (b) Finance only —
   which needs a narrower rule than one switch (e.g. a separate "Open the deal pages" switch, given on day one to
   Leads-view holders and Finance). Recommendation: (a). Nothing changed until answered.
-- **Owner decision (2), 21 Nov:** the customer ledger follows branches, BUT central finance (data scope = all
+- **DONE (Stage 5, report 59). Owner decision (2), 21 Nov:** the customer ledger follows branches, BUT central finance (data scope = all
   branches) sees every customer's ledger and details. Build in Stage 5, with the advisor's whole-customer figure.
-- **Owner decision (3), 21 Nov (Finance, DEF-07):** Received = payments + TDS **only where TDS was actually
+- **DONE (Stage 5). Owner decision (3), 21 Nov (Finance, DEF-07):** Received = payments + TDS **only where TDS was actually
   deducted on that receipt** (never an assumed rate); credit notes shown separately. Build in Stage 5.
 - **Inquiry links now open the read-only page** (`/inquiry?id=`): the chain strip, activity list, search,
   advisor and costing page. The edit form is one click further (Edit on the page) for the people who may work it.
@@ -112,9 +110,8 @@ the campaign). Needs the owner's rule before any build. See QA-REPORTS/V51/52 (D
 ## 🧾 Sales defect register — open items (21 Nov 2026)
 
 The full list, with severity and who decides, is `QA-REPORTS/V51/52-Sales-Defect-Register.md`.
-Fixed: DEF-01, 02, 03, 04, 08, 09, 19 (reports 52, 53). Owner decided 21 Nov: DEF-05, 06, 07,
-10, 11, 14, 15, 17, 23 and Stages 2–6 approval (option B) — built in their stages. Still open:
-DEF-12, 13, 16, 18, 20, 21, 22, 24, 25 (DEF-25 = Customer 360 "Owed" branch rule, needs OK).
+Closing check (21 Nov, report 63): DEF-01 to DEF-23 and DEF-25 to DEF-34 fixed. Still open: DEF-24
+only (plan limits on background jobs, outside Sales — needs the owner's OK).
 
 ## 🧾 Quote/contract model — "trace, don't force" (Aug 2026) — DONE
 

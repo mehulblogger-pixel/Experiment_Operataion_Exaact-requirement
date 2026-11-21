@@ -92,7 +92,7 @@ $stageLink = $stageEditorOn && $__s6open('pipelines', (!function_exists('pipe_ca
         <p class="rec-note" style="margin:0 0 8px">A quick lead for an office goes to its salesperson. Empty = whoever types it. Each list shows only people who work for that office.</p>
         <div class="tbl"><table class="rec-tbl"><thead><tr><th scope="col">Branch</th><th scope="col">Person</th></tr></thead><tbody><?php foreach ($offices as $o): ?>
           <tr><td><?= e($o['name']) ?></td><td><select class="form-control" name="own[<?= (int) $o['id'] ?>]" aria-label="Salesperson for <?= e($o['name']) ?>"><option value="">— whoever types it —</option>
-            <?php foreach ($people as $uid => $nm): if (function_exists('sx_user_covers_office') && !sx_user_covers_office($uid, (int) $o['id']) && (int) ($map[(string) (int) $o['id']] ?? 0) !== (int) $uid) continue;   // only people of this office ?><option value="<?= (int) $uid ?>"<?= (int) ($map[(string) (int) $o['id']] ?? 0) === (int) $uid ? ' selected' : '' ?>><?= e($nm) ?></option><?php endforeach; ?></select></td></tr>
+            <?php foreach ($people as $uid => $nm): if (function_exists('sx_user_covers_office') && !sx_user_covers_office($uid, (int) $o['id']) && (int) ($map[(string) (int) $o['id']] ?? 0) !== (int) $uid) continue;   /* only people of this office */ ?><option value="<?= (int) $uid ?>"<?= (int) ($map[(string) (int) $o['id']] ?? 0) === (int) $uid ? ' selected' : '' ?>><?= e($nm) ?></option><?php endforeach; ?></select></td></tr>
         <?php endforeach; ?></tbody></table></div>
         <p class="rec-note">Only people who work for that branch can be picked.</p>
       <?php rec_card_close(); ?>

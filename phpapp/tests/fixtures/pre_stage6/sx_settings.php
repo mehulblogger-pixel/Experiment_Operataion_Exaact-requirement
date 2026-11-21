@@ -33,7 +33,7 @@ $links = [
         <p class="muted" style="margin:0 0 8px;font-size:13px">A quick lead for an office goes to its salesperson. Empty = whoever types it. Each list shows only people who work for that office.</p>
         <div class="tbl"><table class="sxt"><?php foreach ($offices as $o): ?>
           <tr><td><?= e($o['name']) ?></td><td><select class="form-control" name="own[<?= (int) $o['id'] ?>]" aria-label="Salesperson for <?= e($o['name']) ?>"><option value="">— whoever types it —</option>
-            <?php foreach ($people as $uid => $nm): if (function_exists('sx_user_covers_office') && !sx_user_covers_office($uid, (int) $o['id']) && (int) ($map[(string) (int) $o['id']] ?? 0) !== (int) $uid) continue;   // only people of this office ?><option value="<?= (int) $uid ?>"<?= (int) ($map[(string) (int) $o['id']] ?? 0) === (int) $uid ? ' selected' : '' ?>><?= e($nm) ?></option><?php endforeach; ?></select></td></tr>
+            <?php foreach ($people as $uid => $nm): if (function_exists('sx_user_covers_office') && !sx_user_covers_office($uid, (int) $o['id']) && (int) ($map[(string) (int) $o['id']] ?? 0) !== (int) $uid) continue;   /* only people of this office */ ?><option value="<?= (int) $uid ?>"<?= (int) ($map[(string) (int) $o['id']] ?? 0) === (int) $uid ? ' selected' : '' ?>><?= e($nm) ?></option><?php endforeach; ?></select></td></tr>
         <?php endforeach; ?></table></div></div>
     </div>
     <div class="sxactions"><button class="btn" type="submit">Save Sales settings</button></div>
