@@ -6,7 +6,14 @@
 $r = $edit ?: [];
 $showForm = $edit || $new;
 $val = fn($k, $d = '') => htmlspecialchars((string)($r[$k] ?? $d), ENT_QUOTES);
+//  Stage 6 of the Sales redesign (owner, 21 Nov 2026): the same rules screen in the Sales
+//  workspace look (old page: tests/fixtures/pre_stage6/stage_gates.php). The approver column
+//  names the role in words, and a rule that has already held real requests offers
+//  "Switch off" — which is what the server does with it — instead of "Remove".
+$__s6 = !(function_exists('is_embed') && is_embed());
+if ($__s6) require_once __DIR__ . '/_sxw_ui.php';
 ?>
+<?php if ($__s6): ?><div class="rec sxw has-bn sxq4 sxq6"><?php sxw_nav('/stage-gates'); ?><?php endif; ?>
 <div class="master-head">
   <div><h1>Approval rules for deal stages</h1>
   <p class="sub" style="margin:2px 0 0">Who has to agree before a deal moves. With no rules here nothing is gated and the pipeline behaves exactly as it does today — a gate is something you choose, not something the software insists on.</p></div>
@@ -161,14 +168,15 @@ $val = fn($k, $d = '') => htmlspecialchars((string)($r[$k] ?? $d), ENT_QUOTES);
             <td><?= (int)$g['stage_id'] > 0 ? e((string)$g['stage_name']) : e('Any ' . strtolower((string)$g['stage_kind']) . ' stage') ?></td>
             <td><?= !empty($g['approver_user_id'])
                     ? e(trim(((string)($g['first_name'] ?? '')) . ' ' . ((string)($g['last_name'] ?? ''))) ?: (string)$g['username'])
-                    : (trim((string)$g['approver_role']) !== '' ? e((string)$g['approver_role']) : '<span class="muted">Quote approvers</span>') ?></td>
+                    : (trim((string)$g['approver_role']) !== '' ? e((string)($roles[(string)$g['approver_role']] ?? $g['approver_role'])) : '<span class="muted">Quote approvers</span>') ?></td>
             <td style="text-align:right"><?= (int)$g['used'] ?></td>
             <td style="white-space:nowrap">
               <a class="btn small secondary" href="/stage-gates?edit=<?= (int)$g['id'] ?>">Edit</a>
+              <?php $__used = (int)$g['used'] > 0; ?>
               <form method="post" action="/stage-gate-delete" style="display:inline"
-                    onsubmit="return confirm('Remove this rule? Deals it would have gated will move without approval.')">
+                    onsubmit="return confirm('<?= $__used ? 'Switch this rule off? It has held real requests, so it is kept (switched off) to keep the history. Deals it would have gated will move without approval.' : 'Remove this rule? Deals it would have gated will move without approval.' ?>')">
                 <input type="hidden" name="id" value="<?= (int)$g['id'] ?>">
-                <button class="btn small secondary" type="submit">Remove</button>
+                <button class="btn small secondary" type="submit"<?= $__used ? ' title="It has held real requests, so it is switched off rather than deleted"' : '' ?>><?= $__used ? 'Switch off' : 'Remove' ?></button>
               </form>
             </td>
           </tr>
@@ -184,3 +192,4 @@ $val = fn($k, $d = '') => htmlspecialchars((string)($r[$k] ?? $d), ENT_QUOTES);
     keeps its explanation.
   </p>
 <?php endif; ?>
+<?php if ($__s6): ?></div><?php sxw_bottom('/stage-gates'); ?><?php endif; ?>

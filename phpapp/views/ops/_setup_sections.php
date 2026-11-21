@@ -16,7 +16,9 @@ foreach ($sections as $sec):
       <?php if (!$secCan && (!empty($sec['questions']) || !empty($sec['editor']))): ?>
         <p class="muted" style="margin:0 0 4px;font-size:13px">🔒 This rule is changed by someone who may change the company settings (an administrator). It is shown here so you know what applies.</p>
       <?php endif; ?>
-      <?php if (($sec['editor'] ?? '') === 'quote_levels') { $mode = 'rows'; include __DIR__ . '/crm/approval_levels_inline.php'; } ?>
+      <?php if (($sec['editor'] ?? '') === 'quote_levels'): ?>
+        <p class="muted sq-saves" style="margin:0 0 6px;font-size:13px">Each level below is saved by its own <b>Save</b> (or <b>Add this level</b>) button, straight away. The questions on this page are saved together by the button at the bottom.</p>
+      <?php $mode = 'rows'; include __DIR__ . '/crm/approval_levels_inline.php'; endif; ?>
       <?php foreach ($sec['questions'] as $q): $cur = setupqa_value($q); ?>
         <fieldset style="border:0;padding:0;margin:14px 0 0"<?= !empty($q['only_when']) ? ' data-only-when="' . e($q['only_when'][0]) . '" data-only-value="' . e($q['only_when'][1]) . '"' : '' ?>>
           <legend style="font-weight:600;font-size:15px;margin-bottom:4px"><?= e($q['ask']) ?></legend>

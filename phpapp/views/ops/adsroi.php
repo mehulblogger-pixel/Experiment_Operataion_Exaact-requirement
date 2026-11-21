@@ -12,7 +12,13 @@ $mult  = function ($v) {
     $s = nf((float)$v, 1) . '×';
     return (float)$v >= 1 ? '<b>' . e($s) . '</b>' : '<b style="color:var(--bad,#b42318)">' . e($s) . '</b>';
 };
+//  Stage 6 of the Sales redesign (owner, 21 Nov 2026): the same report inside the Sales
+//  workspace look. Figures, columns, the CSV and who sees what (DEF-01) are unchanged; the
+//  old page is kept in tests/fixtures/pre_stage6/adsroi.php.
+$__s6 = !(function_exists('is_embed') && is_embed());
+if ($__s6) require_once __DIR__ . '/_sxw_ui.php';
 ?>
+<?php if ($__s6): ?><div class="rec sxw has-bn sxq4 sxq6"><?php sxw_nav('/ads-roi'); ?><?php endif; ?>
 <div class="master-head">
   <div><h1>What the advertising actually earned</h1>
   <p class="sub" style="margin:2px 0 0">Not conversion value from a pixel, and not closed-won from a text box. This follows campaign → lead → deal → order → invoice → <b>receipt</b>, and reports the four figures separately, because averaging them is how a campaign that brings in customers who never pay goes on being funded.</p></div>
@@ -152,7 +158,9 @@ $mult  = function ($v) {
       <li><b>Nothing is split across touchpoints.</b> A lead came from one campaign and that campaign is credited with all of it. Fractional multi-touch attribution is a guess, and a guess does not belong in the same column as a receipt.</li>
       <li><b>“In play” is a forecast</b> and is kept out of every return figure on this screen. It is shown so a campaign that is working but has not closed yet is not mistaken for one that failed.</li>
       <li><b>A dash is not a zero.</b> A campaign with no leads yet shows its spend and a dash. Two weeks of spend in a trade with a three-month sales cycle has not failed.</li>
+      <li><b>A deal won through its quotation and contract is followed</b> to the work order raised against them, even when the deal itself was never linked to that work order.</li>
       <li><b>Breaks in the chain are named, not absorbed.</b> Revenue that cannot be traced from campaign to receipt is reported as the break it is, with a link to the screen that closes it — quietly counting it would flatter the return.</li>
     </ul>
   </div>
 <?php endif; ?>
+<?php if ($__s6): ?></div><?php sxw_bottom('/ads-roi'); ?><?php endif; ?>

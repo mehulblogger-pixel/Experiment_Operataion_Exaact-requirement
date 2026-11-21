@@ -8,7 +8,8 @@ $a = (string)file_get_contents(__DIR__ . '/../lib/areas.php');
 
 // Both now appear in the Insights block.
 $insights = substr($a, strpos($a, "case 'insights':"), 1500);
-t_ok(strpos($insights, "'Sales dashboard', '/crm-dashboard'") !== false, 'the Sales dashboard now lives under Insights');
+//  Stage 6 (owner, 21 Nov 2026, DEF-17): /crm-dashboard is now called the "Sales funnel report".
+t_ok(strpos($insights, "'Sales funnel report', '/crm-dashboard'") !== false, 'the Sales funnel report (was "Sales dashboard") lives under Insights');
 t_ok(strpos($insights, "'Management dashboard', '/mis'") !== false, 'the Management dashboard (MIS) now lives under Insights');
 
 // And are gone from their old areas.

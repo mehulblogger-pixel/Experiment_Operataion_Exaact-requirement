@@ -59,7 +59,18 @@ try {
         t_eq($n['refused'], $o['refused'], "$label · $pg — refused as before");
         $fd = []; foreach ($o['figs'] as $k => $v) if (($n['figs'][$k] ?? null) !== $v) $fd[] = "$k: old \"$v\" new \"" . ($n['figs'][$k] ?? '—') . '"';
         t_eq($fd, [], "$label · $pg — all " . count($o['figs']) . ' figures read the same');
-        t_eq(array_values(array_diff(array_unique($o['hrefs']), $n['hrefs'])), [], "$label · $pg — every link of the old page is on the new one");
+        //  Stage 6 (owner, 21 Nov 2026 — test-book finding F-02): a Sales screen whose door (the route's
+        //  module gate) refuses this person is no longer offered as a tile or in the Sales bar.
+        $refusedAtDoor = function ($href) use ($uid) {
+            if (!in_array($href, ['/leads', '/opportunities', '/quotes', '/inquiries', '/clients?view=sales'], true)) return false;
+            $keep = $_SESSION['uid'] ?? null; bbv_as($uid);
+            $base = ltrim((string) strtok($href, '?'), '/');
+            $mod = ops_route_module_map()[$base] ?? ops_module_family($base);
+            $no = $mod && !can("mod.$mod.view");
+            if ($keep) bbv_as($keep);
+            return $no;
+        };
+        t_eq(array_values(array_filter(array_diff(array_unique($o['hrefs']), $n['hrefs']), fn($h) => !$refusedAtDoor($h))), [], "$label · $pg — every link of the old page is on the new one (except screens that refuse this person at the door — F-02)");
         t_eq(array_values(array_diff(array_unique($o['forms']), $n['forms'])), [], "$label · $pg — every form (same address and fields) is on the new one");
         t_eq(array_values(array_diff($o['money'], $n['money'])), [], "$label · $pg — every amount of the old page is on the new one");
         return [$o, $n];

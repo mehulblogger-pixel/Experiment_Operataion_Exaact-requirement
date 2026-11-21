@@ -136,11 +136,17 @@ function roi_chain($fromDate = '', $toDate = '', $withMoney = null) {
             if ($o['status'] !== 'WON') continue;
             $r['n_won']++; $r['opp_won'] += (float)$o['value'];
             $call = (int)($o['call_id'] ?? 0);
-            if (!$call) { $r['break'] = 'won-no-order'; continue; }
+            //  DEF-22 (owner, 21 Nov 2026 — approved item 20): a deal won through its
+            //  quotation → contract → work order carries no work-order link of its own,
+            //  and was reported as "never ordered". Follow the quotation and contract
+            //  links the work order already holds before calling it a break.
+            $calls = $call ? [$call] : roi_calls_via_quote((int)($o['id'] ?? 0));
+            if (!$calls) { $r['break'] = 'won-no-order'; continue; }
             // Whether an order was invoiced, and whether it was paid, are
             // receivables: not asked without the right to see them.
             if (!$withMoney) continue;
-            $invs = $invByJob[$call] ?? [];
+            $invs = [];
+            foreach ($calls as $c) foreach ($invByJob[$c] ?? [] as $iid => $inv) $invs[$iid] = $inv;   // one invoice counted once
             if (!$invs) { $r['break'] = 'order-no-invoice'; continue; }
             foreach ($invs as $inv) {
                 $r['invoiced'] += (float)$inv['total'];
@@ -155,6 +161,32 @@ function roi_chain($fromDate = '', $toDate = '', $withMoney = null) {
         $out[] = $r;
     }
     return $out;
+}
+
+// DEF-22 — the work orders a won deal reached through its quotation and contract,
+// when the deal itself holds no work-order link. A work order records the quotation
+// it was raised from (calls.quotation_id — any revision of the deal's quotation) and
+// the contract number it runs under (calls.contract_number). Read-only; the deal's
+// own branch scope has already been applied to the deal.
+function roi_calls_via_quote($oppId) {
+    if ($oppId <= 0 || !function_exists('opp_quotes')) return [];
+    $qs = roi_try(fn() => opp_quotes($oppId), []) ?: [];
+    if (!$qs) return [];
+    $nos = []; $contracts = [];
+    foreach ($qs as $q) {
+        if (trim((string)($q['quote_no'] ?? '')) !== '') $nos[] = (string)$q['quote_no'];
+        if (trim((string)($q['contract_number'] ?? '')) !== '') $contracts[] = (string)$q['contract_number'];
+    }
+    $ids = [];
+    if ($nos) foreach (roi_try(fn() => ops_all("SELECT id FROM quotations WHERE quote_no IN (" . implode(',', array_fill(0, count($nos), '?')) . ")", $nos), []) ?: [] as $q) $ids[] = (int)$q['id'];
+    foreach ($qs as $q) $ids[] = (int)$q['id'];
+    $ids = array_values(array_unique(array_filter($ids)));
+    $w = []; $a = [];
+    if ($ids) $w[] = "quotation_id IN (" . implode(',', $ids) . ")";
+    if ($contracts) { $w[] = "contract_number IN (" . implode(',', array_fill(0, count($contracts), '?')) . ")"; $a = array_merge($a, $contracts); }
+    if (!$w) return [];
+    return array_values(array_unique(array_map(fn($c) => (int)$c['id'],
+        roi_try(fn() => ops_all("SELECT id FROM calls WHERE " . implode(' OR ', $w), $a), []) ?: [])));
 }
 
 // ---- Rolled up per campaign -------------------------------------------------

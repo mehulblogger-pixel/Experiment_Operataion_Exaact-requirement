@@ -1,3 +1,13 @@
+<?php
+//  Stage 6 of the Sales redesign (owner, 21 Nov 2026): one funnel's stages in the Sales
+//  workspace look, with a way back to the list. Every field, name, button and rule is the
+//  one it had (old page: tests/fixtures/pre_stage6/pipeline_edit.php). On a phone each stage
+//  is a small card instead of an eight-column table.
+$__s6 = !(function_exists('is_embed') && is_embed());
+if ($__s6) require_once __DIR__ . '/_sxw_ui.php';
+?>
+<?php if ($__s6): ?><div class="rec sxw has-bn sxq4 sxq6"><?php sxw_nav('/pipelines'); ?>
+  <a class="sxw-lnk sxq6-back" href="/pipelines"><?= rec_icon('left', 's') ?>All pipelines &amp; funnels</a><?php endif; ?>
 <div class="master-head">
   <div><h1><?= e($p['name']) ?></h1>
   <p class="sub" style="margin:2px 0 0"><?= e($p['entity_kind'] === 'LEAD' ? 'Lead pipeline' : TH('opportunity') . ' funnel') ?>
@@ -19,11 +29,11 @@
     <div class="ff" style="flex:1;min-width:220px"><label for="pname">Name</label>
       <input class="form-control" id="pname" name="pipeline_name" value="<?= e($p['name']) ?>" maxlength="120" <?= $canEdit?'':'disabled' ?>></div>
     <div class="ff-check"><input type="checkbox" name="pipe_active" id="pactive" value="1" <?= (int)$p['active']?'checked':'' ?> <?= $canEdit?'':'disabled' ?>>
-      <label for="pactive">In use</label></div>
+      <label for="pactive">In use (offered for new work)</label></div>
   </div>
 
   <div class="dt-scroll">
-    <table class="dt">
+    <table class="dt sxq6-stages">
       <caption class="sr-only">Stages, in order</caption>
       <thead><tr>
         <th scope="col" style="width:76px">Order</th>
@@ -31,7 +41,7 @@
         <th scope="col">What it means</th>
         <th scope="col" class="num">Probability</th>
         <th scope="col" class="num">Days allowed</th>
-        <th scope="col">In use</th>
+        <th scope="col">Active</th>
         <th scope="col" class="num">On it now</th>
         <?php if ($canEdit): ?><th scope="col"></th><?php endif; ?>
       </tr></thead>
@@ -40,25 +50,25 @@
         <tr><td colspan="8" class="muted" style="padding:18px;text-align:center">No stages yet — add the first one below.</td></tr>
       <?php else: foreach ($stages as $i => $s): $sid = (int)$s['id']; ?>
         <tr<?= (int)$s['active'] ? '' : ' style="opacity:.55"' ?>>
-          <td><label class="sr-only" for="o-<?= $sid ?>">Order</label>
+          <td data-l="Order"><label class="sr-only" for="o-<?= $sid ?>">Order</label>
               <input class="form-control" id="o-<?= $sid ?>" name="order[<?= $sid ?>]" type="number" min="1" step="1" value="<?= $i + 1 ?>" style="width:64px;text-align:right" title="Change the number to move this stage, then Save" <?= $canEdit?'':'disabled' ?>></td>
-          <td><label class="sr-only" for="n-<?= $sid ?>">Stage name</label>
+          <td data-l="Stage name"><label class="sr-only" for="n-<?= $sid ?>">Stage name</label>
               <input class="form-control" id="n-<?= $sid ?>" name="name[<?= $sid ?>]" value="<?= e($s['name']) ?>" maxlength="120" style="min-width:170px" <?= $canEdit?'':'disabled' ?>></td>
-          <td><label class="sr-only" for="k-<?= $sid ?>">What this stage means</label>
+          <td data-l="What it means"><label class="sr-only" for="k-<?= $sid ?>">What this stage means</label>
               <select class="form-control" id="k-<?= $sid ?>" name="kind[<?= $sid ?>]" <?= $canEdit?'':'disabled' ?>>
                 <?php foreach ($kinds as $k => $lbl): ?>
                   <option value="<?= e($k) ?>" <?= $s['kind']===$k?'selected':'' ?>><?= e($lbl) ?></option>
                 <?php endforeach; ?>
               </select></td>
-          <td class="num"><label class="sr-only" for="p-<?= $sid ?>">Probability</label>
+          <td class="num" data-l="Probability"><label class="sr-only" for="p-<?= $sid ?>">Probability</label>
               <input class="form-control" id="p-<?= $sid ?>" name="probability[<?= $sid ?>]" type="number" min="0" max="100"
                      value="<?= (int)$s['probability'] ?>" style="width:78px;text-align:right" <?= $canEdit?'':'disabled' ?>>%</td>
-          <td class="num"><label class="sr-only" for="s-<?= $sid ?>">Days allowed in this stage</label>
+          <td class="num" data-l="Days allowed"><label class="sr-only" for="s-<?= $sid ?>">Days allowed in this stage</label>
               <input class="form-control" id="s-<?= $sid ?>" name="sla_days[<?= $sid ?>]" type="number" min="0"
                      value="<?= (int)$s['sla_days'] ?>" style="width:70px;text-align:right" <?= $canEdit?'':'disabled' ?>></td>
-          <td><label class="sr-only" for="a-<?= $sid ?>">In use</label>
+          <td data-l="Active"><label class="sr-only" for="a-<?= $sid ?>">In use</label>
               <input class="form-control" id="a-<?= $sid ?>" type="checkbox" name="active[<?= $sid ?>]" value="1" <?= (int)$s['active']?'checked':'' ?> <?= $canEdit?'':'disabled' ?>></td>
-          <td class="num"><?= (int)$s['in_use'] ? '<b>' . (int)$s['in_use'] . '</b>' : '<span class="muted">—</span>' ?></td>
+          <td class="num" data-l="On it now"><?= (int)$s['in_use'] ? '<b>' . (int)$s['in_use'] . '</b>' : '<span class="muted">—</span>' ?></td>
           <?php if ($canEdit): ?>
             <td><?php if (!(int)$s['in_use']): ?>
               <button class="btn small danger" form="del-<?= $sid ?>" onclick="return confirm('Remove this stage?')">Remove</button>
@@ -114,3 +124,4 @@
     <?php foreach ($others as $o): ?><a href="/pipeline?id=<?= (int)$o['id'] ?>" style="margin-right:10px"><?= e($o['name']) ?></a><?php endforeach; ?>
   </p>
 <?php endif; ?>
+<?php if ($__s6): ?></div><?php sxw_bottom('/pipelines'); ?><?php endif; ?>

@@ -510,7 +510,7 @@
         <?php if (count($noContractDeals) > 8): ?><p class="muted" style="margin:6px 0 0">+<?= count($noContractDeals) - 8 ?> more.</p><?php endif; ?>
       </div>
       <?php endif; ?>
-      <div class="ctitle" style="margin-top:22px"><h3>Sales pipeline</h3><a href="/quotes"><?= e(THP('quote')) ?> →</a><?php if (can('mod.crm_reports.view')): ?> <a href="/crm-reports" style="margin-left:8px">Sales dashboard →</a><?php endif; ?></div>
+      <div class="ctitle" style="margin-top:22px"><h3>Sales pipeline</h3><a href="/quotes"><?= e(THP('quote')) ?> →</a><?php if (can('mod.crm_reports.view')): ?> <a href="/crm-reports" style="margin-left:8px">Quotation report →</a><?php endif; ?></div>
       <div class="qcards">
         <a class="qcard tone-info" href="/quotes?v=open"><div class="qic">📝</div><div class="qn"><?= (int)$qs['open_n'] ?></div><div class="ql">Open quotes</div></a>
         <a class="qcard tone-warn" href="/quotes?v=pending"><div class="qic">◷</div><div class="qn"><?= (int)$qs['sent_n'] ?></div><div class="ql">Awaiting reply</div></a>
