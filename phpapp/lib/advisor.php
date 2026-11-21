@@ -548,6 +548,13 @@ function adv_draft_invoices() {
 function adv_ad_spend_dry() {
     if (!function_exists('ads_on') || !ads_on() || !function_exists('roi_by_campaign')) return null;
     if (!adv_on('leads')) return null;
+    // DEF-01: the advertising return now counts only the viewer's branches'
+    // leads, while spend is the whole campaign's. For someone limited to some
+    // branches "produced no lead at all" could simply mean "in another branch",
+    // so this finding is made only for a viewer who sees every branch. The
+    // amount not yet received is counted only for someone who may see
+    // receivables (roi_by_campaign() leaves it at zero otherwise).
+    if (function_exists('roi_whole_company') && !roi_whole_company()) return null;
     $rows = []; $wasted = 0.0; $noLead = 0; $uncollected = 0.0;
     foreach (adv_try(fn() => roi_by_campaign(), []) ?: [] as $c) {
         if ((float)$c['spend'] <= 0) continue;

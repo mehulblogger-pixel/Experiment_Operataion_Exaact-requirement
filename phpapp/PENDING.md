@@ -2,6 +2,20 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 📣 Advertising spend by branch — parked by the owner (21 Nov 2026)
+
+Owner: "Let us do it later." Ads Pro spend (`ads_spend`) is per campaign, not per branch, so
+since DEF-01 a branch-limited person sees their branches' leads and deals but no cost per lead
+or return per rupee (`roi_whole_company()`). Later option: split a campaign's spend across
+branches (a setting, e.g. by each branch's share of the campaign's leads, or by a branch tag on
+the campaign). Needs the owner's rule before any build. See QA-REPORTS/V51/52 (DEF-01).
+
+## 🧾 Sales defect register — open items (21 Nov 2026)
+
+The full list, with severity and who decides, is `QA-REPORTS/V51/52-Sales-Defect-Register.md`.
+Fixed: DEF-01. Owner decisions asked 21 Nov: DEF-05, 06, 07, 10, 11, 14, 15, 17, 23 and how
+Stages 2–6 are approved. The rest are to be fixed in the Sales redesign stages.
+
 ## 🧾 Quote/contract model — "trace, don't force" (Aug 2026) — DONE
 
 Decision (user-approved): a quotation is never mandatory before an order, but must always

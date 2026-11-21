@@ -2,6 +2,11 @@
 // Four columns that are never blended: spent, in play, invoiced, collected.
 // The distance between the last two is the finding.
 $money = fn($v) => e(fmoney((float)$v));
+// DEF-01: $showMoney — invoiced / collected are receivables (ar_can()); $whole —
+// the viewer sees every branch, so spend ÷ leads is a true ratio. Both are set
+// by ops_adsroi(); a missing value means the safe answer (not shown).
+$showMoney = !empty($money_ok);
+$whole     = !empty($whole_ok);
 $mult  = function ($v) {
     if ($v === null) return '<span class="muted">—</span>';
     $s = nf((float)$v, 1) . '×';
@@ -38,16 +43,34 @@ $mult  = function ($v) {
   </div>
 <?php else: ?>
 
+  <?php if (!$showMoney || !$whole): ?>
+    <div class="panel" style="margin-top:16px;font-size:13px" role="note">
+      <?php if (!$whole): ?><p style="margin:0"><b>Leads and deals are your branches' only.</b> Spend is for the whole campaign, so cost per lead and the return per rupee are not shown here — they would divide the company's spend by your branches' leads.</p><?php endif; ?>
+      <?php if (!$showMoney): ?><p style="margin:<?= $whole ? '0' : '6px 0 0' ?>">Invoiced and collected amounts are shown only to people who may see receivables.</p><?php endif; ?>
+    </div>
+  <?php endif; ?>
+
+  <?php if (!$showMoney): ?>
+  <div class="qcards" style="margin-top:16px">
+    <div class="qcard"><div class="qic">₹</div><div class="qn" style="font-size:19px"><?= $money($tot['spend']) ?></div><div class="ql">Spent on advertising</div></div>
+    <div class="qcard"><div class="qic">＋</div><div class="qn" style="font-size:19px"><?= (int)$tot['leads'] ?></div><div class="ql">Leads from it</div></div>
+    <div class="qcard tone-ok"><div class="qic">✓</div><div class="qn" style="font-size:19px"><?= (int)$tot['won'] ?></div><div class="ql">Deals won</div></div>
+    <div class="qcard"><div class="qic">↗</div><div class="qn" style="font-size:19px"><?= $money($tot['in_play']) ?></div><div class="ql">Open pipeline from them</div></div>
+  </div>
+  <?php else: ?>
   <div class="qcards" style="margin-top:16px">
     <div class="qcard"><div class="qic">₹</div><div class="qn" style="font-size:19px"><?= $money($tot['spend']) ?></div><div class="ql">Spent on advertising</div></div>
     <div class="qcard"><div class="qic">↗</div><div class="qn" style="font-size:19px"><?= $money($tot['invoiced']) ?></div><div class="ql">Invoiced from those leads</div></div>
     <div class="qcard tone-ok"><div class="qic">✓</div><div class="qn" style="font-size:19px"><?= $money($tot['collected']) ?></div><div class="ql">Actually collected</div></div>
     <div class="qcard <?= $tot['uncollected'] > 0 ? 'tone-bad' : 'tone-ok' ?>"><div class="qic">!</div><div class="qn" style="font-size:19px"><?= $money($tot['uncollected']) ?></div><div class="ql">Invoiced but not received</div></div>
   </div>
+  <?php endif; ?>
 
   <div class="panel" style="margin-top:12px">
     <p style="margin:0;font-size:14px">
-      <?php if (!empty($tot['nothing_closed'])): ?>
+      <?php if (!$showMoney || !$whole): ?>
+        <b><?= $money($tot['spend']) ?> spent; <?= (int)$tot['won'] ?> <?= (int)$tot['won'] === 1 ? 'deal' : 'deals' ?> won from these leads so far.</b>
+      <?php elseif (!empty($tot['nothing_closed'])): ?>
         <b><?= $money($tot['spend']) ?> spent, and nothing has closed from it yet.</b>
         That is not the same as a return of zero, so no return is shown. It becomes answerable the moment the first
         deal from these leads is won and billed
@@ -64,7 +87,7 @@ $mult  = function ($v) {
     </p>
     <p class="muted" style="margin:8px 0 0;font-size:12.5px">
       <?= (int)$tot['leads'] ?> leads across <?= (int)$tot['campaigns'] ?> campaigns, <?= (int)$tot['won'] ?> won.
-      <?= $tot['cpl'] !== null ? 'Cost per lead ' . $money($tot['cpl']) . ' — the figure every ad platform shows you, and the least useful one here.' : '' ?>
+      <?= $whole && $tot['cpl'] !== null ? 'Cost per lead ' . $money($tot['cpl']) . ' — the figure every ad platform shows you, and the least useful one here.' : '' ?>
       Still open and not counted above: <?= $money($tot['in_play']) ?> of pipeline.
     </p>
   </div>
@@ -79,9 +102,11 @@ $mult  = function ($v) {
           <th scope="col" style="text-align:right">Leads</th>
           <th scope="col" style="text-align:right">Won</th>
           <th scope="col" style="text-align:right">In play</th>
+          <?php if ($showMoney): ?>
           <th scope="col" style="text-align:right">Invoiced</th>
           <th scope="col" style="text-align:right">Collected</th>
-          <th scope="col" style="text-align:right">Per ₹ spent</th>
+          <?php endif; ?>
+          <?php if ($showMoney && $whole): ?><th scope="col" style="text-align:right">Per ₹ spent</th><?php endif; ?>
         </tr></thead>
         <tbody>
         <?php foreach ($by as $b): ?>
@@ -103,6 +128,7 @@ $mult  = function ($v) {
             <td style="text-align:right"><?= (int)$b['leads'] ?></td>
             <td style="text-align:right"><?= (int)$b['won'] ?></td>
             <td style="text-align:right"><?= $b['in_play'] > 0 ? '<span class="muted">' . $money($b['in_play']) . '</span>' : '<span class="muted">—</span>' ?></td>
+            <?php if ($showMoney): ?>
             <td style="text-align:right"><?= $b['invoiced'] > 0 ? $money($b['invoiced']) : '<span class="muted">—</span>' ?></td>
             <td style="text-align:right">
               <?= $b['collected'] > 0 ? '<b>' . $money($b['collected']) . '</b>' : '<span class="muted">—</span>' ?>
@@ -110,7 +136,8 @@ $mult  = function ($v) {
                 <div class="muted" style="font-size:12px"><?= $money($b['uncollected']) ?> outstanding</div>
               <?php endif; ?>
             </td>
-            <td style="text-align:right"><?= $mult($b['roi_cash']) ?></td>
+            <?php endif; ?>
+            <?php if ($showMoney && $whole): ?><td style="text-align:right"><?= $mult($b['roi_cash']) ?></td><?php endif; ?>
           </tr>
         <?php endforeach; ?>
         </tbody>
@@ -121,7 +148,7 @@ $mult  = function ($v) {
   <div class="panel" style="margin-top:16px">
     <b style="font-size:13.5px">How to read this, and what it is not</b>
     <ul class="muted" style="margin:8px 0 0;padding-left:20px;font-size:12.5px;line-height:1.6">
-      <li><b>Per ₹ spent is cash, not invoices.</b> A campaign at 8× on paper and 2× in cash is bringing you customers who do not pay. That is a reason to stop it, and no advertising dashboard will ever tell you, because none of them can see a bank statement.</li>
+<?php if ($showMoney && $whole): ?>      <li><b>Per ₹ spent is cash, not invoices.</b> A campaign at 8× on paper and 2× in cash is bringing you customers who do not pay. That is a reason to stop it, and no advertising dashboard will ever tell you, because none of them can see a bank statement.</li><?php endif; ?>
       <li><b>Nothing is split across touchpoints.</b> A lead came from one campaign and that campaign is credited with all of it. Fractional multi-touch attribution is a guess, and a guess does not belong in the same column as a receipt.</li>
       <li><b>“In play” is a forecast</b> and is kept out of every return figure on this screen. It is shown so a campaign that is working but has not closed yet is not mistaken for one that failed.</li>
       <li><b>A dash is not a zero.</b> A campaign with no leads yet shows its spend and a dash. Two weeks of spend in a trade with a three-month sales cycle has not failed.</li>

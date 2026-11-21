@@ -45,6 +45,27 @@ function roi_try($fn, $fb = null) { try { return $fn(); } catch (Throwable $e) {
 
 function roi_can() { return function_exists('ads_can_view') && ads_can_view(); }
 
+// DEF-01 (security review, 21 Nov 2026; owner: "proceed"). Opening this screen
+// needs only Leads view, but INVOICED and COLLECTED are receivables, and the
+// permission matrix (docs/02) shows receivables only to ar_can(): Finance
+// reconcile, credit data, or a master, with Invoicing in the plan. Without it
+// the screen still shows spend, leads, deals won and open pipeline; the money
+// figures are not even read.
+function roi_money_can() { return function_exists('ar_can') && ar_can(); }
+
+// The spend in ads_spend belongs to a campaign, not to a branch. The leads and
+// deals are now limited to the viewer's own branches (as their registers are),
+// so a branch-limited viewer would divide WHOLE-COMPANY spend by THEIR
+// branches' leads: a cost per lead and a return that are both wrong. Those
+// ratios are shown only to someone who sees every branch (or a run with no
+// signed-in person, which has always been unscoped).
+function roi_whole_company() {
+    if (function_exists('is_master') && is_master()) return true;
+    $off = function_exists('scope_offices') ? scope_offices() : 'ALL';
+    if ($off === 'ALL' || !is_array($off)) return true;
+    return !$off && !(function_exists('scope_needs_home') && scope_needs_home());
+}
+
 // Is there anything to show at all? The screen and its nav item stay hidden on
 // an install that does not advertise, rather than offering an empty report.
 function roi_available() {
@@ -60,12 +81,18 @@ function roi_available() {
 // single query per stage rather than a loop of queries, and deliberately LEFT
 // JOINed the whole way: a lead that stopped at stage one must still appear, or
 // the denominator quietly shrinks and every ratio flatters itself.
-function roi_chain($fromDate = '', $toDate = '') {
+function roi_chain($fromDate = '', $toDate = '', $withMoney = null) {
     ads_migrate();
+    $withMoney = $withMoney === null ? roi_money_can() : (bool) $withMoney;
     $w = []; $a = [];
     if ($fromDate !== '') { $w[] = "al.imported_at >= ?"; $a[] = $fromDate; }
     if ($toDate !== '')   { $w[] = "al.imported_at <= ?"; $a[] = $toDate . 'T23:59:59'; }
-    $where = $w ? 'WHERE ' . implode(' AND ', $w) : '';
+    // DEF-01: the viewer's branches only, by the same clause the lead register
+    // uses (a lead with no branch, or an advertising lead not yet in the CRM,
+    // stays visible, exactly as it does there).
+    [$sw, $sa] = scope_office_clause('l.office_id');
+    $w[] = $sw; $a = array_merge($a, $sa);
+    $where = 'WHERE ' . implode(' AND ', $w);
 
     $rows = roi_try(fn() => ops_all(
         "SELECT al.id, al.campaign_id, al.campaign_name, al.platform, al.lead_id,
@@ -79,15 +106,16 @@ function roi_chain($fromDate = '', $toDate = '') {
 
     // Opportunities converted from those leads.
     $opps = [];
+    [$ow, $oa] = scope_office_clause('o.office_id');
     foreach (roi_try(fn() => ops_all(
         "SELECT o.id, o.lead_id, o.value, o.status, o.call_id FROM opportunities o
-         WHERE o.lead_id IS NOT NULL"), []) ?: [] as $o) $opps[(int)$o['lead_id']][] = $o;
+         WHERE o.lead_id IS NOT NULL AND $ow", $oa), []) ?: [] as $o) $opps[(int)$o['lead_id']][] = $o;
 
     // Invoices, and what has actually been received against them. books_settled()
     // is the same function the ledger and the ageing use, so the three cannot
     // disagree about what a customer owes.
     $invByJob = [];
-    if (function_exists('books_migrate')) {
+    if ($withMoney && function_exists('books_migrate')) {
         books_migrate();
         foreach (roi_try(fn() => ops_all(
             "SELECT il.job_id, j.call_id, i.id inv_id, i.invoice_no, i.total, i.status
@@ -109,6 +137,9 @@ function roi_chain($fromDate = '', $toDate = '') {
             $r['n_won']++; $r['opp_won'] += (float)$o['value'];
             $call = (int)($o['call_id'] ?? 0);
             if (!$call) { $r['break'] = 'won-no-order'; continue; }
+            // Whether an order was invoiced, and whether it was paid, are
+            // receivables: not asked without the right to see them.
+            if (!$withMoney) continue;
             $invs = $invByJob[$call] ?? [];
             if (!$invs) { $r['break'] = 'order-no-invoice'; continue; }
             foreach ($invs as $inv) {
@@ -127,9 +158,9 @@ function roi_chain($fromDate = '', $toDate = '') {
 }
 
 // ---- Rolled up per campaign -------------------------------------------------
-function roi_by_campaign($fromDate = '', $toDate = '') {
+function roi_by_campaign($fromDate = '', $toDate = '', $withMoney = null) {
     ads_migrate();
-    $chain = roi_chain($fromDate, $toDate);
+    $chain = roi_chain($fromDate, $toDate, $withMoney);
 
     $spend = [];
     $sw = []; $sa = [];
@@ -226,23 +257,36 @@ function ops_adsroi($route, $method) {
     ads_migrate();
     $from = substr((string)($_GET['from'] ?? ''), 0, 10);
     $to   = substr((string)($_GET['to'] ?? ''), 0, 10);
-    $by   = roi_by_campaign($from, $to);
+    $money = roi_money_can();
+    $whole = roi_whole_company();
+    $by   = roi_by_campaign($from, $to, $money);
     $tot  = roi_totals($by);
 
     if (wants_csv()) {
-        $csv = [['Campaign', 'Platform', 'Spent', 'Leads', 'Cost per lead', 'Deals won',
-                 'Open pipeline', 'Invoiced', 'Collected', 'Not yet collected',
-                 'Return on invoiced', 'Return on cash']];
-        foreach ($by as $b)
-            $csv[] = [$b['name'], $b['platform'], $b['spend'], $b['leads'],
-                      $b['cpl'] === null ? '' : round($b['cpl'], 2), $b['won'],
-                      $b['in_play'], $b['invoiced'], $b['collected'], $b['uncollected'],
-                      $b['roi_inv'] === null ? '' : round($b['roi_inv'], 2),
-                      $b['roi_cash'] === null ? '' : round($b['roi_cash'], 2)];
+        // The same columns as before for someone who may see receivables and
+        // every branch; the money and the ratios drop out exactly as on screen.
+        $head = ['Campaign', 'Platform', 'Spent', 'Leads'];
+        if ($whole) $head[] = 'Cost per lead';
+        $head[] = 'Deals won'; $head[] = 'Open pipeline';
+        if ($money) { $head[] = 'Invoiced'; $head[] = 'Collected'; $head[] = 'Not yet collected'; }
+        if ($money && $whole) { $head[] = 'Return on invoiced'; $head[] = 'Return on cash'; }
+        $csv = [$head];
+        foreach ($by as $b) {
+            $row = [$b['name'], $b['platform'], $b['spend'], $b['leads']];
+            if ($whole) $row[] = $b['cpl'] === null ? '' : round($b['cpl'], 2);
+            $row[] = $b['won']; $row[] = $b['in_play'];
+            if ($money) { $row[] = $b['invoiced']; $row[] = $b['collected']; $row[] = $b['uncollected']; }
+            if ($money && $whole) {
+                $row[] = $b['roi_inv'] === null ? '' : round($b['roi_inv'], 2);
+                $row[] = $b['roi_cash'] === null ? '' : round($b['roi_cash'], 2);
+            }
+            $csv[] = $row;
+        }
         csv_download('advertising-return-' . date('Y-m-d') . '.csv', $csv);
     }
 
     view('ops/adsroi', ['by' => $by, 'tot' => $tot, 'from' => $from, 'to' => $to,
+                        'money_ok' => $money, 'whole_ok' => $whole,
                         'breaks' => ROI_BREAKS, 'connected' => function_exists('ads_on') && ads_on()]);
     return true;
 }
