@@ -54,7 +54,7 @@ $sbuL = lk_options_or('sbu', OPS_SBUS);
 ?>
 <div class="rec sxw has-bn sxl sxq sxqt">
   <?php sxw_nav('/quotes'); ?>
-  <?php sxw_head(T_REG('quote'), 'Quote → approval → send → follow-up → acceptance. The current revision of every ' . Tl('quote') . '. Values are shown before GST (the figure approvals, contracts and the board use); the total with GST is beside it.', 'file', $right); ?>
+  <?php sxw_head(T_REG('quote'), TH('quote') . ' → approval → send → follow-up → acceptance. The current revision of every ' . Tl('quote') . '. Values are shown before GST (the figure approvals, contracts and the board use); the total with GST is beside it.', 'file', $right); ?>
 
   <?php if ($mineApprove): ?>
   <div class="sxl-ban warn" role="status"><span class="ic"><?= rec_icon('lock') ?></span>
