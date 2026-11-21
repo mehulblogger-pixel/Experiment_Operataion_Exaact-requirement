@@ -4,6 +4,13 @@ Living list of things explicitly deferred, so nothing is forgotten. Newest on to
 
 ## 🧭 Sales Stage 5 built (21 Nov 2026, report 59) — what is left for Stage 6 and later
 
+- **Delivered:** commits a88afc2 (BM / SBU Head leads and deals), 94af1f7 (quotation six tabs), 48af9e4 (Stage 5),
+  27a855f (test), bc400d7 (stamp). Test-copy zip `EXAACT-V51.1-Sales-Stage5-TEST-COPY-update.zip`,
+  SHA-256 76b93a4b89890694a424acf07f56cc539c0d9f7f691c560879582bed55e49cbc. Owner's 12-check list in report 59 §7.
+- **Robot book:** SAL-134 still expects the Branch Manager to be refused Leads, Deals and Pipelines; update its
+  expected answer to the owner's 21 Nov decision (read only; Pipelines changes still refused). No robot cases yet
+  for Orders & payments, Renewals, Targets — add them with the Stage 6 robot pass.
+
 - **Sales settings screen (Stage 6):** draw the renewal window field. The handler already saves it
   (`renew_days` → setting `sales_renewal_days`, 7–365) and passes `renewDays` / `renewExample` to the view.
 - **Targets in ₹ lakh:** the approved picture shows the boxes in ₹ lakh; they stay in rupees (as before) so a
