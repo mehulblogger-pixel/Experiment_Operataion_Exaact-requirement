@@ -399,7 +399,7 @@ $jsq = fn($s) => e(json_encode((string) $s));
               ['user', 'Contact', e($l['contact_name'] ?: '—')],
               ['tag', 'Source', e($srcLbl ?: '—')],
               ['mail', 'E-mail', $mailV],
-              ['phone', 'Telephone', $phoneV],
+              ['phone', 'Mobile', $phoneV],
               ['rupee', 'Worth about', $l['value'] ? e(fmoney($l['value'])) : '—'],
               ['cal', 'Hoped to close', $l['expected_close'] ? e(fdate($l['expected_close'])) : '—'],
               ['user', 'Handled by', e($l['owner_name'] ?: '—')],
@@ -435,7 +435,7 @@ $jsq = fn($s) => e(json_encode((string) $s));
           <input class="form-control" id="le-src" name="source" value="<?= e($ev('source')) ?>"></div>
         <div class="ff"><label for="le-em">E-mail</label>
           <input class="form-control" id="le-em" type="email" inputmode="email" name="contact_email" value="<?= e($ev('contact_email')) ?>"></div>
-        <div class="ff"><label for="le-ph">Telephone</label>
+        <div class="ff"><label for="le-ph">Mobile</label>
           <input class="form-control" id="le-ph" type="tel" inputmode="tel" name="contact_phone" value="<?= e($ev('contact_phone')) ?>"></div>
         <div class="ff"><label for="le-val">Worth about <span class="muted">(<?= e(cur_sym()) ?>)</span></label>
           <input class="form-control" id="le-val" type="number" step="0.01" min="0" name="value" value="<?= e($ev('value')) ?>"></div>

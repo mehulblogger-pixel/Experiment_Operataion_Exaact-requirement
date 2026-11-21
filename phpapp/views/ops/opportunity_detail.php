@@ -636,7 +636,7 @@ $lateDays = $nextOn !== '' && $nextOn < $todayYmd ? (int)floor((strtotime($today
       <div><label>Up against</label><input class="form-control" name="competitor" value="<?= e($o['competitor']) ?>" maxlength="200"></div>
       <div><label>Contact</label><input class="form-control" name="contact_name" value="<?= e($o['contact_name']) ?>" maxlength="150"></div>
       <div><label>Contact e-mail</label><input class="form-control" name="contact_email" value="<?= e($o['contact_email']) ?>" maxlength="200"></div>
-      <div><label>Contact phone</label><input class="form-control" name="contact_phone" value="<?= e($o['contact_phone']) ?>" maxlength="60"></div>
+      <div><label>Mobile</label><input class="form-control" type="tel" inputmode="tel" name="contact_phone" value="<?= e($o['contact_phone']) ?>" maxlength="60"></div>
       <div><label>Next thing to do</label><input class="form-control" name="next_action" value="<?= e($o['next_action']) ?>" maxlength="255"></div>
       <div><label>By when</label><input class="form-control" type="date" name="next_action_on" value="<?= e($o['next_action_on']) ?>"></div>
       <div class="ff-wide"><label>What they want</label><textarea class="form-control" name="requirement" rows="3"><?= e($o['requirement']) ?></textarea></div>

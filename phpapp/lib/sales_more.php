@@ -138,7 +138,8 @@ function sx_lead_save(array $b, $confirm) {
     $company = trim((string) ($b['company_name'] ?? ''));
     if ($company === '') return ['err' => 'Type the company (or person) to follow up.'];
     $phone = trim((string) ($b['contact_phone'] ?? ''));
-    if ($phone !== '' && strlen(preg_replace('/\D+/', '', $phone)) < 10) return ['err' => 'That mobile number looks short — 10 digits, please.'];
+    //  D4 (owner, 21 Nov 2026): the quick lead needs a mobile — 10 digits.
+    if (($mp = function_exists('sales_mobile_problem') ? sales_mobile_problem($phone, true) : '') !== '') return ['err' => $mp];
     if (!$confirm && ($d = sx_lead_dupes($company, $phone))) return ['dupes' => $d];
     $u = current_user();
     $officeId = (int) ($b['office_id'] ?? 0) ?: (int) ($u['home_office_id'] ?? 0);

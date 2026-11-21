@@ -72,7 +72,7 @@ if (!empty($done)):
     <div class="sxl-kv">
       <div><span>Contact</span><b><?= e($l['contact_name'] ?: '—') ?></b></div>
       <div><span>E-mail</span><b><?= e($l['contact_email'] ?: '—') ?></b></div>
-      <div><span>Telephone</span><b><?= e($l['contact_phone'] ?: '—') ?></b></div>
+      <div><span>Mobile</span><b><?= e($l['contact_phone'] ?: '—') ?></b></div>
       <div><span>Source</span><b><?= e($src ?: '—') ?></b></div>
       <div><span>Value</span><b><?= $l['value'] ? fmoney($l['value']) : '—' ?></b></div>
       <div><span>Owner</span><b><?= e($l['owner_name'] ?: '—') ?></b></div>

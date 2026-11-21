@@ -659,6 +659,24 @@ function lead_fields_err(array $b) {
         if (array_key_exists($k, $b) && !lead_real_date($b[$k])) return $w . ' is not a real date.';
     return '';
 }
+//  D4 (owner, 21 Nov 2026 — findings QL-01, "as recommended"): ONE rule and ONE word,
+//  "Mobile", for the number on Sales screens. An Indian mobile is 10 digits starting
+//  6–9 (+91 / 0 in front is fine); a number of another country is written with + and
+//  its code. '' = fine. $required: the quick lead must have one. Existing records are
+//  not touched: an edit is checked only when the number itself is changed.
+function sales_mobile_problem($phone, $required = false) {
+    $phone = trim((string) $phone);
+    if ($phone === '') return $required ? 'A mobile number is needed — 10 digits. It is how the lead is called and messaged.' : '';
+    $d = preg_replace('/\D+/', '', $phone);
+    if ($phone[0] === '+' && strpos(preg_replace('/\s+/', '', $phone), '+91') !== 0) return strlen($d) >= 8 ? '' : 'That mobile number looks short.';
+    if (strlen($d) === 12 && substr($d, 0, 2) === '91') $d = substr($d, 2);
+    if (strlen($d) === 11 && $d[0] === '0') $d = substr($d, 1);
+    if (strlen($d) < 10) return 'That mobile number looks short — 10 digits, please.';
+    if (strlen($d) > 10 || !preg_match('/^[6-9]/', $d))
+        return 'That does not look like a mobile number — 10 digits starting 6, 7, 8 or 9 (a number in another country: start with + and its code).';
+    return '';
+}
+
 //  DEF-15 (owner, 21 Nov 2026) — a lead's business unit, set on the forms. The
 //  choices are the company's business units (Masters), narrowed to the units this
 //  person's data scope covers, as the branch list is narrowed to their branches.
@@ -1784,6 +1802,11 @@ function ops_leads($route, $method) {
             $fileAgain = !empty($_FILES['files']['name'][0]) ? ' Choose the file(s) again — a browser never keeps a chosen file after a refused save.' : '';
             //  DEF-15 — the business unit, when given, must be one the person may choose.
             if (($se = lead_sbu_err($_POST['sbu'] ?? '')) !== '') { form_stash('lead-new', $_POST); flash($se . $fileAgain, 'error'); redirect('/lead-new'); }
+            //  D4 (owner, 21 Nov 2026): a mobile or an e-mail, and a mobile that is one.
+            $mp = sales_mobile_problem($_POST['contact_phone'] ?? '');
+            if ($mp === '' && trim((string) ($_POST['contact_phone'] ?? '')) === '' && trim((string) ($_POST['contact_email'] ?? '')) === '')
+                $mp = 'Give a mobile or an e-mail — a lead nobody can reach cannot be followed up.';
+            if ($mp !== '') { form_stash('lead-new', $_POST); flash($mp . $fileAgain, 'error'); redirect('/lead-new'); }
             //  Backend item 1 — the quick lead's duplicate check, on save too. Nothing
             //  is saved; the form comes back with the matches and "Save anyway".
             if (empty($_POST['confirm']) && trim((string)($_POST['company_name'] ?? '')) . (string)($_POST['partner_id'] ?? '') !== '' && lead_form_dupes($_POST)) {
@@ -1924,6 +1947,9 @@ function ops_leads($route, $method) {
         //  The same checks as when the lead was created (test book SALA-003).
         if (trim((string)($_POST['company_name'] ?? '')) === '') $refuse('A lead needs a company or person to chase.');
         if (($fe = lead_fields_err($_POST)) !== '') $refuse($fe);
+        //  D4: a changed mobile must be one; an older number left as it is stays.
+        if (array_key_exists('contact_phone', $_POST) && trim((string) $_POST['contact_phone']) !== trim((string) ($cur['contact_phone'] ?? ''))
+            && ($mp = sales_mobile_problem($_POST['contact_phone'])) !== '') $refuse($mp);
         //  DEF-15 (owner, 21 Nov 2026) — the business unit, when the form sends it. Not
         //  sent (an older page) means "leave it as it is", as for the deputation fields.
         $sbuSent = array_key_exists('sbu', $_POST);

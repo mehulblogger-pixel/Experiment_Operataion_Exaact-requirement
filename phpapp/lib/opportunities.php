@@ -568,6 +568,7 @@ function opp_update($oppId, array $b) {
     opp_migrate();
     $o = opp_row($oppId);
     if (!$o) return 'That ' . Tl('opportunity') . ' no longer exists.';
+    if (($mp = opp_form_err(array_intersect_key($b, ['contact_phone' => 1]), (string) ($o['contact_phone'] ?? ''))) !== '') return $mp;
 
     // ---- The pipeline, which used to be permanent -------------------------
     //  Reported: "once the pipeline is selected nothing can be changed". True —
@@ -1194,9 +1195,13 @@ function opp_dt_columns() {
 // ---- The form's own checks (Sales redesign Stage 3, owner 21 Nov 2026) -------
 //  The deal form gets the checks the lead form already has (backend item 6): one
 //  rule for both, so a value or a date refused on a lead is refused on a deal.
-function opp_form_err(array $b) {
+function opp_form_err(array $b, $oldPhone = null) {
     if (!function_exists('lead_fields_err')) return '';
-    return lead_fields_err(array_intersect_key($b, array_flip(['value', 'expected_close', 'next_action_on'])));
+    $e = lead_fields_err(array_intersect_key($b, array_flip(['value', 'expected_close', 'next_action_on'])));
+    //  D4 (owner, 21 Nov 2026): the deal's "Mobile", when given (or changed), is a mobile.
+    if ($e === '' && function_exists('sales_mobile_problem') && array_key_exists('contact_phone', $b)
+        && ($oldPhone === null || trim((string) $b['contact_phone']) !== trim((string) $oldPhone))) $e = sales_mobile_problem($b['contact_phone']);
+    return $e;
 }
 //  DEF-15 — a deal's business unit, from the same list the lead form offers
 //  (the company's units, narrowed to the units this person's data scope covers).
