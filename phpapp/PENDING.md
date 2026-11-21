@@ -13,8 +13,9 @@ the campaign). Needs the owner's rule before any build. See QA-REPORTS/V51/52 (D
 ## 🧾 Sales defect register — open items (21 Nov 2026)
 
 The full list, with severity and who decides, is `QA-REPORTS/V51/52-Sales-Defect-Register.md`.
-Fixed: DEF-01. Owner decisions asked 21 Nov: DEF-05, 06, 07, 10, 11, 14, 15, 17, 23 and how
-Stages 2–6 are approved. The rest are to be fixed in the Sales redesign stages.
+Fixed: DEF-01, 02, 03, 04, 08, 09, 19 (reports 52, 53). Owner decided 21 Nov: DEF-05, 06, 07,
+10, 11, 14, 15, 17, 23 and Stages 2–6 approval (option B) — built in their stages. Still open:
+DEF-12, 13, 16, 18, 20, 21, 22, 24, 25 (DEF-25 = Customer 360 "Owed" branch rule, needs OK).
 
 ## 🧾 Quote/contract model — "trace, don't force" (Aug 2026) — DONE
 
