@@ -74,6 +74,13 @@ try {
         //  quotation — a "Not found" page. It is now /quote-new, offered only to someone who
         //  may write a quotation (crm_quote_can_create — the form's own rule).
         $replaced = function ($href) use ($uid, $n) {
+            //  D2 (owner, 21 Nov 2026): Today offers "Log" only on a lead or deal this person
+            //  may work (its owner, the people above them, an administrator).
+            if (preg_match('#^/(lead|opportunity)\?id=(\d+)&log=1#', $href, $m)) {
+                $owner = (int) ops_val('SELECT owner_user_id FROM ' . ($m[1] === 'lead' ? 'leads' : 'opportunities') . ' WHERE id=?', [(int) $m[2]]);
+                $keep = $_SESSION['uid'] ?? null; bbv_as($uid); $may = sales_record_can_work($owner); if ($keep) bbv_as($keep);
+                return !$may;
+            }
             if ($href !== '/quote-edit') return false;
             $keep = $_SESSION['uid'] ?? null; bbv_as($uid); $mayWrite = crm_quote_can_create(); if ($keep) bbv_as($keep);
             return $mayWrite ? in_array('/quote-new', $n['hrefs'], true) : !in_array('/quote-new', $n['hrefs'], true);

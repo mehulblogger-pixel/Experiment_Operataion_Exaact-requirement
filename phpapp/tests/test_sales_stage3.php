@@ -101,6 +101,8 @@ try {
         return $made['opps'][] = (int) ($r['id'] ?? 0);
     };
     $oA = $deal('S3 Deal Mumbai ' . $f['tag'], $f['mum'], ['competitor' => 'ABC Inspection', 'requirement' => 'Calibration of 3 tanks']);
+    //  D2 (owner, 21 Nov 2026): a deal is worked by its owner — the BDM who works it in these checks.
+    $pdo->prepare("UPDATE opportunities SET owner_user_id=? WHERE id=?")->execute([$bdm, $oA]);
     opp_move($oA, (int) $openSt[min(2, count($openSt) - 1)]['id'], [], true);
     $pdo->prepare("UPDATE opportunities SET stage_since=? WHERE id=?")->execute([date('c', strtotime('-40 days')), $oA]);   // stalled
     opp_link_quote($oA, $qid);
