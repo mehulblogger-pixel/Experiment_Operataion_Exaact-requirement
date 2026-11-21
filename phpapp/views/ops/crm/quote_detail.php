@@ -315,8 +315,21 @@ $qVal = quote_validity($q);
       <div role="group" aria-label="Same company?" style="flex-basis:100%;padding:10px 12px;border-left:4px solid var(--warn,#b7791f);background:var(--warn-bg,#fffbea);border-radius:8px">
         <div style="margin-bottom:6px"><b>Before recording the acceptance:</b> is “<?= e($q['client_name']) ?>” the same company as <b><?= e($pc['legal_name'] ?? '') ?></b> (<?= e($pc['code'] ?? '') ?>), already on file?</div>
         <form method="post" action="/quote-status?id=<?= (int)$q['id'] ?>" style="display:inline"><input type="hidden" name="to" value="ACCEPTED"><input type="hidden" name="same_as" value="<?= (int)$pc['id'] ?>"><button class="btn small" type="submit">Yes — same company, mark accepted</button></form>
-        <form method="post" action="/quote-status?id=<?= (int)$q['id'] ?>" style="display:inline"><input type="hidden" name="to" value="ACCEPTED"><input type="hidden" name="new_company" value="1"><button class="btn small secondary" type="submit">No — a different company, mark accepted</button></form>
+        <details style="display:inline-block;vertical-align:top"><summary class="btn small secondary" style="display:inline-flex">No — a different company, mark accepted</summary>
+          <form method="post" action="/quote-status?id=<?= (int)$q['id'] ?>" style="margin-top:8px;max-width:760px"><input type="hidden" name="to" value="ACCEPTED"><input type="hidden" name="new_company" value="1">
+            <?php $cidVals = []; $cidId = 'qa-cid2'; $cidNote = 'The new ' . Tl('client') . '\'s GSTIN and PAN — required when a ' . Tl('quote') . ' is won.'; include __DIR__ . '/../_custid_fields.php'; ?>
+            <button class="btn small" type="submit">No — a different company, mark accepted</button></form>
+        </details>
       </div>
+    <?php elseif ($canDecide && empty($q['client_id']) && trim((string) ($q['client_name'] ?? '')) !== '' && !ops_val("SELECT id FROM business_partners WHERE is_client=1 AND (legal_name=? OR display_name=?) LIMIT 1", [trim((string) $q['client_name']), trim((string) $q['client_name'])])): ?>
+      <?php // Won for a name not on the client master: its GSTIN and PAN are asked here (owner, 21 Nov 2026: D1–D4). ?>
+      <form method="post" action="/quote-status?id=<?= (int)$q['id'] ?>" style="flex-basis:100%;max-width:760px"><input type="hidden" name="to" value="ACCEPTED">
+        <?php $cidVals = []; $cidId = 'qa-cid'; $cidNote = '“' . (string) $q['client_name'] . '” is not on the ' . Tl('client') . ' list yet. Winning the ' . Tl('quote') . ' puts it there — with its GSTIN and PAN.'; include __DIR__ . '/../_custid_fields.php'; ?>
+        <?php if ((int) ($_GET['loc'] ?? 0) > 0 && ($locRow = ops_one("SELECT id, code, legal_name FROM business_partners WHERE id=?", [(int) $_GET['loc']]))): ?>
+          <label style="display:flex;gap:8px;align-items:flex-start;margin:0 0 8px;font-weight:600"><input type="checkbox" name="add_location_to" value="<?= (int) $locRow['id'] ?>" style="margin-top:3px"> Yes — it is <?= e($locRow['code'] . ' — ' . $locRow['legal_name']) ?> (same PAN): add this GSTIN as its billing location</label>
+        <?php endif; ?>
+        <button class="btn small" type="submit"><?= e($st==='EXPIRED' ? 'Mark accepted (after expiry)' : 'Mark accepted (won)') ?></button>
+      </form>
     <?php elseif ($canDecide): ?><?= $act('ACCEPTED', $st==='EXPIRED' ? 'Mark accepted (after expiry)' : 'Mark accepted (won)') ?>
     <?php else: ?><span class="muted" style="font-size:12.5px"><?= e($assignedName !== '' ? $assignedName . ', who is assigned to this ' . Tl('quote') . ',' : 'The person assigned to this ' . Tl('quote')) ?> records the <?= e(Tl('client')) ?>'s answer.</span><?php endif; ?>
     <a class="btn small secondary" href="/quote-doc?id=<?= (int)$q['id'] ?>">Re-download Word</a>

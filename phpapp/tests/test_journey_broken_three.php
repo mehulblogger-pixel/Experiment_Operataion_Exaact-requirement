@@ -99,7 +99,8 @@ try {
     $new = $mkOpp('Deal for a brand-new customer', 0, ['partner_name' => 'JB3 Newco ' . $tag, 'contact' => 'Arun Rao']);
     t_ok(!empty(opp_send_to_accounts($new)['err']), 'ARMING · without a customer the deal cannot go to Accounts');
     $before = (int)ops_val("SELECT COUNT(*) FROM business_partners");
-    $r = opp_add_customer($new, ['state' => 'Gujarat']);
+    //  21 Nov 2026 (D1–D4): a NEW customer carries its tax identity — here a recorded exception.
+    $r = opp_add_customer($new, ['state' => 'Gujarat', 'tax_status' => 'UNREGISTERED', 'pan' => 'AABPJ' . sprintf('%04d', random_int(0, 9999)) . 'J', 'tax_reason' => 'test — below the GST threshold']);
     t_ok(!empty($r['ok']), 'the customer is added from the deal' . (!empty($r['err']) ? ': ' . $r['err'] : ''));
     $bp = ops_one("SELECT * FROM business_partners WHERE id=?", [(int)($r['partner_id'] ?? 0)]);
     t_eq([(string)($bp['legal_name'] ?? ''), (int)($bp['is_client'] ?? 0), (string)($bp['status'] ?? ''), (string)($bp['state'] ?? '')], ['JB3 Newco ' . $tag, 1, 'ACTIVE', 'Gujarat'],
@@ -111,10 +112,11 @@ try {
     //  Same name as a customer already on file: stop once and ask — never a silent second record.
     $twin = $mkOpp('Deal for a same-named company', 0, ['partner_name' => 'JB3 Newco ' . $tag]);
     $n0 = (int)ops_val("SELECT COUNT(*) FROM business_partners");
-    $r = opp_add_customer($twin, []);
+    $cidT = ['tax_status' => 'UNREGISTERED', 'pan' => 'AABPK' . sprintf('%04d', random_int(0, 9999)) . 'K', 'tax_reason' => 'test — below the GST threshold'];
+    $r = opp_add_customer($twin, $cidT);
     t_ok(!empty($r['err']) && strpos($r['err'], 'already on file') !== false && !empty($r['near']) && (int)ops_val("SELECT COUNT(*) FROM business_partners") === $n0,
         'a name already on file stops and asks — same company (pick it) or a different one? ' . ($r['err'] ?? ''));
-    $r = opp_add_customer($twin, ['confirm_new' => '1']);
+    $r = opp_add_customer($twin, ['confirm_new' => '1'] + $cidT);
     t_ok(!empty($r['ok']) && (int)ops_val("SELECT COUNT(*) FROM business_partners") === $n0 + 1, 'ticking "It is a different company" adds it, on purpose');
     $open = $mkOpp('Still an open deal', 0, ['status' => 'OPEN', 'partner_name' => 'JB3 Open ' . $tag]);
     t_ok(!empty(opp_add_customer($open, [])['err']), 'it is for a WON deal — an open deal is refused (quoting from a deal is a separate decision, 2.1)');

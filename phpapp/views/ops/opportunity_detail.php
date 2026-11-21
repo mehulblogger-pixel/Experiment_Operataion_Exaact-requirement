@@ -177,8 +177,10 @@ $lateDays = $nextOn !== '' && $nextOn < $todayYmd ? (int)floor((strtotime($today
           <input type="hidden" name="id" value="<?= $id ?>">
           <div class="ff" style="flex:2;min-width:200px"><label for="opp-newcust">Customer name</label>
             <input class="form-control" id="opp-newcust" name="company_name" maxlength="200" required value="<?= e($o['partner_name']) ?>"></div>
-          <div class="ff" style="flex:1;min-width:140px"><label for="opp-newstate">State <span class="muted">(for tax)</span></label>
-            <input class="form-control" id="opp-newstate" name="state" maxlength="60" placeholder="e.g. Gujarat"></div>
+          <div style="flex-basis:100%;min-width:0"><?php $cidVals = ['state' => '']; $cidId = 'opp-cid'; $cidNote = ''; include __DIR__ . '/_custid_fields.php'; ?></div>
+          <?php if ((int) ($_GET['loc'] ?? 0) > 0 && ($locRow = ops_one("SELECT id, code, legal_name FROM business_partners WHERE id=?", [(int) $_GET['loc']]))): ?>
+            <label class="ff-check" style="flex-basis:100%"><input type="checkbox" name="add_location_to" value="<?= (int) $locRow['id'] ?>"> Yes — it is <?= e($locRow['code'] . ' — ' . $locRow['legal_name']) ?> (same PAN): add this GSTIN as its billing location and use that <?= e(Tl('client')) ?></label>
+          <?php endif; ?>
           <?php if (($_GET['samename'] ?? '') === '1'): ?>
             <label class="ff-check" style="flex-basis:100%"><input type="checkbox" name="confirm_new" value="1" required> It is a different company from the one already on file with this name</label>
           <?php endif; ?>

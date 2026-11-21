@@ -11,9 +11,19 @@
   $canMoveOffice = is_master() || (function_exists('is_admin_level') && is_admin_level()); ?>
 <h1><?= $p ? 'Edit ' . e(partner_name($p)) : 'New business partner' ?></h1>
 <p class="sub">Client Code is generated automatically. Enter GSTIN once — PAN &amp; State fill in automatically.<?php if ($picker): ?> <span class="muted">Save and this window closes, selecting the new record on the form you came from.</span><?php endif; ?></p>
-<?php if (!empty($error)): ?><div class="msg msg-error"><?= e($error) ?></div><?php endif; ?>
+<?php if (!empty($error)): ?><div class="msg msg-error"><?= e($error) ?>
+  <?php // Owner, 21 Nov 2026 (D1): the same PAN with a new GSTIN is the same company in
+        // another state — offered as a billing location of it, never a second record.
+    if (!empty($cidOffer)): ?>
+    <label style="display:flex;gap:8px;align-items:flex-start;margin-top:8px;font-weight:600"><input type="checkbox" name="add_location_to" value="<?= (int) $cidOffer['id'] ?>" form="partner-form" style="margin-top:3px">
+      Yes — add this GSTIN as a billing location of <?= e($cidOffer['name']) ?> (no new <?= e(Tl('client')) ?> is created). Tick and save again.</label>
+  <?php elseif (!empty($dupOffer)): ?>
+    <label style="display:flex;gap:8px;align-items:flex-start;margin-top:8px;font-weight:600"><input type="checkbox" name="dup_ok" value="1" form="partner-form" style="margin-top:3px">
+      I have checked — it is a different company. Tick and save again.</label>
+  <?php endif; ?>
+</div><?php endif; ?>
 
-<form method="post" action="<?= $p ? '/partner-edit?id=' . (int)$p['id'] : '/partner-new' ?>" class="panel">
+<form method="post" id="partner-form" action="<?= $p ? '/partner-edit?id=' . (int)$p['id'] : '/partner-new' ?>" class="panel">
   <?php if ($picker): ?><input type="hidden" name="picker" value="1"><?php endif; ?>
 <div data-tabs data-tabs-key="partnerform" class="form-tabs">
 <section class="fs-pane" data-tab="Identity &amp; roles">
@@ -110,9 +120,9 @@
       <div class="msg msg-info" style="margin:0">Commercial &amp; billing details (GSTIN, PAN, payment terms…) are <b>not needed for a vendor</b> — a vendor is a site you inspect at, not a party you invoice. Tick <b>Is a Client</b> above if you also bill them, and these fields appear.</div>
     </div>
     <div id="commercialFields" style="display:contents">
-    <div class="ff"><label>GSTIN</label><input class="form-control" name="gstin" value="<?= e($d['gstin'] ?? '') ?>" placeholder="e.g. 24ADUPL3517E2ZJ"></div>
-    <div class="ff"><label>PAN (auto from GSTIN)</label><input class="form-control readonly-field" id="pan_display" value="<?= e($d['pan'] ?? '') ?>" readonly></div>
-    <div class="ff"><label>State (auto from GSTIN)</label><input class="form-control readonly-field" id="state_display" value="<?= e($d['state'] ?? '') ?>" readonly></div>
+    <?php // GSTIN, PAN, state — or the reason there is none (owner, 21 Nov 2026: D1–D4).
+          // Required for a client; a vendor-only record keeps them optional. ?>
+    <div class="ff ff-wide"><?php $cidVals = $d; $cidId = 'pf-cid'; $cidNote = 'One ' . Tl('client') . ' is one PAN. A further state it is registered in is added as a billing location on its record, not as a second ' . Tl('client') . '.'; include __DIR__ . '/ops/_custid_fields.php'; ?></div>
     <div class="ff"><label>CIN</label><input class="form-control" name="cin" value="<?= e($d['cin'] ?? '') ?>"></div>
     <div class="ff"><label>TAN</label><input class="form-control" name="tan" value="<?= e($d['tan'] ?? '') ?>"></div>
     <div class="ff"><label>MSME / Udyam</label><input class="form-control" name="msme_udyam" value="<?= e($d['msme_udyam'] ?? '') ?>"></div>
@@ -232,7 +242,7 @@
           mapHint=document.getElementById('site_map_hint');
       function guess(){
         var dn=document.querySelector('[name="display_name"]'), ln=document.querySelector('[name="legal_name"]'),
-            st=document.getElementById('state_display');
+            st=document.getElementById('state_display')||document.querySelector('.cid-box [name="state"]');
         var nm=((dn&&dn.value)||(ln&&ln.value)||'').trim(), s=((st&&st.value)||'').trim();
         return (nm + (s?(', '+s):'') + ((nm||s)?', India':'')).replace(/^,\s*/,'').trim();
       }

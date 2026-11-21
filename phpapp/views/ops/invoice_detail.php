@@ -85,6 +85,27 @@
   </div>
 <?php endif; ?>
 
+<?php // Where it is billed to — a customer with more than one GST registration
+      // (billing location) is billed at one of them (owner, 21 Nov 2026: D1).
+  $billLocs = function_exists('custid_locations') && !empty($inv['partner_id']) ? custid_locations((int) $inv['partner_id']) : [];
+  if (count($billLocs) > 1): $curLoc = (int) ($inv['billing_address_id'] ?? 0); ?>
+  <div class="panel" style="margin-top:12px;padding:12px 16px" id="bill-to">
+    <b style="font-size:14px">Billed to</b>
+    <?php if ($isDraft && !empty($canIssue)): ?>
+      <form method="post" action="/invoice-bill-to?id=<?= (int)$inv['id'] ?>" class="inline-add" style="margin-top:8px;align-items:flex-end">
+        <div class="ff"><label for="bill-loc">Billing location of <?= e($inv['partner_name']) ?></label>
+          <select class="form-control" id="bill-loc" name="billing_address_id">
+            <?php foreach ($billLocs as $bl): ?><option value="<?= (int) $bl['id'] ?>" <?= (int) $bl['id'] === $curLoc ? 'selected' : '' ?>><?= e($bl['label'] . ' — ' . ($bl['state'] ?: 'state not set') . ($bl['gstin'] !== '' ? ' — GSTIN ' . $bl['gstin'] : '')) ?></option><?php endforeach; ?>
+          </select></div>
+        <button class="btn small" type="submit">Bill to this location</button>
+      </form>
+      <p class="muted" style="margin:6px 0 0;font-size:12.5px">The place of supply, the GSTIN printed and CGST + SGST or IGST follow the location you choose.</p>
+    <?php else: $bl = custid_location((int) $inv['partner_id'], $curLoc); ?>
+      <div class="muted" style="font-size:13px;margin-top:4px"><?= e(((int) ($inv['bill_snap'] ?? 0) === 1 && trim((string) $inv['bill_gstin']) !== '') ? 'GSTIN ' . $inv['bill_gstin'] . ($inv['bill_state'] !== '' ? ' · ' . custid_state_name($inv['bill_state']) : '') : ($bl ? $bl['label'] . ($bl['gstin'] !== '' ? ' — GSTIN ' . $bl['gstin'] : '') : '')) ?></div>
+    <?php endif; ?>
+  </div>
+<?php endif; ?>
+
 <?php if ($isDraft && $missing): ?>
   <div class="msg msg-warning" style="margin-top:14px">
     <b>Not ready to issue.</b>

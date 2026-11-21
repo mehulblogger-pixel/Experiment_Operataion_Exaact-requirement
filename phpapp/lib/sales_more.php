@@ -553,12 +553,15 @@ function sx_quote_gst_split(array $q) {
     $amt = (float) ($q['gst_amount'] ?? 0); $pct = (float) ($q['gst_pct'] ?? 0);
     if ($amt <= 0 || empty($q['client_id']) || !function_exists('books_is_igst')) return null;
     $ours = function_exists('books_our_state') ? (string) books_our_state($q['office_id'] ?? null) : '';   // the branch's own state when it has its own GSTIN
-    $theirs = function_exists('books_their_state') ? (string) books_their_state((int) $q['client_id']) : '';
+    //  A customer billed at one of its other states (a billing location) is taxed by
+    //  that state (owner, 21 Nov 2026: D1).
+    $loc = function_exists('custid_location_id_for') ? custid_location_id_for((int) $q['client_id'], (int) ($q['billing_address_id'] ?? 0)) : 0;
+    $theirs = function_exists('books_their_state') ? (string) books_their_state((int) $q['client_id'], $loc) : '';
     //  Say which state is missing: ours (the invoice's own setting) or the client's.
     if ($ours === '' || $theirs === '') return ['mode' => 'UNKNOWN', 'rows' => [], 'missing' => $ours === '' ? 'ours' : 'theirs'];
     $nm = function ($c) { $m = defined('GST_STATES') ? GST_STATES : []; return (string) ($m[$c] ?? $m[str_pad($c, 2, '0', STR_PAD_LEFT)] ?? $c); };
     $ours = $nm($ours); $theirs = $nm($theirs);
-    if (books_is_igst((int) $q['client_id'], $q['office_id'] ?? null))
+    if (books_is_igst((int) $q['client_id'], $q['office_id'] ?? null, $loc))
         return ['mode' => 'IGST', 'rows' => [['IGST ' . rtrim(rtrim(number_format($pct, 2), '0'), '.') . '% · ' . Tl('client') . ' in ' . $theirs . ', another state', $amt]]];
     $h = round($amt / 2, 2); $hp = rtrim(rtrim(number_format($pct / 2, 2), '0'), '.');
     return ['mode' => 'CGST_SGST', 'rows' => [['CGST ' . $hp . '% · same state (' . $ours . ')', $h], ['SGST ' . $hp . '%', round($amt - $h, 2)]]];

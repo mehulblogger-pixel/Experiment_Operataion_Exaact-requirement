@@ -159,17 +159,20 @@ t_nothrow('the client screen can create a branch company for an office', functio
     $h = (string) @file_get_contents(dirname(__DIR__) . '/lib/customer360.php');
     $from = strpos($h, "'add_branch_company'");
     t_ok($from !== false, 'the action exists');
-    $body = substr($h, $from, 3600);
+    $body = substr($h, $from, 6000);   // widened 21 Nov: the GSTIN / PAN match (D1–D4) sits inside it
     //  Every one of these is a way the feature could create the very mess it is
     //  meant to prevent.
     t_ok(strpos($body, 'scope_allows') !== false,
         'you cannot hang a branch off a client you are not allowed to open');
     t_ok(substr_count($body, 'scope_allows') >= 2,
         'and you cannot assign it to an office you do not work in');
-    t_ok(strpos($body, 'UPPER(COALESCE(gstin') !== false,
+    //  21 Nov 2026 (D1–D4): the same checks, now through the one customer-identity
+    //  library — the GSTIN is matched against clients AND their billing locations,
+    //  and checked with its real check digit, not only its shape.
+    t_ok(strpos($body, 'custid_gstin_owner(') !== false,
         'the same GSTIN twice is refused — that is the same legal entity twice');
-    t_ok(strpos($body, "preg_match('~^[0-9A-Z]{15}\$~'") !== false,
-        'a GSTIN is checked for shape before it is stored');
+    t_ok(strpos($body, 'custid_gstin_problem(') !== false,
+        'a GSTIN is checked (shape and check digit) before it is stored');
     t_ok(strpos($body, "\$parent['parent_id']") !== false,
         'a branch of a branch still lands in ONE family, not a chain');
     t_ok(strpos($body, 'act_log') !== false, 'and it is audited on both records');

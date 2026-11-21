@@ -295,9 +295,16 @@ function connect_org_register(array $in) {
     $gst = clean_gstin((string)($in['gstin'] ?? ''));
     if ($gst !== '' && function_exists('is_valid_gstin') && !is_valid_gstin($gst))
         return [false, 'That GSTIN does not look right — it is 15 characters, e.g. 24ABCDE1234F1Z5. Leave it empty if you do not have one.', null];
+    //  Owner, 21 Nov 2026: the GSTIN's check digit is verified, as everywhere a
+    //  customer is put on file (a sign-up is not yet a won customer, so the boxes
+    //  stay optional here; one without them is asked at its first invoice — D3).
+    if ($gst !== '' && function_exists('custid_gstin_problem') && ($gp = custid_gstin_problem($gst)) !== '')
+        return [false, $gp . ' Leave it empty if you do not have one.', null];
     $panIn = strtoupper(trim((string)($in['pan'] ?? '')));
     if ($panIn !== '' && !preg_match('/^[A-Z]{5}[0-9]{4}[A-Z]$/', $panIn))
         return [false, 'That PAN does not look right — it is 10 characters, e.g. ABCDE1234F. Leave it empty if you do not have one.', null];
+    if ($panIn !== '' && $gst !== '' && function_exists('pan_from_gstin') && pan_from_gstin($gst) !== '' && pan_from_gstin($gst) !== $panIn)
+        return [false, 'The PAN you typed is not the PAN inside the GSTIN (its 3rd to 12th characters). Check both.', null];
     if ($panIn === '' && $gst !== '' && function_exists('pan_from_gstin')) $in['pan'] = (string) pan_from_gstin($gst);
     //  These three refusals are about the FORM THE PERSON JUST FILLED IN. They
     //  describe their own typing back to them and reveal nothing about anybody

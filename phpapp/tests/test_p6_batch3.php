@@ -1,4 +1,5 @@
 <?php
+//  21 Nov 2026: the made-up GSTINs below carry their real check character — sign-up now checks it (D1–D4).
 // ============================================================================
 //  PHASE 6 · BATCH 3 — Organisation duplicate safety & cross-reference.
 //
@@ -73,7 +74,7 @@ $b3act($uAdmin);
 // =============================================================================
 t_section('P6-B3 · A — /join must not create a duplicate organisation (F1)');
 // =============================================================================
-$aGst = '24AAABB1111A1Z9';
+$aGst = '24AAABB1111A1ZZ';
 $aPid = $b3partner('Northwind Energy Ltd', ['gstin' => $aGst, 'pan' => 'AAABB1111A', 'tan' => 'AHMN11111A']);
 
 // NONE — a genuinely new company must still register.
@@ -113,7 +114,7 @@ t_eq($b3parts('Northwind Energy Ltd'), 1, 'A8 · still exactly one Northwind');
 t_eq($b3orgs('Northwind Energy Ltd'), 0, 'A9 · and no marketplace organisation was created for it');
 
 // A similar but DIFFERENT company must not be blocked by a loose name rule.
-$b3partner('Apex Engineering Services Pvt Ltd', ['gstin' => '24CCCDD2222C1Z9']);
+$b3partner('Apex Engineering Services Pvt Ltd', ['gstin' => '24CCCDD2222C1ZB']);
 $a10 = $b3one('join', 0, json_encode(['name' => 'Apex Engineering Solutions LLP', 'email' => 'a10@apex.test']));
 t_ok($a10['ok'] ?? false, 'A10 · a similarly named but distinct company still registers  [' . ($a10['msg'] ?? '') . ']');
 
@@ -423,13 +424,13 @@ t_section('P6-B3 · D — agency cross-reference (F4 · Q19)');
 // =============================================================================
 $dHas = in_array('party_id', t_columns('agencies'), true);
 t_ok($dHas, 'D1 · agencies carries an optional party_id');
-$dPid = $b3partner('Sterling Manpower Pvt Ltd', ['gstin' => '24EEEFF3333E1Z9']);
+$dPid = $b3partner('Sterling Manpower Pvt Ltd', ['gstin' => '24EEEFF3333E1ZN']);
 if ($dHas) {
 db()->prepare("INSERT INTO agencies (name,agency_type,active,created_at) VALUES ('Sterling Manpower Pvt Ltd','MANPOWER',1,?)")->execute([date('c')]);
 $dA1 = (int)db()->lastInsertId();
 t_eq((int)ops_val("SELECT COALESCE(party_id,0) FROM agencies WHERE id=?", [$dA1]), 0,
      'D2 · creating an agency NEVER infers a party, even with an identical name');
-db()->prepare("INSERT INTO agencies (name,agency_type,gstin,active,created_at) VALUES ('Sterling Manpower Pvt Ltd','RECRUITMENT','24EEEFF3333E1Z9',1,?)")->execute([date('c')]);
+db()->prepare("INSERT INTO agencies (name,agency_type,gstin,active,created_at) VALUES ('Sterling Manpower Pvt Ltd','RECRUITMENT','24EEEFF3333E1ZN',1,?)")->execute([date('c')]);
 $dA2 = (int)db()->lastInsertId();
 t_eq((int)ops_val("SELECT COALESCE(party_id,0) FROM agencies WHERE id=?", [$dA2]), 0,
      'D3 · nor from an identical GSTIN — inference is never performed');
@@ -482,7 +483,7 @@ t_ok(count(agencies_list()) > 0, 'D12 · and the agency list Recruitment reads s
 // =============================================================================
 t_section('P6-B3 · E — the CRM and lead writers are protected (F5)');
 // =============================================================================
-$ePid = $b3partner('Crestwood Industries Ltd', ['gstin' => '24GGGHH4444G1Z9']);
+$ePid = $b3partner('Crestwood Industries Ltd', ['gstin' => '24GGGHH4444G1ZZ']);
 t_ok(function_exists('partner_find_or_problem'), 'E1 · a shared guard exists for the staff writers');
 if (function_exists('partner_find_or_problem')) {
     //  A NAME match is POSSIBLE, never EXACT — owner decision Q20 reserves EXACT
@@ -490,7 +491,7 @@ if (function_exists('partner_find_or_problem')) {
     //  enough that a name can warn but must never prove.
     $e2 = partner_find_or_problem('Crestwood Industries Ltd', '', '', '');
     t_eq((string)($e2['confidence'] ?? ''), 'POSSIBLE', 'E2 · an existing organisation matched BY NAME is POSSIBLE, not EXACT');
-    $e2b = partner_find_or_problem('Anything Else Ltd', '24GGGHH4444G1Z9', '', '');
+    $e2b = partner_find_or_problem('Anything Else Ltd', '24GGGHH4444G1ZZ', '', '');
     t_eq((string)($e2b['confidence'] ?? ''), 'EXACT', 'E2b · and a tax-identifier match IS exact');
     t_ok(strpos((string)($e2b['message'] ?? ''), 'Crestwood') !== false,
          'E2c · the STAFF message names the record — staff are entitled to see the register');
@@ -513,7 +514,7 @@ $e4 = crm_register_client_for_quote(['client_name' => 'Crestwood Industries Ltd'
 t_eq((int)$e4, $ePid, 'E4 · accepting a quote for a company already on file reuses that record');
 t_eq(1, $b3parts('Crestwood Industries Ltd'), 'E4b · and creates no second record');
 
-$e5 = crm_register_client_for_quote(['client_name' => 'Westmark Alloys', 'gstin' => '24GGGHH4444G1Z9']);
+$e5 = crm_register_client_for_quote(['client_name' => 'Westmark Alloys', 'gstin' => '24GGGHH4444G1ZZ']);
 t_eq((int)$e5, $ePid, 'E5 · a quote carrying an existing TAX IDENTIFIER attaches to that organisation');
 t_eq(0, $b3parts('Westmark Alloys'), 'E5b · under a different trading name, still no second record');
 
@@ -528,7 +529,7 @@ t_ok(is_array($e6act) && stripos((string)$e6act['subject'], 'similar') !== false
 //  The lead path. An authoritative identifier REFUSES rather than duplicating.
 $e7lead = lead_create(['company_name' => 'Crestwood Industries Limited']);
 t_ok(!empty($e7lead['id']), 'E7 · a lead can be raised for a company with a similar name');
-$e7 = lead_convert((int)$e7lead['id'], ['company_name' => 'Crestwood Trading Ltd', 'gstin' => '24GGGHH4444G1Z9']);
+$e7 = lead_convert((int)$e7lead['id'], ['company_name' => 'Crestwood Trading Ltd', 'gstin' => '24GGGHH4444G1ZZ']);
 t_ok(!empty($e7['err']), 'E7b · converting it against an EXISTING tax identifier is refused');
 t_ok(!empty($e7['err']) && stripos((string)$e7['err'], 'Crestwood Industries Ltd') !== false,
      'E7c · and the refusal NAMES the record — staff are entitled to see the register');
@@ -537,7 +538,8 @@ t_eq('OPEN', (string)ops_val("SELECT status FROM leads WHERE id=?", [(int)$e7lea
      'E7e · and the lead is untouched — a refusal changes nothing');
 
 //  A name match converts, but the override is recorded.
-$e8 = lead_convert((int)$e7lead['id'], ['company_name' => 'Crestwood Industries Limited']);
+//  21 Nov 2026 (D1–D4): a NEW customer carries its tax identity — here a recorded exception.
+$e8 = lead_convert((int)$e7lead['id'], ['company_name' => 'Crestwood Industries Limited', 'tax_status' => 'UNREGISTERED', 'pan' => 'AABPE' . sprintf('%04d', random_int(0, 9999)) . 'E', 'tax_reason' => 'test — below the GST threshold']);
 t_ok(empty($e8['err']), 'E8 · a NAME match does not block the conversion');
 $e8pid = (int)ops_val("SELECT id FROM business_partners WHERE legal_name=? ORDER BY id DESC LIMIT 1", ['Crestwood Industries Limited']);
 t_ok($e8pid > 0, 'E8b · the customer was created');
@@ -546,12 +548,12 @@ t_ok($eActs($e8pid) > 0, 'E8c · and the creation is audited against it');
 // =============================================================================
 t_section('P6-B3 · F — the detector still serves its existing callers (F6 · Q20)');
 // =============================================================================
-$fPid = $b3partner('Ferrous Metals Ltd', ['gstin' => '24JJJKK5555J1Z9', 'pan' => 'JJJKK5555J', 'tan' => 'AHMF55555F']);
+$fPid = $b3partner('Ferrous Metals Ltd', ['gstin' => '24JJJKK5555J1ZZ', 'pan' => 'JJJKK5555J', 'tan' => 'AHMF55555F']);
 $f1 = find_duplicate_partner('Ferrous Metals Ltd', '', '', '', 0);
 t_ok(is_array($f1) && isset($f1['row']) && isset($f1['by']), 'F1 · the original [row][by] shape is unchanged');
 t_eq((int)$f1['row']['id'], $fPid, 'F2 · and it still finds the right organisation');
 t_eq((string)($f1['confidence'] ?? ''), 'POSSIBLE', 'F3 · a NAME match is POSSIBLE');
-$f4 = find_duplicate_partner('Anything At All', '24JJJKK5555J1Z9', '', '', 0);
+$f4 = find_duplicate_partner('Anything At All', '24JJJKK5555J1ZZ', '', '', 0);
 t_eq((string)($f4['confidence'] ?? ''), 'EXACT', 'F4 · a GSTIN match is EXACT');
 $f5 = find_duplicate_partner('Anything At All', '', 'JJJKK5555J', '', 0);
 t_eq((string)($f5['confidence'] ?? ''), 'EXACT', 'F5 · a PAN match is EXACT');
@@ -572,11 +574,11 @@ t_ok(find_duplicate_partner('Ferrous Metals Ltd', '', '', '', $fPid) === null, '
 //  The name-only record must come FIRST, so that a detector which returned on a
 //  name would return the wrong answer before ever seeing the identifier.
 $fName1 = $b3partner('Cobalt Works Ltd');                                  // name only, earlier
-$fName2 = $b3partner('Cobalt Holdings Ltd', ['gstin' => '24PPPQQ8888P1Z9']); // identifier, later
-$f8a = find_duplicate_partner('Cobalt Works Ltd', '24PPPQQ8888P1Z9', '', '', 0);
+$fName2 = $b3partner('Cobalt Holdings Ltd', ['gstin' => '24PPPQQ8888P1ZZ']); // identifier, later
+$f8a = find_duplicate_partner('Cobalt Works Ltd', '24PPPQQ8888P1ZZ', '', '', 0);
 t_eq((string)($f8a['confidence'] ?? ''), 'EXACT', 'F9 . an identifier outranks a name match on an EARLIER record');
 t_eq((int)($f8a['row']['id'] ?? 0), $fName2, 'F10 . and it points at the organisation the IDENTIFIER names');
-$f8b = partner_find_or_problem('Cobalt Works Ltd', '24PPPQQ8888P1Z9', '', '');
+$f8b = partner_find_or_problem('Cobalt Works Ltd', '24PPPQQ8888P1ZZ', '', '');
 t_eq((string)($f8b['confidence'] ?? ''), 'EXACT', 'F11 . the staff guard agrees');
 //  And with no identifier in play, the same name is still only POSSIBLE.
 t_eq((string)(find_duplicate_partner('Cobalt Works Ltd', '', '', '', 0)['confidence'] ?? ''), 'POSSIBLE',
@@ -749,8 +751,8 @@ t_eq((int)ops_val("SELECT COUNT(*) FROM activities WHERE entity_kind='PARTNER' A
 // =============================================================================
 t_section('P6-B3 · J — historical states are detected, never repaired (F9)');
 // =============================================================================
-$jA = $b3partner('Juniper Cables Ltd', ['gstin' => '24LLLMM6666L1Z9']);
-$jB = $b3partner('Juniper Cables Limited', ['gstin' => '24LLLMM6666L1Z9']);   // same tax id, planted
+$jA = $b3partner('Juniper Cables Ltd', ['gstin' => '24LLLMM6666L1ZB']);
+$jB = $b3partner('Juniper Cables Limited', ['gstin' => '24LLLMM6666L1ZB']);   // same tax id, planted
 $jSnap = (int)ops_val("SELECT COUNT(*) FROM business_partners");
 $jRows = function_exists('identity_state_findings') ? identity_state_findings() : [];
 $jKinds = array_column($jRows, 'kind');
@@ -793,7 +795,7 @@ t_eq((int)ops_val("SELECT COUNT(*) FROM business_partners WHERE id IN (?,?)", [$
 //  report said. Mutation M26 went through it twice. An agency that really does
 //  look like an organisation we know is planted here, and its presence is
 //  asserted BEFORE anything is concluded from its absence.
-$jAgGst = '24TTTUU1212T1Z9';
+$jAgGst = '24TTTUU1212T1Z3';
 $jAgParty = $b3partner('Juniper Manpower Services Ltd', ['gstin' => $jAgGst]);
 db()->prepare("INSERT INTO agencies (name,agency_type,gstin,active,created_at) VALUES (?, 'MANPOWER', ?, 1, ?)")
     ->execute(['Juniper Manpower Services Ltd', $jAgGst, date('c')]);
@@ -885,8 +887,8 @@ t_section('P6-B3 · M — the public route under attack');
 //  The refusal must not become an ORACLE. Whatever matched — a tax identifier
 //  or a name — the visitor must read the same sentence, or the difference
 //  itself tells them which of the two they hit.
-$mPid = $b3partner('Maybury Chemicals Ltd', ['gstin' => '24MMMNN6666M1Z9']);
-$mExact  = $b3one('join', 0, json_encode(['name' => 'Some Other Name Ltd', 'email' => 'm1@mb.test', 'gstin' => '24MMMNN6666M1Z9']));
+$mPid = $b3partner('Maybury Chemicals Ltd', ['gstin' => '24MMMNN6666M1Z2']);
+$mExact  = $b3one('join', 0, json_encode(['name' => 'Some Other Name Ltd', 'email' => 'm1@mb.test', 'gstin' => '24MMMNN6666M1Z2']));
 $mByName = $b3one('join', 0, json_encode(['name' => 'Maybury Chemicals Ltd', 'email' => 'm2@mb.test']));
 t_eq($b3parts('Some Other Name Ltd'), 0, 'M1 · an EXACT tax-identifier match creates no organisation');
 t_eq($b3parts('Maybury Chemicals Ltd'), 1, 'M1b · and a name match leaves the one that was already there');
@@ -913,10 +915,10 @@ if (is_array($mRow)) {
 //  An identifier the company gives us is KEPT, or the one check that cannot be
 //  argued with has nothing to match against next time.
 $mKeep = 'Redhill Ceramics Pvt Ltd';
-$b3one('join', 0, json_encode(['name' => $mKeep, 'email' => 'm11@redhill.test', 'gstin' => '24RRRSS7777R1Z9']));
+$b3one('join', 0, json_encode(['name' => $mKeep, 'email' => 'm11@redhill.test', 'gstin' => '24RRRSS7777R1ZN']));
 t_eq((string)ops_val("SELECT gstin FROM business_partners WHERE legal_name=? ORDER BY id DESC LIMIT 1", [$mKeep]),
-     '24RRRSS7777R1Z9', 'M11 · a tax identifier given at registration is stored, not read and discarded');
-$mAgain = $b3one('join', 0, json_encode(['name' => 'Redhill Ceramics Limited Trading', 'email' => 'm12@redhill.test', 'gstin' => '24RRRSS7777R1Z9']));
+     '24RRRSS7777R1ZN', 'M11 · a tax identifier given at registration is stored, not read and discarded');
+$mAgain = $b3one('join', 0, json_encode(['name' => 'Redhill Ceramics Limited Trading', 'email' => 'm12@redhill.test', 'gstin' => '24RRRSS7777R1ZN']));
 t_eq($b3parts('Redhill Ceramics Limited Trading'), 0,
      'M12 · so the SAME company under another name creates nothing the next time');
 

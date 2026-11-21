@@ -329,17 +329,25 @@ function ops_customer360($route, $method) {
 
         $name = trim((string) ($_POST['legal_name'] ?? ''));
         if ($name === '') { flash('Give the branch company its registered name.', 'error'); redirect('/customer?id=' . $pid); }
-        $gstin = strtoupper(trim((string) ($_POST['gstin'] ?? '')));
-        if ($gstin !== '' && !preg_match('~^[0-9A-Z]{15}$~', $gstin)) {
-            flash('A GSTIN is 15 characters — check it, or leave it blank and add it later.', 'error');
-            redirect('/customer?id=' . $pid);
-        }
-        //  The same GSTIN twice is the same legal entity twice. That is the
-        //  duplicate this feature could most easily create, so it is refused by
-        //  name rather than left for somebody to discover at invoice time.
-        if ($gstin !== '') {
-            $dup = c360_one("SELECT id, COALESCE(NULLIF(display_name,''), legal_name) nm FROM business_partners WHERE UPPER(COALESCE(gstin,''))=? LIMIT 1", [$gstin]);
-            if ($dup) { flash('GSTIN ' . $gstin . ' is already on ' . $dup['nm'] . '.', 'error'); redirect('/customer?id=' . $pid); }
+        //  Owner, 21 Nov 2026 (D1–D4): a branch company is put on file by its GSTIN —
+        //  checked with its check digit — and matched against the central customer
+        //  list. The same GSTIN anywhere is refused; the SAME PAN as this group is
+        //  the same company in another state, so it becomes a billing location of
+        //  the main customer instead of a second record. Only a different PAN (a
+        //  separate legal entity in the group) is a separate branch company.
+        $gstin = clean_gstin($_POST['gstin'] ?? '');
+        if ($gstin === '') { flash('Enter the branch company\'s GSTIN. A branch that is not GST-registered is an address on this ' . Tl('client') . ', not a separate company.', 'error'); redirect('/customer?id=' . $pid); }
+        if (($why = custid_gstin_problem($gstin)) !== '') { flash($why, 'error'); redirect('/customer?id=' . $pid); }
+        if ($own = custid_gstin_owner($gstin)) { flash('GSTIN ' . $gstin . ' is already on ' . trim(($own['code'] ?? '') . ' — ' . ($own['legal_name'] ?? '')) . '.', 'error'); redirect('/customer?id=' . $pid); }
+        $rootId = (int) ($parent['parent_id'] ?? 0) ?: (int) $parent['id'];
+        $rootRow = c360_one("SELECT * FROM business_partners WHERE id=?", [$rootId]) ?: $parent;
+        $groupPan = strtoupper(trim((string) ($rootRow['pan'] ?? ''))) ?: pan_from_gstin($rootRow['gstin'] ?? '');
+        if ($groupPan !== '' && pan_from_gstin($gstin) === $groupPan) {
+            ops_require(custid_can_edit($rootRow), 'You cannot change ' . ($rootRow['legal_name'] ?? 'that record') . '.');
+            $r = custid_add_location($rootId, ['gstin' => $gstin, 'label' => trim((string) ($_POST['display_name'] ?? '')) ?: $name]);
+            if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/customer?id=' . $pid); }
+            flash($name . ' has the same PAN (' . $groupPan . ') as ' . ($rootRow['display_name'] ?: $rootRow['legal_name']) . ', so it is the same company: GSTIN ' . $gstin . ' (' . state_from_gstin($gstin) . ') was added as its billing location — no second record.');
+            redirect('/partner?id=' . $rootId . '#billing-locations');
         }
 
         $br = (int) ($_POST['home_branch_id'] ?? 0);
@@ -359,6 +367,8 @@ function ops_customer360($route, $method) {
                        VALUES (?,?,?,?,?,?,1,0,'ACTIVE',?)")
             ->execute([$code, $name, trim((string) ($_POST['display_name'] ?? '')) ?: $name, $root, $br, $gstin, date('c')]);
         $newId = (int) db()->lastInsertId();
+        custid_save($newId, ['gstin' => $gstin, 'pan' => pan_from_gstin($gstin), 'state' => state_from_gstin($gstin), 'state_code' => substr($gstin, 0, 2),
+                             'tax_status' => 'REGISTERED', 'tax_reason' => '', 'country' => '', 'foreign_tax_id' => '']);
         if (function_exists('act_log')) {
             act_log('PARTNER', $newId, 'SYSTEM', 'Created as a branch company of ' . ($parent['display_name'] ?: $parent['legal_name']) . '.', ['auto' => 1]);
             act_log('PARTNER', $pid, 'SYSTEM', 'Branch company ' . $name . ' added under this client.', ['auto' => 1]);

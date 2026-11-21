@@ -286,7 +286,10 @@ function normalize_name($name) {
     $n = strtolower((string)$name);
     $n = preg_replace('/^m\/?s\.?\s+/', '', $n);
     $n = preg_replace('/[^a-z0-9 ]/', ' ', $n);
-    $n = preg_replace('/\b(private|pvt|limited|ltd|llp|company|co)\b/', ' ', $n);
+    //  Owner, 21 Nov 2026 (Q-02): "Sunrise Valves" and "Sunrise Valves Pvt Ltd" are one
+    //  name — the company form words (Pvt Ltd, Private Limited, Ltd, Limited, LLP, Co,
+    //  Company, & Co, Inc, Incorporated, Corporation) and punctuation are left out.
+    $n = preg_replace('/\b(private|pvt|limited|ltd|llp|company|co|inc|incorporated|corp|corporation)\b/', ' ', $n);
     return trim(preg_replace('/\s+/', ' ', $n));
 }
 function short_token($name) {

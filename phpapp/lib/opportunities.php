@@ -998,13 +998,21 @@ function opp_add_customer($oppId, array $b = []) {
     $name = trim((string)($b['company_name'] ?? '')); if ($name === '') $name = trim((string)($o['partner_name'] ?? ''));
     if ($name === '') return ['err' => 'The customer needs a name.'];
     $name = mb_substr($name, 0, 200); $state = mb_substr(trim((string)($b['state'] ?? '')), 0, 60);
-    $near = null;
-    if (function_exists('partner_find_or_problem')) {
-        $hit = partner_find_or_problem($name, '', '', '', 0);
-        //  Certainly the same company: stop and name it — pick it from the list instead.
-        if (($hit['confidence'] ?? 'NONE') === 'EXACT') return ['err' => $hit['message']];
-        if (($hit['confidence'] ?? 'NONE') === 'POSSIBLE') $near = $hit['row'];
+    //  Owner, 21 Nov 2026 (D1–D4): the customer's GSTIN and PAN (or a recorded
+    //  reason), matched against the central customer list. The same PAN with a new
+    //  GSTIN is a billing location of the customer on file, never a second one.
+    $res = custid_resolve_new_customer($name, $b);
+    if (!empty($res['err'])) return ['err' => $res['err'], 'loc_offer' => (int) ($res['offer']['id'] ?? 0)];
+    if (!empty($res['attach'])) {
+        $pid = (int) $res['attach'];
+        $claim = db()->prepare("UPDATE opportunities SET partner_id=?, partner_name=?, updated_at=? WHERE id=? AND COALESCE(partner_id,0)=0");
+        $claim->execute([$pid, (string) (ops_val("SELECT legal_name FROM business_partners WHERE id=?", [$pid]) ?: $name), date('c'), (int) $o['id']]);
+        if ($claim->rowCount() !== 1) return ['err' => 'Someone else has just set the customer on this deal.'];
+        if (function_exists('act_log')) act_log('OPPORTUNITY', (int) $o['id'], 'CUSTOMER', 'Customer set to the one already on file with this PAN; GSTIN ' . $res['cid']['gstin'] . ' added as its billing location.');
+        return ['partner_id' => $pid];
     }
+    $near = $res['near'] ?? null;
+    if ($res['cid']['state'] !== '') $state = mb_substr($res['cid']['state'], 0, 60);
     //  A name that matches one already on file is evidence, not proof. A person is
     //  standing here with the list of customers right below — so stop ONCE and ask,
     //  rather than quietly create what may be a second record for the same company.
@@ -1018,6 +1026,7 @@ function opp_add_customer($oppId, array $b = []) {
         $pdo->prepare("INSERT INTO business_partners (code,legal_name,display_name,is_client,is_vendor,status,state,created_at) VALUES (?,?,?,1,0,'ACTIVE',?,?)")
             ->execute([$code, $name, $name, $state, date('c')]);
         $pid = (int)$pdo->lastInsertId();
+        custid_save($pid, $res['cid']);
         //  Two people pressing at once: only the first one's customer is kept.
         $claim = $pdo->prepare("UPDATE opportunities SET partner_id=?, partner_name=?, updated_at=? WHERE id=? AND COALESCE(partner_id,0)=0");
         $claim->execute([$pid, $name, date('c'), (int)$o['id']]);
@@ -1422,8 +1431,12 @@ function ops_opportunities($route, $method) {
         $id = (int)($_POST['id'] ?? 0);
         ops_require(function_exists('leads_can_edit') && leads_can_edit() && leads_works_leads(), 'Only someone who works leads and deals can add the customer.');
         $r = opp_add_customer($id, $_POST);
-        if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/opportunity?id=' . $id . (!empty($r['near']) ? '&samename=1' : '') . '#opp=actions'); }
-        flash($r['name'] . ' is now a customer (' . $r['code'] . '). Next: send the deal to Accounts to register the contract. The customer record is short — GSTIN or PAN, address and e-mail are completed before the first ' . Tl('call') . '.'
+        if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/opportunity?id=' . $id . (!empty($r['near']) ? '&samename=1' : '') . (!empty($r['loc_offer']) ? '&loc=' . (int) $r['loc_offer'] : '') . '#opp=actions'); }
+        if (empty($r['code'])) {   // the same PAN: it is the customer already on file, billed at a new location
+            flash('This is the ' . Tl('client') . ' already on file with this PAN — the deal now points at it, and the GSTIN is added as its billing location.');
+            redirect('/opportunity?id=' . $id . '#opp=actions');
+        }
+        flash($r['name'] . ' is now a customer (' . $r['code'] . '), with its GSTIN and PAN. Next: send the deal to Accounts to register the contract. The address and e-mail are completed on the customer record before the first ' . Tl('call') . '.'
             . (!empty($r['near']) ? ' You confirmed it is a different company from ' . trim((string)($r['near']['legal_name'] ?? '')) . ', already on file — that is recorded on the new customer.' : ''));
         redirect('/opportunity?id=' . $id . '#opp=actions');
     }

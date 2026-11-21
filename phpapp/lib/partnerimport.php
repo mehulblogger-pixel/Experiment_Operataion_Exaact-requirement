@@ -181,6 +181,10 @@ function partner_map_header($header) {
         'city'          => ['city', 'town', 'location'],
         'pincode'       => ['pincode', 'pin', 'postcode', 'zip', 'zipcode'],
         'country'       => ['country'],
+        //  Owner, 21 Nov 2026 (D2): a client without a GSTIN says why.
+        'tax_status'    => ['taxstatus', 'gststatus', 'gstregistration', 'registration'],
+        'tax_reason'    => ['taxreason', 'reasonnogstin', 'nogstinreason', 'whynogstin'],
+        'foreign_tax_id'=> ['foreigntaxid', 'foreigntaxno', 'vatno', 'taxid', 'eintrn'],
         'description'   => ['notes', 'note', 'remarks', 'description', 'comment'],
     ];
     foreach (partner_import_columns() as $k => $label) $aliases[$k][] = org_norm($label);
@@ -259,14 +263,53 @@ function partner_import_parse($sheet, $defaultRole = 'Client') {
         $row['match_name'] = $match['legal_name'] ?? '';
         $row['action'] = $match ? 'update' : 'create';
 
+        //  Owner, 21 Nov 2026 (D1–D4). A CLIENT is one PAN, billed at one or more
+        //  places. A row with the same PAN as a client on file but a different GSTIN
+        //  is that client's billing location in another state — it is ADDED as one,
+        //  and never overwrites the main record's GSTIN. A new client needs its GSTIN
+        //  and PAN (or a tax status and reason); a GSTIN must pass its check digit.
+        $isClientRow = !empty((partner_import_roles()[$row['role']] ?? [])['is_client']);
+        $stWord = strtolower($get($r, 'tax_status'));
+        $stCode = preg_match('/overseas|foreign|export/', $stWord) ? 'OVERSEAS'
+                : (preg_match('/gov/', $stWord) ? 'GOVT_NO_PAN'
+                : (preg_match('/un ?reg|not ?reg|no gst/', $stWord) ? 'UNREGISTERED' : 'REGISTERED'));
+        $cid = custid_from_input(['tax_status' => $stCode, 'gstin' => $gstin, 'pan' => $get($r, 'pan'), 'tax_reason' => $get($r, 'tax_reason'),
+                                  'country' => $get($r, 'country'), 'foreign_tax_id' => $get($r, 'foreign_tax_id'), 'state' => $state],
+                                 $isClientRow && !$match);
+        $row['cid'] = $cid;
+        if ($cid['err'] !== '') {
+            if ($isClientRow && !$match) { $row['skip'] = true; $row['notes'][] = 'Not added: ' . $cid['err']; }
+            elseif ($gstin !== '') { $row['notes'][] = 'GSTIN not taken: ' . $cid['err']; $row['gstin'] = ''; $row['pan'] = ''; }
+        } elseif ($cid['gstin'] !== '') {
+            $row['pan'] = $cid['pan']; $row['state'] = $cid['state'];
+        }
+        if ($match && $row['gstin'] !== '') {
+            $cur = ops_one("SELECT gstin, pan FROM business_partners WHERE id=?", [(int) $match['id']]) ?: [];
+            $curG = clean_gstin($cur['gstin'] ?? ''); $curP = strtoupper(trim((string) ($cur['pan'] ?? ''))) ?: pan_from_gstin($curG);
+            if ($curG !== '' && $curG !== $row['gstin']) {
+                if ($curP !== '' && $curP === pan_from_gstin($row['gstin'])) {
+                    $row['action'] = 'location';
+                    $row['notes'][] = 'Same PAN as ' . ($match['legal_name'] ?? '') . ': ' . state_from_gstin($row['gstin']) . ' will be added as its billing location (its own GSTIN stays).';
+                } else {
+                    $row['skip'] = true;
+                    $row['notes'][] = 'Not taken: ' . ($match['legal_name'] ?? '') . ' already has GSTIN ' . $curG . ' with a different PAN — a different PAN is a different company.';
+                }
+            }
+        }
+
         // The same company twice in one sheet: keep the first, flag the rest.
         $norm = normalize_name($name);
-        if (isset($seenNames[$norm])) {
+        //  The same name with a different GSTIN of the same PAN is the same company in
+        //  another state — kept, and added as its billing location when written (D1).
+        if (isset($seenNames[$norm]) && !($row['gstin'] !== '' && ($seenGst[$norm] ?? '') !== '' && $seenGst[$norm] !== $row['gstin']
+                                          && pan_from_gstin($seenGst[$norm]) === pan_from_gstin($row['gstin']))) {
             $row['skip'] = true;
             $row['notes'][] = 'Same company as line ' . $seenNames[$norm] . ' of this file.';
-        } else $seenNames[$norm] = $i + 1;
+        } elseif (isset($seenNames[$norm])) {
+            $row['notes'][] = 'Same PAN as line ' . $seenNames[$norm] . ': added as its billing location in ' . state_from_gstin($row['gstin']) . '.';
+        } else { $seenNames[$norm] = $i + 1; $seenGst[$norm] = $row['gstin']; }
 
-        if ($gstin !== '' && !is_valid_gstin($gstin)) $row['notes'][] = 'GSTIN does not look like a valid 15-character number.';
+        if ($row['gstin'] === '' && $gstin !== '' && !is_valid_gstin($gstin)) $row['notes'][] = 'GSTIN does not look like a valid 15-character number.';
         if ($row['role_given'] !== '' && partner_match_role($row['role_given']) === '')
             $row['notes'][] = 'Role “' . $row['role_given'] . '” was not recognised, so ' . $defaultRole . ' was used.';
         $rows[] = $row;
@@ -277,11 +320,20 @@ function partner_import_parse($sheet, $defaultRole = 'Client') {
 // Write it. Creates what is new, updates what already exists, and never blanks
 // a field the sheet left empty — an empty cell means "no change", not "erase".
 function partner_import_apply(array $rows) {
-    $created = 0; $updated = 0; $skipped = 0; $contacts = 0; $addresses = 0;
+    $created = 0; $updated = 0; $skipped = 0; $contacts = 0; $addresses = 0; $locations = 0;
     foreach ($rows as $r) {
         if (!empty($r['skip'])) { $skipped++; continue; }
         $roles = partner_import_roles()[$r['role']] ?? partner_import_roles()['Client'];
         $id = (int)($r['match_id'] ?? 0);
+        //  The same PAN in another state: a billing location of the client on file.
+        if (($r['action'] ?? '') === 'location' && $id) {
+            $lr = custid_add_location($id, ['gstin' => $r['gstin'], 'label' => trim((string) ($r['display_name'] ?? '')) ?: (string) $r['legal_name'],
+                                            'line1' => $r['line1'] ?? '', 'line2' => $r['line2'] ?? '', 'city' => $r['city'] ?? '', 'pincode' => $r['pincode'] ?? '']);
+            if (!empty($lr['err'])) { $skipped++; continue; }
+            $locations++;
+            idems_log('partner', $id, 'IMPORT_LOCATION', ['field' => $r['gstin']]);
+            continue;
+        }
 
         $fields = ['display_name', 'client_type', 'industry', 'ownership_type', 'gstin', 'pan',
                    'cin', 'tan', 'msme_udyam', 'state', 'website', 'description'];
@@ -308,6 +360,19 @@ function partner_import_apply(array $rows) {
             db()->prepare("UPDATE business_partners SET " . implode(', ', $set) . " WHERE id = ?")->execute($args);
             $updated++;
         } else {
+            //  Checked again as it is written: an earlier row of this same file may
+            //  have just put this PAN on file — then this row is its billing location.
+            if (!empty($roles['is_client']) && trim((string) $r['gstin']) !== '') {
+                $live = custid_match('', $r['gstin'], pan_from_gstin($r['gstin']), 0);
+                if ($live['kind'] === 'GSTIN') { $skipped++; continue; }
+                if ($live['kind'] === 'PAN') {
+                    $lr = custid_add_location((int) $live['row']['id'], ['gstin' => $r['gstin'], 'label' => trim((string) ($r['display_name'] ?? '')) ?: (string) $r['legal_name'],
+                                                                         'line1' => $r['line1'] ?? '', 'line2' => $r['line2'] ?? '', 'city' => $r['city'] ?? '', 'pincode' => $r['pincode'] ?? '']);
+                    if (!empty($lr['err'])) { $skipped++; continue; }
+                    $locations++;
+                    continue;
+                }
+            }
             $code = trim((string)$r['code']);
             if ($code === '') $code = partner_next_code($r['legal_name']);
             $cols = ['code', 'legal_name', 'is_client', 'is_vendor', 'is_subcontractor', 'status', 'created_at'];
@@ -320,6 +385,7 @@ function partner_import_apply(array $rows) {
             db()->prepare("INSERT INTO business_partners (" . implode(',', $cols) . ") VALUES ("
                 . implode(',', array_fill(0, count($cols), '?')) . ")")->execute($vals);
             $id = (int)db()->lastInsertId();
+            if (!empty($roles['is_client']) && !empty($r['cid']) && ($r['cid']['err'] ?? '') === '') custid_save($id, $r['cid']);
             $created++;
         }
 
@@ -350,7 +416,7 @@ function partner_import_apply(array $rows) {
                   ['field' => $r['legal_name']]);
     }
     return ['created' => $created, 'updated' => $updated, 'skipped' => $skipped,
-            'contacts' => $contacts, 'addresses' => $addresses];
+            'contacts' => $contacts, 'addresses' => $addresses, 'locations' => $locations];
 }
 
 // The same GEN-XXXX-0001 series the rest of the app uses, so an imported

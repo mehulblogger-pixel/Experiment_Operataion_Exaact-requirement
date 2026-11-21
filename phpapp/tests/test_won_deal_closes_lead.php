@@ -34,8 +34,17 @@ try {
     $l2 = $mkLead('WDL New Prospect ' . getmypid());
     $d2 = (int) opp_from_lead($l2, [])['id'];
     opp_move($d2, $won, [], true);
+    //  21 Nov 2026 (D1–D4): a won customer needs its GSTIN and PAN, so winning a deal
+    //  with no customer no longer invents one without them. The deal stays won; the
+    //  lead waits for the person to convert it with the customer's tax identity.
+    $p0 = (int) ops_val("SELECT COUNT(*) FROM business_partners");
+    t_eq(lead_row($l2)['status'], 'OPEN', 'a deal with no customer yet: no customer is made without its GSTIN and PAN');
+    $why = lead_close_for_won_deal($d2);
+    t_ok(stripos($why, 'GSTIN') !== false && stripos($why, 'convert it') !== false, '…and the person is told why and what to do: ' . $why);
+    t_eq((int) ops_val("SELECT COUNT(*) FROM business_partners"), $p0, '…and still no customer is made');
+    lead_convert($l2, ['tax_status' => 'UNREGISTERED', 'pan' => 'AABPW' . sprintf('%04d', random_int(0, 9999)) . 'W', 'tax_reason' => 'test — below the GST threshold']);
     $L2 = lead_row($l2);
-    t_ok($L2['status'] === 'CONVERTED' && (int) $L2['converted_partner_id'] > 0, 'a deal with no customer yet: the lead is converted and the customer made');
+    t_ok($L2['status'] === 'CONVERTED' && (int) $L2['converted_partner_id'] > 0, 'converted with its tax identity: the lead is converted and the customer made');
     t_eq((int) opp_row($d2)['partner_id'], (int) $L2['converted_partner_id'], '… and the deal gets that customer');
 
     $l3 = $mkLead('WDL Older ' . getmypid(), $partner);

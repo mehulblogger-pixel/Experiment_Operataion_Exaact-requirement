@@ -2811,6 +2811,7 @@ function ops_crm_quotes($route, $method) {
                 }
                 if (!empty($costingOf))
                     crm_log_change($q['id'], 'Prices changed away from costing ' . $costingOf['code'] . ' — note: ' . trim((string)$b['costing_note']));
+                if (function_exists('custid_quote_set_location')) custid_quote_set_location((int) $q['id'], $b);
                 flash($voided
                     ? ucfirst(Tl('quote')) . ' saved. Because its commercial terms changed, the approval was cancelled — submit it for approval again.'
                     : ucfirst(Tl('quote')) . ' saved.', $voided ? 'warning' : 'success');
@@ -2833,6 +2834,7 @@ function ops_crm_quotes($route, $method) {
                 $pdo->prepare("INSERT INTO quotations (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
                 $id = $pdo->lastInsertId();
                 if ($once !== '') $_SESSION['quote_form_once'][$once] = (int)$id;
+                if (function_exists('custid_quote_set_location')) custid_quote_set_location((int) $id, $b);
                 crm_save_locations($id, $b);
                 crm_save_lines($id, $b); crm_quote_recalc($id); crm_quote_fill_unit_from_lines($id);
                 try { $leadRef = $leadId ? (string) ops_val("SELECT ref FROM leads WHERE id=?", [$leadId]) : ''; } catch (Throwable $e) { $leadRef = ''; }
@@ -3159,6 +3161,28 @@ function ops_crm_quotes($route, $method) {
                 } else {
                     flash('Before recording the acceptance: is "' . $q['client_name'] . '" the same company as ' . ($near['legal_name'] ?? '') . ' (' . ($near['code'] ?? '') . '), already on file? Answer on the ' . Tl('quote') . '.', 'warning');
                     redirect('/quote?id=' . $q['id'] . '#actions');
+                }
+            }
+            //  Owner, 21 Nov 2026 (D1–D4): "when we win the customer it shall be
+            //  mandatory to have GSTIN and PAN". A quotation won for a name that is not
+            //  on the client master asks for them here, matched against the central
+            //  customer list — the same PAN with a new GSTIN is a billing location of
+            //  the customer on file, not a second one.
+            if (empty($q['client_id']) && trim((string) ($q['client_name'] ?? '')) !== ''
+                && !ops_val("SELECT id FROM business_partners WHERE is_client=1 AND (legal_name=? OR display_name=?) LIMIT 1", [trim((string) $q['client_name']), trim((string) $q['client_name'])])) {
+                $cres = custid_resolve_new_customer((string) $q['client_name'], $_POST);
+                if (!empty($cres['err'])) {
+                    flash($cres['err'], 'error');
+                    redirect('/quote?id=' . $q['id'] . (!empty($cres['offer']['id']) ? '&loc=' . (int) $cres['offer']['id'] : '') . '#actions');
+                }
+                if (!empty($cres['attach'])) {
+                    $base = (int)(($q['parent_id'] ?? 0) ?: $q['id']);
+                    $pdo->prepare("UPDATE quotations SET client_id=?, billing_address_id=? WHERE (id=? OR id=? OR parent_id=?) AND (client_id IS NULL OR client_id=0)")
+                        ->execute([(int) $cres['attach'], (int) ($cres['location_id'] ?? 0), (int)$q['id'], $base, $base]);
+                    crm_log_change($q['id'], 'Won by the ' . Tl('client') . ' already on file with PAN ' . $cres['cid']['pan'] . '; GSTIN ' . $cres['cid']['gstin'] . ' added as its billing location (' . $me . ').');
+                    $q = crm_quote_get($q['id']);
+                } else {
+                    $q['_cid'] = $cres['cid'];
                 }
             }
             // Honest audit: if the client accepted after the validity had lapsed,
@@ -4184,6 +4208,8 @@ function crm_register_client_for_quote($q) {
     db()->prepare("INSERT INTO business_partners (code,legal_name,display_name,is_client,is_vendor,status,created_at) VALUES (?,?,?,1,0,'ACTIVE',?)")
         ->execute([$code, $name, $name, date('c')]);
     $pid = (int)db()->lastInsertId();
+    //  The GSTIN and PAN the person gave as the quotation was won (owner, 21 Nov 2026).
+    if (!empty($q['_cid']) && function_exists('custid_save')) custid_save($pid, $q['_cid']);
     if (function_exists('partner_audit_created'))
         partner_audit_created($pid, 'Created from an accepted quotation'
             . ($near ? '. It looks similar to ' . trim((string)($near['code'] ?? '')) . ' — '
