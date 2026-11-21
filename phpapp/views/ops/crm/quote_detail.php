@@ -358,9 +358,21 @@ $qVal = quote_validity($q);
 <?php endif; ?>
 <?php endif; // current revision ?>
 
+<?php // ---- The six tabs of the approved design (owner, 21 Nov 2026: Stage 4 / Stage 5 C2) ----
+      //  Overview (next step, decision, approval chain, pre-order checklist, costing,
+      //  commercials) · Lines & milestones · Approvals (the full approval record) ·
+      //  Documents · Contract & order · History & follow-ups. Every panel is the one
+      //  that was here; only the tab it sits under changed. Without script every
+      //  panel shows, one below the other. ?>
+<div data-tabs data-tabs-key="quote" data-tabs-order="Overview,Lines &amp; milestones,Approvals,Documents,Contract &amp; order,History &amp; follow-ups">
+<?php // Quotation playbook — the guided sales path, first thing on Overview so
+      // Quote -> Order -> Job all read the same.
+      if (function_exists('crm_render_quote_playbook')): ?>
+  <div data-tab="Overview"><?php crm_render_quote_playbook($q); ?></div>
+<?php endif; ?>
 <?php // ---- Project costing linked to this quotation --------------------------
   if (!empty($costingCan)): $pcRow = $costing ?? null; $back = '/quote?id=' . (int)$q['id']; ?>
-<div class="panel" id="costing" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+<div class="panel" id="costing" data-tab="Overview" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
   <span class="muted">🧮 Project costing:</span>
   <?php if ($pcRow): ?>
     <a class="btn small secondary" href="/project-costing?id=<?= (int)$pcRow['id'] ?>"><b><?= e($pcRow['code']) ?></b> — <?= e($pcRow['title']) ?></a>
@@ -416,7 +428,7 @@ $qVal = quote_validity($q);
     $pcWaived = trim((string)($q['preorder_waiver'] ?? '')) !== '';
     $pcOpen = !empty($q['is_current']) && !in_array((string)$q['status'], ['ACCEPTED', 'LOST', 'EXPIRED'], true);
 ?>
-<div class="panel" id="preorder" style="border:1px solid <?= ($pcAll || $pcWaived) ? 'var(--ok)' : 'var(--warn,#c90)' ?>">
+<div class="panel" id="preorder" data-tab="Overview" style="border:1px solid <?= ($pcAll || $pcWaived) ? 'var(--ok)' : 'var(--warn,#c90)' ?>">
   <div class="ctitle" style="margin-top:0"><h3>Pre-order review</h3>
     <span class="pill <?= ($pcAll || $pcWaived) ? 'p-ok' : 'p-warn' ?>"><?= $pcWaived && !$pcAll ? 'Waived' : (int)$pcDone . '/' . count($preorderItems) . ' done' ?></span></div>
   <p class="muted" style="margin:0 0 8px;font-size:12px">Enquiry / tender / contract review for this <?= e(Tl('quote')) ?>.<?= $preorderRequireAll ? ' <b>Every point must be ticked — or the checklist waived — before it is approved, sent, or accepted.</b>' : '' ?></p>
@@ -449,7 +461,7 @@ $qVal = quote_validity($q);
 <?php endif; ?>
 
 <?php if ($approvals): ?>
-<div class="panel" id="approval">
+<div class="panel" id="approval" data-tab="Overview">
   <h3 class="tab-sub" style="margin-top:0">Approval chain</h3>
   <?php if ($st==='PENDING_APPROVAL' && $pendingWith): ?>
     <div class="panel" style="margin:0 0 10px;background:var(--soft)">
@@ -549,12 +561,6 @@ $qVal = quote_validity($q);
   </form>
 </div>
 
-<div data-tabs data-tabs-key="quote">
-<?php // Quotation playbook — the guided sales path, first thing on Overview so
-      // Quote -> Order -> Job all read the same.
-      if (function_exists('crm_render_quote_playbook')): ?>
-  <div data-tab="Overview"><?php crm_render_quote_playbook($q); ?></div>
-<?php endif; ?>
 <div class="panel-split" data-tab="Overview">
   <div class="panel">
     <h3 class="tab-sub" style="margin-top:0"><?= e(T('client')) ?></h3>
@@ -576,7 +582,7 @@ $qVal = quote_validity($q);
   </div>
 </div>
 
-<div class="panel" style="padding:0;overflow:hidden" data-tab="Overview">
+<div class="panel" style="padding:0;overflow:hidden" data-tab="Lines &amp; milestones">
   <div class="tbl-scroll" style="overflow-x:auto">
   <table class="dt">
     <thead><tr><th>#</th><th><?= e(T('sbu')) ?></th><th>Service</th><th>Description</th><th>Location</th><th>Order</th><th class="num">Qty</th><th>Unit</th><th class="num">Rate</th><th class="num">Amount</th></tr></thead>
@@ -627,7 +633,7 @@ $qVal = quote_validity($q);
 
 <?php if (!empty($orderCalls)):
   $cInv=0;$cRec=0; foreach($orderCalls as $oc){ $cInv+=(float)$oc['invoiced']; $cRec+=(float)$oc['received']; } ?>
-<div class="panel" data-tab="Jobs &amp; order">
+<div class="panel" data-tab="Contract &amp; order">
   <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
     <h3 class="tab-sub" style="margin:0">Inspection <?= e(Tlp('call')) ?> under this order</h3>
     <a style="margin-left:auto;font-size:12.5px" href="/calls?<?= $q['contract_number'] ? 'contract=' . e(urlencode((string)$q['contract_number'])) : 'quote=' . (int)$q['id'] ?>">Open in the register →</a>
@@ -656,7 +662,7 @@ $qVal = quote_validity($q);
 
 <?php if (!empty($orderJobs)):
   $oInv=0;$oPaid=0; foreach($orderJobs as $oj){ $oInv+=(float)($oj['_invoiced'] ?? $oj['invoice_amount']); $oPaid+= !empty($oj['payment_received'])?(float)$oj['payment_amount']:0; } ?>
-<div class="panel" data-tab="Jobs &amp; order">
+<div class="panel" data-tab="Contract &amp; order">
   <h3 class="tab-sub" style="margin-top:0">Jobs &amp; revenue against this order</h3>
   <div class="chip-row" style="margin-bottom:8px">
     <span class="ct">Ordered <b><?= e(cur_sym()) ?><?= nf((float)$q['total_amount'], 2) ?></b></span>
@@ -678,7 +684,7 @@ $qVal = quote_validity($q);
 <?php endif; ?>
 
 <?php if ($st==='ACCEPTED'): ?>
-<div class="panel" id="contract" style="border:1px solid var(--ok)" data-tab="Jobs &amp; order">
+<div class="panel" id="contract" style="border:1px solid var(--ok)" data-tab="Contract &amp; order">
   <h3 class="tab-sub" style="margin-top:0">Won — client &amp; contract registration (Accounts)</h3>
   <?php
     $cr = $contractRow ?? null;
@@ -919,7 +925,7 @@ $qVal = quote_validity($q);
 <?php // Open by default once there is more than one version or any recorded change,
       // so the revision trail is visible without a click — a quotation's history is
       // part of the record, not a detail to hunt for. ?>
-<details class="fold" id="revisions" data-tab="History"<?= (count($revs) > 1 || !empty($hist)) ? ' open' : '' ?>>
+<details class="fold" id="revisions" data-tab="History &amp; follow-ups"<?= (count($revs) > 1 || !empty($hist)) ? ' open' : '' ?>>
   <summary>Revisions &amp; change history <span class="sub"><?= count($revs) ?> version<?= count($revs) === 1 ? '' : 's' ?><?= $hist ? ' · ' . count($hist) . ' logged change' . (count($hist) === 1 ? '' : 's') : '' ?><?= $followups ? ' · ' . count($followups) . ' follow-up' . (count($followups) === 1 ? '' : 's') : '' ?></span></summary>
   <div class="fold-body">
 <div class="panel-split">
@@ -1050,7 +1056,7 @@ $qVal = quote_validity($q);
   </div>
 </details>
 
-<div class="panel" data-tab="Sites &amp; docs">
+<div class="panel" data-tab="Documents">
   <h3 class="tab-sub" style="margin-top:0">Sites <span class="muted">— every location this <?= e(Tl('quote')) ?> covers</span></h3>
   <?php if ($locs): ?>
   <table class="dt">
@@ -1071,7 +1077,7 @@ $qVal = quote_validity($q);
   <?php else: ?><p class="muted">No sites recorded. Add them on the edit screen.</p><?php endif; ?>
 </div>
 
-<div class="panel" data-tab="Sites &amp; docs" id="quote-docs">
+<div class="panel" data-tab="Documents" id="quote-docs">
   <h3 class="tab-sub" style="margin-top:0">Documents <span class="muted">— the enquiry e-mail, the <?= e(Tl('client')) ?>'s PO, QAP / scope of inspection, our format and anything the <?= e(Tl('engineer')) ?> will need</span></h3>
   <?php if ($files): ?>
   <table class="dt">
@@ -1145,6 +1151,33 @@ $qVal = quote_validity($q);
   })();
   </script>
   <?php endif; ?>
+</div>
+<?php // ---- Approvals tab: the whole approval record, every revision (read only) ----
+      //  The live chain with its Approve / Reject buttons stays on Overview, where
+      //  the decision is taken; this tab is the record — who signed what, when, with
+      //  what comment, on this revision and the earlier ones. Read from crm_approvals(). ?>
+<div class="panel" id="approval-record" data-tab="Approvals">
+  <h3 class="tab-sub" style="margin-top:0">Approval record</h3>
+  <?php $arRows = [];
+        foreach (($revs ?? []) as $rv) foreach ((function_exists('crm_approvals') ? crm_approvals((int) $rv['id']) : []) as $ar) $arRows[] = ['rev' => $rv, 'a' => $ar];
+        if (!$arRows): ?>
+    <p class="muted" style="margin:0">This <?= e(Tl('quote')) ?> has not been sent for approval yet. When it is, every level, who signed it, when and with what comment is listed here.</p>
+  <?php else: ?>
+  <div class="rec-scroll"><table class="dt">
+    <thead><tr><th>Revision</th><th class="num">Level</th><th>With whom</th><th>Status</th><th>Acted</th><th>Comment</th></tr></thead>
+    <tbody>
+    <?php foreach ($arRows as $x): $rv = $x['rev']; $a = $x['a']; ?>
+      <tr><td><?= (int) $rv['rev'] > 0 ? 'Rev ' . str_pad((string) $rv['rev'], 2, '0', STR_PAD_LEFT) : 'Original' ?><?= !empty($rv['is_current']) ? ' <span class="pill p-ok">current</span>' : '' ?></td>
+        <td class="num"><?= (int) $a['level'] ?></td>
+        <td><?= e(function_exists('crm_step_who') ? ucfirst(crm_step_who($a)) : (string) ($a['approver_role'] ?? '')) ?></td>
+        <td><span class="pill <?= $a['status'] === 'APPROVED' ? 'p-ok' : ($a['status'] === 'REJECTED' ? 'p-bad' : 'p-warn') ?>"><?= e($a['status'] === 'PENDING' ? 'Pending' : ucfirst(strtolower((string) $a['status']))) ?></span></td>
+        <td class="muted"><?= !empty($a['acted_by']) ? e($a['acted_by']) . ' · ' . e(fdate(substr((string) $a['acted_at'], 0, 10))) : '—' ?></td>
+        <td class="muted"><?= !empty($a['remarks']) ? e($a['remarks']) : '—' ?></td></tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table></div>
+  <?php endif; ?>
+  <p class="muted" style="font-size:12px;margin:8px 0 0">The decision itself — Approve or Reject — is on <b>Overview</b>, under <b>Approval chain</b>.</p>
 </div>
 </div><!-- /data-tabs (quote) -->
 </div><!-- /rec sxqd -->
