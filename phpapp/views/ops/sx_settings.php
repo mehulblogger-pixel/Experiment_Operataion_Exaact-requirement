@@ -81,6 +81,13 @@ $stageLink = $stageEditorOn && $__s6open('pipelines', (!function_exists('pipe_ca
         <div class="sxs6-inl"><input id="sx6_stale" class="form-control sxnum" type="number" min="1" max="365" name="stale" value="<?= (int) $stale ?>" aria-label="Days"><span>days with no activity</span></div>
       <?php rec_card_close(); ?>
 
+      <?php //  DEF-10 (owner, 21 Nov 2026): ONE renewal window for Renewals, Today and Sales home.
+            if (isset($renewDays)): rec_card_open('Renewals', 'cal'); ?>
+        <label class="sxs6-lab" for="sx6_renew">Show contracts ending within</label>
+        <div class="sxs6-inl"><input id="sx6_renew" class="form-control sxnum" type="number" min="7" max="365" name="renew_days" value="<?= (int) $renewDays ?>" aria-label="Days"><span>days</span></div>
+        <p class="rec-note">Used by Renewals, Today and Sales home. Only open contracts are listed.<?= !empty($renewExample) ? ' <b>60 is an example</b> — change it to suit you.' : '' ?></p>
+      <?php rec_card_close(); endif; ?>
+
       <?php rec_card_open('New leads go to', 'building'); ?>
         <p class="rec-note" style="margin:0 0 8px">A quick lead for an office goes to its salesperson. Empty = whoever types it. Each list shows only people who work for that office.</p>
         <div class="tbl"><table class="rec-tbl"><thead><tr><th scope="col">Branch</th><th scope="col">Person</th></tr></thead><tbody><?php foreach ($offices as $o): ?>

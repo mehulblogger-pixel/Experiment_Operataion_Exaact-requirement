@@ -41,11 +41,33 @@ function sx_short($n) {
 //  The person a list is for: 0 = everyone (managers only).
 function sx_person() {
     $me = (int) (current_user()['id'] ?? 0);
-    if (!sx_can_see_all()) return $me;
+    if (!sx_can_see_all()) {
+        //  Owner, 21 Nov 2026: a sales manager sees their own list by default "but
+        //  they can also see details of his reportee" — anyone below them in
+        //  Reports to, never anyone else.
+        $p = (string) ($_GET['who'] ?? 'me');
+        if ($p !== '' && ctype_digit($p) && in_array((int) $p, sx_my_reportees(), true)) return (int) $p;
+        return $me;
+    }
     $p = $_GET['who'] ?? 'me';
     if ($p === 'all') return 0;
     if ($p === 'me' || $p === '') return $me;
     return (int) $p;
+}
+//  The people who report to me (the whole line below), for the "My team" picker.
+//  None for a person set to "own records" (Q10): they would see nothing of them.
+function sx_my_reportees() {
+    $me = (int) (current_user()['id'] ?? 0);
+    if (!$me || !function_exists('sales_reportee_ids')) return [];
+    if (function_exists('sales_rec_mode') && sales_rec_mode() === 'own') return [];
+    return sales_reportee_ids($me);
+}
+function sx_team_people() {
+    $ids = sx_my_reportees(); if (!$ids) return [];
+    $in = implode(',', array_map('intval', $ids)); $out = [];
+    try { foreach (ops_all("SELECT * FROM users WHERE id IN ($in) AND is_active=1 ORDER BY first_name, last_name") ?: [] as $u) $out[(int) $u['id']] = user_name($u); }
+    catch (Throwable $e) {}
+    return $out;
 }
 function sx_people() {
     try {
@@ -338,7 +360,10 @@ function ops_sales_simple($route, $method) {
     ops_require(sx_can(), 'Sales is not open to you.');
     if (function_exists('nav_under')) nav_under($route, 'sales');
     $who = sx_person();
-    $base = ['who' => $who, 'whoKey' => $_GET['who'] ?? 'me', 'people' => sx_can_see_all() ? sx_people() : [], 'seeAll' => sx_can_see_all()];
+    //  seeAll: true = Me / Everyone / anyone; 'team' = Me / the people who report to me.
+    $team = sx_can_see_all() ? [] : sx_team_people();
+    $base = ['who' => $who, 'whoKey' => $_GET['who'] ?? 'me', 'people' => sx_can_see_all() ? sx_people() : $team,
+             'seeAll' => sx_can_see_all() ? true : ($team ? 'team' : false)];
     switch ($route) {
         case 'sales-today':
             view('ops/sx_today', $base + ['d' => sx_today_data($who), 'whoRows' => sx_can_see_all() ? sx_who_has_what() : []]);

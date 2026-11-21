@@ -64,14 +64,14 @@ Left for later stages, noted here so nothing is lost:
   if the owner wants it limited to the person's branches, it is a one-line change in `sx_lead_dupes()`.
 - **Quick lead's 10-digit mobile rule** is still only on the quick lead (the full form accepts any
   telephone, e.g. a landline). Left as it was; ask before making them the same.
-- Q10 (whose records a person sees) — decided by the owner 21 Nov ("Keep this"); build in Stage 6, see below.
+- Q10 (whose records a person sees) — decided by the owner 21 Nov ("Keep this"); BUILT 21 Nov (Batch E, report 61).
 
 ## 🔐 "Who can do what" — batch B built (21 Nov 2026); follow-ups
 
 The new permission screen (`/who-can`, docs/02 19t) is built and tested; the old Roles screen
 (`/access`) stays reachable from it ("Old layout") for ONE release — remove the link and the
 tile-less route after the owner has used the new screen on opstest. Q10 ("whose
-records a person sees: own / team / branch / all") was decided 21 Nov — build in Stage 6. The person form's
+records a person sees: own / team / branch / all") was built 21 Nov (Batch E, report 61). The person form's
 permission grid could later be replaced by a link to this screen (one place to switch rights).
 
 ## 🔐 Permission foundation A — built 21 Nov 2026 (docs/02 19r, report 54)
@@ -89,12 +89,17 @@ permissions and person screens. Follow-ups noted, not built:
   is now decided by the switch alone (it used to need the specific module ticked).
 - The customer ledger (/ledger) and the advisor still show the whole-customer figure.
 
-## 🔐 Permission screen Q10 — decided 21 Nov 2026, build in Stage 6
+## 🔐 Permission screen Q10 — BUILT 21 Nov 2026 (Batch E, report 61)
 
-Owner: "Keep this." A per-role setting, with a per-person override, for whose records a person sees:
-**Own** (only records they own) / **Team** (theirs and their reporting line's) / **Branch** (everything in
-their branches) / **All** (the whole company). Day one = today's behaviour for every role. Scheduled with
-Stage 6 and the "Who can do what" screen. See EXAACT-Permission-Screen-Redesign-Proposal.pdf, question 10.
+Owner: "Keep this." Built as a per-role setting, with a per-person choice, on "Who can do what":
+**Own** / **Team** / **Branch** / **All**. Day one = Branch for every role (exactly as before; proved in
+`tests/test_q10_scope.php`). Follow-ups, only if the owner asks:
+- Own / Team are not applied to Accounts' "awaiting a contract number" queue (a work queue, not a
+  salesperson's list), nor to project costing's enquiry picker.
+- A record with no owner (an unassigned lead or enquiry) is hidden from a person set to Own / Team;
+  they still reach it through someone set to Branch. Ask the owner whether unassigned records should
+  stay visible to Own / Team people.
+- The person form (/user-edit) does not show the choice; it is on "Who can do what" only.
 
 ## 📣 Advertising spend by branch — parked by the owner (21 Nov 2026)
 

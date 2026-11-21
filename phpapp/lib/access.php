@@ -1838,14 +1838,113 @@ function scope_sales_unit_list() {
 function scope_sales_clause($alias) {
     [$w, $a] = scope_office_clause("$alias.office_id");
     $units = scope_sales_unit_list();
-    if ($units === null) return [$w, $a];
+    //  Q10 — whose records (own / team), inside the branch and unit limits above.
+    $own = sales_owner_sql("$alias.owner_user_id");
+    if ($units === null) return [$own === '1=1' ? $w : "($w) AND $own", $a];
     $q = implode(',', array_map(fn($u) => db()->quote($u), $units));
-    return ["($w) AND (COALESCE($alias.sbu,'') = '' OR $alias.sbu IN ($q))", $a];
+    return ["($w) AND (COALESCE($alias.sbu,'') = '' OR $alias.sbu IN ($q))" . ($own === '1=1' ? '' : " AND $own"), $a];
 }
-function scope_sales_allows($officeId, $sbu) {
+//  $ownerId: the record's owner (leads / deals), or false when the caller has no
+//  owner to ask about — then only branch and unit decide, as before Q10.
+function scope_sales_allows($officeId, $sbu, $ownerId = false) {
     if (function_exists('scope_office_allows') && !scope_office_allows($officeId)) return false;
+    if ($ownerId !== false && !sales_owner_allows($ownerId)) return false;
     $units = scope_sales_unit_list();
     return $units === null || trim((string) $sbu) === '' || in_array((string) $sbu, $units, true);
+}
+
+// ---- Q10 — whose records a person sees (owner, 21 Nov 2026: "Keep this") -------
+//  Own    only the records they own;
+//  Team   theirs and those of everyone who reports to them (the whole line below);
+//  Branch everything in their branches (and business units) — the rule every
+//         Sales register has always followed;
+//  All    the whole company = Branch for a person whose branches are "All
+//         branches". Branches stay where they have always been set (the person's
+//         branches / data scope); "All" on the screen sets them to All branches.
+//  Own and Team NARROW inside the branch and unit limits; they never let anyone
+//  see a branch they could not see before.
+//
+//  Stored as a setting, not as permission ticks: "Select everything" and the
+//  Master Admin's every-right must never switch a person to "own records only".
+//  A role with nothing saved, and a person with no override, is Branch — exactly
+//  what every register did before Q10 (proved person by person in
+//  tests/test_q10_scope.php). Owner of a lead / deal = its owner; of an enquiry =
+//  the person it is assigned to; of a quotation = its owner (else whoever made it).
+const SALES_REC_MODES = ['own' => 'Own', 'team' => 'Team', 'branch' => 'Branch'];
+function sales_rec_store() {
+    $s = json_decode((string) (function_exists('setting_get') ? setting_get('sales_records_mode', '') : ''), true);
+    $s = is_array($s) ? $s : [];
+    return ['roles' => (array) ($s['roles'] ?? []), 'users' => (array) ($s['users'] ?? [])];
+}
+function sales_rec_store_put(array $st) { setting_set('sales_records_mode', json_encode(['roles' => (object) $st['roles'], 'users' => (object) $st['users']])); }
+function sales_rec_role_mode($role) {
+    $st = sales_rec_store(); $role = strtoupper((string) $role);
+    $m = $st['roles'][$role] ?? null;
+    if ($m === null && function_exists('role_effective_key')) $m = $st['roles'][role_effective_key($role)] ?? null;
+    return in_array($m, ['own', 'team'], true) ? $m : 'branch';
+}
+//  A person's own choice ('' = follows the role).
+function sales_rec_user_override($uid) {
+    $m = sales_rec_store()['users'][(string) (int) $uid] ?? '';
+    return in_array($m, ['own', 'team', 'branch'], true) ? $m : '';
+}
+function sales_rec_mode_for($u) {
+    if (!$u) return 'branch';
+    if (!empty($u['is_superuser']) || strtoupper((string) ($u['role'] ?? '')) === 'MASTER_ADMIN') return 'branch';
+    $o = sales_rec_user_override((int) ($u['id'] ?? 0));
+    return $o !== '' ? $o : sales_rec_role_mode($u['role'] ?? '');
+}
+function sales_rec_mode() {
+    $u = function_exists('current_user') ? current_user() : null;
+    return $u ? sales_rec_mode_for($u) : 'branch';   // no signed-in person (CLI, nightly runs): unchanged
+}
+//  The person and everyone below them in "Reports to", however deep (loop-safe).
+function sales_team_ids($uid) {
+    $uid = (int) $uid; if ($uid <= 0) return [];
+    $kids = [];
+    try { foreach (ops_all("SELECT id, reports_to_id FROM users WHERE COALESCE(reports_to_id,0) > 0") ?: [] as $r) $kids[(int) $r['reports_to_id']][] = (int) $r['id']; }
+    catch (Throwable $e) { return [$uid]; }
+    $seen = [$uid => true]; $todo = [$uid];
+    while ($todo) { $c = array_pop($todo); foreach ($kids[$c] ?? [] as $k) if (!isset($seen[$k])) { $seen[$k] = true; $todo[] = $k; } }
+    return array_keys($seen);
+}
+//  Everyone who reports to $uid (not $uid), for the Sales home / Today picker.
+function sales_reportee_ids($uid) { return array_values(array_diff(sales_team_ids($uid), [(int) $uid])); }
+//  The owners whose records the current person sees; null = no owner limit (Branch).
+function sales_rec_ids() {
+    $u = function_exists('current_user') ? current_user() : null;
+    $mode = sales_rec_mode();
+    if ($mode === 'branch' || !$u) return null;
+    $me = (int) ($u['id'] ?? 0);
+    return $mode === 'own' ? [$me] : sales_team_ids($me);
+}
+function sales_owner_sql($col) {
+    $ids = sales_rec_ids();
+    return $ids === null ? '1=1' : "COALESCE($col,0) IN (" . implode(',', array_map('intval', $ids ?: [0])) . ")";
+}
+function sales_owner_allows($ownerId) {
+    $ids = sales_rec_ids();
+    return $ids === null || in_array((int) $ownerId, $ids, true);
+}
+//  A quotation's owner: owner_id, else the person who made it (created_by holds a
+//  username or a full name — crm_quote_owner_user_id()'s own rule).
+function sales_quote_owner_sql($a = 'q') {
+    $ids = sales_rec_ids();
+    if ($ids === null) return '1=1';
+    $in = implode(',', array_map('intval', $ids ?: [0]));
+    $names = [];
+    try { foreach (ops_all("SELECT username, first_name, last_name FROM users WHERE id IN ($in)") ?: [] as $r) {
+        if (trim((string) $r['username']) !== '') $names[] = (string) $r['username'];
+        $full = trim(($r['first_name'] ?? '') . ' ' . ($r['last_name'] ?? '')); if ($full !== '') $names[] = $full;
+    } } catch (Throwable $e) {}
+    $nm = $names ? implode(',', array_map(fn($n) => db()->quote($n), array_values(array_unique($names)))) : "''";
+    return "(COALESCE($a.owner_id,0) IN ($in) OR (COALESCE($a.owner_id,0)=0 AND $a.created_by IN ($nm)))";
+}
+//  scope_clause() for a quotation, with Q10 on top.
+function scope_quote_clause($officeCol = 'q.office_id', $sbuCol = 'q.sbu', $a = 'q') {
+    [$w, $args] = scope_clause($officeCol, $sbuCol);
+    $o = sales_quote_owner_sql($a);
+    return [$o === '1=1' ? $w : "($w) AND $o", $args];
 }
 
 // Build a WHERE fragment scoping calls/jobs by office + Business Unit. $officeCol is the

@@ -265,6 +265,9 @@ function sx_orders($who, $from, $to) {
     if ($who) $rows = array_values(array_filter($rows, fn($q) => (int) ($q['owner_id'] ?? 0) === $who));
     //  Office scope: the quotation register's own rule, when the office is set.
     if (function_exists('scope_allows')) $rows = array_values(array_filter($rows, fn($q) => empty($q['office_id']) || scope_allows((int) $q['office_id'])));
+    //  Q10 — "own" / "team" (owner, 21 Nov 2026): the order's quotation owner, as on its register.
+    if (function_exists('sales_rec_ids') && sales_rec_ids() !== null && function_exists('crm_quote_owner_user_id'))
+        $rows = array_values(array_filter($rows, fn($q) => sales_owner_allows((int) (crm_quote_owner_user_id($q) ?? 0))));
     $ar = function_exists('ar_can') && ar_can();
     foreach ($rows as &$q) {
         $q['_billed'] = null; $q['_recv'] = null; $q['_cash'] = null; $q['_tds'] = null; $q['_credit'] = null; $q['_out'] = null; $q['_invs'] = [];

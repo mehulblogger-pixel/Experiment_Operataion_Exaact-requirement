@@ -212,6 +212,9 @@ $previewCard = function (array $lines, $title, $sub, array $history, $histTitle 
         <input type="hidden" name="_back" value="who">
         <fieldset<?= $isCustom ? ' disabled' : '' ?> class="wc-fs">
         <legend class="sr-only">Switches for <?= e($roles[$sel]) ?></legend>
+        <?php if (function_exists('sales_rec_role_mode')): ?>
+          <section class="rec-card wc-recbox"><?= whocan_records_ctl('role', sales_rec_role_mode($sel)) ?></section>
+        <?php endif; ?>
         <?php $renderTree($tree, $savedOn,
             function ($r, $isOn) use ($recOn) {
                 $rec = $recOn($r['key']);
@@ -327,6 +330,11 @@ $previewCard = function (array $lines, $title, $sub, array $history, $histTitle 
             <small>Only a company-wide user manager can change <?= e(Tlp('office')) ?>. Saving here — as on the person form — keeps them on their own <?= e(Tl('office')) ?>.</small>
           <?php endif; ?>
           </div>
+          <?php if (function_exists('sales_rec_user_override')):
+              $recCur = sales_rec_user_override((int) $user['id']);
+              if ($recCur === 'branch' && $offAll) $recCur = 'all'; ?>
+          <div class="wide"><?= whocan_records_ctl('person', $recCur, sales_rec_role_mode($role), $globalMgr) ?></div>
+          <?php endif; ?>
           <?php if ($globalMgr && $opsOn): ?>
           <div class="wide"><span class="k"><?= e(THP('sbu')) ?> they see</span>
             <label class="wc-chk"><input type="checkbox" name="scope_sbus_all" value="1" data-wc-all="wc-sbus"<?= $sbuAll ? ' checked' : '' ?>> <b>Every <?= e(Tl('sbu')) ?></b></label>

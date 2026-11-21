@@ -649,6 +649,8 @@ function crm_inquiry_in_scope($inq) {
     if (!$inq) return false;
     if (function_exists('scope_office_allows') && !scope_office_allows($inq['office_id'] ?? null)) return false;
     if (function_exists('scope_sbu_allows') && trim((string)($inq['sbu'] ?? '')) !== '' && !scope_sbu_allows($inq['sbu'])) return false;
+    //  Q10 — "own" / "team": an enquiry is the person's it is assigned to.
+    if (function_exists('sales_owner_allows') && !sales_owner_allows((int)($inq['assigned_to'] ?? 0))) return false;
     return true;
 }
 function crm_inquiry_office_for_recorder() {
@@ -2089,6 +2091,7 @@ function inquiries_due($today = null) {
         foreach ($sb as $s) $a[] = $s;
     }
     if (function_exists('scope_office_clause')) { [$ow, $oa] = scope_office_clause('i.office_id'); $w[] = $ow; $a = array_merge($a, $oa); }
+    if (function_exists('sales_owner_sql')) $w[] = sales_owner_sql('i.assigned_to');   // Q10
     $rows = ops_all("SELECT i.*, bp.display_name client_disp, u.first_name owner_first, u.last_name owner_last, u.username owner_username
                      FROM crm_inquiries i
                      LEFT JOIN business_partners bp ON bp.id=i.client_id
@@ -2152,6 +2155,7 @@ function ops_crm_inquiries($route, $method) {
         $sb = scope_sbus();
         if ($sb !== 'ALL' && is_array($sb) && $sb) { $ph = implode(',', array_fill(0, count($sb), '?')); $w[] = "(i.sbu IN ($ph) OR i.sbu='')"; foreach ($sb as $s) $args[] = $s; }
         [$ow, $oa] = scope_office_clause('i.office_id'); $w[] = $ow; $args = array_merge($args, $oa);
+        if (function_exists('sales_owner_sql')) $w[] = sales_owner_sql('i.assigned_to');   // Q10
         // Financial-year window (defaults to the current FY; "All years" removes it).
         $fy = fy_filter();
         if (!$fy['all']) { $w[] = 'i.created_at >= ?'; $args[] = $fy['from']; $w[] = 'i.created_at < ?'; $args[] = $fy['to_excl']; }
@@ -2405,8 +2409,11 @@ function crm_quote_scope_gate($route) {
         $id = (int)ops_val("SELECT quote_id FROM quote_followups WHERE id=?", [$id]);
     }
     if ($id <= 0) return;
-    $q = ops_one("SELECT office_id, sbu FROM quotations WHERE id=?", [$id]);
+    $q = ops_one("SELECT office_id, sbu, owner_id, created_by FROM quotations WHERE id=?", [$id]);
     if (!$q) return;                            // no such quote — the route's own 404 answers
+    //  Q10 — "own" / "team" (owner, 21 Nov 2026): a quotation is its owner's, else its maker's.
+    ops_require(!function_exists('sales_owner_allows') || sales_owner_allows((int) (crm_quote_owner_user_id($q) ?? 0)),
+                'This ' . Tl('quote') . ' belongs to someone outside the records you see (your "whose records" setting).');
     ops_require(scope_allows($q['office_id'] ?? null, $q['sbu'] ?? null),
                 'This quotation is outside your office / branch scope.');
 }
@@ -2491,14 +2498,14 @@ function ops_crm_quotes($route, $method) {
             // "Awaiting a contract number" — accepted quotes Accounts still has to
             // register. Same scope as quotes_awaiting_contract_count(), so the list
             // matches the dashboard task.
-            [$cw, $args] = scope_clause('q.office_id', 'q.sbu');
+            [$cw, $args] = scope_clause('q.office_id', 'q.sbu');   // Accounts' queue: branch only, not Q10
             $w = ['q.is_current=1', "q.status='ACCEPTED'", "(q.contract_number IS NULL OR q.contract_number='')", $cw];
             $view = 'closed';
         } else {
             $mine = '';
             // EXPIRED is its OWN closed state, not a regretted loss — kept out of "lost"
             // so the win/loss numbers stay honest (Module 03).
-            [$scopeW, $args] = scope_clause('q.office_id', 'q.sbu');
+            [$scopeW, $args] = scope_quote_clause('q.office_id', 'q.sbu');
             $w = [$scopeW, 'q.is_current=1'];
             if (isset($stateSets[$view])) { $set = $stateSets[$view]; $ph = implode(',', array_fill(0, count($set), '?')); $w[] = "q.status IN ($ph)"; foreach ($set as $s) $args[] = $s; }
             // Financial-year window (defaults to the current FY; "All years" removes it).
@@ -2525,7 +2532,7 @@ function ops_crm_quotes($route, $method) {
         else {
             [$fyW2, $fyA2] = fy_sql('q.created_at', $fy);
             foreach (['open', 'pending', 'closed', 'lost', 'expired'] as $k) {
-                [$sw, $sa] = scope_clause('q.office_id', 'q.sbu'); $set = $stateSets[$k]; $ph = implode(',', array_fill(0, count($set), '?'));
+                [$sw, $sa] = scope_quote_clause('q.office_id', 'q.sbu'); $set = $stateSets[$k]; $ph = implode(',', array_fill(0, count($set), '?'));
                 foreach ($set as $s) $sa[] = $s;
                 $counts[$k] = (int)ops_val("SELECT COUNT(*) FROM quotations q WHERE $sw AND q.is_current=1 AND q.status IN ($ph)" . $fyW2, array_merge($sa, $fyA2));
             }
@@ -2540,7 +2547,7 @@ function ops_crm_quotes($route, $method) {
         $total = (int)ops_val("SELECT COUNT(*)" . $join . $where, $allArgs);
         $rows = ops_all($select . $join . $where . dt_sql_tail($dt, $cols, 'q.id DESC'), $allArgs) ?: [];
         //  What the filters offer: only owners, branches and units inside the person's own rows.
-        [$sw0, $sa0] = scope_clause('q.office_id', 'q.sbu');
+        [$sw0, $sa0] = scope_quote_clause('q.office_id', 'q.sbu');
         $owners = ops_all("SELECT DISTINCT u.id, u.first_name, u.last_name, u.username FROM quotations q JOIN users u ON u.id=q.owner_id
                            WHERE q.is_current=1 AND $sw0 ORDER BY u.first_name, u.username", $sa0) ?: [];
         $branches = ops_all("SELECT DISTINCT o.id, o.name FROM quotations q JOIN offices o ON o.id=q.office_id WHERE q.is_current=1 AND $sw0 ORDER BY o.name", $sa0) ?: [];
@@ -3889,6 +3896,7 @@ function ops_crm_quotes($route, $method) {
 //  it just has to be visible that the paperwork is outstanding.
 // ---------------------------------------------------------------------------
 function quotes_awaiting_contract($limit = 100) {
+    //  Accounts' work queue, not a salesperson's list: branch scope only (not Q10).
     [$w, $a] = scope_clause('q.office_id', 'q.sbu');
     return ops_all("SELECT q.id, q.quote_no, q.rev, q.client_name, q.subject, q.total_amount, q.accepted_date,
                            q.client_id, q.office_id
@@ -5290,7 +5298,7 @@ function ops_crm_reports() {
     ops_require(can('mod.crm_reports.view') || is_master_of('crm_reports'), 'You do not have access to sales reports.');
     $fy = $_GET['fy'] ?? current_fy();
     [$from, $to] = fy_range($fy);
-    [$sw, $sa] = scope_clause('q.office_id', 'q.sbu');
+    [$sw, $sa] = scope_quote_clause('q.office_id', 'q.sbu');
     $rows = ops_all("SELECT q.*, bp.display_name client_disp FROM quotations q LEFT JOIN business_partners bp ON bp.id=q.client_id WHERE q.is_current=1 AND $sw", $sa);
     // keep FY by created date
     $rows = array_values(array_filter($rows, function ($r) use ($from, $to) { $d = substr((string)$r['created_at'], 0, 10); return $d >= $from && $d <= $to; }));

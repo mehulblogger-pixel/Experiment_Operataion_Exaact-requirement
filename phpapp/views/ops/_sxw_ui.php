@@ -78,11 +78,14 @@ function sxw_person($route, $whoKey, $people, $seeAll, $extra = '') {
     if (!$seeAll) return '';
     $u = fn($k) => '/' . $route . '?who=' . rawurlencode((string) $k) . $extra;
     $cur = (string) $whoKey;
+    //  'team' (owner, 21 Nov 2026): a manager without "See other salespeople's
+    //  lists" — Me, or one of the people who report to them. No "Everyone".
+    $team = $seeAll === 'team';
     $h = '<div class="sxw-ctl"><span class="lab">View:</span><nav class="sxw-seg" aria-label="Whose list">'
-       . '<a href="' . e($u('me')) . '"' . ($cur === 'me' ? ' class="on" aria-current="true"' : '') . '>Me</a>'
-       . '<a href="' . e($u('all')) . '"' . ($cur === 'all' ? ' class="on" aria-current="true"' : '') . '>Everyone</a></nav>';
+       . '<a href="' . e($u('me')) . '"' . (($cur === 'me' || ($team && !isset($people[(int) $cur]))) ? ' class="on" aria-current="true"' : '') . '>Me</a>'
+       . ($team ? '' : '<a href="' . e($u('all')) . '"' . ($cur === 'all' ? ' class="on" aria-current="true"' : '') . '>Everyone</a>') . '</nav>';
     if ($people) {
-        $name = isset($people[$cur]) ? $people[$cur] : ($people[(int) $cur] ?? 'Choose a person');
+        $name = isset($people[$cur]) ? $people[$cur] : ($people[(int) $cur] ?? ($team ? 'My team' : 'Choose a person'));
         $h .= '<details class="sxw-pp"><summary>' . rec_icon('user', 's') . '<span>' . e($name) . '</span>' . rec_icon('down', 's') . '</summary><div>';
         foreach ($people as $id => $n) $h .= '<a href="' . e($u($id)) . '"' . ((string) $id === $cur ? ' class="on" aria-current="true"' : '') . '>' . e($n) . '</a>';
         $h .= '</div></details>';

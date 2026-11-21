@@ -3839,6 +3839,8 @@ function ops_access($method) {
         if (($_POST['_do'] ?? '') === 'reset') {
             unset($store[$sel]);
             setting_set('role_access', json_encode($store));
+            //  Q10: back to the built-in "Branch" too.
+            if (function_exists('sales_rec_store')) { $rs = sales_rec_store(); if (isset($rs['roles'][$sel])) { unset($rs['roles'][$sel]); sales_rec_store_put($rs); } }
             $logRoleAccess(role_perms($sel));
             flash('Access for ' . (function_exists("role_name") ? role_name($sel) : (ORG_ROLES[$sel] ?? $sel)) . ' reset to the built-in default.');
             redirect($back . $sel);
@@ -3852,6 +3854,18 @@ function ops_access($method) {
         $store[$sel] = $checked;
         setting_set('role_access', json_encode($store));
         $logRoleAccess($checked);
+        //  Q10 (owner, 21 Nov 2026): the role's "whose records they see" — sent only
+        //  by "Who can do what"; the old screen does not send it and leaves it alone.
+        if (isset($_POST['records_mode']) && function_exists('sales_rec_store')) {
+            $rm = in_array($_POST['records_mode'], ['own', 'team'], true) ? $_POST['records_mode'] : 'branch';
+            $rs = sales_rec_store(); $was = in_array($rs['roles'][$sel] ?? '', ['own', 'team'], true) ? $rs['roles'][$sel] : 'branch';
+            if ($rm !== $was) {
+                if ($rm === 'branch') unset($rs['roles'][$sel]); else $rs['roles'][$sel] = $rm;
+                sales_rec_store_put($rs);
+                if (function_exists('idems_log')) idems_log('role', null, 'ROLE_RECORDS_SCOPE_CHANGED',
+                    ['field' => $sel, 'reason' => 'by ' . user_name(current_user()), 'new' => ['role' => $sel, 'from' => $was, 'to' => $rm]]);
+            }
+        }
         // Remember which modules existed at this moment, so a module added in a
         // later version is known to be new rather than deliberately untieked.
         stamp_modules_at_save();

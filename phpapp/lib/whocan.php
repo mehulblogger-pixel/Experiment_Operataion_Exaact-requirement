@@ -85,6 +85,24 @@ function whocan_row($key, $label = '', $help = '', $mod = '', $verb = '') {
     if ($help === '' && function_exists('perm_help')) $help = (string) perm_help($key);
     return ['type' => 'key', 'key' => $key, 'label' => $label, 'help' => $help, 'mod' => $mod, 'verb' => $verb];
 }
+//  Q10 — the "Whose records they see" control (owner, 21 Nov 2026: "Keep this").
+//  $ctx 'role': Own / Team / Branch (Branch vs All is each person's branches);
+//  $ctx 'person': follow the role, or Own / Team / Branch / All ($canAll: may set
+//  "All branches", which only a company-wide user manager may).
+function whocan_records_ctl($ctx, $cur, $roleMode = 'branch', $canAll = false) {
+    $opt = ['own' => 'Own — only the records they own', 'team' => 'Team — theirs and those of everyone who reports to them',
+            'branch' => 'Branch — everything in their ' . Tlp('office')];
+    if ($ctx === 'person') {
+        $opt = ['' => 'As the role: ' . (SALES_REC_MODES[$roleMode] ?? 'Branch')] + $opt;
+        if ($canAll) $opt['all'] = 'All — the whole company (sets ' . Tlp('office') . ' to all)';
+    }
+    $h = '<div class="wc-rec"><label class="sxs6-lab" for="wc-rec-' . e($ctx) . '">Whose records they see</label>'
+       . '<select class="form-control" id="wc-rec-' . e($ctx) . '" name="records_mode" data-wc-rec>';
+    foreach ($opt as $k => $l) $h .= '<option value="' . e($k) . '"' . ((string) $k === (string) $cur ? ' selected' : '') . '>' . e($l) . '</option>';
+    return $h . '</select><small>Leads, ' . e(Tlp('opportunity')) . ', ' . e(Tlp('inquiry')) . ', ' . e(Tlp('quote'))
+        . ', orders, Sales home, Today, the board and reports. Own and Team narrow inside the ' . e(Tlp('office')) . ' they see; they never add one.'
+        . ($ctx === 'role' ? ' Branch or All for one person: their ' . e(Tlp('office')) . ' under People.' : '') . '</small></div>';
+}
 function whocan_rule($label, $how) { return ['type' => 'rule', 'label' => $label, 'help' => $how]; }
 function whocan_decision($label, $how) { return ['type' => 'decision', 'label' => $label, 'help' => $how]; }
 
@@ -111,7 +129,7 @@ function whocan_sales_features() {
     $f = [];
     $f[] = ['f' => 'Sales workspace', 'd' => 'Sales home, Today and the Pipeline board', 'rows' => [
         whocan_row('crm.sales.see_all', "See other salespeople's lists", 'The "Everyone" view and "Choose a person" on Sales home, Today and the board. Without it a person sees their own list.'),
-        whocan_decision('Whose records they see — own, team, branch or all', 'Waiting for your decision after Stage 2 (question 10). Today: the branches set for the person, below.'),
+        whocan_rule('Whose records they see — own, team, branch or all', 'Set in "Whose records they see" at the top (your decision of 21 Nov, question 10).'),
     ]];
     $f[] = ['f' => 'Leads', 'd' => 'People and firms who may buy', 'rows' => array_merge(whocan_module_rows('leads', 'leads'), [
         whocan_row('crm.lead.export', 'Download leads to Excel / CSV'),
@@ -401,11 +419,26 @@ function whocan_save_person() {
         flash('You cannot remove your own user-management access — ask another administrator to change it.', 'error');
         redirect('/who-can?tab=people&id=' . $id);
     }
+    //  Q10 — this person's "whose records" choice ('' = as the role). "All" = Branch
+    //  with every branch (only a company-wide user manager may set branches).
+    $recNote = null;
+    if (isset($_POST['records_mode']) && function_exists('sales_rec_store')) {
+        $rm = (string) $_POST['records_mode'];
+        if ($rm === 'all' && $globalMgr) { $scopeOffices = 'ALL'; $rm = 'branch'; }
+        if (!in_array($rm, ['', 'own', 'team', 'branch'], true)) $rm = '';
+        $st = sales_rec_store(); $was = (string) ($st['users'][(string) (int) $user['id']] ?? '');
+        if ($rm !== $was) {
+            if ($rm === '') unset($st['users'][(string) (int) $user['id']]); else $st['users'][(string) (int) $user['id']] = $rm;
+            sales_rec_store_put($st);
+            $recNote = ['records_seen' => ['from' => $was === '' ? 'as role' : $was, 'to' => $rm === '' ? 'as role' : $rm]];
+        }
+    }
     db()->prepare("UPDATE users SET scope_offices=?, scope_sbus=?, permissions=? WHERE id=?")
         ->execute([$scopeOffices, $scopeSbus, $perms, (int) $user['id']]);
     $newRow = ['role' => $user['role'], 'permissions' => $perms, 'is_superuser' => (int) ($user['is_superuser'] ?? 0),
                'is_active' => (int) ($user['is_active'] ?? 1), 'scope_offices' => $scopeOffices, 'scope_sbus' => $scopeSbus];
     $adiff = function_exists('access_diff') ? access_diff($user, $newRow) : [];
+    if ($recNote) $adiff = array_merge((array) $adiff, $recNote);
     if ($adiff && function_exists('idems_log')) idems_log('user', (int) $user['id'], 'ACCESS_CHANGED',
         ['field' => $user['username'], 'reason' => 'by ' . user_name(current_user()) . ' (Who can do what)', 'new' => $adiff]);
     flash($adiff ? 'Saved for ' . whocan_person_name($user) . '.' : 'Nothing changed for ' . whocan_person_name($user) . '.');

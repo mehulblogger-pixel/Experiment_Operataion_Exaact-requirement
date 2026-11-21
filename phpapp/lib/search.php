@@ -155,7 +155,7 @@ function search_sources() {
     $add('quotes', THP('quote'), '📝', can('mod.quotes.view') || is_master_of('quotes'),
         function ($q, $n) use ($like) {
             $l = $like($q);
-            [$sw, $sa] = scope_clause('q.office_id', 'q.sbu');
+            [$sw, $sa] = scope_quote_clause('q.office_id', 'q.sbu');
             return array_map(fn($r) => [
                 'title'    => $r['quote_no'] . ((int)$r['rev'] ? ' rev ' . (int)$r['rev'] : ''),
                 'subtitle' => $r['subject'] ?: ($r['client_name'] ?: ''),

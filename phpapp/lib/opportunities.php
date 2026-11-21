@@ -1142,13 +1142,16 @@ function opp_sbu_err($sbu) { return function_exists('lead_sbu_err') ? lead_sbu_e
 function opp_scope_gate($route) {
     $id = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
     if ($id <= 0) return;
-    $row = opp_try(fn() => ops_one("SELECT office_id, sbu FROM opportunities WHERE id=?", [$id]), false);
+    $row = opp_try(fn() => ops_one("SELECT office_id, sbu, owner_user_id FROM opportunities WHERE id=?", [$id]), false);
     if (!$row) return;                          // no such deal — the route's own 404 answers
     $office = $row['office_id'];
     ops_require(scope_office_allows($office), 'This ' . Tl('opportunity') . ' is outside your office / branch scope.');
     //  An SBU Head (every branch, some units) opens the deals of their units (owner, 21 Nov 2026).
     ops_require(!function_exists('scope_sales_allows') || scope_sales_allows($office, (string) ($row['sbu'] ?? '')),
                 'This ' . Tl('opportunity') . ' belongs to another business unit.');
+    //  Q10 — a person set to "own" or "team" records opens only those (owner, 21 Nov 2026).
+    ops_require(!function_exists('sales_owner_allows') || sales_owner_allows((int) ($row['owner_user_id'] ?? 0)),
+                'This ' . Tl('opportunity') . ' belongs to someone outside the records you see (your "whose records" setting).');
 }
 
 function ops_opportunities($route, $method) {

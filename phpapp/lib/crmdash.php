@@ -210,7 +210,7 @@ function crmdash_topfunnel($days = 365) {
     [$lw, $la] = scope_sales_clause('l');
     $leads = (int)crmdash_val("SELECT COUNT(*) FROM leads l WHERE $lw AND l.created_at >= ?", array_merge($la, [$cut]), 0);
     $toOpp = (int)crmdash_val("SELECT COUNT(*) FROM opportunities o WHERE o.lead_id IS NOT NULL AND o.created_at >= ?", [$cut], 0);
-    [$qw, $qa] = scope_clause('q.office_id', 'q.sbu');
+    [$qw, $qa] = scope_quote_clause('q.office_id', 'q.sbu');
     $quotes = (int)crmdash_val("SELECT COUNT(*) FROM quotations q WHERE $qw AND q.is_current=1 AND q.created_at >= ?", array_merge($qa, [$cut]), 0);
     [$ow, $oa] = scope_sales_clause('o');
     $won = (int)crmdash_val("SELECT COUNT(*) FROM opportunities o WHERE $ow AND o.status='WON' AND o.won_at >= ?", array_merge($oa, [$cut]), 0);

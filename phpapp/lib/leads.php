@@ -1558,13 +1558,16 @@ function lead_scope_gate($route) {
         $id = (int)leads_try(fn() => ops_val("SELECT lead_id FROM lead_files WHERE id=?", [$id]), 0);
         if ($id <= 0) return;                   // no such file — the route's own 404 answers
     }
-    $row = leads_try(fn() => ops_one("SELECT office_id, sbu FROM leads WHERE id=?", [$id]), false);
+    $row = leads_try(fn() => ops_one("SELECT office_id, sbu, owner_user_id FROM leads WHERE id=?", [$id]), false);
     if (!$row) return;                          // no such lead — let the route say "not found"
     $office = $row['office_id'];
     ops_require(scope_office_allows($office), 'This lead is outside your office / branch scope.');
     //  An SBU Head (every branch, some units) opens the leads of their units (owner, 21 Nov 2026).
     ops_require(!function_exists('scope_sales_allows') || scope_sales_allows($office, (string) ($row['sbu'] ?? '')),
                 'This lead belongs to another business unit.');
+    //  Q10 — a person set to "own" or "team" records opens only those (owner, 21 Nov 2026).
+    ops_require(!function_exists('sales_owner_allows') || sales_owner_allows((int) ($row['owner_user_id'] ?? 0)),
+                'This lead belongs to someone outside the records you see (your "whose records" setting).');
 }
 
 function ops_leads($route, $method) {

@@ -1787,6 +1787,10 @@ a.sxw-k:focus-visible{outline:3px solid var(--focus,#2563eb);outline-offset:2px}
 .wc-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px 16px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
 .wc-facts>div{min-width:0}
 .wc-facts .wide{grid-column:1/-1}
+/* Q10 — "Whose records they see" (owner, 21 Nov 2026) */
+.wc-recbox{padding:12px 16px;margin:0 0 12px}
+.wc-rec .form-control{max-width:520px;min-height:38px}
+.wc-rec small{display:block;color:var(--muted);font-size:12px;margin-top:4px;max-width:70ch}
 .wc-facts .k{display:block;font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
 .wc-facts b{display:block;font-size:14px;overflow-wrap:anywhere}
 .wc-facts small{display:block;color:var(--muted);font-size:12px;margin-top:2px}

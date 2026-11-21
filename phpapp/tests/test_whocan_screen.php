@@ -147,7 +147,8 @@ try {
     t_ok(in_array('Deals', $feats, true) && in_array('Project costing', $feats, true) && in_array('Customer money in Sales', $feats, true) && in_array('Sales settings', $feats, true),
          'tree · Sales is laid out as approved: Deals, Project costing, Customer money and Sales settings are features of their own');
     $dec = 0; foreach ($sales as $ft) foreach ($ft['rows'] as $r) if ($r['type'] === 'decision') $dec++;
-    t_eq($dec, 1, 'tree · exactly one row waits for the owner (question 10, whose records)');
+    //  Q10 was decided and built on 21 Nov (docs/02 19z): nothing waits for the owner any more.
+    t_eq($dec, 0, 'tree · no row waits for the owner (question 10 was decided and built, 21 Nov)');
 
     // ---- (1) Roles: the new screen draws the same boxes, ticked the same way --------------
     $cr = json_decode($prev['custom_roles'], true); if (!is_array($cr)) $cr = [];
