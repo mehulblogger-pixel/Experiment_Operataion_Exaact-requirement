@@ -1230,7 +1230,12 @@ function opp_scope_gate($route) {
 
 function ops_opportunities($route, $method) {
     opp_scope_gate($route);   // M14 — object-level branch scope, before anything reads an id
-    ops_require(opp_can_view(), 'You cannot open the ' . Tl('opportunity') . ' register.');
+    //  Accounts register a won deal's contract from their own list ("Contracts to register") without
+    //  opening deals at all (bounce list 3.1). D1 (owner, 21 Nov 2026) took "View deals" away from
+    //  Finance, so that one action must not sit behind the register's view check: it carries its own
+    //  (crm.contract.register, below) and the branch scope above. Contract registration is unchanged by D1.
+    $accountsRegister = $route === 'opportunity-contract' && $method === 'POST' && (can('crm.contract.register') || is_master());
+    ops_require($accountsRegister || opp_can_view(), 'You cannot open the ' . Tl('opportunity') . ' register.');
     opp_migrate();
     $canEdit = opp_can_edit() && leads_works_leads();   // BM / SBU Head read only (owner, 21 Nov 2026)
 
