@@ -46,6 +46,7 @@
 const INDUSTRY_TEMPLATES = [
 
     'inspection' => [
+        'quote' => 2,   // D3: the funnel step at which a quotation has gone (index in 'funnel'; null = none)
         'label' => 'Inspection, testing & certification',
         'blurb' => 'Third-party inspection, NDT, vendor assessment, certification bodies.',
         'funnel' => [
@@ -78,6 +79,7 @@ const INDUSTRY_TEMPLATES = [
     ],
 
     'labs' => [
+        'quote' => 2,   // D3: the funnel step at which a quotation has gone (index in 'funnel'; null = none)
         'label' => 'Testing & calibration laboratory',
         'blurb' => 'Materials testing, calibration, NABL / ISO 17025 laboratories, sample analysis.',
         'funnel' => [
@@ -110,6 +112,7 @@ const INDUSTRY_TEMPLATES = [
     ],
 
     'manufacturing' => [
+        'quote' => 3,   // D3: the funnel step at which a quotation has gone (index in 'funnel'; null = none)
         'label' => 'Manufacturing & engineering',
         'blurb' => 'Fabrication, machining, capital equipment, industrial supply.',
         'funnel' => [
@@ -143,6 +146,7 @@ const INDUSTRY_TEMPLATES = [
     ],
 
     'trading' => [
+        'quote' => 2,   // D3: the funnel step at which a quotation has gone (index in 'funnel'; null = none)
         'label' => 'Trading & distribution',
         'blurb' => 'Stockists, distributors, importers, industrial supply houses.',
         'funnel' => [
@@ -175,6 +179,7 @@ const INDUSTRY_TEMPLATES = [
     ],
 
     'services' => [
+        'quote' => 2,   // D3: the funnel step at which a quotation has gone (index in 'funnel'; null = none)
         'label' => 'Professional & consulting services',
         'blurb' => 'Consultancy, audit, advisory, design, and other fee-based practices.',
         'funnel' => [
@@ -207,6 +212,7 @@ const INDUSTRY_TEMPLATES = [
     ],
 
     'construction' => [
+        'quote' => 2,   // D3: the funnel step at which a quotation has gone (index in 'funnel'; null = none)
         'label' => 'Construction, projects & infrastructure',
         'blurb' => 'Contractors, EPC, project services. Long cycles, tender-driven.',
         'funnel' => [
@@ -240,6 +246,7 @@ const INDUSTRY_TEMPLATES = [
     ],
 
     'itservices' => [
+        'quote' => 3,   // D3: the funnel step at which a quotation has gone (index in 'funnel'; null = none)
         'label' => 'IT & software services',
         'blurb' => 'Software development, implementation, managed services, SaaS.',
         'funnel' => [
@@ -273,6 +280,7 @@ const INDUSTRY_TEMPLATES = [
     ],
 
     'healthcare' => [
+        'quote' => 2,   // D3: the funnel step at which a quotation has gone (index in 'funnel'; null = none)
         'label' => 'Healthcare & diagnostics',
         'blurb' => 'Diagnostic labs, medical equipment, hospital supply, corporate health.',
         'funnel' => [
@@ -305,6 +313,7 @@ const INDUSTRY_TEMPLATES = [
     ],
 
     'education' => [
+        'quote' => 2,   // D3: the funnel step at which a quotation has gone (index in 'funnel'; null = none)
         'label' => 'Education & training',
         'blurb' => 'Institutes, corporate training, certification and skilling providers.',
         'funnel' => [
@@ -336,6 +345,7 @@ const INDUSTRY_TEMPLATES = [
     ],
 
     'logistics' => [
+        'quote' => 2,   // D3: the funnel step at which a quotation has gone (index in 'funnel'; null = none)
         'label' => 'Logistics & transport',
         'blurb' => 'Freight forwarding, warehousing, fleet, courier and 3PL.',
         'funnel' => [
@@ -368,6 +378,7 @@ const INDUSTRY_TEMPLATES = [
     ],
 
     'realestate' => [
+        'quote' => null,   // D3: the funnel step at which a quotation has gone (index in 'funnel'; null = none)
         'label' => 'Real estate & facilities',
         'blurb' => 'Developers, brokers, leasing, facility and property management.',
         'funnel' => [
@@ -400,6 +411,7 @@ const INDUSTRY_TEMPLATES = [
     ],
 
     'staffing' => [
+        'quote' => null,   // D3: the funnel step at which a quotation has gone (index in 'funnel'; null = none)
         'label' => 'Recruitment & staffing',
         'blurb' => 'Permanent placement, contract staffing, payroll and manpower supply.',
         'funnel' => [
@@ -432,6 +444,7 @@ const INDUSTRY_TEMPLATES = [
     ],
 
     'generic' => [
+        'quote' => 2,   // D3: the funnel step at which a quotation has gone (index in 'funnel'; null = none)
         'label' => 'General B2B (no specific industry)',
         'blurb' => 'A plain, sensible funnel. Start here and shape it as you learn.',
         'funnel' => [

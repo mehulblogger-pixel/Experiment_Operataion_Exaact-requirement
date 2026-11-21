@@ -95,11 +95,17 @@ function sxw_person($route, $whoKey, $people, $seeAll, $extra = '') {
 
 //  A figure tile. $key is the old card's own title (without its emoji), kept as
 //  data-k so the figure on this page can be checked against the one before.
+//  D8 (owner, 21 Nov 2026 — findings SH-03, "as recommended"): every Sales figure card
+//  is the product's ONE KPI card (.kpi — white card, coloured header band with the label
+//  and icon, the big number, the note), the card the Dashboard and Money use. The tone
+//  colours the band (and the number) exactly as .kpi.tone-* does elsewhere; "teal" and
+//  "grey" are the plain brand band. Same arguments, same data-k / data-v hooks.
 function sxw_kpi($tone, $icon, $key, $label, $value, $hint = '', $href = '') {
     $tag = $href !== '' ? 'a' : 'div';
-    echo '<' . $tag . ' class="sxw-k ' . e($tone) . '" data-k="' . e($key) . '"' . ($href !== '' ? ' href="' . e($href) . '"' : '') . '>'
-       . '<span class="ic">' . rec_icon($icon) . '</span><span class="l">' . e($label) . '</span><span class="v" data-v>' . e($value) . '</span>'
-       . ($hint !== '' ? '<span class="h">' . e($hint) . '</span>' : '') . '</' . $tag . '>';
+    $cls = ['bad' => 'tone-bad', 'warn' => 'tone-warn', 'info' => 'tone-info', 'ok' => 'tone-ok'][$tone] ?? '';
+    echo '<' . $tag . ' class="kpi sxw-kpi' . ($cls !== '' ? ' ' . $cls : '') . '" data-k="' . e($key) . '"' . ($href !== '' ? ' href="' . e($href) . '"' : '') . '>'
+       . '<span class="k">' . e($label) . '</span><span class="kic" aria-hidden="true">' . rec_icon($icon, 's') . '</span><span class="v" data-v>' . e($value) . '</span>'
+       . ($hint !== '' ? '<span class="d">' . e($hint) . '</span>' : '') . '</' . $tag . '>';
 }
 
 //  Call / WhatsApp for a number — the same links sx_contact_btns() gives, in the new look.

@@ -643,6 +643,11 @@ function crm_render_quote_playbook($q) {
     echo ob_get_clean();
 }
 function crm_inquiry_get($id) { return ops_one("SELECT * FROM crm_inquiries WHERE id=?", [(int)$id]); }
+// May the current user start a new quotation (/quote-new)? The route's own rule,
+// also read by the Sales home "New quote" tile so it is not offered to someone the
+// form then refuses (owner test SH-03, 21 Nov 2026 — e.g. a Business Director, who
+// approves quotations but does not write them).
+function crm_quote_can_create() { return can('crm.quote.create') || can('mod.quotes.edit') || is_master_of('quotes'); }
 // An enquiry belongs to the branch of the person who recorded it, and branch
 // scope applies to it as to a quotation; one with no branch is everyone's.
 function crm_inquiry_in_scope($inq) {
@@ -2311,8 +2316,9 @@ function ops_crm_inquiries($route, $method) {
                 $pdo->prepare("UPDATE crm_inquiries SET client_id=?,client_name=?,contact_name=?,contact_email=?,contact_mobile=?,subject=?,service_requirement=?,sbu=?,source=?,received_date=?,assigned_to=?,status=?,notes=? WHERE id=?")
                     ->execute(array_merge($vals, [$inq['id']]));
                 if (function_exists('ads_queue_inquiry')) ads_queue_inquiry((int)$inq['id'], 'Enquiry edited');
+                $addedC = $vals[0] ? crm_inquiry_add_contact((int)$vals[0], (string)$vals[2], (string)$vals[3], (string)$vals[4], (string)$inq['inquiry_no'], (int)$inq['id']) : false;
                 //  Stage 3 (backend item 5): back to the inquiry itself, not the register.
-                flash('Inquiry updated.'); redirect('/inquiry?id=' . (int)$inq['id']);
+                flash('Inquiry updated.' . ($addedC ? ' ' . $vals[2] . ' is now also on the ' . Tl('client') . "'s contacts." : '')); redirect('/inquiry?id=' . (int)$inq['id']);
             } else {
                 $no = crm_next_inquiry_no();
                 $pdo->prepare("INSERT INTO crm_inquiries (inquiry_no,client_id,client_name,contact_name,contact_email,contact_mobile,subject,service_requirement,sbu,source,received_date,assigned_to,status,notes,created_by,created_at,office_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
@@ -2322,7 +2328,8 @@ function ops_crm_inquiries($route, $method) {
                 $newId = (int)$pdo->lastInsertId();
                 if ($once !== '') $_SESSION['inquiry_form_once'][$once] = $newId;
                 if (function_exists('ads_queue_inquiry')) ads_queue_inquiry($newId, 'Enquiry raised');
-                flash("$no created. You can now raise a quotation against it.");
+                $addedC = $vals[0] ? crm_inquiry_add_contact((int)$vals[0], (string)$vals[2], (string)$vals[3], (string)$vals[4], (string)$no, $newId) : false;
+                flash("$no created. You can now raise a quotation against it." . ($addedC ? ' ' . $vals[2] . ' is now also on the ' . Tl('client') . "'s contacts." : ''));
                 redirect('/inquiry?id=' . $newId);
             }
         }
@@ -2702,7 +2709,7 @@ function ops_crm_quotes($route, $method) {
         return;
     }
     if ($route === 'quote-new' || $route === 'quote-edit') {
-        ops_require(can('crm.quote.create') || can('mod.quotes.edit') || is_master_of('quotes'), 'You cannot create or edit quotations.');
+        ops_require(crm_quote_can_create(), 'You cannot create or edit quotations.');
         $q = null;
         if ($route === 'quote-edit') {
             $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
@@ -3135,11 +3142,12 @@ function ops_crm_quotes($route, $method) {
                         if ($o && ($o['status'] ?? '') === 'OPEN') {
                             $stages = pipeline_stages((int)$o['pipeline_id']);
                             $curIdx = -1; $sentId = 0; $sentIdx = -1;
-                            foreach ($stages as $i => $st) {
-                                if ((int)$st['id'] === (int)$o['stage_id']) $curIdx = $i;
-                                if ($sentIdx < 0 && ($st['kind'] ?? '') === 'OPEN'
-                                    && preg_match('/quot|proposal|sent/i', (string)$st['name'])) { $sentIdx = $i; $sentId = (int)$st['id']; }
-                            }
+                            $stages = array_values($stages);
+                            foreach ($stages as $i => $st) if ((int)$st['id'] === (int)$o['stage_id']) $curIdx = $i;
+                            //  D3 (owner, 21 Nov 2026): the same "quotation stage" the move rule uses
+                            //  (opp_quote_stage — the template's quotation step), so sending moves the
+                            //  deal exactly to the stage that needs a quotation.
+                            if (function_exists('opp_quote_stage') && ($qs = opp_quote_stage($stages, (int)$o['pipeline_id']))) { $sentIdx = $qs['idx']; $sentId = (int)$qs['stage']['id']; }
                             if ($sentId && $sentIdx > $curIdx) opp_move($oid, $sentId, [], true);
                         }
                     }
@@ -4155,6 +4163,29 @@ function partner_carry_from_crm($partnerId, $name = '') {
     }
     return ['linked' => $linked, 'types' => $types, 'contacts' => $contacts];
 }
+// D5 (owner, 21 Nov 2026 — findings J3-01, "as recommended"): a person typed on an
+// inquiry for a customer already on file is added to that customer's Contacts when
+// they are not there yet — matched on mobile (its last ten digits) or e-mail, else on
+// the name when neither is given. Never replaces anyone and is never made the main
+// contact over an existing one; written in the customer's history. Returns true when added.
+function crm_inquiry_add_contact($partnerId, $name, $email, $mobile, $inqNo = '', $inqId = 0) {
+    $partnerId = (int) $partnerId; $name = trim((string) $name); $email = trim((string) $email); $mobile = trim((string) $mobile);
+    if (!$partnerId || $name === '' || !ops_val("SELECT 1 FROM business_partners WHERE id=?", [$partnerId])) return false;
+    $digits = fn($s) => substr(preg_replace('/\D+/', '', (string) $s), -10);
+    foreach (ops_all("SELECT name, email, mobile FROM partner_contacts WHERE partner_id=?", [$partnerId]) ?: [] as $c) {
+        if ($mobile !== '' && strlen($digits($mobile)) >= 6 && $digits($c['mobile'] ?? '') === $digits($mobile)) return false;
+        if ($email !== '' && strcasecmp(trim((string) ($c['email'] ?? '')), $email) === 0) return false;
+        if ($mobile === '' && $email === '' && strcasecmp(trim((string) $c['name']), $name) === 0) return false;
+    }
+    $isFirst = !ops_val("SELECT 1 FROM partner_contacts WHERE partner_id=?", [$partnerId]);
+    db()->prepare("INSERT INTO partner_contacts (partner_id,name,email,mobile,is_primary,department) VALUES (?,?,?,?,?,?)")
+        ->execute([$partnerId, $name, $email, $mobile, $isFirst ? 1 : 0, 'From ' . T('inquiry') . ($inqNo !== '' ? ' ' . $inqNo : '')]);
+    if (function_exists('act_log'))
+        act_log('INQUIRY', (int) $inqId, 'SYSTEM', 'Contact ' . $name . ' added to the ' . Tl('client') . "'s contacts from " . Tl('inquiry') . ($inqNo !== '' ? ' ' . $inqNo : '')
+                . ' (by ' . user_name(current_user()) . ')', ['auto' => 1, 'partner_id' => $partnerId]);
+    return true;
+}
+
 // One sentence for the flash message, or '' when nothing came across.
 function partner_carry_text($res) {
     $bits = [];

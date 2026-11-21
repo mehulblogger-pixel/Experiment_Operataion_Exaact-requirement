@@ -45,7 +45,7 @@ $right = '<div class="sxw-ctl">'
 
   <?php $step(1, ucfirst(Tl('client')) . ' and contact', 'A ' . Tl('client') . ' on hold or blocked is refused, with the reason.'); ?>
   <div class="form-grid">
-    <div class="ff"><label><?= e(ucfirst(Tl('client'))) ?> * <a href="#" class="addlink" data-qa="client" data-target="select[name='client_id']">+ Add new</a></label>
+    <div class="ff"><label><?= e(ucfirst(Tl('client'))) ?> * <?php if (!function_exists('partner_can_add') || partner_can_add()): ?><a href="#" class="addlink" data-qa="client" data-target="select[name='client_id']">+ Add new</a><?php endif; ?></label>
       <select class="form-control searchable" name="client_id"><option value="">— pick or type below —</option>
         <?php foreach ($clients as $cl): ?><option value="<?= (int)$cl['id'] ?>" <?= (string)($inq['client_id'] ?? '') === (string)$cl['id'] ? 'selected' : '' ?>><?= e($cl['display_name'] ?: $cl['legal_name']) ?></option><?php endforeach; ?>
       </select></div>
@@ -59,8 +59,9 @@ $right = '<div class="sxw-ctl">'
         var chk=function(){var bad=d.value!==''&&d.value>d.max;w.style.display=bad?'block':'none';d.setAttribute('aria-invalid',bad?'true':'false');};
         d.addEventListener('input',chk);d.addEventListener('change',chk);chk();})();</script></div>
     <div class="ff"><label>Contact person *</label><input class="form-control" name="contact_name" value="<?= e($inq['contact_name'] ?? '') ?>"></div>
-    <div class="ff"><label>Contact email <span class="muted">— email or mobile</span></label><input class="form-control" type="email" name="contact_email" value="<?= e($inq['contact_email'] ?? '') ?>"></div>
-    <div class="ff"><label>Contact mobile <span class="muted">— email or mobile</span></label><input class="form-control" name="contact_mobile" value="<?= e($inq['contact_mobile'] ?? '') ?>"></div>
+    <?php // Owner test J3-01 (21 Nov 2026): both boxes said "— email or mobile". One label each. ?>
+    <div class="ff"><label for="inq-cemail">Contact e-mail</label><input class="form-control" type="email" id="inq-cemail" name="contact_email" autocomplete="email" value="<?= e($inq['contact_email'] ?? '') ?>"></div>
+    <div class="ff"><label for="inq-cmob">Contact mobile</label><input class="form-control" type="tel" id="inq-cmob" name="contact_mobile" inputmode="tel" autocomplete="tel" value="<?= e($inq['contact_mobile'] ?? '') ?>"></div>
   </div>
   <?php $stepEnd(); ?>
 

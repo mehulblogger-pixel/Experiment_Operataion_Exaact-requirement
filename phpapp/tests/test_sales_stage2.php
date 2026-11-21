@@ -101,7 +101,18 @@ try {
         t_eq($n['refused'], $o['refused'], "$label · $pg — refused as before");
         $fd = []; foreach ($o['figs'] as $k => $v) if (($n['figs'][$k] ?? null) !== $v) $fd[] = "$k: old \"$v\" new \"" . ($n['figs'][$k] ?? '—') . '"';
         t_eq($fd, [], "$label · $pg — all " . count($o['figs']) . ' figures read the same');
-        t_eq(array_values(array_diff(array_unique($o['hrefs']), $n['hrefs'])), [], "$label · $pg — every link of the old page is on the new one");
+        //  Owner findings B4 (21 Nov 2026): the "+ Add new" customer link (href "#") is no longer
+        //  offered to someone the add form refuses (partner_can_add — the form's own rule).
+        $keep = $_SESSION['uid'] ?? null; bbv_as($uid); $mayAdd = partner_can_add(); if ($keep) bbv_as($keep);
+        $gone = array_values(array_diff(array_unique($o['hrefs']), $n['hrefs']));
+        if ($route === 'lead-convert' && !$mayAdd) $gone = array_values(array_diff($gone, ['#']));
+        //  D2 (owner, 21 Nov 2026): someone else's lead is read only — no "Make a quote" or costing from it.
+        if ($route === 'lead' && !empty($get['id'])) {
+            $own = (int) ops_val("SELECT owner_user_id FROM leads WHERE id=?", [(int) $get['id']]);
+            bbv_as($uid); $mayWork = sales_record_can_work($own); if ($keep) bbv_as($keep);
+            if (!$mayWork) $gone = array_values(array_filter($gone, fn($h) => !preg_match('#^/(quote-new|project-costings)\?lead(_id)?=\d+$#', $h)));
+        }
+        t_eq($gone, [], "$label · $pg — every link of the old page is on the new one (except “+ Add new” customer for someone who may not add one — B4)");
         //  A form keeps its address and every field it had (a new page may add one — the business unit).
         $lost = [];
         foreach (array_unique($o['forms']) as $sig) {
@@ -192,7 +203,7 @@ try {
     $nameB = 'S2 Second Mumbai ' . $f['tag'];
     $cnt = fn() => (int) ops_val("SELECT COUNT(*) FROM leads WHERE company_name=?", [$nameB]);
     $c0 = $cnt();
-    $r = s2_drive($bdm, 'lead-new', 'POST', [], ['company_name' => $nameB, 'contact_name' => 'X', 'office_id' => $f['mum']]);
+    $r = s2_drive($bdm, 'lead-new', 'POST', [], ['company_name' => $nameB, 'contact_name' => 'X', 'contact_email' => 'x@s2.example', 'office_id' => $f['mum']]);
     t_eq($cnt(), $c0, 'a second lead with the same name is NOT saved straight away');
     t_ok(stripos(s2_said($r), 'already have') !== false, 'the person is told it looks like one we already have — "' . s2_said($r) . '"');
     //  The next page load, as the browser makes it after that refusal (form_stash keeps the typing in the session).
@@ -200,7 +211,7 @@ try {
     $back = s2_drive($bdm, 'lead-new', 'GET', [], [], ['This looks like one we already have', 'name="confirm"', 'value="' . $nameB . '"', 'Nothing was lost'], ['form_retry' => $stash]);
     t_ok(!empty($back['has']['value="' . $nameB . '"']) && !empty($back['has']['Nothing was lost']), 'nothing typed is lost (the form comes back filled)');
     t_ok(!empty($back['has']['This looks like one we already have']) && !empty($back['has']['name="confirm"']), 'the form shows the matches and the "save it anyway" tick');
-    $r = s2_drive($bdm, 'lead-new', 'POST', [], ['company_name' => $nameB, 'contact_name' => 'X', 'office_id' => $f['mum'], 'confirm' => '1']);
+    $r = s2_drive($bdm, 'lead-new', 'POST', [], ['company_name' => $nameB, 'contact_name' => 'X', 'contact_email' => 'x@s2.example', 'office_id' => $f['mum'], 'confirm' => '1']);
     t_eq($cnt(), $c0 + 1, 'ticked "It is a different requirement" — saved (' . s2_said($r) . ')');
     if ($cnt() > $c0) $made['leads'][] = (int) ops_val("SELECT MAX(id) FROM leads WHERE company_name=?", [$nameB]);
     $j = s2_drive($bdm, 'lead-new', 'GET', ['dupcheck' => '1', 'company_name' => $nameB], [], ['"dupes"', 'S2 Second Mumbai']);
@@ -216,7 +227,7 @@ try {
     $r = s2_drive($f['neha'], 'lead-new', 'GET', ['dupcheck' => '1', 'company_name' => $nameB], [], ['S2 Second Mumbai']);
     t_ok(empty($r['has']['S2 Second Mumbai']), 'someone who may not add leads gets no answer (the form\'s own right)');
     $fresh = 'S2 Brand New ' . $f['tag'];
-    $r = s2_drive($bdm, 'lead-new', 'POST', [], ['company_name' => $fresh, 'office_id' => $f['mum'], 'sbu' => $sk]);
+    $r = s2_drive($bdm, 'lead-new', 'POST', [], ['company_name' => $fresh, 'contact_email' => 'new@s2.example', 'office_id' => $f['mum'], 'sbu' => $sk]);
     $nid = (int) ops_val("SELECT id FROM leads WHERE company_name=?", [$fresh]);
     if ($nid) $made['leads'][] = $nid;
     t_ok($nid > 0, 'a lead that matches nothing is saved at once, as before (' . s2_said($r) . ')');

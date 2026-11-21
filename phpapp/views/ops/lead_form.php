@@ -69,7 +69,7 @@ $right = '<div class="sxw-ctl"><a class="sxw-bt" href="/sales-lead">' . rec_icon
     <div class="ff"><label for="lf-em">E-mail</label>
       <input class="form-control" id="lf-em" type="email" inputmode="email" name="contact_email" maxlength="200"
              value="<?= e($val('contact_email')) ?>"></div>
-    <div class="ff"><label for="lf-ph">Telephone</label>
+    <div class="ff"><label for="lf-ph">Mobile</label>
       <input class="form-control" id="lf-ph" type="tel" inputmode="tel" name="contact_phone" maxlength="60"
              value="<?= e($val('contact_phone')) ?>"></div>
     <div class="ff"><label for="lf-src">Where they came from</label>
@@ -196,7 +196,7 @@ $right = '<div class="sxw-ctl"><a class="sxw-bt" href="/sales-lead">' . rec_icon
   <?php $stepEnd(); ?>
 
   <div class="sxl-act">
-    <span class="sp">A lead with no e-mail and no telephone number scores badly on purpose — it is a lead nobody can chase.</span>
+    <span class="sp">A lead needs a mobile or an e-mail — one nobody can reach cannot be chased.</span>
     <a class="btn secondary" href="/leads">Cancel</a>
     <button class="btn" type="submit">Create it</button>
   </div>

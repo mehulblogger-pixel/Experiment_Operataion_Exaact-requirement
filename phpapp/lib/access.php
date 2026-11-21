@@ -930,13 +930,19 @@ function perm_split_rules() {
 //  Bring a set saved before foundation A into its vocabulary: add each new
 //  switch the old rule would have answered "yes" to. Additive only, and a set
 //  stamped '@split1' is returned untouched.
+//  Owner decisions that a split rule must NOT re-derive for a role (the rule itself
+//  stays the historical one). D1 (owner, 21 Nov 2026): Finance reads Quotes but
+//  does not see deals — so Quotes view no longer brings "View deals" to Finance.
+//  An administrator may still switch it on for the role on "Who can do what".
+const PERM_SPLIT_NOT_FOR = ['crm.deal.view' => ['FINANCE']];
 function perm_upgrade_split(array $perms, $role) {
     if (in_array(PERM_SPLIT_TAG, $perms, true)) return $perms;
     $base = function_exists('role_effective_key') ? role_effective_key(strtoupper((string) $role)) : strtoupper((string) $role);
     $mgmt = in_array($base, MGMT_ROLES, true);
     $h = fn($p) => perm_set_has($perms, $p);
     $add = [];
-    foreach (perm_split_rules() as $key => $rule) if (!in_array($key, $perms, true) && $rule($h, $mgmt)) $add[] = $key;
+    foreach (perm_split_rules() as $key => $rule)
+        if (!in_array($key, $perms, true) && !in_array($base, PERM_SPLIT_NOT_FOR[$key] ?? [], true) && $rule($h, $mgmt)) $add[] = $key;
     return $add ? array_values(array_merge($perms, $add)) : $perms;
 }
 
@@ -1027,8 +1033,13 @@ function module_defaults($role) {
             //  while the matrix already said View. Read only.
             //  Clients: finance invoices and chases them. The owner's answer,
             //  2026-10-19 (Q-K): yes, read only -- which is what the matrix said.
-            $edit = ['invoicing','crm_orders'];
-            $view = ['quotes','crm_reports','profitability','reports','jobs','calls','vouchers','vendors','clients']; break;
+            //  D1 (owner, 21 Nov 2026, findings SH-08 "as recommended"): in Sales, Finance
+            //  reads the Quotes register only (view — no create, submit, approve or send)
+            //  and the Client register's normal view. Sales reports and Orders / contracts
+            //  are no longer Finance's; ageing stays in Money → Receivables, contract
+            //  registration on crm.contract.register (docs/02 19y).
+            $edit = ['invoicing'];
+            $view = ['quotes','profitability','reports','jobs','calls','vouchers','vendors','clients']; break;
         case 'QUALITY_HEAD': case 'TECHNICAL_HEAD':
             //  The owner's rule, 2026-10-18: "only Quality or Technical Head can
             //  close it". Closing a nonconformity means owning the whole loop —
@@ -1599,6 +1610,64 @@ function access_apply_owner_grants($force = false) {
     } catch (Throwable $e) { return []; }   // never block a sign-in over this; it retries next request
 }
 
+// ---- Owner's rules that TAKE something away from a SAVED access grid -------------
+// The counterpart of access_owner_grants() for a narrowing the owner decided. Applied
+// ONCE per database (its id is recorded): the rights are taken out of the stored role
+// grid of those roles (and of a company role built on one), and out of every older
+// frozen per-person copy of someone in those roles. A person stored as "role +
+// differences" (19r) follows the role by itself; a '+right' there is an exception an
+// administrator gave on purpose and is left alone. Each change is on the audit chain.
+function access_owner_revokes() {
+    $verbs = fn($mod) => array_map(fn($v) => "mod.$mod.$v", ['view', 'add', 'edit', 'archive', 'delete', 'approve']);
+    return [
+        //  D1 (owner, 21 Nov 2026 — findings SH-08, "as recommended"): Finance keeps the
+        //  Quotes register (view) and the Client register's normal view in Sales; it loses
+        //  deals (and with them Sales home, Today, the board, the Sales dashboard, Orders &
+        //  payments, Renewals and Targets — all behind sx_can()), Sales reports and
+        //  Orders / contracts. Ageing stays in Money → Receivables.
+        'D1-FINANCE-SALES-2026-11-21' => ['perms' => array_merge(['crm.deal.view', 'crm.deal.export', 'crm.deal.edit'],
+                                              $verbs('crm_reports'), $verbs('crm_orders')), 'roles' => ['FINANCE']],
+    ];
+}
+function access_apply_owner_revokes($force = false) {
+    static $ran = false;
+    if (($ran && !$force) || !function_exists('setting_get') || !function_exists('setting_set')) return [];
+    $ran = true;
+    try {
+        $applied = array_values(array_filter(array_map('trim', explode(',', (string) setting_get('access_owner_revokes_applied', '')))));
+        $pending = array_diff_key(access_owner_revokes(), array_flip($applied));
+        if (!$pending) return [];
+        $base = fn($r) => function_exists('role_effective_key') ? role_effective_key(strtoupper((string) $r)) : strtoupper((string) $r);
+        $raw = (string) setting_get('role_access', '');
+        $store = $raw !== '' ? json_decode($raw, true) : null;
+        if (is_array($store)) {
+            foreach ($pending as $g)
+                foreach ($store as $roleKey => $perms)
+                    if (is_array($perms) && in_array($base($roleKey), $g['roles'], true))
+                        $store[$roleKey] = array_values(array_diff($perms, $g['perms']));
+            setting_set('role_access', json_encode($store));
+        }
+        foreach (ops_all("SELECT id, role, permissions FROM users WHERE COALESCE(permissions,'')<>'' AND COALESCE(is_superuser,0)=0") ?: [] as $u) {
+            $csv = (string) $u['permissions'];
+            if (strpos($csv, PERM_DIFF_TAG) !== false) continue;          // follows the role; '+' exceptions are deliberate
+            $take = [];
+            foreach ($pending as $g) if (in_array($base($u['role']), $g['roles'], true)) $take = array_merge($take, $g['perms']);
+            if (!$take) continue;
+            //  A frozen copy is read through perm_resolve_stored(), which adds what its
+            //  rights imply; store what it resolves to, minus the rule, as differences.
+            $eff = array_values(array_diff(perm_resolve_stored($csv, $base($u['role'])), $take));
+            $new = perm_diff_from($eff, $base($u['role']));
+            if ($new !== $csv) {
+                db()->prepare("UPDATE users SET permissions=? WHERE id=?")->execute([$new, (int) $u['id']]);
+                if (function_exists('idems_log')) { try { idems_log('user', (int) $u['id'], 'ACCESS_CHANGED',
+                    ['reason' => "owner's rule " . implode(', ', array_keys($pending)), 'old' => $csv, 'new' => $new]); } catch (Throwable $e) {} }
+            }
+        }
+        setting_set('access_owner_revokes_applied', implode(',', array_merge($applied, array_keys($pending))));
+        return array_keys($pending);
+    } catch (Throwable $e) { return []; }   // never block a sign-in over this; it retries next request
+}
+
 // ---- C1 (owner, 16 Nov 2026): central roles become office-based ---------------
 // Finance and the Marketing Manager used to see every office by role. They now
 // see the offices ticked on their record (role_defaults_base(), 'OWN'). So that
@@ -1639,6 +1708,7 @@ function ua($fresh = false) {
     if (function_exists('access_apply_owner_grants')) access_apply_owner_grants();
     if (function_exists('access_migrate_central_roles_scope')) access_migrate_central_roles_scope();
     if (function_exists('access_migrate_user_diffs')) access_migrate_user_diffs();
+    if (function_exists('access_apply_owner_revokes')) access_apply_owner_revokes();
     if ($fresh) $a = null;
     $u = current_user($fresh);
     if (!$u) return $a = ['role' => 'GUEST', 'perms' => [], 'offices' => [], 'sbus' => [], 'self' => true, 'home' => null, 'master' => false];

@@ -56,11 +56,12 @@ $fixN = count(array_filter($health, fn($h) => (int) $h[1] > 0));
     <?php endif; ?>
   </div>
 
-  <div class="sxw-qt">
+  <?php $qtQuote = !function_exists('crm_quote_can_create') || crm_quote_can_create(); ?>
+  <div class="sxw-qt" style="--n:<?= $qtQuote ? 6 : 5 ?>">
     <a class="p" href="/sales-lead"><?= rec_icon('plus') ?>New lead</a>
     <a href="/sales-today"><?= rec_icon('note') ?>Log activity</a>
     <a href="/opportunity-new"><?= rec_icon('brief') ?>New deal</a>
-    <a href="/quote-edit"><?= rec_icon('file') ?>New <?= e(function_exists('Tl') ? Tl('quote') : 'quote') ?></a>
+    <?php if ($qtQuote): ?><a href="/quote-new"><?= rec_icon('file') ?>New <?= e(function_exists('Tl') ? Tl('quote') : 'quote') ?></a><?php endif; ?>
     <a href="/sales-orders"><?= rec_icon('trophy') ?>Orders won</a>
     <a href="/quotes"><?= rec_icon('copy') ?>Print a <?= e(function_exists('Tl') ? Tl('quote') : 'quote') ?></a>
   </div>

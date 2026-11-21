@@ -41,7 +41,7 @@ $selPipe = (int)($prefill['pipeline_id'] ?? 0) ?: (int)($pipelines[0]['id'] ?? 0
       <select class="form-control" name="pipeline_id" id="of-pipe">
         <?php foreach ($pipelines as $p): ?><option value="<?= (int)$p['id'] ?>" <?= ((int)($prefill['pipeline_id'] ?? 0) === (int)$p['id']) ? 'selected' : '' ?>><?= e($p['name']) ?></option><?php endforeach; ?>
       </select></div>
-    <div class="ff"><label>Customer <span class="muted" style="font-size:12px">— on the master</span> <a href="#" class="addlink" data-qa="client" data-target="select[name='partner_id']">+ Add new</a></label>
+    <div class="ff"><label>Customer <span class="muted" style="font-size:12px">— on the master</span> <?php if (!function_exists('partner_can_add') || partner_can_add()): ?><a href="#" class="addlink" data-qa="client" data-target="select[name='partner_id']">+ Add new</a><?php endif; ?></label>
       <select name="partner_id" class="form-control searchable">
         <option value="">— not on the master yet —</option>
         <?php foreach ($clients as $cl): ?>
@@ -73,7 +73,7 @@ $selPipe = (int)($prefill['pipeline_id'] ?? 0) ?: (int)($pipelines[0]['id'] ?? 0
   <div class="form-grid">
     <div class="ff"><label>Contact</label><input class="form-control" name="contact_name" maxlength="150" value="<?= e($prefill['contact_name'] ?? '') ?>"></div>
     <div class="ff"><label>Contact e-mail</label><input class="form-control" name="contact_email" type="email" maxlength="200" value="<?= e($prefill['contact_email'] ?? '') ?>"></div>
-    <div class="ff"><label>Contact phone</label><input class="form-control" name="contact_phone" maxlength="60" value="<?= e($prefill['contact_phone'] ?? '') ?>"></div>
+    <div class="ff"><label>Mobile</label><input class="form-control" type="tel" inputmode="tel" name="contact_phone" maxlength="60" value="<?= e($prefill['contact_phone'] ?? '') ?>"></div>
     <?php if ($sources): ?>
       <div class="ff"><label>Where it came from</label>
         <select class="form-control" name="source"><option value="">—</option>

@@ -267,6 +267,29 @@ function lead_can_mark_lost($l) {
     if ($owner) return $owner === (int)(current_user()['id'] ?? 0);
     return leads_can_edit();
 }
+// ---- D2 (owner, 21 Nov 2026 — findings J5-01 / LR-05, "as recommended") -------
+//  Who WORKS a lead or a deal — changes its stage, logs on it, edits it, files on
+//  it, quotes or orders from it: the person handling it (its owner), the people
+//  above them in "Reports to", and an administrator (Admin role, or Master Admin).
+//  Everybody else who may see it reads it only. A record nobody owns (or whose
+//  owner has left) is anybody's in the branch to pick up — the Q10 answer "a".
+//  The same reporting-line rule as an assigned enquiry or quotation
+//  (crm_assignee_allows(), owner 14 Nov 2026). Grants nothing: it only narrows who,
+//  of those holding the edit right, acts on this one record.
+function sales_record_can_work($ownerId) {
+    if (function_exists('is_master') && is_master()) return true;
+    $base = function_exists('role_effective_key') ? role_effective_key((string) user_role()) : (string) user_role();
+    if ($base === 'ADMIN') return true;
+    $ownerId = (int) $ownerId; $me = (int) (current_user()['id'] ?? 0);
+    if (function_exists('crm_assignee_allows')) return crm_assignee_allows($ownerId);
+    return !$ownerId || $ownerId === $me;
+}
+function sales_record_lock_words($ownerId) {
+    $u = $ownerId ? ops_one("SELECT first_name, last_name, username FROM users WHERE id=?", [(int) $ownerId]) : null;
+    $nm = $u ? (trim(($u['first_name'] ?? '') . ' ' . ($u['last_name'] ?? '')) ?: (string) $u['username']) : 'its owner';
+    return 'Only ' . $nm . ' or their manager can change this.';
+}
+
 // A valid reason is one on the lost-reason list; remarks are always required.
 // DEF-SAL-025 — why LEADS are lost, for the Sales dashboard's "Why we lose" (it counted lost deals only).
 function lead_loss_reasons($days = 365) {
@@ -636,6 +659,24 @@ function lead_fields_err(array $b) {
         if (array_key_exists($k, $b) && !lead_real_date($b[$k])) return $w . ' is not a real date.';
     return '';
 }
+//  D4 (owner, 21 Nov 2026 — findings QL-01, "as recommended"): ONE rule and ONE word,
+//  "Mobile", for the number on Sales screens. An Indian mobile is 10 digits starting
+//  6–9 (+91 / 0 in front is fine); a number of another country is written with + and
+//  its code. '' = fine. $required: the quick lead must have one. Existing records are
+//  not touched: an edit is checked only when the number itself is changed.
+function sales_mobile_problem($phone, $required = false) {
+    $phone = trim((string) $phone);
+    if ($phone === '') return $required ? 'A mobile number is needed — 10 digits. It is how the lead is called and messaged.' : '';
+    $d = preg_replace('/\D+/', '', $phone);
+    if ($phone[0] === '+' && strpos(preg_replace('/\s+/', '', $phone), '+91') !== 0) return strlen($d) >= 8 ? '' : 'That mobile number looks short.';
+    if (strlen($d) === 12 && substr($d, 0, 2) === '91') $d = substr($d, 2);
+    if (strlen($d) === 11 && $d[0] === '0') $d = substr($d, 1);
+    if (strlen($d) < 10) return 'That mobile number looks short — 10 digits, please.';
+    if (strlen($d) > 10 || !preg_match('/^[6-9]/', $d))
+        return 'That does not look like a mobile number — 10 digits starting 6, 7, 8 or 9 (a number in another country: start with + and its code).';
+    return '';
+}
+
 //  DEF-15 (owner, 21 Nov 2026) — a lead's business unit, set on the forms. The
 //  choices are the company's business units (Masters), narrowed to the units this
 //  person's data scope covers, as the branch list is narrowed to their branches.
@@ -1696,7 +1737,10 @@ function ops_leads($route, $method) {
                     ? opp_try(fn() => ops_val("SELECT id FROM opportunities WHERE lead_id=? ORDER BY id DESC LIMIT 1", [(int)$l['id']]), 0)
                     : 0)],
             ]) : ['mins' => 0, 'touches' => 0],
-            'canEdit' => $canEdit, 'days' => lead_days_in_stage($l), 'stalled' => lead_stalled($l),
+            //  D2: someone who may edit leads but not THIS one reads it, with the reason.
+            'canEdit' => $canEdit && sales_record_can_work((int) ($l['owner_user_id'] ?? 0)),
+            'workNote' => $canEdit && !sales_record_can_work((int) ($l['owner_user_id'] ?? 0)) ? sales_record_lock_words((int) $l['owner_user_id']) : '',
+            'days' => lead_days_in_stage($l), 'stalled' => lead_stalled($l),
             'sbus' => lead_sbu_options(),
             'clients' => ops_all("SELECT id, display_name, legal_name FROM business_partners WHERE is_client=1 AND " . partner_office_sql() . " ORDER BY COALESCE(display_name, legal_name) LIMIT 500"),
             // Who a lead can be allocated to. Active logins only — allocating
@@ -1719,6 +1763,21 @@ function ops_leads($route, $method) {
     }
 
     ops_require($canEdit, 'You cannot change a lead.');
+
+    //  D2 (owner, 21 Nov 2026): working ONE lead — its stage, a log, its details, its
+    //  files, turning it into a customer — is for the person handling it, the people
+    //  above them and an administrator; everyone else reads it. Reopening a lost lead
+    //  (a manager's act) and deleting (management) keep their own rules.
+    $workLead = 0;
+    if (in_array($route, ['lead-move', 'lead-edit', 'lead-contact', 'lead-convert'], true)) $workLead = (int) ($_POST['id'] ?? $_GET['id'] ?? 0);
+    elseif ($route === 'lead-files') $workLead = (int) ($_GET['id'] ?? 0);
+    elseif ($route === 'lead-file-delete') $workLead = (int) leads_try(fn() => ops_val("SELECT lead_id FROM lead_files WHERE id=?", [(int) ($_GET['id'] ?? 0)]), 0);
+    if ($workLead > 0 && ($wl = leads_try(fn() => ops_one("SELECT owner_user_id, status FROM leads WHERE id=?", [$workLead]), null))
+        && !($route === 'lead-convert' && $method !== 'POST' && ($wl['status'] ?? '') === 'CONVERTED')
+        && !sales_record_can_work((int) ($wl['owner_user_id'] ?? 0))) {
+        flash(sales_record_lock_words((int) ($wl['owner_user_id'] ?? 0)), 'error');
+        redirect('/lead?id=' . $workLead);
+    }
 
     // ---- Files attached to a lead — the customer's RFQ, specs, correspondence.
     if ($route === 'lead-files' && $method === 'POST') {
@@ -1743,6 +1802,11 @@ function ops_leads($route, $method) {
             $fileAgain = !empty($_FILES['files']['name'][0]) ? ' Choose the file(s) again — a browser never keeps a chosen file after a refused save.' : '';
             //  DEF-15 — the business unit, when given, must be one the person may choose.
             if (($se = lead_sbu_err($_POST['sbu'] ?? '')) !== '') { form_stash('lead-new', $_POST); flash($se . $fileAgain, 'error'); redirect('/lead-new'); }
+            //  D4 (owner, 21 Nov 2026): a mobile or an e-mail, and a mobile that is one.
+            $mp = sales_mobile_problem($_POST['contact_phone'] ?? '');
+            if ($mp === '' && trim((string) ($_POST['contact_phone'] ?? '')) === '' && trim((string) ($_POST['contact_email'] ?? '')) === '')
+                $mp = 'Give a mobile or an e-mail — a lead nobody can reach cannot be followed up.';
+            if ($mp !== '') { form_stash('lead-new', $_POST); flash($mp . $fileAgain, 'error'); redirect('/lead-new'); }
             //  Backend item 1 — the quick lead's duplicate check, on save too. Nothing
             //  is saved; the form comes back with the matches and "Save anyway".
             if (empty($_POST['confirm']) && trim((string)($_POST['company_name'] ?? '')) . (string)($_POST['partner_id'] ?? '') !== '' && lead_form_dupes($_POST)) {
@@ -1824,6 +1888,18 @@ function ops_leads($route, $method) {
                 : '.'));
             redirect('/lead?id=' . (int)$l['id']);
         }
+        //  Owner test LC-01 (21 Nov 2026): opening this page again for a lead that is
+        //  already a customer showed the whole form. It now says it is done and links
+        //  to the customer and the inquiry; a POST is still refused by lead_convert().
+        if (($l['status'] ?? '') === 'CONVERTED') {
+            $cp = (int) ($l['converted_partner_id'] ?? 0) ?: (int) ($l['partner_id'] ?? 0);
+            $ci = (int) ($l['converted_inquiry_id'] ?? 0);
+            view('ops/lead_convert', ['l' => $l, 'done' => [
+                'partner' => $cp ? ops_one("SELECT id, display_name, legal_name FROM business_partners WHERE id=?", [$cp]) : null,
+                'inquiry' => $ci && function_exists('crm_inquiry_get') ? crm_inquiry_get($ci) : null,
+            ]]);
+            return true;
+        }
         view('ops/lead_convert', [
             'l' => $l, 'stage_id' => (int)($_GET['stage_id'] ?? $l['stage_id']),
             'dup' => lead_possible_duplicate((string)$l['company_name']),
@@ -1871,6 +1947,9 @@ function ops_leads($route, $method) {
         //  The same checks as when the lead was created (test book SALA-003).
         if (trim((string)($_POST['company_name'] ?? '')) === '') $refuse('A lead needs a company or person to chase.');
         if (($fe = lead_fields_err($_POST)) !== '') $refuse($fe);
+        //  D4: a changed mobile must be one; an older number left as it is stays.
+        if (array_key_exists('contact_phone', $_POST) && trim((string) $_POST['contact_phone']) !== trim((string) ($cur['contact_phone'] ?? ''))
+            && ($mp = sales_mobile_problem($_POST['contact_phone'])) !== '') $refuse($mp);
         //  DEF-15 (owner, 21 Nov 2026) — the business unit, when the form sends it. Not
         //  sent (an older page) means "leave it as it is", as for the deputation fields.
         $sbuSent = array_key_exists('sbu', $_POST);

@@ -138,7 +138,8 @@ function sx_lead_save(array $b, $confirm) {
     $company = trim((string) ($b['company_name'] ?? ''));
     if ($company === '') return ['err' => 'Type the company (or person) to follow up.'];
     $phone = trim((string) ($b['contact_phone'] ?? ''));
-    if ($phone !== '' && strlen(preg_replace('/\D+/', '', $phone)) < 10) return ['err' => 'That mobile number looks short — 10 digits, please.'];
+    //  D4 (owner, 21 Nov 2026): the quick lead needs a mobile — 10 digits.
+    if (($mp = function_exists('sales_mobile_problem') ? sales_mobile_problem($phone, true) : '') !== '') return ['err' => $mp];
     if (!$confirm && ($d = sx_lead_dupes($company, $phone))) return ['dupes' => $d];
     $u = current_user();
     $officeId = (int) ($b['office_id'] ?? 0) ?: (int) ($u['home_office_id'] ?? 0);
@@ -171,14 +172,16 @@ function sx_log_target() {
         $l = lead_row($id); if (!$l) return null;
         return ['kind' => 'LEAD', 'id' => $id, 'row' => $l, 'name' => (string) $l['company_name'], 'ref' => (string) $l['ref'],
                 'stage' => (string) ($l['stage_name'] ?? ''), 'phone' => (string) ($l['contact_phone'] ?? ''), 'who' => (string) ($l['contact_name'] ?? ''),
-                'office' => (int) ($l['office_id'] ?? 0), 'url' => '/lead?id=' . $id, 'can' => leads_can_edit(),
+                'office' => (int) ($l['office_id'] ?? 0), 'url' => '/lead?id=' . $id, 'can' => leads_can_edit() && (!function_exists('leads_works_leads') || leads_works_leads()),
+                'owner' => (int) ($l['owner_user_id'] ?? 0),
                 'open' => ($l['status'] ?? '') === 'OPEN', 'next' => (string) ($l['next_action'] ?? ''), 'next_on' => (string) ($l['next_action_on'] ?? '')];
     }
     if (($id = (int) ($_GET['deal'] ?? $_POST['deal'] ?? 0)) > 0) {
         $o = opp_row($id); if (!$o) return null;
         return ['kind' => 'OPPORTUNITY', 'id' => $id, 'row' => $o, 'name' => (string) ($o['client_name'] ?: $o['partner_name'] ?: $o['name']), 'ref' => (string) $o['ref'],
                 'stage' => (string) ($o['stage_name'] ?? ''), 'phone' => (string) ($o['contact_phone'] ?? ''), 'who' => (string) ($o['contact_name'] ?? ''),
-                'office' => (int) ($o['office_id'] ?? 0), 'url' => '/opportunity?id=' . $id, 'can' => opp_can_edit(),
+                'office' => (int) ($o['office_id'] ?? 0), 'url' => '/opportunity?id=' . $id, 'can' => opp_can_edit() && (!function_exists('leads_works_leads') || leads_works_leads()),
+                'owner' => (int) ($o['owner_user_id'] ?? 0),
                 'open' => ($o['status'] ?? '') === 'OPEN', 'next' => (string) ($o['next_action'] ?? ''), 'next_on' => (string) ($o['next_action_on'] ?? '')];
     }
     return null;
@@ -624,6 +627,11 @@ function ops_sales_more($route, $method) {
             $t = sx_log_target();
             if (!$t) { http_response_code(404); view('notfound'); return true; }
             ops_require($t['can'], 'Logging on this record needs the right to edit it.');
+            //  D2 (owner, 21 Nov 2026): only the person handling it, the people above them
+            //  and an administrator log on a lead or deal; everybody else reads it.
+            if (function_exists('sales_record_can_work') && !sales_record_can_work((int) $t['owner'])) {
+                flash(sales_record_lock_words((int) $t['owner']), 'error'); redirect($t['url']);
+            }
             //  The same branch boundary as opening the record itself: a record of
             //  another office is not logged on from here either.
             ops_require(!function_exists('scope_office_allows') || scope_office_allows($t['office'] ?: null),

@@ -2261,3 +2261,27 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill); else fill();
 })();
+// Record menus (owner test J5-01, 21 Nov 2026): the ⋯ menu and the stage menu on a
+// record page are <details class="rec-menu">. Opening one closes any other; a click
+// outside an open menu, or Esc, closes it. Shared here so every record page behaves
+// the same.
+(function () {
+  "use strict";
+  function openMenus() { return document.querySelectorAll('details.rec-menu[open]'); }
+  document.addEventListener('toggle', function (e) {
+    var d = e.target;
+    if (!d || !d.matches || !d.matches('details.rec-menu') || !d.open) return;
+    Array.prototype.forEach.call(openMenus(), function (o) { if (o !== d && !o.contains(d) && !d.contains(o)) o.open = false; });
+  }, true);
+  document.addEventListener('click', function (e) {
+    Array.prototype.forEach.call(openMenus(), function (o) { if (!o.contains(e.target)) o.open = false; });
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    Array.prototype.forEach.call(openMenus(), function (o) {
+      var hadFocus = o.contains(document.activeElement);
+      o.open = false;
+      var s = o.querySelector('summary'); if (s && hadFocus) s.focus();
+    });
+  });
+})();

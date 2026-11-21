@@ -48,7 +48,9 @@ register_shutdown_function(function () use ($vid) {
                       'view_ok' => !empty($GLOBALS['__bbv_view_ok']), 'view_err' => $GLOBALS['__bbv_view_err'] ?? '',
                       'out' => trim(preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags(
                           preg_replace('#<(style|script)\b.*?</\1>#is', ' ', $out)), ENT_QUOTES, 'UTF-8'))),
-                      'len' => strlen($out)]) . "\n";
+                      'len' => strlen($out)]
+                     // BBV_RAW=1: also the page's own HTML, for checks on links and attributes.
+                     + (getenv('BBV_RAW') ? ['html' => $out] : [])) . "\n";
 });
 // Optional query-string values (argv[6], JSON) — e.g. ins/month for find-or-create.
 $_GET = (json_decode((string) ($argv[6] ?? '{}'), true) ?: []) + ['id' => $vid];

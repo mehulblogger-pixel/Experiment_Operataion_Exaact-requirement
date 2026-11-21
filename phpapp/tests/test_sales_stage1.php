@@ -70,7 +70,22 @@ try {
             if ($keep) bbv_as($keep);
             return $no;
         };
-        t_eq(array_values(array_filter(array_diff(array_unique($o['hrefs']), $n['hrefs']), fn($h) => !$refusedAtDoor($h))), [], "$label · $pg — every link of the old page is on the new one (except screens that refuse this person at the door — F-02)");
+        //  Owner findings B1 (21 Nov 2026): the old "New quote" link was /quote-edit with no
+        //  quotation — a "Not found" page. It is now /quote-new, offered only to someone who
+        //  may write a quotation (crm_quote_can_create — the form's own rule).
+        $replaced = function ($href) use ($uid, $n) {
+            //  D2 (owner, 21 Nov 2026): Today offers "Log" only on a lead or deal this person
+            //  may work (its owner, the people above them, an administrator).
+            if (preg_match('#^/(lead|opportunity)\?id=(\d+)&log=1#', $href, $m)) {
+                $owner = (int) ops_val('SELECT owner_user_id FROM ' . ($m[1] === 'lead' ? 'leads' : 'opportunities') . ' WHERE id=?', [(int) $m[2]]);
+                $keep = $_SESSION['uid'] ?? null; bbv_as($uid); $may = sales_record_can_work($owner); if ($keep) bbv_as($keep);
+                return !$may;
+            }
+            if ($href !== '/quote-edit') return false;
+            $keep = $_SESSION['uid'] ?? null; bbv_as($uid); $mayWrite = crm_quote_can_create(); if ($keep) bbv_as($keep);
+            return $mayWrite ? in_array('/quote-new', $n['hrefs'], true) : !in_array('/quote-new', $n['hrefs'], true);
+        };
+        t_eq(array_values(array_filter(array_diff(array_unique($o['hrefs']), $n['hrefs']), fn($h) => !$refusedAtDoor($h) && !$replaced($h))), [], "$label · $pg — every link of the old page is on the new one (except screens that refuse this person at the door — F-02; the broken New quote link replaced — B1)");
         t_eq(array_values(array_diff(array_unique($o['forms']), $n['forms'])), [], "$label · $pg — every form (same address and fields) is on the new one");
         t_eq(array_values(array_diff($o['money'], $n['money'])), [], "$label · $pg — every amount of the old page is on the new one");
         return [$o, $n];

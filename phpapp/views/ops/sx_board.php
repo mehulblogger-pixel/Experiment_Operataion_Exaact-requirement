@@ -19,6 +19,12 @@ $totN = array_sum(array_map(fn($c) => count($c['rows']), $cols)); $totV = array_
 //  The open leads as before (the first 25 cards, then "+ more"), grouped by each lead's own stage.
 $leadV = array_sum(array_map(fn($l) => (float) $l['value'], $leads));
 $lg = [];
+//  Every open stage of the lead pipeline(s) gets its column, empty ones too, as on the
+//  deals board (owner test PB-01, 21 Nov 2026: only stages holding a lead were drawn).
+$lpIds = array_unique(array_filter(array_map(fn($l) => (int) ($l['pipeline_id'] ?? 0), $leads)));
+if (!$lpIds && function_exists('pipeline_default') && ($dp = pipeline_default('LEAD'))) $lpIds = [(int) $dp['id']];
+if (function_exists('pipeline_stages')) foreach ($lpIds as $lpId) foreach ((pipeline_stages($lpId) ?: []) as $st)
+    if (($st['kind'] ?? 'OPEN') === 'OPEN') $lg[(int) $st['seq'] . '|' . (string) $st['name']] = $lg[(int) $st['seq'] . '|' . (string) $st['name']] ?? [];
 foreach (array_slice($leads, 0, 25) as $l) { $k = (int) ($l['stage_seq'] ?? 0) . '|' . (string) ($l['stage_name'] ?? ''); $lg[$k][] = $l; }
 ksort($lg, SORT_NATURAL);
 $pipeQ = isset($_GET['pipeline']) ? '&pipeline=' . (int) $_GET['pipeline'] : '';
@@ -79,6 +85,7 @@ $right .= sxw_person('sales-board', $whoKey, $people, $seeAll, $pipeQ) . '</div>
         <?php $j = 0; foreach ($lg as $k => $rows): ?>
           <section class="sxw-col" data-col="<?= $j++ ?>"><header style="border-top-color:var(--info)"><b><?= e(explode('|', $k, 2)[1] ?: 'Open') ?></b><small><?= count($rows) ?> · <?= e(sx_short(array_sum(array_map(fn($l) => (float) $l['value'], $rows)))) ?> est.</small></header>
             <?php foreach ($rows as $l) echo $card('/lead?id=' . (int) $l['id'], $l['company_name'], $l['value'], $l['owner_name'] ?? '', $l); ?>
+            <?php if (!$rows): ?><p class="sxw-empty" style="padding:4px 6px">—</p><?php endif; ?>
           </section>
         <?php endforeach; ?>
       </div>

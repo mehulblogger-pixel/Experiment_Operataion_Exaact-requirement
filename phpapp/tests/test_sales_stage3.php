@@ -101,6 +101,8 @@ try {
         return $made['opps'][] = (int) ($r['id'] ?? 0);
     };
     $oA = $deal('S3 Deal Mumbai ' . $f['tag'], $f['mum'], ['competitor' => 'ABC Inspection', 'requirement' => 'Calibration of 3 tanks']);
+    //  D2 (owner, 21 Nov 2026): a deal is worked by its owner — the BDM who works it in these checks.
+    $pdo->prepare("UPDATE opportunities SET owner_user_id=? WHERE id=?")->execute([$bdm, $oA]);
     opp_move($oA, (int) $openSt[min(2, count($openSt) - 1)]['id'], [], true);
     $pdo->prepare("UPDATE opportunities SET stage_since=? WHERE id=?")->execute([date('c', strtotime('-40 days')), $oA]);   // stalled
     opp_link_quote($oA, $qid);
@@ -146,6 +148,11 @@ try {
         $fd = []; foreach ($o['figs'] as $k => $v) if (($n['figs'][$k] ?? null) !== $v) $fd[] = "$k: old \"$v\" new \"" . ($n['figs'][$k] ?? '—') . '"';
         t_eq($fd, [], "$label · $pg — all " . count($o['figs']) . ' figures read the same');
         $lostL = array_values(array_filter(array_diff(array_unique($o['hrefs']), $nn['hrefs']), fn($h) => !$moved($route, $GLOBALS['__s3g'] ?? [], $h)));
+        //  Owner findings B4 (21 Nov 2026): "+ Add new" customer (href "#") is not offered to
+        //  someone the add form refuses (partner_can_add — the form's own rule).
+        $keep = $_SESSION['uid'] ?? null; bbv_as($uid); $mayAdd = partner_can_add(); if ($keep) bbv_as($keep);
+        if (!$mayAdd && in_array($route, ['inquiry-new', 'inquiry-edit', 'opportunity-new', 'opportunity-edit', 'quote-new', 'quote-edit', 'lead-convert'], true))
+            $lostL = array_values(array_diff($lostL, ['#']));
         t_eq($lostL, [], "$label · $pg — every link of the old page is on the new one (moves listed above)");
         //  A form keeps its address and every field it had (a new page may add one). A GET filter
         //  form may be split into several on the same page: every old field must be on one of them.
