@@ -37,11 +37,15 @@ function db($reset = false) {
     // it from config — used when a company is chosen at login and the live
     // database must switch to that company's own store. No existing caller
     // passes an argument, so this changes nothing for them.
-    if ($reset) { $pdo = null; $epoch++; $GLOBALS['__db_epoch'] = $epoch; return null; }
+    if ($reset) { $pdo = null; $epoch++; $GLOBALS['__db_epoch'] = $epoch; unset($GLOBALS['__db_driver']); return null; }
     if (!isset($GLOBALS['__db_epoch'])) $GLOBALS['__db_epoch'] = $epoch;
     if ($pdo) return $pdo;
     $cfg = require __DIR__ . '/../config.php';
     $d = $cfg['db'];
+    //  DEF-24 (21 Nov 2026): remember which engine THIS connection is, so
+    //  db_driver() never has to re-read config.php — re-reading it re-resolves
+    //  the company and overwrote the active one ($GLOBALS['__tenant']) mid-run.
+    $GLOBALS['__db_driver'] = (string) $d['driver'];
     if ($d['driver'] === 'sqlite') {
         $pdo = new PDO('sqlite:' . $cfg['sqlite_path']);
         // SQLITE TAKES ONE DATABASE-WIDE WRITE LOCK, AND WITHOUT A BUSY TIMEOUT
@@ -120,8 +124,18 @@ function db($reset = false) {
 // when the live company changes within a request (single-URL login). Additive.
 function db_reset() { db(true); }
 
+//  The engine of the live connection. Read once when the connection is made
+//  (db()), never by re-running config.php: config.php also re-resolves the
+//  company from the web address / session and writes it to $GLOBALS['__tenant'],
+//  so calling it here (46 places) silently swapped the company a background run
+//  or an owner-console walk had selected — and with it the plan limits that
+//  company is held to (DEF-24). Before the first connection it falls back to
+//  config, exactly as before.
 function db_driver() {
+    if (isset($GLOBALS['__db_driver']) && $GLOBALS['__db_driver'] !== '') return $GLOBALS['__db_driver'];
+    $keep = $GLOBALS['__tenant'] ?? null;
     $cfg = require __DIR__ . '/../config.php';
+    if ($keep !== null) $GLOBALS['__tenant'] = $keep;
     return $cfg['db']['driver'];
 }
 
