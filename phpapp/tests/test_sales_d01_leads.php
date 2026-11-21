@@ -82,7 +82,8 @@ t_ok(!in_array('mod.quotes.view', role_perms('OPERATION_MANAGER'), true) && in_a
 $ra0 = setting_get('role_access', ''); $ap0 = setting_get('access_owner_grants_applied', '');
 try {
     setting_set('role_access', json_encode(['MARKETING_EXECUTIVE' => ['mod.quotes.view'], 'INSPECTOR' => ['mod.idems.view']]));
-    setting_set('access_owner_grants_applied', 'Q-B1-2026-10-19,Q-G-2026-10-19,Q-K-2026-10-19');
+    //  Every other owner rule already applied (later ones, e.g. 21 Nov, are marked applied too — this checks D-01 alone).
+    setting_set('access_owner_grants_applied', implode(',', array_diff(array_keys(access_owner_grants()), ['D-01-2026-10-20'])));
     t_eq(access_apply_owner_grants(true), ['D-01-2026-10-20'], 'only the new rule is applied to a company that already had the older ones');
     $st = json_decode(setting_get('role_access', ''), true);
     t_ok(in_array('mod.leads.view', $st['MARKETING_EXECUTIVE'], true), 'the saved Marketing Executive grid now opens Leads');
