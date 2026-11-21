@@ -283,10 +283,23 @@ function sx_orders($who, $from, $to) {
     return $rows;
 }
 //  Average days from invoice to the last payment, invoices fully paid in the last 180 days.
-function sx_avg_days_to_pay() {
+//  DEF-08 (21 Nov 2026): it was company-wide whatever the person and branch. Now:
+//  $invIds = the invoices of the orders on screen (a person picked) — the same
+//  match as the "Received" column; null = every invoice the person's branches
+//  may see, by the invoice register's own rule (scope_clause on office + unit).
+function sx_avg_days_to_pay($invIds = null) {
+    $w = ''; $a = [date('c', strtotime('-180 days'))];
+    if (is_array($invIds)) {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $invIds))));
+        if (!$ids) return null;
+        $w = ' AND i.id IN (' . implode(',', $ids) . ')';
+    } elseif (function_exists('scope_clause')) {
+        [$sw, $sa] = scope_clause('i.office_id', 'i.sbu');
+        $w = " AND $sw"; $a = array_merge($a, $sa);
+    }
     try {
         $rows = ops_all("SELECT i.invoice_date d, MAX(a.allocated_at) p FROM invoices i JOIN receipt_allocations a ON a.invoice_id=i.id
-                         WHERE i.status='PAID' AND a.allocated_at>=? GROUP BY i.id, i.invoice_date", [date('c', strtotime('-180 days'))]) ?: [];
+                         WHERE i.status='PAID' AND a.allocated_at>=?$w GROUP BY i.id, i.invoice_date", $a) ?: [];
     } catch (Throwable $e) { return null; }
     $n = 0; $s = 0;
     foreach ($rows as $r) { $a = strtotime(substr((string) $r['d'], 0, 10)); $b = strtotime(substr((string) $r['p'], 0, 10)); if ($a && $b && $b >= $a) { $s += ($b - $a) / 86400; $n++; } }
@@ -503,9 +516,15 @@ function ops_sales_more($route, $method) {
             if (!sx_can_see_all() && function_exists('ar_can') && ar_can()) $who = 0;
             $p = in_array($_GET['p'] ?? '', ['fy', 'quarter', 'month', '90'], true) ? $_GET['p'] : 'fy';
             [$from, $to, $plab] = sx_period($p);
-            view('ops/sx_orders', ['rows' => sx_orders($who, $from, $to), 'p' => $p, 'plab' => $plab, 'ar' => function_exists('ar_can') && ar_can(),
-                'avgPay' => sx_avg_days_to_pay(), 'who' => $who, 'whoKey' => $_GET['who'] ?? 'me', 'people' => sx_can_see_all() ? sx_people() : [], 'seeAll' => sx_can_see_all(),
-                'recvMonth' => sx_received_this_month(), 'overdue' => sx_receivables()]);
+            $orders = sx_orders($who, $from, $to);
+            //  DEF-08: one person's list → the two collection figures follow that
+            //  person's orders (their invoices); everyone → the person's branches.
+            $invIds = null;
+            if ($who) { $invIds = []; foreach ($orders as $o) foreach ($o['_invs'] ?? [] as $i) $invIds[] = (int) $i['id']; }
+            view('ops/sx_orders', ['rows' => $orders, 'p' => $p, 'plab' => $plab, 'ar' => function_exists('ar_can') && ar_can(),
+                'avgPay' => sx_avg_days_to_pay($invIds), 'who' => $who, 'whoKey' => $_GET['who'] ?? 'me', 'people' => sx_can_see_all() ? sx_people() : [], 'seeAll' => sx_can_see_all(),
+                'recvMonth' => sx_received_this_month($invIds), 'collectHint' => $who ? 'these orders' : (sx_scope_is_all() ? 'all customers' : 'your branches'),
+                'overdue' => sx_receivables()]);
             return true;
 
         case 'sales-renewals':
@@ -581,8 +600,27 @@ function ops_sales_more($route, $method) {
     }
     return false;
 }
-function sx_received_this_month() {
+//  DEF-08 (21 Nov 2026): was every receipt in the company. Now $invIds (a person
+//  picked) = cash received this month against the invoices of that person's
+//  orders; null = receipts of the person's branches, by the receipt register's
+//  own rule (scope_office_clause on the receipt's office).
+function sx_received_this_month($invIds = null) {
     if (!function_exists('ar_can') || !ar_can()) return null;
-    try { return (float) ops_val("SELECT COALESCE(SUM(amount),0) FROM receipts WHERE receipt_date>=? AND receipt_date<=?", [date('Y-m-01'), date('Y-m-d')]); }
-    catch (Throwable $e) { return null; }
+    $from = date('Y-m-01'); $to = date('Y-m-d');
+    try {
+        if (is_array($invIds)) {
+            $ids = array_values(array_unique(array_filter(array_map('intval', $invIds))));
+            if (!$ids) return 0.0;
+            return (float) ops_val("SELECT COALESCE(SUM(a.amount),0) FROM receipt_allocations a JOIN receipts r ON r.id=a.receipt_id
+                                    WHERE a.kind='CASH' AND a.invoice_id IN (" . implode(',', $ids) . ") AND r.receipt_date>=? AND r.receipt_date<=?", [$from, $to]);
+        }
+        [$sw, $sa] = scope_office_clause('r.office_id');
+        return (float) ops_val("SELECT COALESCE(SUM(r.amount),0) FROM receipts r WHERE r.receipt_date>=? AND r.receipt_date<=? AND $sw", array_merge([$from, $to], $sa));
+    } catch (Throwable $e) { return null; }
+}
+//  Does the signed-in person see every branch? (Only changes a hint's wording.)
+function sx_scope_is_all() {
+    if (function_exists('is_master') && is_master()) return true;
+    $off = function_exists('scope_offices') ? scope_offices() : 'ALL';
+    return $off === 'ALL' || !is_array($off);
 }

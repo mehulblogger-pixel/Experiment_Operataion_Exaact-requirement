@@ -380,7 +380,7 @@ function sx_client_sales_cols(array $ids) {
         foreach (ops_all("SELECT partner_id, MAX(occurred_at) t FROM activities WHERE partner_id IN ($in) AND COALESCE(auto,0)=0 GROUP BY partner_id") ?: [] as $a)
             $out[(int) $a['partner_id']]['touch'] = (string) $a['t'];
     } catch (Throwable $e) {}
-    if ($ar) foreach ($ids as $pid) { try { $bo = books_outstanding($pid); $out[$pid]['owed'] = (float) (is_array($bo) ? ($bo['outstanding'] ?? 0) : $bo); } catch (Throwable $e) {} }
+    if ($ar) foreach ($ids as $pid) { try { $bo = books_outstanding($pid, true); $out[$pid]['owed'] = (float) (is_array($bo) ? ($bo['outstanding'] ?? 0) : $bo); } catch (Throwable $e) {} }
     return $out;
 }
 //  Two small icons (WhatsApp, call) for a table cell outside the Sales screens.

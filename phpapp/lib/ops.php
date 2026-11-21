@@ -906,6 +906,8 @@ function ops_preorder_checklist($method) {
         foreach (preg_split('/\r?\n/', (string)($_POST['items'] ?? '')) as $ln) { $ln = trim($ln); if ($ln !== '') $items[] = mb_substr($ln, 0, 300); }   // letters, not bytes (SALB-038)
         setting_set('preorder_checklist_on', $on);
         setting_set('preorder_checklist_require', $req);
+        //  DEF-04: quotations already ticked keep the points they were ticked against.
+        if (function_exists('preorder_checklist_items') && preorder_checklist_items() !== $items) preorder_checklist_freeze_started(preorder_checklist_items());
         setting_set('preorder_checklist_items', implode("\n", $items));
         flash('Pre-order checklist saved.' . ($on ? '' : ' (It is switched off, so it will not appear on quotations.)'));
         redirect('/preorder-checklist');

@@ -1720,13 +1720,19 @@ function ops_leads($route, $method) {
         $keepOwnerId = (int)($cur['owner_user_id'] ?? 0) ?: null; $ownerNm = (string)($cur['owner_name'] ?? '');
         $pref = isset(LEAD_PREF_CONTACT[$_POST['pref_contact'] ?? '']) ? (string)$_POST['pref_contact'] : '';
         // Field #7 — manpower deputation, same rule as create: a man-month needs the site.
-        $dep = strtoupper(trim((string)($_POST['deputation_kind'] ?? '')));
+        //  DEF-19 (21 Nov 2026): a form that does not carry the deputation fields at
+        //  all (an older page, a bookmark) used to save them as blank and wipe the
+        //  lead's deputation. Not sent now means "leave as it is".
+        $depSent = array_key_exists('deputation_kind', $_POST);
+        $dep = $depSent ? strtoupper(trim((string)$_POST['deputation_kind'])) : strtoupper((string)($cur['deputation_kind'] ?? ''));
         if (!isset(LEAD_DEPUTATION[$dep])) $dep = '';
-        $site = trim((string)($_POST['site_location'] ?? ''));
-        if ($dep === 'MANMONTH' && $site === '') {
+        $site = $depSent ? trim((string)($_POST['site_location'] ?? '')) : trim((string)($cur['site_location'] ?? ''));
+        $mpCount = $depSent ? max(0, (int)($_POST['manpower_count'] ?? 0)) : max(0, (int)($cur['manpower_count'] ?? 0));
+        $mpSkills = $depSent ? trim((string)($_POST['manpower_skills'] ?? '')) : trim((string)($cur['manpower_skills'] ?? ''));
+        if ($depSent && $dep === 'MANMONTH' && $site === '') {
             $refuse('A man-month deputation places people on the customer’s site, so the site details are required. Add them, or choose man-day.');
         }
-        if ($dep === 'MANMONTH' && (int)($_POST['manpower_count'] ?? 0) < 1) {
+        if ($depSent && $dep === 'MANMONTH' && $mpCount < 1) {
             $refuse('A man-month deputation places people on the customer’s site — say how many (at least 1).');
         }
         if ($dep !== 'MANMONTH') $site = '';
@@ -1748,8 +1754,8 @@ function ops_leads($route, $method) {
                 (string)($_POST['next_action_on'] ?? ''),
                 substr(trim((string)($_POST['next_action'] ?? '')), 0, 255),
                 $pref,
-                $dep, max(0, (int)($_POST['manpower_count'] ?? 0)),
-                trim((string)($_POST['manpower_skills'] ?? '')), substr($site, 0, 300),
+                $dep, $mpCount,
+                $mpSkills, substr($site, 0, 300),
                 date('c'), $id]);
         if (function_exists('ads_queue_lead')) ads_queue_lead($id, 'Details edited');
         // Who it belongs to changes through the one rule (manager approval),

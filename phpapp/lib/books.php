@@ -1125,16 +1125,22 @@ function books_ledger($partnerId, $from = '', $to = '') {
 }
 
 // One figure, used by Customer 360 and the customer screen.
-function books_outstanding($partnerId) {
+// $scoped (DEF-08, 21 Nov 2026): count only invoices the signed-in person's
+// branches may see, by the invoice register's own rule (scope_clause on office
+// + business unit). Used by the Sales view of the client register; every other
+// caller keeps the whole-customer figure it always had.
+function books_outstanding($partnerId, $scoped = false) {
     books_migrate();
+    $sw = '1=1'; $sa = [];
+    if ($scoped && function_exists('scope_clause')) [$sw, $sa] = scope_clause('i.office_id', 'i.sbu');
     $inv = (float)books_try(fn() => ops_val(
-        "SELECT COALESCE(SUM(total),0) FROM invoices WHERE partner_id=? AND status IN ('ISSUED','PART_PAID')", [(int)$partnerId]), 0);
+        "SELECT COALESCE(SUM(i.total),0) FROM invoices i WHERE i.partner_id=? AND i.status IN ('ISSUED','PART_PAID') AND $sw", array_merge([(int)$partnerId], $sa)), 0);
     $set = (float)books_try(fn() => ops_val(
         "SELECT COALESCE(SUM(a.amount),0) FROM receipt_allocations a JOIN invoices i ON i.id = a.invoice_id
-         WHERE i.partner_id=? AND i.status IN ('ISSUED','PART_PAID')", [(int)$partnerId]), 0);
+         WHERE i.partner_id=? AND i.status IN ('ISSUED','PART_PAID') AND $sw", array_merge([(int)$partnerId], $sa)), 0);
     $cn = (float)books_try(fn() => ops_val(
         "SELECT COALESCE(SUM(c.total),0) FROM credit_notes c JOIN invoices i ON i.id = c.invoice_id
-         WHERE i.partner_id=? AND c.status='ISSUED' AND i.status IN ('ISSUED','PART_PAID')", [(int)$partnerId]), 0);
+         WHERE i.partner_id=? AND c.status='ISSUED' AND i.status IN ('ISSUED','PART_PAID') AND $sw", array_merge([(int)$partnerId], $sa)), 0);
     $unalloc = (float)books_try(fn() => ops_val(
         "SELECT COALESCE(SUM(r.amount + r.tds_amount),0) - COALESCE((
              SELECT SUM(a.amount) FROM receipt_allocations a JOIN receipts r2 ON r2.id = a.receipt_id

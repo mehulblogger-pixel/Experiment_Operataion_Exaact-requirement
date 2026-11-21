@@ -100,14 +100,17 @@ foreach (($msHidden ?? []) as $k => $v) $hidden .= '<input type="hidden" name="'
       <?php if ($isC): ?><input type="hidden" name="act" value="save"><?php endif; ?>
       <?php if ($isC && $fixedPct > 0): ?><p class="muted" style="margin:0 0 6px;font-size:12.5px">Milestones already reached (<?= e($pc($fixedPct)) ?>%) stay as they are; below are the ones still to come.</p><?php endif; ?>
       <table class="ms-ed" style="width:100%">
-        <thead><tr><th style="text-align:left">Milestone — what has to happen</th><th style="width:90px;text-align:left">Share %</th><th style="width:110px;text-align:left" class="ms-hide-sm">Releases retention</th><th style="width:30px"></th></tr></thead>
+        <thead><tr><th style="text-align:left">Milestone — what has to happen</th><th style="width:90px;text-align:left">Share %</th><th style="width:110px;text-align:left">Releases retention</th><th style="width:30px"></th></tr></thead>
         <tbody data-ms-rows>
         <?php $edRows = $isC ? $planned : $msRows; if (!$edRows) $edRows = [['title' => '', 'pct' => '', 'releases_retention' => 0]];
         foreach ($edRows as $i => $r): ?>
           <tr class="ms-row">
             <td><input class="form-control" name="ms_title[<?= $i ?>]" value="<?= e($r['title']) ?>" maxlength="200" placeholder="e.g. Design approved by the client"></td>
             <td><input class="form-control" type="number" step="0.001" min="0" max="100" name="ms_pct[<?= $i ?>]" value="<?= $r['pct'] === '' ? '' : e($pc($r['pct'])) ?>" data-ms-pct></td>
-            <td class="ms-hide-sm" style="text-align:center"><input type="radio" name="ms_release" value="<?= $i ?>" <?= !empty($r['releases_retention']) ? 'checked' : '' ?> aria-label="This milestone releases the retention"></td>
+            <?php // DEF-03 (21 Nov 2026): this cell carried the phone-hiding class. The hiding rule only reaches the
+                  // read-only list (.ms-tbl), so it was visible, but one widening of that rule would have
+                  // hidden the only way to mark the retention milestone on a phone. The class is removed. ?>
+            <td style="text-align:center"><input type="radio" name="ms_release" value="<?= $i ?>" <?= !empty($r['releases_retention']) ? 'checked' : '' ?> aria-label="This milestone releases the retention"></td>
             <td><button type="button" class="btn small secondary" data-ms-del aria-label="Remove this milestone">✕</button></td>
           </tr>
         <?php endforeach; ?>

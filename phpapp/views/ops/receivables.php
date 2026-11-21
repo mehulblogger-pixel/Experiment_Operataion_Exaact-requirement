@@ -81,11 +81,14 @@
         <td><b><?= e($r['invoice_number'] ?: '—') ?></b></td>
         <td><?= e($r['job_code']) ?><?php if ($r['office_name']): ?><br><span class="muted" style="font-size:12px"><?= e($r['office_name']) ?></span><?php endif; ?></td>
         <td><?= e(fdate($r['invoice_date'])) ?></td>
-        <td><?= $r['invoice_due_date'] ? e(fdate($r['invoice_due_date'])) : '<span class="muted">not set</span>' ?></td>
+        <?php //  DEF-09 (21 Nov 2026): a row from the invoice book carries due_date and the
+              //  invoice's own id; a legacy job row carries invoice_due_date and the job's id.
+              $dueOn = !empty($r['from_books']) ? (string) ($r['due_date'] ?? '') : (string) ($r['invoice_due_date'] ?? ''); ?>
+        <td><?= $dueOn !== '' ? e(fdate($dueOn)) : '<span class="muted">not set</span>' ?></td>
         <td class="num"><?= (int)$r['age_days'] ?> d<?php if (!empty($r['estimated'])): ?><br><span class="muted" style="font-size:11px">from invoice date</span><?php endif; ?></td>
         <td><span class="pill <?= $r['bucket'] === 'b90p' ? 'p-bad' : ($r['bucket'] === 'notdue' ? 'p-mut' : 'p-warn') ?>"><?= e($lbl) ?></span></td>
         <td class="num"><b><?= fmoney($r['amount']) ?></b></td>
-        <td><a class="btn small" href="/job?id=<?= (int)$r['id'] ?>#invoice">Open →</a></td>
+        <td><a class="btn small" href="<?= !empty($r['from_books']) ? '/invoice?id=' . (int)$r['id'] : '/job?id=' . (int)$r['id'] . '#invoice' ?>">Open →</a></td>
       </tr>
     <?php endforeach; ?>
     </tbody>

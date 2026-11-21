@@ -264,7 +264,13 @@
       <td><input class="form-control" name="l_desc[]" value="<?= e($ln['description'] ?? '') ?>">
           <?php // Office is set once for the whole quote (Executing offices tab), not
                 // per line — kept as a hidden value so existing quotes are preserved. ?>
-          <input type="hidden" name="l_office[]" value="<?= e((string)($ln['office_id'] ?? '')) ?>"></td>
+          <input type="hidden" name="l_office[]" value="<?= e((string)($ln['office_id'] ?? '')) ?>">
+          <?php // DEF-02 (21 Nov 2026): the line's sub-types and deliverables have no box on
+                // this form any more, but crm_save_lines() rewrites every line from what is
+                // posted — so without these two they were wiped on every save. Carried as
+                // they are; a new line starts with both empty (the + Add line copy clears inputs). ?>
+          <input type="hidden" name="l_subtypes[]" value="<?= e((string)($ln['subtypes'] ?? '')) ?>">
+          <input type="hidden" name="l_deliv[]" value="<?= e((string)($ln['deliverables'] ?? '')) ?>"></td>
       <td><select class="form-control l_loc" name="l_location[]" data-cur="<?= e((string)($ln['location_id'] ?? '')) ?>"><option value="">— add a site above —</option></select></td>
       <td><select class="form-control" name="l_order[]"><?php foreach ($orderOpts as $k=>$v): ?><option value="<?= e($k) ?>" <?= (($ln['order_type'] ?? 'LINE')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></td>
       <td><input class="form-control num l_qty" type="number" step="0.01" min="0" name="l_qty[]" value="<?= e($ln['qty'] ?? '') ?>"></td>

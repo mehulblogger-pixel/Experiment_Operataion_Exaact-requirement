@@ -2781,7 +2781,7 @@ function ops_crm_quotes($route, $method) {
         elseif (function_exists('nav_under') && ($qd = crm_quote_deal_link($q))) nav_under('quote', 'opportunities', $qd);
         view('ops/crm/quote_detail', [
             'q' => $q, 'lines' => crm_quote_lines($q['id']),
-            'preorderOn' => preorder_checklist_enabled(), 'preorderItems' => preorder_checklist_items(),
+            'preorderOn' => preorder_checklist_enabled(), 'preorderItems' => preorder_checklist_items_for($q),
             'preorderState' => preorder_checklist_state($q), 'preorderRequireAll' => preorder_checklist_require_all(),
             'preorderCanWaive' => crm_quote_checklist_can_waive($q),
             'revs' => ops_all("SELECT id, rev, status, total_amount, is_current, created_at, created_by FROM quotations WHERE quote_no=? ORDER BY rev", [$q['quote_no']]),
@@ -3198,11 +3198,13 @@ function ops_crm_quotes($route, $method) {
         // first tick, and unticking removes it.
         $ticked = (array)($_POST['pc'] ?? []); $vc = []; $was = preorder_checklist_state($q);
         $me = user_name(current_user());
-        foreach (preorder_checklist_items() as $it) {
+        $items = preorder_checklist_items_for($q);      // DEF-04: the list this quotation is reviewed against
+        foreach ($items as $it) {
             $k = preorder_item_key($it);
             if (empty($ticked[$k])) continue;
             $vc[$k] = is_array($was[$k] ?? null) ? $was[$k] : ['by' => $me, 'at' => date('c')];
         }
+        $vc['_items'] = array_values($items);
         $pdo->prepare("UPDATE quotations SET preorder_checklist=? WHERE id=?")->execute([json_encode($vc), $q['id']]);
         $pg = preorder_checklist_progress(['preorder_checklist' => json_encode($vc)]);
         crm_log_change($q['id'], 'Review checklist: ' . $pg['done'] . ' of ' . $pg['total'] . ' points ticked');
@@ -4160,9 +4162,42 @@ function preorder_checklist_default() {
     ]);
 }
 function preorder_item_key($item) { return 'c' . substr(md5(trim((string)$item)), 0, 10); }
+//  DEF-04 (21 Nov 2026). A tick is keyed by its point's wording, so rewording a
+//  point on the settings screen used to orphan every tick of it, on every
+//  quotation, old ones included. Now a quotation whose checklist has been started
+//  keeps the list of points it was ticked against ("_items", inside the same
+//  quotations.preorder_checklist JSON — no new table or column). A changed list
+//  applies going forward: to quotations whose checklist has not been started.
 function preorder_checklist_state($q) {
     $j = json_decode((string)($q['preorder_checklist'] ?? ''), true);
-    return is_array($j) ? $j : [];
+    if (!is_array($j)) return [];
+    unset($j['_items']);
+    return $j;
+}
+function preorder_checklist_items_for($q) {
+    $j = json_decode((string)($q['preorder_checklist'] ?? ''), true);
+    if (is_array($j) && isset($j['_items']) && is_array($j['_items'])) {
+        $out = [];
+        foreach ($j['_items'] as $it) { $it = trim((string)$it); if ($it !== '') $out[] = $it; }
+        if ($out) return $out;
+    }
+    return preorder_checklist_items();
+}
+//  Called by the settings screen just before the list changes: each quotation
+//  that has ticks but no saved list was ticked against the list in force until
+//  now, so that list is written beside its ticks. The ticks themselves, and who
+//  ticked them when, are not touched.
+function preorder_checklist_freeze_started(array $oldItems) {
+    if (!$oldItems) return 0;
+    $n = 0;
+    foreach (ops_all("SELECT id, preorder_checklist FROM quotations WHERE preorder_checklist IS NOT NULL AND preorder_checklist <> '' AND preorder_checklist <> '[]'") ?: [] as $r) {
+        $j = json_decode((string)$r['preorder_checklist'], true);
+        if (!is_array($j) || isset($j['_items'])) continue;
+        $j['_items'] = array_values($oldItems);
+        db()->prepare("UPDATE quotations SET preorder_checklist=? WHERE id=?")->execute([json_encode($j), (int)$r['id']]);
+        $n++;
+    }
+    return $n;
 }
 // D-10 (the owner, 20 Oct 2026: "Yes to both") — when every point is required,
 // the checklist holds approval, sending and the customer's acceptance, unless
@@ -4184,7 +4219,7 @@ function crm_quote_checklist_can_waive($q) {
 }
 // How many of the configured points are ticked on this quotation.
 function preorder_checklist_progress($q) {
-    $items = preorder_checklist_items(); $state = preorder_checklist_state($q);
+    $items = preorder_checklist_items_for($q); $state = preorder_checklist_state($q);
     $done = 0; foreach ($items as $it) if (!empty($state[preorder_item_key($it)])) $done++;
     return ['done' => $done, 'total' => count($items), 'complete' => $done >= count($items)];
 }

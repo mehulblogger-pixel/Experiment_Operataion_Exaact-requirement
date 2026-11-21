@@ -18,7 +18,8 @@
   <div class="ff">
     <label>Check points — one per line</label>
     <textarea class="form-control" name="items" rows="10" style="font-family:inherit;font-size:13.5px" placeholder="One check point per line…"><?= e($items) ?></textarea>
-    <small class="muted">Edit freely — these are suggestions to get you started; make them your own.</small>
+    <small class="muted">Edit freely — these are suggestions to get you started; make them your own.
+      A change applies to <?= e(Tlp('quote')) ?> whose checklist has not been started yet. A <?= e(Tl('quote')) ?> already ticked keeps the points it was ticked against, with who ticked them and when.</small>
   </div>
 
   <div style="margin-top:14px"><button class="btn" type="submit">Save pre-order checklist</button>

@@ -18,9 +18,9 @@ $overAmt = 0.0; $overN = 0; if ($overdue) foreach ($overdue as $r) if ((int) $r[
     <?php sx_kpi('green', '🏆 Orders won', sx_short($tot['v']), count($rows) . ' order' . (count($rows) === 1 ? '' : 's') . ' · ' . $plab);
           if ($ar) { sx_kpi('blue', '🧾 Still to bill', sx_short(max(0, $tot['v'] - $tot['b'])), 'order in hand');
                      sx_kpi('teal', '✅ Received', sx_short($tot['r']), 'against these orders');
-                     if ($recvMonth !== null) sx_kpi('slate', '📅 Received this month', sx_short($recvMonth), 'all customers');
+                     if ($recvMonth !== null) sx_kpi('slate', '📅 Received this month', sx_short($recvMonth), $collectHint ?? 'all customers');
                      sx_kpi('red', '⏰ Overdue', sx_short($overAmt), $overN . ' invoice' . ($overN === 1 ? '' : 's'), '/receivables');
-                     sx_kpi('purple', '⌛ Days to get paid', $avgPay !== null ? $avgPay . ' d' : '—', 'average · last 6 months'); } ?>
+                     sx_kpi('purple', '⌛ Days to get paid', $avgPay !== null ? $avgPay . ' d' : '—', 'average · last 6 months · ' . ($collectHint ?? 'all customers')); } ?>
   </div>
   <?php if (!$ar): ?><p class="muted" style="margin-top:10px">Billed and received amounts are shown to people who may see receivables.</p><?php endif; ?>
   <div class="sxcard"><h2>Orders · <?= e($plab) ?></h2>
