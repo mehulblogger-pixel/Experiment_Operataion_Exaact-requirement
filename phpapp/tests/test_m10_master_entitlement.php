@@ -220,6 +220,14 @@ $BASELINE = [
     // It is asked only inside /sales-renewals, whose handler first requires sx_can(),
     // which refuses without the Sales licence. Same answer for a master as before.
     'sx_contract_money_can',
+    // Owner's test results, round 2 (21 Nov 2026). crm_quote_can_create() (B1) is the
+    // quotation create/edit check lifted into a function — asked inside the /quote-new
+    // handler (Quotes module, refused by the M5 gate without Sales) and for the Sales
+    // home tile (behind sx_can()) — Category B. partner_can_add() (B4) is the add-a-
+    // client/vendor check index.php always made inline, lifted into a function so the
+    // "+ Add new" links ask the same question; clients and vendors are CORE (section E),
+    // so a master keeps it on any plan. Same answer for a master as before.
+    'crm_quote_can_create', 'partner_can_add',
 ];
 $unclassified = array_values(array_diff($open, $BASELINE));
 t_ok(!$unclassified,
