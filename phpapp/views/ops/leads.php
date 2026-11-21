@@ -11,7 +11,7 @@
     <?php if ($canEdit): ?><a class="btn" href="/lead-new">+ New lead</a><?php endif; ?>
     <?php // The list carries its own export, inside the register, so it can say
           // it is exporting what the filters match. Only the board needs one here. ?>
-    <?php if ($view !== 'list'): ?>
+    <?php if ($view !== 'list' && (!function_exists('leads_can_export') || leads_can_export())): ?>
       <a class="btn secondary" href="/leads?<?= e(http_build_query(array_merge($_GET,['export'=>'csv']))) ?>">⬇ CSV</a>
     <?php endif; ?>
   </div>
@@ -173,7 +173,7 @@
         'caption'     => 'Lead register',
         'search'      => true,
         'search_hint' => 'Company, contact or reference…',
-        'export'      => true,
+        'export'      => !function_exists('leads_can_export') || leads_can_export(),
         'empty'       => 'Nothing yet. Leads land here from the website form, a phone call, or by typing one in.',
         'bulk_action' => '/leads-bulk',
         'bulk_extra'  => $bulkExtra,

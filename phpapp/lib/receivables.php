@@ -44,9 +44,14 @@ const AR_BUCKETS = [
 // renders BEFORE the router reaches that gate — so this was real ledger data on
 // the screen of a company that had not bought the module. Entitlement first,
 // then the person's own permission.
+//  Foundation A (owner, 21 Nov 2026, Q5): "See what customers were billed and
+//  paid" is its own, plainly named switch. It used to ride on "inter-office credit
+//  figures" or "Credit reconciliation", so unticking either quietly took payments
+//  off the Sales screens. On day one it is on for exactly those people (docs/02
+//  19r); finance.reconcile and data.credit keep their own meanings everywhere else.
 function ar_can() {
     if (function_exists('licence_module_live') && !licence_module_live('invoicing')) return false;
-    return can('finance.reconcile') || can('data.credit') || is_master();
+    return can('data.customer_money') || is_master();
 }
 
 function ar_bucket_of($days) {

@@ -4,7 +4,7 @@
   <p class="sub" style="margin:2px 0 0">Pieces of business you are trying to win. Kept apart from quotations on purpose: one deal often carries three quotations, and counting quotations makes the forecast three times too big. A deal can also be lost before anyone quotes — that loss is the one worth recording.</p></div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
     <?php if ($canEdit): ?><a class="btn" href="/opportunity-new">+ New <?= e(Tl('opportunity')) ?></a><?php endif; ?>
-    <?php if ($view !== 'list'): ?>
+    <?php if ($view !== 'list' && (!function_exists('opp_can_export') || opp_can_export())): ?>
       <a class="btn secondary" href="/opportunities?<?= e(http_build_query(array_merge($_GET,['export'=>'csv']))) ?>">⬇ CSV</a>
     <?php endif; ?>
   </div>
@@ -96,7 +96,7 @@
           'caption'     => TH('opportunity') . ' register',
           'search'      => true,
           'search_hint' => 'Deal, customer or reference…',
-          'export'      => true,
+          'export'      => !function_exists('opp_can_export') || opp_can_export(),
           'empty'       => 'Nothing yet. ' . ucfirst(Tla('opportunity')) . ' opens from a lead, or straight from here when a customer tells you what they are planning.',
         ]) ?>
   </div>

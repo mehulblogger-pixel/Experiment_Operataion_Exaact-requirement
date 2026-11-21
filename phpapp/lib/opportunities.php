@@ -61,8 +61,15 @@ function opp_lost_reasons() {
         : ['PRICE_HIGH' => 'Price', 'NO_RESPONSE' => 'No response', 'OTHER' => 'Other'];
 }
 
-function opp_can_view() { return can('mod.leads.view') || can('mod.quotes.view') || can('mod.inquiries.view') || is_master_of(['leads','quotes','inquiries']); }
-function opp_can_edit() { return can('mod.leads.edit') || can('mod.quotes.edit') || can('mod.inquiries.edit') || is_master_of(['leads','quotes','inquiries']); }
+//  Foundation A (owner, 21 Nov 2026, Q3): Deals are a feature of their own — "View
+//  deals" and "Add and edit deals" — instead of riding on Leads, Quotations or
+//  Enquiries. On day one each is on for exactly the people the old rule let in
+//  (docs/02 19r). Sales must still be in the plan, as it was for the old ticks.
+function opp_sales_live() { return !function_exists('licence_module_live') || licence_module_live('leads'); }
+function opp_can_view() { return (can('crm.deal.view') && opp_sales_live()) || is_master_of(['leads','quotes','inquiries']); }
+function opp_can_edit() { return (can('crm.deal.edit') && opp_sales_live()) || is_master_of(['leads','quotes','inquiries']); }
+//  Q6 — downloading the deal list is its own switch (on day one: everyone who could open it).
+function opp_can_export() { return is_master() || can('crm.deal.export'); }
 
 function opp_try($fn, $fb = []) {
     try { return $fn(); }
@@ -1137,6 +1144,7 @@ function ops_opportunities($route, $method) {
                    'fy_from' => $fy['all'] ? '' : $fy['from'], 'fy_to_excl' => $fy['all'] ? '' : $fy['to_excl']];
 
         if (wants_csv()) {
+            ops_require(opp_can_export(), 'Downloading the ' . Tl('opportunity') . ' list needs the "Download deals to Excel / CSV" permission.');
             $csv = [['Ref',T('opportunity'),'Customer','Stage','Status','Estimate','Weighted','%','Expected close',
                      'Owner','Branch','Against','Days in stage','Lost reason']];
             foreach (opp_all($filter) as $o)

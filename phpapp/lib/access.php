@@ -259,6 +259,28 @@ const PERMISSIONS = [
     // doing the work, because those are two different responsibilities.
     'capa.close'          => 'Close corrective actions (§8.7.3 — asserts the action was effective)',
     'ncr.close'           => 'Close nonconformities (asserts the disposition was carried out)',
+    // ---- Sales rights that used to ride on another tick or on a job title ----
+    //  Permission foundation A (owner, 21 Nov 2026: "All as recommended", the
+    //  permission-screen proposal Q1–Q9). Each was decided by something else —
+    //  a job title, the Leads edit tick, "inter-office credit figures", "Manage
+    //  system settings" — so it could not be given or taken away on its own.
+    //  Each now has a switch, and on the day it shipped it was on for EXACTLY the
+    //  people who could already do it: perm_upgrade_split() works that out from
+    //  the old rule for every set saved before (docs/02 19r; proved person by
+    //  person in tests/test_perm_a_equivalence.php).
+    'crm.sales.see_all'   => 'See other salespeople\'s lists (Everyone / Choose a person)',
+    'crm.targets.set'     => 'Set sales targets for others',
+    'crm.deal.view'       => 'View deals',
+    'crm.deal.edit'       => 'Add and edit deals',
+    'crm.pipeline.manage' => 'Change pipelines and stages',
+    'crm.lead.export'     => 'Download leads to Excel / CSV',
+    'crm.deal.export'     => 'Download deals to Excel / CSV',
+    'crm.quote.export'    => 'Download quotations to Excel / CSV',
+    'crm.settings.manage' => 'Change Sales settings (working days, follow-up days, who gets new leads)',
+    'data.customer_money' => 'See what customers were billed and paid (Sales screens and Receivables)',
+    'costing.view'        => 'View project costings',
+    'costing.prepare'     => 'Prepare project costings',
+    'costing.heads.manage'=> 'Manage the cost-head library',
 ];
 
 // Human-friendly grouping of every permission, so the access editor reads clearly
@@ -268,8 +290,11 @@ function permission_groups() {
         'Dashboards & sensitive figures' => ['dash.operations','dash.financial','dash.utilization','dash.people','data.credit','data.revenue','data.salary','data.profitability'],
         'Operations (calls & jobs)'      => ['ops.call.create','ops.job.allocate','ops.job.close','ops.call.delete','workforce.availability','workforce.report.approve'],
         'Inspection documentation (IDEMS)' => ['idems.finalize','idems.type.manage','idems.timestamp.edit','idems.audit.view'],
-        'Money'                          => ['finance.reconcile'],
-        'Marketing & Sales (CRM)'        => ['crm.quote.create','crm.quote.approve','crm.quote.send','crm.followup.manage','crm.contract.register','crm.template.manage'],
+        'Money'                          => ['finance.reconcile','data.customer_money'],
+        'Marketing & Sales (CRM)'        => ['crm.quote.create','crm.quote.approve','crm.quote.send','crm.followup.manage','crm.contract.register','crm.template.manage',
+                                             'crm.sales.see_all','crm.targets.set','crm.deal.view','crm.deal.edit','crm.pipeline.manage',
+                                             'crm.lead.export','crm.deal.export','crm.quote.export','crm.settings.manage'],
+        'Project costing'                => ['costing.view','costing.prepare','costing.heads.manage'],
         'Recruitment'                    => ['hiring.admin','hiring.material_change.propose','hiring.review.clear'],
         'Identity documents (personal data)' => ['person.iddoc.view','person.iddoc.manage'],
         'Complaints & appeals'           => ['complaints.decide','capa.close','ncr.close'],
@@ -374,7 +399,10 @@ function module_groups_licensed() {
 function permission_nav_groups() {
     // fine-grained action permissions, by nav area
     $fine = [
-        'Sales'                   => ['crm.quote.create','crm.quote.approve','crm.quote.send','crm.followup.manage','crm.contract.register','crm.template.manage'],
+        'Sales'                   => ['crm.quote.create','crm.quote.approve','crm.quote.send','crm.followup.manage','crm.contract.register','crm.template.manage',
+                                      'crm.sales.see_all','crm.targets.set','crm.deal.view','crm.deal.edit','crm.pipeline.manage',
+                                      'crm.lead.export','crm.deal.export','crm.quote.export','crm.settings.manage',
+                                      'costing.view','costing.prepare','costing.heads.manage'],
         'Operations'              => ['ops.call.create','ops.job.allocate','ops.job.close','ops.call.delete','workforce.availability','workforce.report.approve'],
         //  R-14, second half. module_groups() gave recruitment its own heading on
         //  the ROLE screen, but this map feeds the PER-USER screen and was not
@@ -383,7 +411,7 @@ function permission_nav_groups() {
         //  exactly that. One name, one place, on both screens.
         'Recruitment'             => ['hiring.admin','hiring.material_change.propose','hiring.review.clear'],
         'Reporting'               => ['idems.finalize','idems.type.manage','idems.timestamp.edit','idems.template.approve'],
-        'Money'                   => ['data.credit','data.revenue','data.salary','data.profitability','finance.reconcile'],
+        'Money'                   => ['data.credit','data.revenue','data.salary','data.profitability','finance.reconcile','data.customer_money'],
         'Quality & Accreditation' => ['idems.audit.view','person.iddoc.view','person.iddoc.manage','complaints.decide','capa.close','ncr.close'],
         'Insights'                => ['dash.operations','dash.financial','dash.utilization','dash.people'],
         'Directory'               => ['master.manage'],
@@ -535,6 +563,19 @@ function perm_help($key) {
             'crm.followup.manage' => 'Manage quotation follow-ups & reminders. Who: sales.',
             'crm.contract.register' => 'Register the ' . $client . ' & contract number — turn a won quotation into a live contract and set its branch. Who: accounts / back-office.',
             'crm.template.manage' => 'Manage quotation & e-mail templates. Who: sales / marketing admins.',
+            'crm.sales.see_all'   => 'On Sales home, Today, the board, Orders and Targets: look at another salesperson\'s list or "Everyone" instead of only their own. Who: sales managers and management.',
+            'crm.targets.set'     => 'Set and change the sales targets of other people. Each change is kept with the figure before it. Who: sales managers and management.',
+            'crm.deal.view'       => 'See deals (live pieces of business being worked) — on the board, Sales home and search. Who: sales and whoever follows the pipeline.',
+            'crm.deal.edit'       => 'Create a deal, change it and move it between stages. Who: sales.',
+            'crm.pipeline.manage' => 'Add, rename and reorder the company\'s pipelines and their stages. Affects everyone\'s board — grant deliberately. Who: the sales head / administrators.',
+            'crm.lead.export'     => 'Download the lead list to Excel / CSV. A file can leave the company — switch it off for people who only need to work leads on screen.',
+            'crm.deal.export'     => 'Download the deal list to Excel / CSV. A file can leave the company — grant deliberately.',
+            'crm.quote.export'    => 'Download the quotation register to Excel / CSV. A file can leave the company — grant deliberately.',
+            'crm.settings.manage' => 'Change Sales settings: follow-up outcomes and days, weekly off, when a deal is stale, and who gets new leads in each office. Not the other company settings.',
+            'data.customer_money' => 'See what customers were billed, what they paid and what is overdue — on the Sales screens (Orders, Today, Sales home, Advertising return, client register) and in Receivables. Who: finance and those who chase payment.',
+            'costing.view'        => 'Open project costings — the cost build-up behind a quotation, including salary figures. Who: sales, recruitment and managers who price work.',
+            'costing.prepare'     => 'Prepare and change a project costing and submit it for approval. Approving stays with the approval levels.',
+            'costing.heads.manage'=> 'Change the cost-head library and costing templates (with dates from which a value applies). Affects every new costing. Who: administrators / finance head.',
             // --- Directory / masters ---
             'master.manage'    => 'Add and edit master data — ' . Tlp('client') . ', ' . Tlp('vendor') . ', lookups, offices. Who: back-office, coordinators, admins.',
             'org.hierarchy.view' => 'View the organisation hierarchy (who reports to whom). Who: managers.',
@@ -814,7 +855,89 @@ function perm_close_implications(array $perms) {
     //  that can promise a stored set is in the new vocabulary — and therefore
     //  that its gaps are deliberate and must never be filled in again.
     $out[] = PERM_VOCAB_TAG;
+    //  …and in the vocabulary that has the switches of permission foundation A,
+    //  so a gap in it is a decision and is never worked out again from old rules.
+    $out[] = PERM_SPLIT_TAG;
     return array_values(array_unique($out));
+}
+
+// ============================================================================
+//  PERMISSION FOUNDATION A — NINE SALES RIGHTS BECOME SWITCHES     (docs/02 19r)
+// ============================================================================
+//  Owner, 21 Nov 2026 ("All as recommended", proposal questions Q1–Q9). Each of
+//  these used to be decided by something the administrator could not see or
+//  separate: a job title (seeing other salespeople's lists, setting targets,
+//  the cost-head library), the Leads edit tick (changing the company's
+//  pipelines), "inter-office credit figures" (customers' billed and paid
+//  amounts), "Manage system settings" (Sales settings), "anyone who can view"
+//  (downloads), or one of three other modules (deals, project costing).
+//
+//  THE RULE THAT MADE IT SAFE: on day one each switch is on for exactly the
+//  people who could already do the thing. That is not a list somebody typed —
+//  it is the old rule itself, kept below, applied to each saved set as it is
+//  read. The same read-time pattern as the verb split (PERM_VOCAB_TAG): a set
+//  saved before this carries no '@split1' stamp, so its new switches are worked
+//  out from what it already holds; a set saved after it carries the stamp, so
+//  every gap in it is somebody's decision and is left alone. Nothing in the
+//  database is rewritten for this, so it needs no downtime and cannot half-apply.
+//
+//  Proved for every role, custom roles, a saved Roles & access grid and every
+//  format a person's own access has ever been stored in, gate by gate and as
+//  real sign-ins: tests/test_perm_a_equivalence.php.
+const PERM_SPLIT_TAG = '@split1';
+
+//  Does a saved set hold this right, the way can() would answer it? A held
+//  stronger verb carries the weaker one (Delete on Leads means View on Leads),
+//  exactly as can()'s fallback does — so the old rule is evaluated faithfully.
+function perm_set_has(array $set, $perm) {
+    if (in_array($perm, $set, true)) return true;
+    if (!preg_match('/^mod\.(.+)\.(view|edit)$/', (string) $perm, $mm)) return false;
+    foreach (PERM_VERB_IMPLIES as $verb => $implies)
+        if (in_array($mm[2], $implies, true) && in_array(perm_verb_key($mm[1], $verb), $set, true)) return true;
+    return false;
+}
+
+//  The old rule of each new switch, as it stood on 21 Nov 2026 (c41919a). $h =
+//  "does the set hold", $mgmt = the role is a management role (is_admin_level()).
+//  Masters are never asked: they hold every right.
+function perm_split_rules() {
+    return [
+        //  sx_can_see_all(): is_master() || is_admin_level()
+        'crm.sales.see_all'   => fn($h, $mgmt) => $mgmt,
+        //  sxt_can_set(): sx_can_see_all() && crmdash_can()
+        'crm.targets.set'     => fn($h, $mgmt) => $mgmt && $h('mod.crm_reports.view'),
+        //  opp_can_view() / opp_can_edit(): Leads, Quotations or Enquiries
+        'crm.deal.view'       => fn($h, $mgmt) => $h('mod.leads.view') || $h('mod.quotes.view') || $h('mod.inquiries.view'),
+        'crm.deal.edit'       => fn($h, $mgmt) => $h('mod.leads.edit') || $h('mod.quotes.edit') || $h('mod.inquiries.edit'),
+        //  pipe_can(): Leads edit or Manage system settings
+        'crm.pipeline.manage' => fn($h, $mgmt) => $h('mod.leads.edit') || $h('settings.manage'),
+        //  The three downloads: whoever could open the list (its route gate).
+        'crm.lead.export'     => fn($h, $mgmt) => $h('mod.leads.view'),
+        'crm.deal.export'     => fn($h, $mgmt) => $h('mod.leads.view'),
+        'crm.quote.export'    => fn($h, $mgmt) => $h('mod.quotes.view'),
+        //  /sales-settings: is_master() || can('settings.manage')
+        'crm.settings.manage' => fn($h, $mgmt) => $h('settings.manage'),
+        //  ar_can(): finance.reconcile || data.credit (|| master), with Invoicing
+        'data.customer_money' => fn($h, $mgmt) => $h('finance.reconcile') || $h('data.credit'),
+        //  pc_can() / pc_can_edit(): Quotations, Recruitment or Enquiries — or a
+        //  management role; ch_can_manage(): a management role.
+        'costing.view'        => fn($h, $mgmt) => $mgmt || $h('mod.quotes.view') || $h('mod.hiring.view') || $h('mod.inquiries.view'),
+        'costing.prepare'     => fn($h, $mgmt) => $mgmt || $h('mod.quotes.edit') || $h('mod.hiring.edit'),
+        'costing.heads.manage'=> fn($h, $mgmt) => $mgmt,
+    ];
+}
+
+//  Bring a set saved before foundation A into its vocabulary: add each new
+//  switch the old rule would have answered "yes" to. Additive only, and a set
+//  stamped '@split1' is returned untouched.
+function perm_upgrade_split(array $perms, $role) {
+    if (in_array(PERM_SPLIT_TAG, $perms, true)) return $perms;
+    $base = function_exists('role_effective_key') ? role_effective_key(strtoupper((string) $role)) : strtoupper((string) $role);
+    $mgmt = in_array($base, MGMT_ROLES, true);
+    $h = fn($p) => perm_set_has($perms, $p);
+    $add = [];
+    foreach (perm_split_rules() as $key => $rule) if (!in_array($key, $perms, true) && $rule($h, $mgmt)) $add[] = $key;
+    return $add ? array_values(array_merge($perms, $add)) : $perms;
 }
 
 function perm_verb_label($verb) {
@@ -1069,7 +1192,7 @@ function role_perms($role) {
         //  upgraded as it is read. Read-time, never rewritten: idempotent, no
         //  downtime, and it cannot half-apply.
         if (is_array($ov) && isset($ov[$role]) && is_array($ov[$role]))
-            return perm_upgrade_verbs(merge_new_module_defaults(array_values($ov[$role]), $role));
+            return perm_upgrade_split(perm_upgrade_verbs(merge_new_module_defaults(array_values($ov[$role]), $role)), $role);
     }
     return role_defaults($role)['perms'];
 }
@@ -1101,6 +1224,8 @@ function role_defaults($role) {
     //  Delete on Calls. module_defaults() cannot see fine rights, so doing it
     //  there would have missed exactly these people.
     $d['perms'] = perm_upgrade_verbs($d['perms']);
+    //  Foundation A — the role's new switches, from its own rights (docs/02 19r).
+    $d['perms'] = perm_upgrade_split($d['perms'], $role);
     return $d;
 }
 
@@ -1113,18 +1238,101 @@ function user_effective_perms($u) {
     if (function_exists('role_effective_key')) $role = role_effective_key($role);   // custom role → its base (so it never falls through to ADMIN)
     if (!isset(ORG_ROLES[$role])) $role = 'ADMIN';
     if ($role === 'MASTER_ADMIN') return array_keys(all_permissions());
-    if (trim((string)($u['permissions'] ?? '')) !== '') {
-        $perms = array_values(array_filter(explode(',', (string)$u['permissions'])));
-        $hasMod = false; foreach ($perms as $p) if (strncmp($p, 'mod.', 4) === 0) { $hasMod = true; break; }
-        if (!$hasMod) $perms = array_merge($perms, module_defaults($role));   // pre-module logins keep module access
-        else $perms = merge_new_module_defaults($perms, $role);               // grant brand-new modules
-        //  R-20 — a per-user set stored before the verb split says "mod.X.edit",
-        //  which meant add AND edit, and on four modules carried a destructive
-        //  act as well. Upgrading it here is what keeps that person able to do
-        //  on Monday exactly what they did on Friday.
-        return perm_strip_bookkeeping(perm_upgrade_verbs(array_values(array_unique($perms))));
+    return perm_resolve_stored((string)($u['permissions'] ?? ''), $role);
+}
+
+//  What a person's stored value grants, for a role (already resolved to its base).
+//  Three shapes, read the same way everywhere (the editor, the audit, can()):
+//    ''                → follows the role exactly;
+//    '@diff,+a,-b'     → the role, plus a, minus b (Q11, owner 21 Nov 2026) — so a
+//                        later change to the role still reaches the person;
+//    anything else     → an older FROZEN copy, read as it always was.
+function perm_resolve_stored($csv, $role) {
+    $csv = trim((string) $csv);
+    if ($csv === '') return role_perms($role);
+    $perms = array_values(array_filter(array_map('trim', explode(',', $csv)), 'strlen'));
+    if (in_array(PERM_DIFF_TAG, $perms, true)) {
+        $plus = []; $minus = [];
+        foreach ($perms as $p) {
+            if ($p[0] === '+') $plus[] = substr($p, 1);
+            elseif ($p[0] === '-') $minus[] = substr($p, 1);
+        }
+        $eff = array_values(array_unique(array_merge(role_perms($role), $plus)));
+        return perm_strip_bookkeeping(array_values(array_diff($eff, $minus)));
     }
-    return role_perms($role);
+    $hasMod = false; foreach ($perms as $p) if (strncmp($p, 'mod.', 4) === 0) { $hasMod = true; break; }
+    if (!$hasMod) $perms = array_merge($perms, module_defaults($role));   // pre-module logins keep module access
+    else $perms = merge_new_module_defaults($perms, $role);               // grant brand-new modules
+    //  R-20 — a per-user set stored before the verb split says "mod.X.edit",
+    //  which meant add AND edit, and on four modules carried a destructive
+    //  act as well. Upgrading it here is what keeps that person able to do
+    //  on Monday exactly what they did on Friday. Foundation A the same way:
+    //  a copy frozen before 21 Nov 2026 gets the new switches its rights
+    //  already gave (perm_upgrade_split).
+    return perm_strip_bookkeeping(perm_upgrade_split(perm_upgrade_verbs(array_values(array_unique($perms))), $role));
+}
+
+// ---- Q11 (owner, 21 Nov 2026): a person's own access = the role + differences
+//
+//  A person given their own access used to be stored as a full copy of the
+//  ticks, frozen at that moment — so allowing "Send quotations" for every
+//  Marketing Executive later did not reach the one who had a single exception.
+//  It is now stored as what differs from the role: '+right' given beyond it,
+//  '-right' taken away from it. Everything else follows the role, today and
+//  after any later change to it.
+const PERM_DIFF_TAG = '@diff';
+
+//  The value to store so that a person has exactly $effective under $role:
+//  '' when that is the role's own set, else '@diff,+…,-…'. Bookkeeping stamps
+//  ('@…') are not rights and never become a difference.
+function perm_diff_from(array $effective, $role) {
+    $real = fn($a) => array_values(array_unique(array_filter($a, fn($p) => $p !== '' && $p[0] !== '@')));
+    $want = $real($effective);
+    $have = $real(role_perms($role));
+    $plus = array_values(array_diff($want, $have)); sort($plus);
+    $minus = array_values(array_diff($have, $want)); sort($minus);
+    if (!$plus && !$minus) return '';
+    return implode(',', array_merge([PERM_DIFF_TAG], array_map(fn($p) => '+' . $p, $plus), array_map(fn($p) => '-' . $p, $minus)));
+}
+
+//  ONE-TIME, ON THE LIVE DATA: every person still on a frozen copy is moved to
+//  "role + differences", worked out so that what they can do is IDENTICAL before
+//  and after — checked person by person before anything is written, and skipped
+//  (left as it is) if it would not be. The value that was there is kept on the
+//  sealed audit chain. Idempotent: once moved, a person is never moved again, and
+//  the flag stops the scan from running on every request.
+const ACCESS_USER_DIFF_FLAG = 'access_user_diff_q11_applied';
+function access_migrate_user_diffs($force = false) {
+    static $ran = false;
+    if (($ran && !$force) || !function_exists('setting_get') || !function_exists('setting_set')) return 0;
+    $ran = true;
+    try {
+        if (!$force && (string) setting_get(ACCESS_USER_DIFF_FLAG, '') !== '') return 0;
+        $n = 0; $kept = 0;
+        $real = function ($a) { $a = array_values(array_unique(array_filter($a, fn($p) => $p !== '' && $p[0] !== '@'))); sort($a); return $a; };
+        foreach (ops_all("SELECT id, username, role, is_superuser, permissions FROM users
+                          WHERE COALESCE(permissions,'')<>'' AND COALESCE(is_superuser,0)=0") ?: [] as $u) {
+            $csv = (string) $u['permissions'];
+            if (strpos($csv, PERM_DIFF_TAG) !== false) continue;          // already moved
+            $role = strtoupper((string) $u['role']);
+            if (function_exists('role_effective_key')) $role = role_effective_key($role);
+            if (!isset(ORG_ROLES[$role])) $role = 'ADMIN';
+            if ($role === 'MASTER_ADMIN') continue;
+            $before = $real(user_effective_perms($u));
+            $new = perm_diff_from($before, $role);
+            $after = $real(perm_resolve_stored($new, $role));
+            if ($after !== $before) { $kept++; continue; }               // would change what they can do: leave it
+            db()->prepare("UPDATE users SET permissions=? WHERE id=?")->execute([$new, (int) $u['id']]);
+            if (function_exists('idems_log')) try {
+                idems_log('user', (int) $u['id'], 'ACCESS_STORED_AS_DIFFERENCES',
+                    ['field' => (string) $u['username'], 'old' => $csv, 'new' => $new,
+                     'reason' => 'Owner decision 21 Nov 2026 (Q11): own access stored as differences from the role; what the person can do is unchanged']);
+            } catch (Throwable $e) {}
+            $n++;
+        }
+        setting_set(ACCESS_USER_DIFF_FLAG, date('c') . ' (' . $n . ' moved' . ($kept ? ', ' . $kept . ' kept as they were' : '') . ')');
+        return $n;
+    } catch (Throwable $e) { return 0; }   // never block a sign-in over this; it retries next request
 }
 
 //  WHAT A ROLE GIVES, AND WHEN A PERSON FOLLOWS IT.
@@ -1154,22 +1362,26 @@ function role_perm_set($role) {
 // $existingCsv the person's stored set ('' = follows the role, or a new person)
 // Returns '' (follow the role) or the comma list to store.
 function user_perms_to_store(array $chosen, $role, array $assignable, $existingCsv = '') {
+    if (function_exists('role_effective_key')) $role = role_effective_key(strtoupper((string) $role));
     $chosen  = perm_close_implications(array_values(array_unique(array_filter($chosen))));
     $roleSet = role_perm_set($role);
     $inside  = function ($s) use ($assignable) { $x = array_values(array_unique(array_intersect($s, $assignable))); sort($x); return $x; };
     $outside = function ($s) use ($assignable) { $x = array_values(array_unique(array_diff($s, $assignable))); sort($x); return $x; };
     // What the person keeps beyond this editor's view (R3 — an editor never takes
-    // away what they cannot see): their own stored part if they have one, else
-    // the part their role gives them there today.
+    // away what they cannot see): what they hold there now if they have their own
+    // access, else the part their role gives them there today.
     // Nothing ticked has always meant "the role's access" — an empty set cannot
     // be stored (empty IS "follow the role"). The screen says so before saving;
     // taking somebody's access away is Deactivate, not unticking every box.
     if ($inside($chosen) === []) return '';
-    $existing = array_values(array_filter(explode(',', (string) $existingCsv)));
+    $existing = trim((string) $existingCsv) !== '' ? perm_close_implications(perm_resolve_stored((string) $existingCsv, $role)) : [];
     $keep = $existing ? $outside($existing) : $outside($roleSet);
-    if ($inside($chosen) === $inside($roleSet) && $keep === $outside($roleSet)) return '';
-    $keep = perm_strip_bookkeeping($keep);   // re-stamped below, never carried twice
-    return implode(',', perm_mods_stamp(perm_close_implications(array_values(array_unique(array_merge($inside($chosen), $keep))))));
+    //  Q11 — stored as the differences from the role ('' when there are none), so
+    //  a later change to the role still reaches this person.
+    $want = perm_close_implications(array_values(array_unique(array_merge($inside($chosen), $keep))));
+    $real = function ($a) { $a = array_values(array_unique(array_filter($a, fn($p) => $p !== '' && $p[0] !== '@'))); sort($a); return $a; };
+    if ($real($want) === $real($roleSet)) return '';
+    return perm_diff_from($want, $role);
 }
 
 // True when a person has their OWN access that differs from what their role
@@ -1223,6 +1435,7 @@ function perm_product_module($perm) {
     }
     static $exact = [
         'data.credit' => 'money', 'data.revenue' => 'money', 'data.salary' => 'money', 'data.profitability' => 'money',
+        'data.customer_money' => 'money',
         'dash.operations' => 'operations', 'dash.financial' => 'money',
     ];
     if (isset($exact[$perm])) return $exact[$perm];
@@ -1350,10 +1563,18 @@ function access_apply_owner_grants($force = false) {
             setting_set('role_access', json_encode($store));
         }
         foreach (ops_all("SELECT id, role, permissions FROM users WHERE COALESCE(permissions,'')<>'' AND COALESCE(is_superuser,0)=0") ?: [] as $u) {
+            $grant = [];
+            foreach ($pending as $g) if (in_array($base($u['role']), $g['roles'], true)) $grant = array_merge($grant, $g['perms']);
+            if (!$grant) continue;
+            if (strpos((string) $u['permissions'], PERM_DIFF_TAG) !== false) {
+                //  Stored as differences (Q11): the person's access plus the rule.
+                $eff = array_values(array_unique(array_merge(perm_resolve_stored((string) $u['permissions'], $base($u['role'])), $grant)));
+                $newCsv = perm_diff_from($eff, $base($u['role']));
+                if ($newCsv !== (string) $u['permissions']) db()->prepare("UPDATE users SET permissions=? WHERE id=?")->execute([$newCsv, (int)$u['id']]);
+                continue;
+            }
             $perms = array_values(array_filter(explode(',', (string)$u['permissions'])));
-            $new = $perms;
-            foreach ($pending as $g) if (in_array($base($u['role']), $g['roles'], true)) $new = array_merge($new, $g['perms']);
-            $new = array_values(array_unique($new));
+            $new = array_values(array_unique(array_merge($perms, $grant)));
             if ($new !== $perms) db()->prepare("UPDATE users SET permissions=? WHERE id=?")->execute([implode(',', $new), (int)$u['id']]);
         }
         setting_set('access_owner_grants_applied', implode(',', array_merge($applied, array_keys($pending))));
@@ -1399,6 +1620,7 @@ function ua($fresh = false) {
     if (!$fresh && $a !== null) return $a;
     if (function_exists('access_apply_owner_grants')) access_apply_owner_grants();
     if (function_exists('access_migrate_central_roles_scope')) access_migrate_central_roles_scope();
+    if (function_exists('access_migrate_user_diffs')) access_migrate_user_diffs();
     if ($fresh) $a = null;
     $u = current_user($fresh);
     if (!$u) return $a = ['role' => 'GUEST', 'perms' => [], 'offices' => [], 'sbus' => [], 'self' => true, 'home' => null, 'master' => false];

@@ -69,6 +69,17 @@ overrides and the Settings→Roles editor can change any of this at runtime.
 > role, and the user register marks such people "own access". Nothing ticked still
 > means "the role's access" (empty cannot be stored); removing access is Deactivate.
 > No right was added to any role. Guard rail `tests/test_user_perms_follow_role.php`.
+>
+> **Own access is stored as differences from the role (Q11, owner 21 Nov 2026: "All as
+> recommended").** It used to be a frozen copy of the ticks, so a later change to the
+> role passed that person by. It is now stored as `@diff,+right,-right` — what is given
+> beyond the role and what is taken away from it — and everything else follows the
+> role, today and after any later change (`perm_resolve_stored()`, `perm_diff_from()`).
+> Every person on a frozen copy was moved **once** (`access_migrate_user_diffs()`),
+> each checked to hold exactly the same rights before and after; the value that was
+> there is kept on the sealed audit chain (`ACCESS_STORED_AS_DIFFERENCES`). An older
+> frozen copy written by anything else is still read exactly as before. **No right is
+> added to or removed from anyone.** See 19r.
 
 > **D-07 (decided, 2026-10-04) — what Finance reads.** Business UAT 1.5.4 reported a
 > Finance login opening on what looked like an operations menu. Measured: the engine
@@ -345,6 +356,30 @@ administrator. Raise it with the owner before widening.
 | Contract register ⁶ | — | — | — | — |
 | Templates ¹⁹ | — | — | Manage | — |
 
+**Sales switches of their own (permission foundation A, 19r — owner, 21 Nov 2026).**
+Each used to ride on another tick or on a job title; on day one each is on for exactly
+the people who could already do it (worked out from the old rule, never typed):
+
+| Switch | MA | AD | BD | SBU | BM | BAM | OM | CO | AM | FIN | BDM | KAM | MM | ME | QH | TH | SRI | INS |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| See other salespeople's lists (Everyone / Choose a person) (`crm.sales.see_all`) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — | — | — | — | — | — | — | — | — | — | — |
+| Set sales targets for others (`crm.targets.set`) | ✓ | ✓ | ✓ | ✓ | ✓ | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| View deals (`crm.deal.view`) | ✓ | ✓ | ✓ | ✓ | ✓ | — | — | — | — | ✓ | ✓ | ✓ | ✓ | ✓ | — | — | — | — |
+| Add and edit deals (`crm.deal.edit`) | ✓ | ✓ | ✓ | ✓ | ✓ | — | — | — | — | — | ✓ | ✓ | ✓ | ✓ | — | — | — | — |
+| Change pipelines and stages (`crm.pipeline.manage`) | ✓ | ✓ | ✓ | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| Download leads to Excel / CSV (`crm.lead.export`) | ✓ | ✓ | ✓ | — | — | — | — | — | — | — | ✓ | ✓ | ✓ | ✓ | — | — | — | — |
+| Download deals to Excel / CSV (`crm.deal.export`) | ✓ | ✓ | ✓ | — | — | — | — | — | — | — | ✓ | ✓ | ✓ | ✓ | — | — | — | — |
+| Download quotations to Excel / CSV (`crm.quote.export`) | ✓ | ✓ | ✓ | ✓ | ✓ | — | — | — | — | ✓ | ✓ | ✓ | ✓ | ✓ | — | — | — | — |
+| Change Sales settings (working days, follow-up days, who gets new leads) (`crm.settings.manage`) | ✓ | ✓ | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| See what customers were billed and paid (Sales screens and Receivables) (`data.customer_money`) | ✓ | ✓ | ✓ | ✓ | ✓ | — | — | ✓ | — | ✓ | ✓ | ✓ | ✓ | — | — | — | — | — |
+| View project costings (`costing.view`) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — | ✓ | ✓ | ✓ | ✓ | ✓ | — | — | — | — |
+| Prepare project costings (`costing.prepare`) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — | — | ✓ | ✓ | ✓ | ✓ | — | — | — | — |
+| Manage the cost-head library (`costing.heads.manage`) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — | — | — | — | — | — | — | — | — | — | — |
+
+Read from `role_perms()` with no saved grid. A company that has saved Roles &
+permissions gets the same rule applied to its own saved grid and to each person's own
+access, so the answer is that company's day-one answer, not this table's.
+
 **Office reach of the sales roles:** BDM, KAM and ME work in their own office; the
 **Marketing Manager is office-based since 16 Nov 2026** — the offices ticked on the
 person (All offices = company-wide), else their home office — and approves the
@@ -496,7 +531,21 @@ quotations and costings of the offices they cover (see "0.1 / C1" above).
 
 19p. **Advertising return — money and branches (DEF-01, security review 21 Nov 2026; owner: "proceed with your recommendation"; 21 Nov: "Yes, branch-limited users will no longer see cost per lead or return per rupee"). No permission is added; this narrows what is shown.** *What the advertising actually earned* (`/ads-roi`) still opens on Leads view (`roi_can()` = `ads_can_view()`), unchanged. It showed **invoiced, collected and not-yet-received** amounts — receivables — to every Leads viewer, and for **every branch**. Now: (1) leads and deals on it are the viewer's own branches only (`scope_office_clause('l.office_id')` / `('o.office_id')`, the registers' own rule; a lead with no branch, or an advertising lead not yet in the CRM, stays visible as in the register); (2) invoiced / collected / not yet received, the "invoiced but unpaid" and "never invoiced" breaks, and the matching CSV columns appear only with the receivables right (`roi_money_can()` = `ar_can()`); without it the invoice tables are not read; (3) cost per lead and the return per rupee are shown only to someone who sees every branch (`roi_whole_company()`), because campaign spend is not split by branch; (4) the *What to fix* item "Advertising you are paying for that has produced nothing" is made only for a viewer who sees every branch, and its "invoiced but not received" sentence only with `ar_can()`. With the default roles this removes the money from the **Marketing Executive** and limits **branch-limited** BDM / KAM / Marketing Manager users to their branches; the Business Director, Admin and Master Admin see exactly what they saw before. Guard rail `tests/test_def01_ads_roi_money.php`.
 
-19q. **Collection figures follow the person's branches (DEF-08, 21 Nov 2026; owner: "data shown shall be as per the permission set in our settings"). No permission is added; this narrows what is shown.** Who may see them is unchanged (`ar_can()`). *Orders & payments* (`/sales-orders`): **Received this month** counts the receipts of the person's branches by the receipt register's own rule (`scope_office_clause('r.office_id')`), and **Days to get paid** the invoices of their branches and business units by the invoice register's rule (`scope_clause('i.office_id','i.sbu')`); when one salesperson is picked, both follow that person's orders (the invoices matched to them, as the Received column). *Client register, Sales view* (`/clients?view=sales`): **Owed to us** counts only invoices of the person's branches (`books_outstanding($pid, true)`). Customer 360, the ledger and the advisor keep the whole-customer figure they always showed. A person who sees every branch sees exactly what they saw before. Guard rail `tests/test_def_batch1.php`.
+19q. **Collection figures follow the person's branches (DEF-08, 21 Nov 2026; owner: "data shown shall be as per the permission set in our settings"). No permission is added; this narrows what is shown.** Who may see them is unchanged (`ar_can()`). *Orders & payments* (`/sales-orders`): **Received this month** counts the receipts of the person's branches by the receipt register's own rule (`scope_office_clause('r.office_id')`), and **Days to get paid** the invoices of their branches and business units by the invoice register's rule (`scope_clause('i.office_id','i.sbu')`); when one salesperson is picked, both follow that person's orders (the invoices matched to them, as the Received column). *Client register, Sales view* (`/clients?view=sales`): **Owed to us** counts only invoices of the person's branches (`books_outstanding($pid, true)`). The ledger and the advisor keep the whole-customer figure they always showed; Customer 360 follows the branches since DEF-25 (19s). A person who sees every branch sees exactly what they saw before. Guard rail `tests/test_def_batch1.php`.
+
+19r. **Permission foundation A — nine Sales rights become switches of their own (owner, 21 Nov 2026: "All as recommended", permission-screen proposal Q1–Q9 and Q11). New permissions, approved by the owner; on day one nobody gains or loses anything.** Each was decided by something the administrator could not see or separate. Now each is a named right, shown on Roles & permissions and on a person's Permissions tab, and asked by its gate:
+    - *See other salespeople's lists* — `crm.sales.see_all` (`sx_can_see_all()`); was the management job title (`is_admin_level()`).
+    - *Set sales targets for others* — `crm.targets.set` (`sxt_can_set()`); was a management job title holding Sales reports. A Master Admin still needs Sales reports switched on. DEF-11's widening (sales managers set targets for their branches) is built in Stage 5, not here.
+    - *View deals* / *Add and edit deals* — `crm.deal.view` / `crm.deal.edit` (`opp_can_view()` / `opp_can_edit()`); were "Leads, Quotations or Enquiries" view / edit. Opening the Deals register still also needs Leads view (its route gate), as before.
+    - *Change pipelines and stages* — `crm.pipeline.manage` (`pipe_can()`); was Leads edit (which Leads delete carries) or *Manage system settings*.
+    - *Download leads / deals / quotations to Excel / CSV* — `crm.lead.export`, `crm.deal.export`, `crm.quote.export` (`leads_can_export()`, `opp_can_export()`, `crm_quote_can_export()`, asked at the download and the button is hidden without it); were "anyone who can open the list". The Sales reports CSV (`/crm-reports`) is a report and is unchanged.
+    - *Change Sales settings* — `crm.settings.manage` (`sx_settings_can()`, `/sales-settings` and its tile); was *Manage system settings*, the same tick as every company setting.
+    - *See what customers were billed and paid (Sales screens and Receivables)* — `data.customer_money` (`ar_can()`, still with Invoicing in the plan); was *inter-office credit figures* or *Credit reconciliation*. Those two keep their own meanings everywhere else.
+    - *View / Prepare project costings* — `costing.view` / `costing.prepare` (`pc_can()` / `pc_can_edit()`, still with Sales or People & hiring in the plan); were "Quotations, Enquiries or Recruitment" or a management job title. Approving a costing is unchanged (the approval levels; `pc_can_approve()`, `pc_can_act()`).
+    - *Manage the cost-head library* — `costing.heads.manage` (`ch_can_manage()`); was a management job title.
+  **How day one is kept exact:** the old rule of each switch is kept in the code (`perm_split_rules()`) and applied, as it is read, to every set saved before this (the built-in defaults, a saved Roles & permissions grid, a person's own access) — the read-time pattern of the verb split. A set saved after it carries the stamp `@split1`, so a switch left off there is a decision and is never worked out again. Nothing in the database was rewritten for this. Proved for 41 people — every role, branch-limited and all-branch, four custom roles, and own access stored in every format ever written — gate by gate, every older right through `can()`, the Sales tiles, and 190 screens and downloads as real sign-ins, with the built-in defaults and with a saved grid, before and after the move of Q11: `tests/test_perm_a_equivalence.php` (snapshot taken on the code before, `tests/fixtures/pre_perm_a/`). That each switch works on its own (off for one role, on for one person): `tests/test_perm_a_switches.php`. The default holders are in the table under the Sales / CRM roles above.
+
+19s. **Customer 360 money and Orders' "Overdue" follow the viewer (DEF-25, owner 21 Nov 2026: "All as recommended"). No permission is added; this narrows what is shown.** *Customer 360* (`/customer`): **Owed**, the overdue figure, the ageing and the invoices listed count only invoices of the viewer's branches and business units, by the invoice register's own rule (`scope_clause('office_id','sbu')`, `books_outstanding($pid, true)`) — the same as the client register's Sales view that links to it. *Orders & payments*: when one salesperson is picked, **Overdue** lists only the invoices of that person's orders, as *Received this month* and *Days to get paid* already did (19q); a row of the older job-based register has no order behind it and is not counted for one person (`sx_overdue_for()`). A person who sees every branch, or "Everyone", sees exactly what they saw before. The customer ledger and the advisor keep the whole-customer figure. Guard rail `tests/test_perm_a_switches.php`.
 
 19n. **Quotation approval is an escalating chain — the owner's decision, 2026-10-24 (test book SAL-003):** a quotation needs the level its value falls in and every level below it, in order (docs/03). Who signs each level is unchanged (19h: the people in the level's role who cover the quotation's branch and business unit, or the one named person). Overlapping levels and a higher range with a lower level number are refused at the save. **No permission is added**; more people now sign a large quotation, which is the decision. Guard rail `tests/test_quote_escalating_chain.php`.
 19k. **Approval rules — the owner's answers, 2026-10-21:** (1) a quotation made from an approved project costing, at the costing's prices, is not approved a second time; (2) with no approval levels set up, a quotation needs no approval (it used to wait for anyone who may approve — top management included); (3) Set up Sales asks whether levels approve one after another or all at the same time (`quote_approval_mode`), for quotations and costings alike. The approvers are still exactly those the levels name (19h); **no permission is added.** Guard rail `tests/test_quote_approval_owner_21oct.php`.

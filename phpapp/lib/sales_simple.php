@@ -23,7 +23,11 @@ function sx_can() {
     return (function_exists('leads_can_view') && leads_can_view()) || (function_exists('opp_can_view') && opp_can_view());
 }
 //  A manager may look at anybody's list; everyone else sees their own.
-function sx_can_see_all() { return is_master() || (function_exists('is_admin_level') && is_admin_level()); }
+//  Foundation A (owner, 21 Nov 2026, Q1): its own switch, "See other salespeople's
+//  lists" — on day one exactly the management roles that had it (docs/02 19r).
+function sx_can_see_all() { return is_master() || can('crm.sales.see_all'); }
+//  Sales settings (Q9): their own switch, no longer "Manage system settings".
+function sx_settings_can() { return is_master() || can('crm.settings.manage'); }
 function sx_stale_days() { return max(1, (int) (setting_get('sales_stale_days', 15) ?? 15)); }
 function sx_today() { return date('Y-m-d'); }
 function sx_money($n) { return (function_exists('cur_sym') ? cur_sym() : '₹') . (function_exists('nf') ? nf((float) $n, 0) : number_format((float) $n)); }
@@ -96,6 +100,17 @@ function sx_days_since($ts) { $t = strtotime(substr((string) $ts, 0, 10)); retur
 function sx_receivables() {
     if (!function_exists('ar_rows') || (function_exists('ar_can') && !ar_can())) return null;
     try { return ar_rows('DUE'); } catch (Throwable $e) { return null; }
+}
+//  The overdue list of Orders & payments. $invIds = the invoices of the orders on
+//  screen when one person is picked (the same list "Received this month" and "Days
+//  to get paid" follow, DEF-08); null = everyone, i.e. the person's branches. A row
+//  from the older job-based register has no order behind it, so it is not one of
+//  that person's orders and is not counted for them.
+function sx_overdue_for($invIds = null) {
+    $rows = sx_receivables();
+    if ($rows === null || !is_array($invIds)) return $rows;
+    $keep = array_flip(array_map('intval', $invIds));
+    return array_values(array_filter($rows, fn($r) => !empty($r['from_books']) && isset($keep[(int) ($r['id'] ?? 0)])));
 }
 //  Contracts ending within the warning window (the existing contract setting).
 function sx_renewals($days = null) {

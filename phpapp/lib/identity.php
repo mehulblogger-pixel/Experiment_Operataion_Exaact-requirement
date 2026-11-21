@@ -244,9 +244,9 @@ function iddoc_holders($perm = 'person.iddoc.manage') {
     foreach (ops_all("SELECT id, username, first_name, last_name, role, is_superuser, permissions
                       FROM users WHERE is_active=1 ORDER BY username") as $u) {
         if (!empty($u['is_superuser'])) continue;          // counted separately, and always logged
-        $role = strtoupper((string)($u['role'] ?? 'ADMIN'));
-        $csv  = trim((string)($u['permissions'] ?? ''));
-        $perms = $csv !== '' ? array_values(array_filter(explode(',', $csv))) : role_perms($role);
+        //  Read through the one resolver (Q11, 21 Nov 2026): a person's own access is
+        //  stored as differences from the role, so the raw value is not a list of rights.
+        $perms = user_effective_perms($u);
         if (in_array($perm, $perms, true)) $out[] = $u;
     }
     return $out;

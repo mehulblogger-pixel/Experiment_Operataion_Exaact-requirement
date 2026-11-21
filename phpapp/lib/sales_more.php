@@ -320,7 +320,13 @@ function sx_renewals_list($days) {
 }
 
 // ---- Targets ------------------------------------------------------------------------
-function sxt_can_set() { return sx_can_see_all() && (!function_exists('crmdash_can') || crmdash_can()); }
+//  Foundation A (Q2): "Set sales targets for others" is its own switch. On day one
+//  it is on for exactly the people who had it — a management role holding Sales
+//  reports (docs/02 19r). A Master Admin still needs Sales reports switched on.
+function sxt_can_set() {
+    if (is_master()) return !function_exists('crmdash_can') || crmdash_can();
+    return can('crm.targets.set') && (!function_exists('licence_module_live') || licence_module_live('crm_reports'));
+}
 //  The FY's months as YYYY-MM.
 function sxt_months() {
     try { [$fa] = fy_range(active_fy()); } catch (Throwable $e) { $fa = date('Y') . '-04-01'; }
@@ -524,7 +530,9 @@ function ops_sales_more($route, $method) {
             view('ops/sx_orders', ['rows' => $orders, 'p' => $p, 'plab' => $plab, 'ar' => function_exists('ar_can') && ar_can(),
                 'avgPay' => sx_avg_days_to_pay($invIds), 'who' => $who, 'whoKey' => $_GET['who'] ?? 'me', 'people' => sx_can_see_all() ? sx_people() : [], 'seeAll' => sx_can_see_all(),
                 'recvMonth' => sx_received_this_month($invIds), 'collectHint' => $who ? 'these orders' : (sx_scope_is_all() ? 'all customers' : 'your branches'),
-                'overdue' => sx_receivables()]);
+                //  "Overdue" follows the person picked too (owner, 21 Nov 2026): only the
+                //  invoices of the orders on screen. Everyone → the person's branches, as before.
+                'overdue' => sx_overdue_for($invIds)]);
             return true;
 
         case 'sales-renewals':
@@ -559,7 +567,7 @@ function ops_sales_more($route, $method) {
             return true;
 
         case 'sales-settings':
-            ops_require(is_master() || can('settings.manage'), 'Sales settings are for the Master Admin or whoever manages settings.');
+            ops_require(sx_settings_can(), 'Sales settings need the "Change Sales settings" permission. Ask your administrator.');
             if ($method === 'POST') {
                 $rows = [];
                 foreach ((array) ($_POST['oc_label'] ?? []) as $i => $l) {

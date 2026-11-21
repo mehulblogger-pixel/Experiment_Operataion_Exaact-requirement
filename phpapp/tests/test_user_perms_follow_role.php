@@ -26,12 +26,15 @@ t_ok(user_perms_to_store(array_reverse($mx), 'MARKETING_EXECUTIVE', $all, '') ==
     'order of ticks does not matter');
 t_ok(user_perms_to_store($mx, 'MARKETING_EXECUTIVE', $all, implode(',', $mx)) === '',
     'a frozen copy of the role, saved untouched, goes back to following the role');
+//  Own access is stored as differences from the role since Q11 (owner, 21 Nov 2026),
+//  so what a stored value grants is read through perm_resolve_stored().
 $legacy = user_perms_to_store($co, 'MARKETING_EXECUTIVE', $all, '');
-t_ok($legacy !== '' && in_array('data.credit', explode(',', $legacy), true),
+t_ok($legacy !== '' && strpos($legacy, '+data.credit') !== false && in_array('data.credit', perm_resolve_stored($legacy, 'MARKETING_EXECUTIVE'), true),
     'Coordinator ticks kept on a Marketing Executive are stored as their own access');
-$extra = explode(',', user_perms_to_store(array_merge($mx, ['dash.operations']), 'MARKETING_EXECUTIVE', $all, ''));
-t_ok(in_array('dash.operations', $extra, true) && in_array('crm.quote.create', $extra, true),
-    'one deliberate extra tick: own access = the role plus that tick');
+$extraCsv = user_perms_to_store(array_merge($mx, ['dash.operations']), 'MARKETING_EXECUTIVE', $all, '');
+$extra = perm_resolve_stored($extraCsv, 'MARKETING_EXECUTIVE');
+t_ok($extraCsv === PERM_DIFF_TAG . ',+dash.operations' && in_array('dash.operations', $extra, true) && in_array('crm.quote.create', $extra, true),
+    'one deliberate extra tick: own access = the role plus that tick (stored as just that one difference)');
 t_ok(user_perms_to_store([], 'MARKETING_EXECUTIVE', $all, implode(',', $co)) === '',
     'nothing ticked means the role\'s access (an empty set cannot be stored) — the screen says so');
 
@@ -41,8 +44,9 @@ $bmSet = role_perm_set('BRANCH_MANAGER');
 t_ok(user_perms_to_store(array_intersect($bmSet, $sub), 'BRANCH_MANAGER', $sub, '') === '',
     'a branch editor saving the role\'s visible part leaves the person following the role');
 $visible1 = array_slice(array_values(array_intersect($bmSet, $sub)), 0, 1);
-$narrow = explode(',', user_perms_to_store($visible1, 'BRANCH_MANAGER', $sub, ''));
+$narrow = perm_resolve_stored(user_perms_to_store($visible1, 'BRANCH_MANAGER', $sub, ''), 'BRANCH_MANAGER');
 $unseen = array_diff($bmSet, $sub);
+$unseen = array_values(array_filter($unseen, fn($p) => $p[0] !== '@'));   // bookkeeping stamps are not rights
 t_ok($unseen === [] || !array_diff($unseen, $narrow),
     'a branch editor who narrows what they see keeps what they cannot see (R3)');
 

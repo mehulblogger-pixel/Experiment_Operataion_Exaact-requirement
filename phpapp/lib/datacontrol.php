@@ -280,7 +280,7 @@ function integrity_checks() {
         $stale = 0;
         foreach (ops_all("SELECT id, permissions FROM users WHERE COALESCE(permissions,'')<>''") as $u)
             foreach (array_filter(explode(',', (string)$u['permissions'])) as $p)
-                if (($p = trim($p)) !== '' && $p[0] !== '@' && !in_array($p, $valid, true)) { $stale++; break; }   // '@…' = bookkeeping stamps, not rights
+                if (($p = ltrim(trim($p), '+-')) !== '' && $p[0] !== '@' && !in_array($p, $valid, true)) { $stale++; break; }   // '@…' = bookkeeping stamps, not rights; '+' / '-' = a difference from the role (Q11)
         $out[] = ['key' => 'perm_stale', 'ok' => $stale === 0, 'found' => $stale, 'skipped' => false,
                   'what' => 'No account carries a permission that no longer exists',
                   'why'  => 'A permission left over from an old version is a right nobody reviewed.'];
@@ -422,8 +422,8 @@ function access_report() {
                       FROM users WHERE is_active=1 ORDER BY username") as $u) {
         $master = !empty($u['is_superuser']);
         $role = $master ? 'MASTER_ADMIN' : strtoupper((string)($u['role'] ?? 'ADMIN'));
-        $csv = trim((string)($u['permissions'] ?? ''));
-        $perms = $master ? $valid : ($csv !== '' ? array_map('trim', array_filter(explode(',', $csv))) : role_perms($role));
+        //  Through the one resolver (Q11): own access is stored as differences from the role.
+        $perms = $master ? $valid : user_effective_perms($u);
         $has = [];
         foreach (DC_POWERS as $p => $label) $has[$p] = in_array($p, $perms, true);
         $last = trim((string)($u['last_login_at'] ?? ''));

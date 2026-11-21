@@ -207,6 +207,9 @@ function leads_try($fn, $fb = []) {
 }
 
 function leads_can_view() { return can('mod.leads.view') || can('mod.inquiries.view') || is_master_of(['leads','inquiries']); }
+//  Foundation A (owner, 21 Nov 2026, Q6): downloading the lead list is its own
+//  switch — on day one on for everyone who could open the list (docs/02 19r).
+function leads_can_export() { return is_master() || can('crm.lead.export'); }
 function leads_can_edit() { return can('mod.leads.edit') || can('mod.inquiries.edit') || is_master_of(['leads','inquiries']); }
 // D-22 (the owner, 20 Oct 2026: "Yes") — a manager may reopen a lost lead or a
 // closed deal, with a reason. "A manager" is someone who already holds sales-
@@ -1514,6 +1517,7 @@ function ops_leads($route, $method) {
                    'fy_from' => $fy['all'] ? '' : $fy['from'], 'fy_to_excl' => $fy['all'] ? '' : $fy['to_excl']];
 
         if (wants_csv()) {
+            ops_require(leads_can_export(), 'Downloading the lead list needs the "Download leads to Excel / CSV" permission.');
             // The rows the screen shows (owner, 12 Nov 2026: "CSV file downloads but
             // it does not have any lead details in it" — the board showed the open
             // leads carried forward from last year, the file only the year's own).

@@ -56,7 +56,13 @@ function c360_on($accessModule, $perm = null) {
 // ---- The sections -----------------------------------------------------------
 function c360_money($pid) {
     if (!c360_on('invoicing') || !function_exists('books_outstanding')) return null;
-    $sum = c360_try(fn() => books_outstanding($pid));
+    //  DEF-25 (owner, 21 Nov 2026: "All as recommended"; "data shown shall be as per
+    //  the permission set"). The figure, the ageing and the invoices listed are the
+    //  viewer's branches only — the invoice register's own rule (office + business
+    //  unit), the same as the client register's Sales view that links here. Someone
+    //  who sees every branch sees exactly what they saw before.
+    [$sw, $sa] = function_exists('scope_clause') ? scope_clause('office_id', 'sbu') : ['1=1', []];
+    $sum = c360_try(fn() => books_outstanding($pid, true));
     if ($sum === null) return null;
     // Ageing of THIS customer's open invoices, using the same buckets the
     // receivables report uses so the two cannot disagree.
@@ -64,8 +70,8 @@ function c360_money($pid) {
     $buckets = [];
     $oldest = null; $overdue = 0.0;
     foreach (c360_rows("SELECT id, invoice_no, invoice_date, due_date, total FROM invoices
-                        WHERE partner_id=? AND status IN ('ISSUED','PART_PAID')
-                        ORDER BY due_date, id", [(int)$pid]) as $inv) {
+                        WHERE partner_id=? AND status IN ('ISSUED','PART_PAID') AND $sw
+                        ORDER BY due_date, id", array_merge([(int)$pid], $sa)) as $inv) {
         $s = c360_try(fn() => books_settled((int)$inv['id']), null);
         $out = $s ? $s['outstanding'] : (float)$inv['total'];
         if ($out <= 1) continue;
@@ -79,7 +85,7 @@ function c360_money($pid) {
     return $sum + ['buckets' => $buckets, 'overdue' => round($overdue, 2), 'oldest_days' => $oldest,
                    'invoices' => c360_rows(
                         "SELECT id, invoice_no, invoice_date, due_date, total, status FROM invoices
-                         WHERE partner_id=? AND status <> 'DRAFT' ORDER BY invoice_date DESC, id DESC LIMIT 8", [(int)$pid])];
+                         WHERE partner_id=? AND status <> 'DRAFT' AND $sw ORDER BY invoice_date DESC, id DESC LIMIT 8", array_merge([(int)$pid], $sa))];
 }
 
 function c360_pipeline($pid) {

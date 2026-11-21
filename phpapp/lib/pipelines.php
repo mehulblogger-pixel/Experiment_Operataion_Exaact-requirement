@@ -47,7 +47,10 @@ const PIPE_ENTITIES = [
     'LEAD'        => 'Lead pipeline',
 ];
 
-function pipe_can()      { return can('mod.leads.edit') || can('settings.manage') || is_master_of(['leads','settings']); }
+//  Foundation A (owner, 21 Nov 2026, Q4): changing the company's pipelines and
+//  stages is its own switch, apart from editing leads — on day one on for exactly
+//  the people who had it (Leads edit or Manage system settings; docs/02 19r).
+function pipe_can()      { return can('crm.pipeline.manage') || is_master_of(['leads','settings']); }
 function pipe_can_view() { return can('mod.leads.view') || can('mod.quotes.view') || is_master_of(['leads','quotes']); }
 
 function pipe_try($fn, $fb = null) { try { return $fn(); } catch (Throwable $e) { return $fb; } }

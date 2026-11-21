@@ -436,9 +436,12 @@ function ch_unit_for_basis($basis) { return strtoupper((string) $basis) === 'DAI
 // It is also a project-costing screen, so it asks the costing question first:
 // no costing module (Sales or Recruitment) entitled, no costing setup — the same
 // answer the route itself gives (pc_can() runs before every costing route).
+//  Foundation A (owner, 21 Nov 2026, Q8): "Manage the cost-head library" is its own
+//  switch — no longer a management job title — so a Finance Head can be given it
+//  without becoming management. On day one: exactly the management roles (docs/02 19r).
 function ch_can_manage() {
     if (function_exists('pc_can') && !pc_can()) return false;
-    return (function_exists('is_admin_level') && is_admin_level()) || (function_exists('is_master') && is_master());
+    return (function_exists('can') && can('costing.heads.manage')) || (function_exists('is_master') && is_master());
 }
 
 function ch_migrate() {

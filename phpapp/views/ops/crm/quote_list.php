@@ -15,7 +15,7 @@
       <p class="sub" style="margin:2px 0 0">Quote → approval → send → follow-up → acceptance. <?= count($rows) ?> shown.</p>
     <?php endif; ?></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap">
-    <a class="btn secondary" href="/quotes?<?= e(http_build_query(array_merge($_GET, ['export'=>'1']))) ?>">⬇ Export</a>
+    <?php if (!function_exists('crm_quote_can_export') || crm_quote_can_export()): ?><a class="btn secondary" href="/quotes?<?= e(http_build_query(array_merge($_GET, ['export'=>'1']))) ?>">⬇ Export</a><?php endif; ?>
     <?php if (can('crm.quote.approve') || is_master()): ?><a class="btn secondary" href="/approval-rules?module=quote">Approval rules</a><?php endif; ?>
     <?php if (can('crm.template.manage') || is_master()): ?><a class="btn secondary" href="/templates?kind=quote">Templates</a><?php endif; ?>
     <?php if (can('crm.quote.create') || can('mod.quotes.edit')): ?><a class="btn secondary" href="/quote-external">+ External</a><?php endif; ?>

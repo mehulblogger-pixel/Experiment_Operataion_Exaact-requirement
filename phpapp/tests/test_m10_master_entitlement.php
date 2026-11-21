@@ -202,6 +202,12 @@ $BASELINE = [
     // Master Admin). Every Sales screen that asks it first requires sx_can(),
     // which refuses without the Sales licence and a Leads / Deals view right.
     'sx_can_see_all',
+    // Permission foundation A (owner, 21 Nov 2026, docs/02 19r) — Category B. The
+    // three download gates are asked only inside the /leads, /opportunities and
+    // /quotes handlers, whose routes the M5 gate refuses without Sales; and
+    // sx_settings_can() guards /sales-settings, a Sales route behind sx_can(), with
+    // its tile shown only when Sales is on. Same answer for a master as before.
+    'leads_can_export', 'opp_can_export', 'crm_quote_can_export', 'sx_settings_can',
 ];
 $unclassified = array_values(array_diff($open, $BASELINE));
 t_ok(!$unclassified,

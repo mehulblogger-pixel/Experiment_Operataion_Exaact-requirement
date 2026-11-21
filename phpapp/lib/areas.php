@@ -105,7 +105,7 @@ function ops_area_def($area) {
             $t($sxOk, '💰', 'Orders & payments', '/sales-orders', 'Orders won, billed, received and overdue.');
             $t($sxOk, '🔁', 'Renewals', '/sales-renewals', 'Contracts ending soon, by days left.');
             $t($sxOk, '🎯', 'Targets', '/sales-targets', 'Monthly target per person and what was won.');
-            $t($sxOk && (is_master() || can('settings.manage')), '⚙️', 'Sales settings', '/sales-settings', 'Follow-up days, weekly off, who gets new leads.');
+            $t($sxOk && $fx('sx_settings_can') && sx_settings_can(), '⚙️', 'Sales settings', '/sales-settings', 'Follow-up days, weekly off, who gets new leads.');
             $sec('Records');
             //  The ONE client register (Directory → Clients), opened with Sales columns.
             $t($sxOk && can('mod.clients.view'), '🏢', T_REG('client'), '/clients?view=sales', 'The one customer list — open deals, won this year, owed, last contact.');

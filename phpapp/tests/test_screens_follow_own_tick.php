@@ -55,16 +55,21 @@ try {
     $roleSet = role_perm_set($role);
     $chosen = array_values(array_diff($roleSet, ['mod.crm_reports.view', 'mod.inquiries.view', 'mod.inquiries.add', 'mod.inquiries.edit', PERM_VOCAB_TAG]));
     $stored = user_perms_to_store($chosen, $role, array_keys(all_permissions()), '');
-    t_ok(strpos($stored, PERM_MODS_TAG) !== false, 'the saved set carries which modules existed when it was saved');
+    //  Since Q11 (owner, 21 Nov 2026) own access is stored as differences from the
+    //  role, so it needs no module stamp: what it removes is named, everything else follows the role.
+    t_ok(strpos($stored, PERM_DIFF_TAG) === 0 && strpos($stored, '-mod.crm_reports.view') !== false, 'the saved set names what was taken away: ' . $stored);
     $eff = user_effective_perms(['role' => $role, 'permissions' => $stored]);
     t_ok(!in_array('mod.crm_reports.view', $eff, true) && !in_array('mod.inquiries.view', $eff, true), 'Sales reports and Enquiries stay unticked — not handed back as "new modules"');
     t_ok(!preg_grep('/^@mods=/', $eff), 'the stamp is bookkeeping: it never appears as a right');
     $again = user_perms_to_store(array_values(array_diff($eff, [PERM_VOCAB_TAG])), $role, array_keys(all_permissions()), $stored);
-    t_eq(substr_count($again, PERM_MODS_TAG), 1, 'saving again keeps exactly one stamp');
+    t_eq($again, $stored, 'saving again stores exactly the same differences');
     // A set saved by the verb-era editor before the stamp existed: no NEW_MODULES re-grant either.
     $verbEra = implode(',', array_merge($chosen, [PERM_VOCAB_TAG]));
     t_ok(!in_array('mod.inquiries.view', user_effective_perms(['role' => $role, 'permissions' => $verbEra]), true), 'a set saved before the stamp (verb era) keeps its gaps too');
-    // A genuinely new module still reaches a person (stamp lists only what existed).
-    $old = str_replace('|crm_reports', '', $stored);
-    t_ok(in_array('mod.crm_reports.view', user_effective_perms(['role' => $role, 'permissions' => $old]), true), 'a module missing from the stamp (added later) is still given its role default');
+    // A genuinely new module still reaches a person: a frozen copy through its stamp
+    // (stamp lists only what existed), a stored difference because it follows the role.
+    $frozen = implode(',', perm_mods_stamp(perm_close_implications($chosen)));
+    $old = str_replace('|crm_reports', '', $frozen);
+    t_ok(in_array('mod.crm_reports.view', user_effective_perms(['role' => $role, 'permissions' => $old]), true), 'a frozen copy: a module missing from its stamp (added later) is still given its role default');
+    t_ok(in_array('mod.crm_orders.view', $eff, true), 'stored as differences: everything not taken away comes from the role, including what the role gains later');
 } finally { setting_set('role_access_modules', $prevStamp); }

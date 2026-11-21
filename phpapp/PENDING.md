@@ -2,6 +2,20 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🔐 Permission foundation A — built 21 Nov 2026 (docs/02 19r, report 54)
+
+Nine Sales rights became switches of their own (Q1–Q9) and a person's own access is
+stored as differences from the role (Q11); nobody gained or lost anything on day one
+(`tests/test_perm_a_equivalence.php`). Still to do: the new "Who can do what" SCREEN
+(the proposal's pictures) — today the switches appear on the existing Roles &
+permissions and person screens. Follow-ups noted, not built:
+- Opening the Deals register still also needs Leads view (its route gate); making
+  Deals fully separate would let today's Finance (quotations view) open deals — a
+  change of who can do what, so it waits for the owner.
+- In a company that has only one of Sales / People & hiring, "View project costings"
+  is now decided by the switch alone (it used to need the specific module ticked).
+- The customer ledger (/ledger) and the advisor still show the whole-customer figure.
+
 ## 🔐 Permission screen Q10 — parked by the owner until after Stage 2 (21 Nov 2026)
 
 "Whose records a person sees" (own / team / branch / all) as its own setting. Decide after

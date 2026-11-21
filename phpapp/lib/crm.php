@@ -2343,6 +2343,10 @@ function crm_quote_scope_gate($route) {
                 'This quotation is outside your office / branch scope.');
 }
 
+//  Foundation A (owner, 21 Nov 2026, Q6): downloading the quotation register is
+//  its own switch — on day one on for everyone who could open it (docs/02 19r).
+function crm_quote_can_export() { return is_master() || can('crm.quote.export'); }
+
 function ops_crm_quotes($route, $method) {
     crm_quote_scope_gate($route);   // M14 — object-level branch scope, before anything reads an id
     $pdo = db();
@@ -2405,7 +2409,10 @@ function ops_crm_quotes($route, $method) {
             $counts[$k] = (int)ops_val("SELECT COUNT(*) FROM quotations q WHERE $sw AND q.is_current=1 AND q.status IN ($ph)" . $fyW, array_merge($sa, $fyA));
         }
         // §xxii — the same rows the screen shows, as a spreadsheet.
-        if (($_GET['export'] ?? '') === '1') { csv_download('quotes-' . date('Y-m-d') . '.csv', crm_quotes_export($rows)); return; }
+        if (($_GET['export'] ?? '') === '1') {
+            ops_require(crm_quote_can_export(), 'Downloading the ' . Tl('quote') . ' register needs the "Download quotations to Excel / CSV" permission.');
+            csv_download('quotes-' . date('Y-m-d') . '.csv', crm_quotes_export($rows)); return;
+        }
         view('ops/crm/quote_list', ['rows' => $rows, 'view' => $view, 'q' => $qq, 'counts' => $counts, 'fy' => $fy['fy']]); return;
     }
     // §xv — a quote we did not write (client / tender portal) still belongs in the

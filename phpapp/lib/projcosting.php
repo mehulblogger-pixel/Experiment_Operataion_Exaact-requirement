@@ -169,17 +169,18 @@ function pc_modules_live() {
     foreach (['quotes', 'inquiries', 'hiring'] as $m) if (licence_module_live($m)) return true;
     return false;   // neither Sales & CRM nor People & hiring — nothing to price
 }
+//  Foundation A (owner, 21 Nov 2026, Q7): Project costing is a feature of its own
+//  — "View project costings" and "Prepare project costings" — instead of riding on
+//  Quotations, Enquiries or Recruitment or on a management job title. On day one
+//  each is on for exactly the people the old rule let in (docs/02 19r). Approving
+//  is unchanged: the approval levels decide it (pc_can_approve, pc_can_act).
 function pc_can() {
     if (!pc_modules_live()) return false;
-    return function_exists('can') && (
-        can('mod.quotes.view') || can('mod.hiring.view') || can('mod.inquiries.view')
-        || (function_exists('is_admin_level') && is_admin_level()) || (function_exists('is_master') && is_master()));
+    return function_exists('can') && (can('costing.view') || (function_exists('is_master') && is_master()));
 }
 function pc_can_edit() {
     if (!pc_modules_live()) return false;
-    return function_exists('can') && (
-        can('mod.quotes.edit') || can('mod.hiring.edit')
-        || (function_exists('is_admin_level') && is_admin_level()) || (function_exists('is_master') && is_master()));
+    return function_exists('can') && (can('costing.prepare') || (function_exists('is_master') && is_master()));
 }
 function pc_can_approve() {
     if (!pc_modules_live()) return false;
