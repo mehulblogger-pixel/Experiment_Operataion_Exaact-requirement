@@ -626,16 +626,17 @@ function ops_sales_more($route, $method) {
             //  sends a visit to the record's own form.
             $t = sx_log_target();
             if (!$t) { http_response_code(404); view('notfound'); return true; }
+            //  The same branch boundary as opening the record itself, asked FIRST (as when
+            //  opening it): a record of another office is not logged on from here either, and
+            //  the person is told where it belongs rather than that they lack a right.
+            ops_require(!function_exists('scope_office_allows') || scope_office_allows($t['office'] ?: null),
+                'This ' . ($t['kind'] === 'LEAD' ? 'lead' : Tl('opportunity')) . ' belongs to another office / branch.');
             ops_require($t['can'], 'Logging on this record needs the right to edit it.');
             //  D2 (owner, 21 Nov 2026): only the person handling it, the people above them
             //  and an administrator log on a lead or deal; everybody else reads it.
             if (function_exists('sales_record_can_work') && !sales_record_can_work((int) $t['owner'])) {
                 flash(sales_record_lock_words((int) $t['owner']), 'error'); redirect($t['url']);
             }
-            //  The same branch boundary as opening the record itself: a record of
-            //  another office is not logged on from here either.
-            ops_require(!function_exists('scope_office_allows') || scope_office_allows($t['office'] ?: null),
-                'This ' . ($t['kind'] === 'LEAD' ? 'lead' : Tl('opportunity')) . ' belongs to another office / branch.');
             $back = (string) ($_POST['back'] ?? $_GET['back'] ?? '/sales-today');
             $back = sx_safe_back($back, '/sales-today');
             if ($method === 'POST') {

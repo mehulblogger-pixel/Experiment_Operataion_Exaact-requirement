@@ -47,16 +47,17 @@ try {
     $L = lead_row($r['id']);
     t_eq($L['next_action_on'], sx_add_working_days(1, (int) ($L['office_id'] ?? 0)), 'quick lead · first follow-up = next working day');
     t_eq((int) $L['owner_user_id'], (int) $f['master'], 'quick lead · with no office rule it is the person who typed it');
-    $r2 = sx_lead_save(['company_name' => $co, 'contact_phone' => ''], false);
+    //  D4 (owner, 21 Nov 2026): a quick lead always needs a 10-digit mobile, so each save below carries one.
+    $r2 = sx_lead_save(['company_name' => $co, 'contact_phone' => '9825077002'], false);
     t_ok(!empty($r2['dupes']) && empty($r2['ok']), 'quick lead · the same name again is shown as a possible duplicate, not saved');
     $r3 = sx_lead_save(['company_name' => 'Fx Other ' . uniqid(), 'contact_phone' => '+91 98250-77001'], false);
     t_ok(!empty($r3['dupes']) && strpos($r3['dupes'][0]['text'], 'mobile') !== false, 'quick lead · the same mobile (any format) is shown too');
-    $r4 = sx_lead_save(['company_name' => $co, 'contact_phone' => ''], true);
+    $r4 = sx_lead_save(['company_name' => $co, 'contact_phone' => '9825077002'], true);
     t_ok(!empty($r4['ok']), 'quick lead · "Save anyway" saves it'); $made['l'][] = (int) ($r4['id'] ?? 0);
     t_ok(!empty(sx_lead_save(['company_name' => 'Fx Short', 'contact_phone' => '123'], true)['err']), 'quick lead · a mobile that is too short is refused');
     t_ok(!empty(sx_lead_save(['company_name' => '  '], true)['err']), 'quick lead · no company is refused');
     $setS('sales_owner_by_office', json_encode([(string) $f['mum'] => $f['kiran']]));
-    $r5 = sx_lead_save(['company_name' => 'Fx Mum Co ' . uniqid(), 'office_id' => $f['mum']], true);
+    $r5 = sx_lead_save(['company_name' => 'Fx Mum Co ' . uniqid(), 'contact_phone' => '9825077003', 'office_id' => $f['mum']], true);
     $made['l'][] = (int) ($r5['id'] ?? 0);
     t_eq((int) ($r5['owner'] ?? 0), (int) $f['kiran'], 'quick lead · an office with a salesperson set gives the lead to them');
 
@@ -256,9 +257,12 @@ try {
     t_ok(!in_array('FX-R-AHM', array_column(sx_renewals_list(90), 'contract_number'), true) && !in_array('FX-R-AHM', array_column(sx_renewals(), 'contract_number'), true),
          'renewals · the Mumbai branch manager does not (Renewals screen and Today)');
     bbv_as($f['master']);
-    // Finance sees every order of their offices on Orders & payments.
+    // D1 (owner, 21 Nov 2026): Finance no longer opens Orders & payments (Sales); a person who does
+    // (here the administrator, "Everyone") sees every order of their offices, not only "their own".
     $ro = bbv_route('sales-orders', 'GET', $f['rakesh'], 0);
-    t_ok(strpos($ro['out'] ?? '', 'FX-Q-1') !== false, 'orders · Finance sees the company\'s orders (not only "their own", which is none)');
+    t_ok(strpos($ro['out'] ?? '', 'FX-Q-1') === false, 'orders · Finance is refused Orders & payments (D1)');
+    $ro = bbv_route('sales-orders', 'GET', $f['master'], 0, [], ['who' => 'all']);
+    t_ok(strpos($ro['out'] ?? '', 'FX-Q-1') !== false, 'orders · the administrator sees the company\'s orders (not only "their own", which is none)');
     // "0 days" = the person picks the date.
     $_GET = ['deal' => (string) $o['id']]; $td = sx_log_target(); $_GET = [];
     $rz = sx_log_save($td, ['method' => 'MEETING', 'outcome' => 'FX_PICK']);
@@ -291,6 +295,9 @@ try {
     };
     $bdm = $mkU('bdmx', 'BUSINESS_DEV_MANAGER', $f['mum']); $mktm = $mkU('mktmx', 'MARKETING_MANAGER', $f['mum']);
     $calls0 = (int) ops_val("SELECT COUNT(*) FROM calls");
+    //  D2 (owner, 21 Nov 2026): make the BDM the one handling the deal, so what refuses here is the
+    //  Work orders right itself (SALA-026), not "only the person handling it".
+    db()->prepare("UPDATE opportunities SET owner_user_id=?, office_id=? WHERE id=?")->execute([$bdm, $f['mum'], $o['id']]);
     $rro = bbv_route('opportunity-raise-order', 'POST', $bdm, 0, ['id' => (string) $o['id']]);
     t_ok((int) ops_val("SELECT COUNT(*) FROM calls") === $calls0 && stripos(json_encode($rro), 'Operations') !== false,
          'SALA-026 · a salesperson without the Work orders right cannot raise a work order by posting the form');
