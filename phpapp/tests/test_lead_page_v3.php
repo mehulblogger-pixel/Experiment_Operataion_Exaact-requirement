@@ -197,7 +197,7 @@ try {
               'Days there', 'Why it was lost', 'Remarks — what happened', 'They said yes without a', 'Only the person responsible for this lead',
               'closes by itself as', 'days without progress', 'Project costing', 'How promising', 'Effort to win', 'Effort so far', 'What they want',
               'Why it is being reassigned', 'Edit the details', 'No documents yet.', 'It has not moved yet.', 'Nothing logged yet.',
-              'No contact has been logged on this lead.', 'is now a customer', 'Hoped to close', 'Handled by', 'Worth about', 'Telephone', 'E-mail'] as $w)
+              'No contact has been logged on this lead.', 'is now a customer', 'Hoped to close', 'Handled by', 'Worth about', 'Mobile', 'E-mail'] as $w)   // 'Telephone' → 'Mobile': owner decision D4, 21 Nov 2026 (one word for it across Sales)
         t_ok(strpos($neu, $w) !== false, 'the lead page still says "' . $w . '"');
     foreach (['lead_form' => 'lead_form', 'sx_lead' => 'sx_lead'] as $o => $nv) {
         $oldF = (string) file_get_contents(__DIR__ . '/fixtures/pre_v3/' . $o . '.php');
