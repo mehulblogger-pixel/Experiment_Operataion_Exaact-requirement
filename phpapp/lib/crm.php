@@ -2316,8 +2316,9 @@ function ops_crm_inquiries($route, $method) {
                 $pdo->prepare("UPDATE crm_inquiries SET client_id=?,client_name=?,contact_name=?,contact_email=?,contact_mobile=?,subject=?,service_requirement=?,sbu=?,source=?,received_date=?,assigned_to=?,status=?,notes=? WHERE id=?")
                     ->execute(array_merge($vals, [$inq['id']]));
                 if (function_exists('ads_queue_inquiry')) ads_queue_inquiry((int)$inq['id'], 'Enquiry edited');
+                $addedC = $vals[0] ? crm_inquiry_add_contact((int)$vals[0], (string)$vals[2], (string)$vals[3], (string)$vals[4], (string)$inq['inquiry_no'], (int)$inq['id']) : false;
                 //  Stage 3 (backend item 5): back to the inquiry itself, not the register.
-                flash('Inquiry updated.'); redirect('/inquiry?id=' . (int)$inq['id']);
+                flash('Inquiry updated.' . ($addedC ? ' ' . $vals[2] . ' is now also on the ' . Tl('client') . "'s contacts." : '')); redirect('/inquiry?id=' . (int)$inq['id']);
             } else {
                 $no = crm_next_inquiry_no();
                 $pdo->prepare("INSERT INTO crm_inquiries (inquiry_no,client_id,client_name,contact_name,contact_email,contact_mobile,subject,service_requirement,sbu,source,received_date,assigned_to,status,notes,created_by,created_at,office_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
@@ -2327,7 +2328,8 @@ function ops_crm_inquiries($route, $method) {
                 $newId = (int)$pdo->lastInsertId();
                 if ($once !== '') $_SESSION['inquiry_form_once'][$once] = $newId;
                 if (function_exists('ads_queue_inquiry')) ads_queue_inquiry($newId, 'Enquiry raised');
-                flash("$no created. You can now raise a quotation against it.");
+                $addedC = $vals[0] ? crm_inquiry_add_contact((int)$vals[0], (string)$vals[2], (string)$vals[3], (string)$vals[4], (string)$no, $newId) : false;
+                flash("$no created. You can now raise a quotation against it." . ($addedC ? ' ' . $vals[2] . ' is now also on the ' . Tl('client') . "'s contacts." : ''));
                 redirect('/inquiry?id=' . $newId);
             }
         }
@@ -4161,6 +4163,29 @@ function partner_carry_from_crm($partnerId, $name = '') {
     }
     return ['linked' => $linked, 'types' => $types, 'contacts' => $contacts];
 }
+// D5 (owner, 21 Nov 2026 — findings J3-01, "as recommended"): a person typed on an
+// inquiry for a customer already on file is added to that customer's Contacts when
+// they are not there yet — matched on mobile (its last ten digits) or e-mail, else on
+// the name when neither is given. Never replaces anyone and is never made the main
+// contact over an existing one; written in the customer's history. Returns true when added.
+function crm_inquiry_add_contact($partnerId, $name, $email, $mobile, $inqNo = '', $inqId = 0) {
+    $partnerId = (int) $partnerId; $name = trim((string) $name); $email = trim((string) $email); $mobile = trim((string) $mobile);
+    if (!$partnerId || $name === '' || !ops_val("SELECT 1 FROM business_partners WHERE id=?", [$partnerId])) return false;
+    $digits = fn($s) => substr(preg_replace('/\D+/', '', (string) $s), -10);
+    foreach (ops_all("SELECT name, email, mobile FROM partner_contacts WHERE partner_id=?", [$partnerId]) ?: [] as $c) {
+        if ($mobile !== '' && strlen($digits($mobile)) >= 6 && $digits($c['mobile'] ?? '') === $digits($mobile)) return false;
+        if ($email !== '' && strcasecmp(trim((string) ($c['email'] ?? '')), $email) === 0) return false;
+        if ($mobile === '' && $email === '' && strcasecmp(trim((string) $c['name']), $name) === 0) return false;
+    }
+    $isFirst = !ops_val("SELECT 1 FROM partner_contacts WHERE partner_id=?", [$partnerId]);
+    db()->prepare("INSERT INTO partner_contacts (partner_id,name,email,mobile,is_primary,department) VALUES (?,?,?,?,?,?)")
+        ->execute([$partnerId, $name, $email, $mobile, $isFirst ? 1 : 0, 'From ' . T('inquiry') . ($inqNo !== '' ? ' ' . $inqNo : '')]);
+    if (function_exists('act_log'))
+        act_log('INQUIRY', (int) $inqId, 'SYSTEM', 'Contact ' . $name . ' added to the ' . Tl('client') . "'s contacts from " . Tl('inquiry') . ($inqNo !== '' ? ' ' . $inqNo : '')
+                . ' (by ' . user_name(current_user()) . ')', ['auto' => 1, 'partner_id' => $partnerId]);
+    return true;
+}
+
 // One sentence for the flash message, or '' when nothing came across.
 function partner_carry_text($res) {
     $bits = [];
