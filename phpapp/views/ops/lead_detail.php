@@ -148,15 +148,29 @@ $jsq = fn($s) => e(json_encode((string) $s));
         <div class="rec-pop">
           <h4>Change the stage</h4>
           <p class="hint">Stages are optional markers for your manager's reports. A lead closes by itself as <b>won</b> when they accept your <?= e($Q) ?>. You are asked to confirm before anything moves.</p>
+          <?php //  D7 (owner, 21 Nov 2026 — findings J1-04): the current stage is marked and
+                //  cannot be picked; stages ahead as before; earlier stages apart, under
+                //  "Move back", and the question says "Move back …".
+                $curIx = -1; foreach ($openStages as $i => $s) if ((int) $s['id'] === (int) $l['stage_id']) $curIx = $i;
+                $ahead = $curIx < 0 ? $openStages : array_slice($openStages, $curIx + 1);
+                $behind = $curIx > 0 ? array_reverse(array_slice($openStages, 0, $curIx)) : []; ?>
           <?php if ($fwd || $curStage): ?><div class="rec-grp">Mark how far it has got</div><?php endif; ?>
-          <?php foreach ($openStages as $s): if ((int) $s['id'] === (int) $l['stage_id']): ?>
-            <div class="rec-mi cur"><span class="ico"><?= rec_icon('target') ?></span><span><?= e($s['name']) ?><small>Now · <?= (int) ($days ?? 0) ?> day<?= (int) ($days ?? 0) === 1 ? '' : 's' ?></small></span><span class="rec-tag info">Current</span></div>
-          <?php else: ?>
+          <?php if ($curIx >= 0): $s = $openStages[$curIx]; ?>
+            <div class="rec-mi cur" aria-disabled="true"><span class="ico"><?= rec_icon('target') ?></span><span><?= e($s['name']) ?><small>Now · <?= (int) ($days ?? 0) ?> day<?= (int) ($days ?? 0) === 1 ? '' : 's' ?></small></span><span class="rec-tag info">Current</span></div>
+          <?php endif; ?>
+          <?php foreach ($ahead as $s): ?>
             <form method="post" action="/lead-move" onsubmit="return confirm('Move <?= e(addslashes($l['company_name'])) ?> to “<?= e(addslashes($s['name'])) ?>”?')">
               <input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="stage_id" value="<?= (int) $s['id'] ?>">
               <button class="rec-mi" type="submit"><span class="ico"><?= rec_icon('checkc') ?></span><span><?= e($s['name']) ?></span><?= rec_icon('right', 's') ?></button>
             </form>
-          <?php endif; endforeach; ?>
+          <?php endforeach; ?>
+          <?php if ($behind): ?><div class="rec-grp">Move back</div><?php endif; ?>
+          <?php foreach ($behind as $s): ?>
+            <form method="post" action="/lead-move" onsubmit="return confirm('Move back from “<?= e(addslashes($curStage)) ?>” to “<?= e(addslashes($s['name'])) ?>”?')">
+              <input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="stage_id" value="<?= (int) $s['id'] ?>">
+              <button class="rec-mi" type="submit"><span class="ico"><?= rec_icon('swap') ?></span><span>Move back to <?= e($s['name']) ?></span><?= rec_icon('right', 's') ?></button>
+            </form>
+          <?php endforeach; ?>
           <?php if ($won || $lostSt): ?><div class="rec-grp">Close it</div><?php endif; ?>
           <?php foreach ($won as $s): ?>
             <form method="post" action="/lead-move" onsubmit="return confirm('They said yes without a <?= e(addslashes($Q)) ?> from us? It makes <?= e(addslashes($l['company_name'])) ?> a customer and raises the <?= e(addslashes(Tl('inquiry'))) ?> — you check the details on the next screen.')">
