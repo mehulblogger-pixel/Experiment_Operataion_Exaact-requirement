@@ -15,6 +15,26 @@ Living list of things explicitly deferred, so nothing is forgotten. Newest on to
   removed; revisit only when the owner asks.
 - **Ad spend by branch — PENDING** (owner, earlier: "let us do it later"). Needs the owner's rule for
   splitting a campaign's spend across branches.
+- **Owner's own opstest test sheets (Stage 3 zip) — round 2: BUILT.** Bugs B1–B8 fixed; decisions
+  D1–D8 ("all as recommended") built — D1 Finance in Sales = Quotes register (view) + Client register;
+  D2 only the person handling a lead / deal, their managers and admins change or log on it; D3 a
+  quotation before the quotation stage (or "Sent outside EXAACT" + reason); D4 mobile rules and one
+  word "Mobile"; D5 a new inquiry contact is added to the customer's contacts; D6 customers come from
+  converting a lead; D7 "Current" / "Move back" in the lead stage menu; D8 app-wide figure cards.
+  D1 follow-up: Accounts still register a won deal's contract from Contracts to register.
+- **Industry templates V2.1 (owner approved, no "certification", "Deployed Engineer" OK): BUILT** —
+  TPIA, technical manpower, recruitment, audit; each with its D3 quotation step.
+- **Design items from the owner's sheets — PENDING (not changed in round 2; owner to pick):** one
+  breadcrumb pattern and a "Sales home" button on every Sales screen (SH-03); Print-a-quote layout
+  (SH-03); every Orders & payments card opens its list (IP-01); branch name instead of "— mine —"
+  (LF-03); hide "Payments to collect" when it cannot show anything (TD-04); one "Save anyway" button
+  on both lead forms (J2-04); number with Copy on a laptop (LR-05).
+- **Industry template gaps (V2.1 §8 + mapping) — PENDING, recorded not built:** P1 quotation PDF title
+  fixed as "QUOTATION" (`lib/pdf.php`); P2 the "Quotes" tab name on lead / deal / enquiry pages is also
+  its address; P3 "CRM — Quotations" on the quotation form; P4 no action to extend a deployment;
+  G1 "Principal Employer" on statutory papers only; G2 contract name per industry; G3 lost-reason
+  categories; G4 recruitment replacement guarantee; G5 client-audit findings / nonconformities;
+  G6 overtime and extra-shift pricing.
 
 ## ✅ Sales redesign — closing check done (21 Nov 2026, report 63)
 
