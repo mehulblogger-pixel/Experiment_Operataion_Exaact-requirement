@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '9f38df2 · 2026-11-21 15:11 UTC · 751 files';
+$RELEASE = '8d72415 · 2026-11-21 15:57 UTC · 751 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -658,13 +658,13 @@ $EXPECT  = [
     'views/ops/super_admin.php' => ['s'=>25523,'h'=>'276844b10ac9c368'],
     'views/ops/sx_board.php' => ['s'=>8318,'h'=>'ffab34fd595ab1e1'],
     'views/ops/sx_dash.php' => ['s'=>10213,'h'=>'b369f3a038b80a23'],
-    'views/ops/sx_home.php' => ['s'=>12189,'h'=>'eef4dc40909233a0'],
+    'views/ops/sx_home.php' => ['s'=>12183,'h'=>'1b94b68b22fcd3f9'],
     'views/ops/sx_lead.php' => ['s'=>7087,'h'=>'3776cf2127563d1b'],
     'views/ops/sx_orders.php' => ['s'=>6987,'h'=>'7de4b028f524be67'],
     'views/ops/sx_renewals.php' => ['s'=>5784,'h'=>'554624dcc14eca7f'],
     'views/ops/sx_settings.php' => ['s'=>9401,'h'=>'c34829f0df398e83'],
     'views/ops/sx_targets.php' => ['s'=>7111,'h'=>'de2de19877e0278e'],
-    'views/ops/sx_today.php' => ['s'=>11481,'h'=>'bd10e891b2e0b32e'],
+    'views/ops/sx_today.php' => ['s'=>11553,'h'=>'7ee479a24e4bfbe0'],
     'views/ops/system_status.php' => ['s'=>2399,'h'=>'90287c341b6166f4'],
     'views/ops/tally_export.php' => ['s'=>13104,'h'=>'4b8ef6be8b7b91b4'],
     'views/ops/tapi.php' => ['s'=>988,'h'=>'33442189ab50828c'],
