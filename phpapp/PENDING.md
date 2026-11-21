@@ -2,6 +2,14 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🔐 "Who can do what" — batch B built (21 Nov 2026); follow-ups
+
+The new permission screen (`/who-can`, docs/02 19t) is built and tested; the old Roles screen
+(`/access`) stays reachable from it ("Old layout") for ONE release — remove the link and the
+tile-less route after the owner has used the new screen on opstest. Still waiting: Q10 ("whose
+records a person sees: own / team / branch / all"), decided after Stage 2. The person form's
+permission grid could later be replaced by a link to this screen (one place to switch rights).
+
 ## 🔐 Permission foundation A — built 21 Nov 2026 (docs/02 19r, report 54)
 
 Nine Sales rights became switches of their own (Q1–Q9) and a person's own access is

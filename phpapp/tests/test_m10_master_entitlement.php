@@ -208,6 +208,12 @@ $BASELINE = [
     // sx_settings_can() guards /sales-settings, a Sales route behind sx_can(), with
     // its tile shown only when Sales is on. Same answer for a master as before.
     'leads_can_export', 'opp_can_export', 'crm_quote_can_export', 'sx_settings_can',
+    // "Who can do what" (batch B, owner 21 Nov 2026, docs/02 19t) — the same
+    // questions as the screens it replaces: whocan_can_roles() is is_master(),
+    // exactly ops_access()'s own gate; whocan_can_people() is the person form's
+    // users.manage.* gate; whocan_can() is either. Asked only inside /who-can,
+    // which maps to the Users module like /user-edit. Same answer for a master.
+    'whocan_can', 'whocan_can_people', 'whocan_can_roles',
 ];
 $unclassified = array_values(array_diff($open, $BASELINE));
 t_ok(!$unclassified,

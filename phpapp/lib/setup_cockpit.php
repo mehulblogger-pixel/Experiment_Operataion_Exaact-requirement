@@ -483,7 +483,8 @@ function cockpit_search_index() {
         ['label' => 'Forms', 'route' => '/workspace/setup/forms', 'kw' => 'form field label required dropdown candidate requisition requirement builder'],
         ['label' => 'Dropdown lists', 'route' => '/masters', 'kw' => 'dropdown list master value option department source employment type'],
         ['label' => 'People & access', 'route' => '/users', 'kw' => 'user role permission recruiter manager access who can'],
-        ['label' => 'Roles & permissions', 'route' => '/access', 'kw' => 'role permission access grant recruiter hiring manager'],
+        ['label' => 'Who can do what', 'route' => '/who-can', 'kw' => 'role permission access grant recruiter hiring manager who can do what switch branch'],
+        ['label' => 'Roles & permissions (old layout)', 'route' => '/access', 'kw' => 'role permission access old layout grid'],
         ['label' => 'Wording / terminology', 'route' => '/terminology', 'kw' => 'terminology wording rename candidate client label word'],
         ['label' => 'Company profile', 'route' => '/company-profile', 'kw' => 'legal name logo address company details'],
     ];

@@ -508,7 +508,7 @@
       $setTile('/billing', '💳', 'Users &amp; billing', $bcfg ? 'Add or renew seats online' : 'Set price &amp; keys to switch on');
     }
   }
-  $setTile('/access', '🔐', 'Roles &amp; access', 'Who can view or edit what');
+  $setTile('/who-can', '🔐', 'Who can do what', 'Roles, people and branches — who can see and do what');
   $setTile('/terminology', '🔤', 'Terminology', 'Rename the words the app uses');
   $setTile('/ai-settings', '🤖', 'AI providers &amp; models', 'API keys &amp; model selection');
   $setTile('/backup', '💾', 'Backup &amp; restore', 'Download a safe copy &amp; restore anytime');

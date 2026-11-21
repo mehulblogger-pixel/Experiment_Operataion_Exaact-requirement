@@ -265,7 +265,7 @@ function setup_journey() {
         ['title' => 'Check who can do what',
          'why'   => 'Read the roles once, now, while it is cheap. A permission nobody checked is the one that surprises you later.',
          'done'  => $people > 1, 'state' => $people > 1 ? 'worth a look' : 'add people first',
-         'href'  => '/access', 'cta' => 'Open Roles'],
+         'href'  => '/who-can', 'cta' => 'Open Who can do what'],
 
         ['title' => 'Turn on e-mail',
          'why'   => 'Offers, approvals and reminders are sent by e-mail. Until this is set they are written but never leave.',

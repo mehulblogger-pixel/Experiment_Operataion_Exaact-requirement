@@ -30,7 +30,7 @@
 //  Never switchable: the screens a company needs to run itself and to switch
 //  things back on. A route in this list is never refused by a feature switch.
 const FEAT_CORE = ['', 'admin', 'workspace/setup', 'workspace/setup/modules', 'workspace/setup/features-save',
-    'workspace/setup/features-preset', 'workspace/setup/module-toggle', 'users', 'user-new', 'user-edit', 'access',
+    'workspace/setup/features-preset', 'workspace/setup/module-toggle', 'users', 'user-new', 'user-edit', 'access', 'who-can', 'who-can-person',
     'settings', 'masters', 'company-profile', 'licence', 'backup', 'search', 'my-work', 'tasks', 'login', 'logout',
     'sales', 'operations', 'quality', 'reporting', 'money', 'insights', 'directory', 'recruitment', 'marketplace',
     'subscription', 'owner', 'platform-setup', 'audit-log', 'hierarchy', 'role-workspaces',

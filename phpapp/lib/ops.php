@@ -3556,6 +3556,7 @@ function ops_route_module_map() {
         'analytics-scorecard'=>'reports','analytics-alerts'=>'reports',
         'analytics-export'=>'reports','analytics-review'=>'reports','analytics-snapshot'=>'reports',
         'users'=>'users','user-new'=>'users','user-edit'=>'users','hierarchy'=>'users','org-template'=>'users',
+        'who-can'=>'users','who-can-person'=>'users',   // "Who can do what" — the same gate as the person form
         'user-unlock'=>'users','user-2fa-reset'=>'users','user-retire'=>'users',
         'contract-overrides'=>'calls','contract-override'=>'calls','contract-open'=>'calls',
         'settings'=>'settings','access'=>'settings','ai-settings'=>'settings','terminology'=>'settings',
@@ -3805,6 +3806,10 @@ function ops_access($method) {
     if ($method === 'POST') {
         $sel = $_POST['role'] ?? $sel;
         if (!isset($roles[$sel])) $sel = array_key_first($roles);
+        //  "Who can do what" (batch B, owner 21 Nov 2026) saves a role by posting
+        //  HERE, with the same fields — so the same ticks store the same value.
+        //  Only where the person lands afterwards differs.
+        $back = (($_POST['_back'] ?? '') === 'who') ? '/who-can?tab=roles&role=' : '/access?role=';
         $store = json_decode(setting_get('role_access', ''), true); if (!is_array($store)) $store = [];
         $before = role_perms($sel);   // Module 02 — the role's resolved default, to diff for the audit
         // Records a role-default change on the sealed audit chain (Module 02).
@@ -3828,7 +3833,7 @@ function ops_access($method) {
             setting_set('role_access', json_encode($store));
             $logRoleAccess($store[$sel]);
             flash('Recommended permissions applied for ' . (function_exists("role_name") ? role_name($sel) : (ORG_ROLES[$sel] ?? $sel)) . '. Review and Save, or adjust as needed.');
-            redirect('/access?role=' . $sel);
+            redirect($back . $sel);
         }
         // Restore to built-in default (drop the override).
         if (($_POST['_do'] ?? '') === 'reset') {
@@ -3836,7 +3841,7 @@ function ops_access($method) {
             setting_set('role_access', json_encode($store));
             $logRoleAccess(role_perms($sel));
             flash('Access for ' . (function_exists("role_name") ? role_name($sel) : (ORG_ROLES[$sel] ?? $sel)) . ' reset to the built-in default.');
-            redirect('/access?role=' . $sel);
+            redirect($back . $sel);
         }
         $valid = array_keys(all_permissions());
         $checked = array_values(array_intersect(array_keys($_POST['perms'] ?? []), $valid));
@@ -3851,7 +3856,7 @@ function ops_access($method) {
         // later version is known to be new rather than deliberately untieked.
         stamp_modules_at_save();
         flash('Access for ' . (function_exists("role_name") ? role_name($sel) : (ORG_ROLES[$sel] ?? $sel)) . ' saved.');
-        redirect('/access?role=' . $sel);
+        redirect($back . $sel);
     }
     view('ops/access', ['roles' => $roles, 'sel' => $sel, 'current' => role_perms($sel),
         'recommended' => role_recommended_perms($sel),
@@ -4505,6 +4510,8 @@ function ops_dispatch($route, $method) {
             ops_backup($method); return true;
         case $route === 'access':
             ops_access($method); return true;
+        case $route === 'who-can' || $route === 'who-can-person':
+            return ops_whocan($route, $method);
         case $route === 'ai-settings':
             ops_ai_settings($method); return true;
         case $route === 'terminology':
@@ -11053,32 +11060,19 @@ function ops_users($route, $method) {
                     return;
                 }
             }
-            // Both scopes arrive as tick-lists now. "Every…" wins over the
-            // individual ticks, and is stored as ALL so an office added next
-            // year is included without anybody revisiting this person.
-            if ($globalMgr) {
-                $scopeOffices = !empty($b['scope_offices_all']) ? 'ALL'
-                    : implode(',', array_map('intval', array_filter((array)($b['scope_offices'] ?? []))));
-            } else { $scopeOffices = ''; }                                       // '' = OWN(home)
-            $sbuOpts = lk_options_or('sbu', OPS_SBUS);
-            $scopeSbus = !empty($b['scope_sbus_all']) ? 'ALL'
-                : implode(',', array_values(array_intersect(array_keys($sbuOpts), (array)($b['scope_sbus'] ?? []))));
-            // permissions: an administrator may toggle only the set they can see
-            // (a branch manager gets a safe operational subset; a global manager gets
-            // everything) — assignable_permissions() is the SAME set the form renders.
-            $assignable = array_keys(assignable_permissions($globalMgr));
-            $chosen = array_intersect(array_filter((array)($b['permissions'] ?? [])), $assignable);
-            //  Ticks that are exactly the role's are stored as '' — the person
-            //  follows their role, including later changes under Roles &
-            //  permissions. Anything else is their own access. R3 (what lies
-            //  outside this editor's view is kept, never dropped) and R-20 (the
-            //  set is closed under the verb implications) both live in the helper.
-            $perms = user_perms_to_store($chosen, $role, $assignable, $user['permissions'] ?? '');
-            // "Reset access to the role default" — clears the per-user override so the
-            // login tracks its ROLE's full default access (and any modules added
-            // later) instead of a frozen ticked set. This is the recovery when an
-            // edit accidentally narrowed an admin. Global managers only.
-            if ($globalMgr && !empty($b['reset_perms'])) $perms = '';
+            //  Branches, business units and permissions: ONE implementation,
+            //  shared with "Who can do what" (lib/whocan.php, batch B, owner
+            //  21 Nov 2026), so the two screens can never store different values
+            //  for the same ticks. Unchanged behaviour, moved verbatim:
+            //    · both scopes arrive as tick-lists; "Every…" wins and is stored
+            //      as ALL (an office added next year is included); a branch-level
+            //      manager's save stores '' (their own branch);
+            //    · an administrator may toggle only the set they can see
+            //      (assignable_permissions(), the SAME set the form renders);
+            //      ticks that are exactly the role's are stored as '' — the person
+            //      follows their role; R3 and R-20 live in user_perms_to_store();
+            //    · "Reset access to the role default" (global managers) stores ''.
+            [$perms, $scopeOffices, $scopeSbus] = user_access_from_post($b, $role, $user, $globalMgr);
             // Reporting manager (for the org hierarchy + approvals): a system user when
             // one exists, else a manual name/position/email for a manager without a login.
             // "+ add them" is not a person id — it means the manager has no login,
@@ -11160,9 +11154,12 @@ function ops_users($route, $method) {
                     }
                 }
                 $meId = (int)(current_user()['id'] ?? 0);
+                //  Read what the stored value GRANTS, not its text: since Q11 it is
+                //  "@diff,+…,-…", in which "users.manage.branch" never appears as a
+                //  bare word, so the text test refused every self-save that kept
+                //  some other exception (and let a "-users.manage…" one through).
                 if ((int)$user['id'] === $meId && !is_master() && $perms !== ''
-                    && !in_array('users.manage.branch', explode(',', $perms), true)
-                    && !in_array('users.manage.global', explode(',', $perms), true)) {
+                    && !user_access_keeps_user_mgmt($perms, $role)) {
                     flash('You cannot remove your own user-management access — ask another administrator to change it.', 'error');
                     redirect('/user-edit?id=' . (int)$user['id']);
                 }

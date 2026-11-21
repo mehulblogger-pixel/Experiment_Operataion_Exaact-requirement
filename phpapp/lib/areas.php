@@ -326,7 +326,7 @@ function ops_area_def($area) {
         case 'admin':
             $title = 'Admin'; $icon = '⚙️';
             $sub = 'For administrators: masters, people, access, licensing and system configuration.';
-            $routes = ['admin','report-types','report-type-edit','irn-rules','compliance','incidents','incident','incident-new','incident-edit','consents','data-requests','workspace/setup','workspace/setup/modules','masters','m/','lookups','custom-fields','cforms','cform','form-designer','ai-forms','users','user-new','user-edit','hierarchy','access','role-workspaces','adspro','sso','licence','product-package','pricing-usage','settings','terminology','service-scope','service-formats','company-profile','backup','ai-settings','books-bridge','approvals-setup','voucher-rules','approver-map','approval-rules','idems-approval-rules','templates','report-templates','audit-log'];
+            $routes = ['admin','report-types','report-type-edit','irn-rules','compliance','incidents','incident','incident-new','incident-edit','consents','data-requests','workspace/setup','workspace/setup/modules','masters','m/','lookups','custom-fields','cforms','cform','form-designer','ai-forms','users','user-new','user-edit','hierarchy','access','who-can','who-can-person','role-workspaces','adspro','sso','licence','product-package','pricing-usage','settings','terminology','service-scope','service-formats','company-profile','backup','ai-settings','books-bridge','approvals-setup','voucher-rules','approver-map','approval-rules','idems-approval-rules','templates','report-templates','audit-log'];
 
             // Phase 1 — the Company Setup Cockpit is the single front door to all
             // configuration below. Shown first so a non-technical admin starts here.
@@ -352,7 +352,11 @@ function ops_area_def($area) {
             $sec('People');
             $t(can('mod.users.view'), '👥', T_REG('user'), '/users', 'People who can sign in.');
             $t(can('mod.users.view'), '🗂️', 'Organisation', '/hierarchy', 'The reporting hierarchy.');
-            $t(is_master(), '🔐', 'Roles & permissions', '/access', 'Who can do what.');
+            //  "Who can do what" (batch B, owner 21 Nov 2026) replaces the Roles &
+            //  permissions tile: roles, people and branches on one screen. The old
+            //  screen stays reachable from it ("Old layout") for one release.
+            $t(is_master() || (can('mod.users.view') && (can('users.manage.branch') || can('users.manage.global'))),
+               '🔐', 'Who can do what', '/who-can', 'Roles, people and branches — what each can see and do.');
             $t(is_master(), '🧭', 'Role workspaces', '/role-workspaces', 'Per-role landing page & quick-access launchpad.');
             $t($fx('sso_on') && (can('users.manage.global') || is_master()), '🔑', 'Single sign-on', '/sso', 'Identity provider settings.');
 

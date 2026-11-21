@@ -205,6 +205,7 @@ try {
     require __DIR__ . '/lib/licenceissue.php';
     require __DIR__ . '/lib/billing.php';
     require __DIR__ . '/lib/adsroi.php';
+    require __DIR__ . '/lib/whocan.php';   // "Who can do what" — roles, people, branches (batch B)
     require __DIR__ . '/lib/audits.php';
     require __DIR__ . '/lib/datacontrol.php';
     require __DIR__ . '/lib/trust.php';

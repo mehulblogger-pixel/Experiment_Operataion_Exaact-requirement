@@ -60,9 +60,13 @@ t_ok(!in_array('dash.operations', $chosen, true),
 $form = file_get_contents(__DIR__ . '/../views/ops/user_form.php');
 t_ok(strpos($form, 'assignable_permissions($globalMgr)') !== false, 'the form sources its editable set from the shared helper');
 t_ok(strpos($form, 'user_effective_perms($user)') !== false, 'the form pre-ticks the login\'s effective set');
+//  Batch B (21 Nov 2026): the person form's save calls user_access_from_post()
+//  (lib/whocan.php), shared with "Who can do what", which holds these two lines.
 $ops = file_get_contents(__DIR__ . '/../lib/ops.php');
-t_ok(strpos($ops, 'assignable_permissions($globalMgr)') !== false, 'the save handler uses the same editable set');
-t_ok(strpos($ops, 'user_perms_to_store($chosen, $role, $assignable,') !== false, 'the save handler stores through the shared helper');
+$shared = file_get_contents(__DIR__ . '/../lib/whocan.php');
+t_ok(strpos($ops, 'user_access_from_post($b, $role, $user, $globalMgr)') !== false, 'the person form saves through the one shared helper');
+t_ok(strpos($shared, 'assignable_permissions($globalMgr)') !== false, 'the save handler uses the same editable set');
+t_ok(strpos($shared, 'user_perms_to_store($chosen, $role, $assignable,') !== false, 'the save handler stores through the shared helper');
 $acc = file_get_contents(__DIR__ . '/../lib/access.php');
 t_ok(strpos($acc, '$keep = $existing ? $outside($existing) : $outside($roleSet);') !== false, 'the helper preserves unseen permissions');
 t_ok(strpos($form, 'will remove access to') !== false, 'a confirm warns before a save drops a held module');

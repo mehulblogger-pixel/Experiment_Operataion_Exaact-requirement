@@ -2,27 +2,18 @@
   $has = fn($p) => in_array($p, $current, true);
   $rec = fn($p) => in_array($p, $recommended, true);
   $allPerm = all_permissions();
-  // short plain-English description of each role (who they are)
-  $roleBlurb = [
-    'BUSINESS_DIRECTOR' => 'Top management. Sees everything across all offices and ' . Tlp('sbu') . ' — all dashboards, revenue, salary and profitability — but does not run day-to-day operations.',
-    'SBU_HEAD' => 'Heads one ' . Tl('sbu') . ' across all offices. Full dashboards & figures for their ' . Tl('sbu') . '; approves inspection reports for their people.',
-    'BRANCH_MANAGER' => 'Runs one office end-to-end: calls, jobs, availability, report approvals, masters, and users in that office.',
-    'BRANCH_APP_MANAGER' => 'Application manager in a branch — masters, overheads and branch users; limited operational view.',
-    'OPERATION_MANAGER' => 'Under the branch manager — allocates & closes jobs, runs the availability board, approves reports.',
-    'ASST_MANAGER' => 'Assists operations — creates calls, allocates jobs, manages availability. No money figures.',
-    'COORDINATOR' => 'Day-to-day desk — schedules and closes jobs, availability board, sees revenue but not salary/profit.',
-    'BUSINESS_DEV_MANAGER' => 'Sales — creates & sends ' . Tlp('quote') . ' and runs follow-ups across offices.',
-    'KEY_ACCOUNTS_MANAGER' => 'Sales — owns key accounts; creates & sends ' . Tlp('quote') . ' and follow-ups.',
-    'MARKETING_MANAGER' => 'Senior sales — everything BDM/KAM can do plus approve ' . Tlp('quote') . ' and manage templates.',
-    'MARKETING_EXECUTIVE' => 'Junior sales — drafts ' . Tlp('quote') . ' and manages follow-ups (no send/approve).',
-    'FINANCE' => 'Accounts — invoicing, credit reconciliation, register clients/contracts; sees all figures.',
-    'INSPECTOR' => 'Field engineer — only their own My Jobs / My Voucher; no admin screens.',
-  ];
+  // short plain-English description of each role — role_blurb() (lib/whocan.php),
+  // shared with "Who can do what" so both screens say the same thing.
+  $roleBlurb = []; foreach (array_keys($roles) as $rk) $roleBlurb[$rk] = role_blurb($rk);
 ?>
 <div class="master-head">
   <div><h1>Roles &amp; permissions</h1>
     <p class="sub" style="margin:2px 0 0">Pick a role, apply the recommended set in one click, then fine-tune. Applies to everyone in that role without a personal override. <strong>Master Admin</strong> always has everything.</p></div>
   <a class="btn secondary" href="/settings">← Settings</a>
+</div>
+<div class="note-inline" role="note" style="margin:0 0 12px;padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:var(--info-bg,#eff6ff)">
+  <b>This is the old layout.</b> The same switches, with people, branches and a plain-English preview on one page, are on
+  <a href="/who-can?tab=roles&amp;role=<?= e($sel) ?>"><b>Who can do what</b></a>. Both save to the same place.
 </div>
 
 <div class="chip-row" style="margin-bottom:14px">
