@@ -1,3 +1,12 @@
+<?php
+// Stage 4 of the Sales redesign (owner, 21 Nov 2026) — the approval rules in the Sales
+// workspace look: the Sales bar on a laptop, the bottom bar on a phone, the record-page
+// cards. Every field, button, link and rule below is the one it had (the old page is kept
+// in tests/fixtures/pre_stage4/); only the frame around it changed.
+require_once __DIR__ . '/../_sxw_ui.php';
+$__sxq4 = !(function_exists('is_embed') && is_embed());   // never inside the in-page popup
+?>
+<?php if ($__sxq4): ?><div class="rec sxw has-bn sxq sxq4"><?php sxw_nav('/quotes'); ?><?php endif; ?>
 <div class="master-head">
   <div><h1>Quote &amp; report approvals</h1>
     <p class="sub" style="margin:2px 0 0">Who must approve a <?= e(Tl('quote')) ?> — by <strong>amount band</strong> and/or <strong><?= e(T('sbu')) ?></strong>. When a <?= e(Tl('quote')) ?> is submitted, matching rules become its approval chain (lower levels first).
@@ -42,3 +51,4 @@
   </table>
   </div>
 </div>
+<?php if ($__sxq4): ?></div><?php sxw_bottom('/quotes'); ?><?php endif; ?>

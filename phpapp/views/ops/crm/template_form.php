@@ -1,3 +1,12 @@
+<?php
+// Stage 4 of the Sales redesign (owner, 21 Nov 2026) — the template form in the Sales
+// workspace look: the Sales bar on a laptop, the bottom bar on a phone, the record-page
+// cards. Every field, button, link and rule below is the one it had (the old page is kept
+// in tests/fixtures/pre_stage4/); only the frame around it changed.
+require_once __DIR__ . '/../_sxw_ui.php';
+$__sxq4 = !(function_exists('is_embed') && is_embed());   // never inside the in-page popup
+?>
+<?php if ($__sxq4): ?><div class="rec sxw has-bn sxq sxq4"><?php sxw_nav('/quotes'); ?><?php endif; ?>
 <div class="master-head">
   <div><h1><?= $t ? 'Edit template — ' . e($t['name']) : 'Add quote / e-mail template' ?></h1></div>
   <a class="btn secondary" href="<?= e(nav_back($cur)) ?>">← <?= e(nav_back_label($cur)) ?></a>
@@ -48,3 +57,4 @@
     </div>
   <?php endforeach; ?>
 </div>
+<?php if ($__sxq4): ?></div><?php sxw_bottom('/quotes'); ?><?php endif; ?>

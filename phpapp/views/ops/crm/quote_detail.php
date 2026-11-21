@@ -7,12 +7,31 @@
   };
   $locT = lk_options_or('quote_location_type', QUOTE_LOCATION_TYPES);
 ?>
+<?php
+// Stage 4 of the Sales redesign (owner, 21 Nov 2026, approved design s4-quote): the
+// quotation page on the record kit — the Sales bar, the chain, the header card with
+// its status and versions, and the three figures (DEF-06: before GST first). Every
+// panel, tab, form and button below is the same as before (the old page is kept in
+// tests/fixtures/pre_stage4/quote_detail.php); DEF-18: the buttons follow the server's
+// own rules; backend item 9: the preparer may withdraw it from its approvers.
+require_once __DIR__ . '/../_sxw_ui.php';
+$qBg = crm_quote_before_gst($q); $qTot = (float)$q['total_amount'];
+$qVal = quote_validity($q);
+?>
+<div class="rec sxw has-bn sxq sxqd">
+<?php sxw_nav('/quotes'); ?>
 <?= function_exists('chain_strip') ? chain_strip('QUOTE', (int)$q['id'], 'QUOTE', (int)$q['id']) : '' ?>
-<div class="master-head">
-  <div><h1><?= e(quote_label($q)) ?> <span class="pill <?= $stPill[$st] ?? 'p-mut' ?>" style="font-size:13px;vertical-align:middle"><?= e(lk_options_or('quote_status', QUOTE_STATUS)[$st] ?? $st) ?></span>
-    <?php $verN = count($revs); ?><a href="#revisions" class="pill p-info" style="font-size:12px;vertical-align:middle;text-decoration:none" title="See the revision list and the full change history">🕑 Rev <?= str_pad((string)(int)$q['rev'],2,'0',STR_PAD_LEFT) ?> · <?= $verN ?> version<?= $verN === 1 ? '' : 's' ?></a></h1>
-    <p class="sub" style="margin:2px 0 0"><?= e($q['subject'] ?: '—') ?></p></div>
-  <div style="display:flex;gap:6px;flex-wrap:wrap">
+<div class="sxqd-top">
+<section class="rec-card sxqd-hd">
+  <div class="sxqd-t">
+    <span class="tile"><?= rec_icon('file') ?></span>
+    <div class="sxqd-tt">
+      <h1><?= e(quote_label($q)) ?> <span class="pill <?= $stPill[$st] ?? 'p-mut' ?>" style="font-size:13px;vertical-align:middle"><?= e(lk_options_or('quote_status', QUOTE_STATUS)[$st] ?? $st) ?></span>
+        <?php $verN = count($revs); ?><a href="#revisions" class="pill p-info" style="font-size:12px;vertical-align:middle;text-decoration:none" title="See the revision list and the full change history">🕑 Rev <?= str_pad((string)(int)$q['rev'],2,'0',STR_PAD_LEFT) ?> · <?= $verN ?> version<?= $verN === 1 ? '' : 's' ?></a></h1>
+      <p class="sub"><?= e(($q['client_name'] ?? '') ?: (($clientReg['legal_name'] ?? '') ?: '—')) ?> · <?= e($q['subject'] ?: '—') ?></p>
+    </div>
+  </div>
+  <div class="sxqd-acts">
     <?php // Sales hands over to operations here. Acceptance is given to the quote;
           // the contract number is registered off that acceptance; then inspection
           // calls are raised FROM the contract — so the handover button points at
@@ -26,15 +45,24 @@
     <?php endif; ?>
     <a class="btn<?= $st === 'ACCEPTED' ? ' secondary' : '' ?>" href="/quote-pdf?id=<?= (int)$q['id'] ?>">⬇ PDF (for client)</a>
     <a class="btn secondary" href="/quote-doc?id=<?= (int)$q['id'] ?>">Word (editable)</a>
-    <?php if (function_exists('crm_quote_pdf_unprintable') && crm_quote_pdf_unprintable($q, $lines ?? [])): ?>
-      <span class="pill p-warn" style="white-space:normal" title="The PDF's font has only English letters">This <?= e(Tl('quote')) ?> has Gujarati / Hindi letters or symbols that the PDF cannot print (they show as “?”). Send the <b>Word</b> document, or save it as PDF from Word.</span>
-    <?php endif; ?>
-    <?php //  "📎 Documents" and "← back" were drawn twice — here and in the row below / the back pill
-          //  above the page (owner, 14 Nov 2026: "There are two document tabs"). Once each now. ?>
     <?php //  A re-edit the Super Admin granted on a closed quotation shows its own Edit button (SALB-061).
+          //  DEF-18 — the edit screen also takes an APPROVED one (a commercial change cancels the
+          //  approval, D-07), so Edit is offered there too.
           $reEdit = in_array($st, ['ACCEPTED','LOST'], true) && trim((string)($q['unlocked_until'] ?? '')) !== '' && strtotime((string)$q['unlocked_until']) > time() && !quote_is_locked($q); ?>
-    <?php if ($canEdit && (in_array($st, ['DRAFT','PENDING_APPROVAL','REJECTED'], true) || $reEdit)): ?><a class="btn secondary" href="/quote-edit?id=<?= (int)$q['id'] ?>"><?= $reEdit ? 'Edit (re-opened until ' . e(fdate(substr((string)$q['unlocked_until'], 0, 10))) . ')' : 'Edit' ?></a><?php endif; ?>
+    <?php if ($canEdit && (in_array($st, ['DRAFT','PENDING_APPROVAL','REJECTED','APPROVED'], true) || $reEdit)): ?><a class="btn secondary" href="/quote-edit?id=<?= (int)$q['id'] ?>"><?= $reEdit ? 'Edit (re-opened until ' . e(fdate(substr((string)$q['unlocked_until'], 0, 10))) . ')' : 'Edit' ?></a><?php endif; ?>
   </div>
+  <?php if (function_exists('crm_quote_pdf_unprintable') && crm_quote_pdf_unprintable($q, $lines ?? [])): ?>
+    <p class="sxl-note" style="margin:8px 0 0"><span class="pill p-warn" style="white-space:normal" title="The PDF's font has only English letters">This <?= e(Tl('quote')) ?> has Gujarati / Hindi letters or symbols that the PDF cannot print (they show as “?”). Send the <b>Word</b> document, or save it as PDF from Word.</span></p>
+  <?php endif; ?>
+  <?php //  "📎 Documents" and "← back" were drawn twice — here and in the row below / the back pill
+        //  above the page (owner, 14 Nov 2026: "There are two document tabs"). Once each now. ?>
+</section>
+<div class="sxw-kp sxqd-kp" style="--n:3">
+  <?php sxw_kpi('teal', 'rupee', 'Before GST', 'Before GST', $qBg > 0 ? cur_sym() . nf($qBg, fmod($qBg, 1) ? 2 : 0) : '—', 'the figure approvals and contracts use');
+        sxw_kpi('grey', 'rupee', 'With GST', 'With GST' . ((float)($q['gst_pct'] ?? 0) > 0 ? ' ' . nf((float)$q['gst_pct'], fmod((float)$q['gst_pct'], 1) ? 2 : 0) . '%' : ''), $qTot > 0 ? cur_sym() . nf($qTot, fmod($qTot, 1) ? 2 : 0) : '—', 'what the ' . Tl('client') . ' pays');
+        sxw_kpi(!empty($qVal['expired']) ? 'bad' : 'info', 'cal', 'Validity', 'Validity', (int)($q['validity_days'] ?? 0) > 0 ? (int)$q['validity_days'] . ' days' : 'Open',
+                !empty($qVal['expires_on']) ? (!empty($qVal['expired']) ? 'lapsed ' : 'to ') . fdate($qVal['expires_on']) : 'counted from when it is sent'); ?>
+</div>
 </div>
 
 <?php // Jump-nav: every section of this quote in one place, so nothing has to be
@@ -103,6 +131,18 @@
   <div class="step"><?= e($nbTitle) ?></div>
   <?php if ($nbNext !== ''): ?><p class="next"><?= e($nbNext) ?></p><?php endif; ?>
 </div>
+<?php //  Stage 4 (backend item 9, owner 21 Nov 2026): the person who prepared it may take it
+      //  back from its approvers to draft, with a note (docs/03). Only them, only now. ?>
+<?php if (function_exists('crm_quote_withdraw_problem') && crm_quote_withdraw_problem($q) === ''): ?>
+<details class="rec-card sxqd-wd" id="withdraw">
+  <summary><?= rec_icon('left', 's') ?> <b>Withdraw to draft</b> <span class="muted">— take it back from its approvers to change it</span></summary>
+  <form method="post" action="/quote-withdraw?id=<?= (int)$q['id'] ?>" class="sxqd-wdf">
+    <label for="wd-note">Why are you taking it back? <span class="muted">— the approvers it was waiting on are told</span></label>
+    <input class="form-control" id="wd-note" name="note" required maxlength="500" placeholder="e.g. the client changed the scope — two more sites">
+    <button class="btn small secondary" type="submit" onclick="return confirm('Take this <?= e(Tl('quote')) ?> back to draft? Its approval in progress ends; you submit it again when it is ready.')">Withdraw to draft</button>
+  </form>
+</details>
+<?php endif; ?>
 
 <?php // C1 — the Sales → Finance → Operations wall, said plainly to a SALES viewer.
       // Sales own the thread only up to "won"; the accepted quote is then LOCKED
@@ -1046,7 +1086,8 @@
         <td><?= $f['share_with_inspector'] ? '<span class="pill p-ok">yes</span>' : '<span class="pill p-mut">no</span>' ?></td>
         <td class="muted"><?= e($f['uploaded_by']) ?><br><span style="font-size:11px"><?= e(fdate(substr((string)$f['uploaded_at'],0,10))) ?></span></td>
         <td class="num">
-          <?php if ($canEdit || is_master()): ?>
+          <?php // DEF-18 — the server removes a file for "create quotations" or a master, never on a sent one. ?>
+          <?php if ((can('crm.quote.create') || is_master()) && !quote_is_locked($q)): ?>
           <form method="post" action="/quote-file-delete?id=<?= (int)$f['id'] ?>" onsubmit="return confirm('Remove this file?')" style="display:inline">
             <button class="btn small danger" type="submit">✕</button></form>
           <?php endif; ?>
@@ -1055,9 +1096,31 @@
     <?php endforeach; ?>
     </tbody>
   </table>
-  <?php else: ?><p class="muted">Nothing attached yet.</p><?php endif; ?>
+  <?php else: ?><p class="muted">Nothing attached to this revision yet.</p><?php endif; ?>
 
-  <?php if ($canEdit || is_master()): ?>
+  <?php //  DEF-05 (owner, 21 Nov 2026, option A): the earlier revisions' files, linked — not copied. ?>
+  <?php if (!empty($prevFiles)): ?>
+  <h4 class="tab-sub" style="margin:14px 0 6px">From earlier revisions <span class="muted">— attached there, shown here so nothing has to be uploaded again</span></h4>
+  <table class="dt">
+    <thead><tr><th>File</th><th>Kind</th><th>Note</th><th>From</th><th>Added</th></tr></thead>
+    <tbody>
+    <?php foreach ($prevFiles as $f): ?>
+      <tr>
+        <td><a href="/quote-file?id=<?= (int)$f['id'] ?>">⬇ <?= e($f['file_name']) ?></a>
+            <span class="muted" style="font-size:11px">(<?= e(nf(((int)$f['b64len']) * 3 / 4 / 1024, 0)) ?> KB)</span></td>
+        <td><?= e($fileKinds[$f['kind']] ?? $f['kind']) ?></td>
+        <td class="muted"><?= e($f['note'] ?: '—') ?></td>
+        <td><span class="pill p-mut">from Rev <?= str_pad((string)(int)$f['from_rev'], 2, '0', STR_PAD_LEFT) ?></span></td>
+        <td class="muted"><?= e($f['uploaded_by']) ?><br><span style="font-size:11px"><?= e(fdate(substr((string)$f['uploaded_at'],0,10))) ?></span></td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+  <?php endif; ?>
+
+  <?php // DEF-18 — the server takes a file from "create quotations", Quotes edit or a master of
+        // quotations; on a sent (locked) one only a master. The form follows exactly that. ?>
+  <?php if ((can('crm.quote.create') || can('mod.quotes.edit') || is_master_of('quotes')) && (!quote_is_locked($q) || is_master())): ?>
   <form method="post" action="/quote-files?id=<?= (int)$q['id'] ?>" enctype="multipart/form-data" style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px">
     <div class="form-grid">
       <div class="ff"><label>Kind</label>
@@ -1084,3 +1147,5 @@
   <?php endif; ?>
 </div>
 </div><!-- /data-tabs (quote) -->
+</div><!-- /rec sxqd -->
+<?php sxw_bottom('/quotes'); ?>

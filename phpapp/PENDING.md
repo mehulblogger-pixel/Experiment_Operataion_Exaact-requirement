@@ -2,6 +2,19 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🧭 Sales Stage 4 — Quotations, costing, templates, approvals built (21 Nov 2026, report 58); follow-ups
+
+Built to the approved design pack: register on the shared register (item 8), Withdraw to draft
+(item 9, docs/03), decide quotations and sign contract openings from the Approvals inbox (items
+12–13), DEF-05, DEF-06 (quotations), DEF-18, DEF-23, /crm-reports renamed "Quotation report" (Q5).
+Left for later stages, noted here so nothing is lost:
+- DEF-06 on Orders & payments ("Orders won" and order values) — Stage 5, with DEF-07.
+- The quotation page's inner panels (approval chain, checklist, costing, contract) keep their
+  layout inside the new frame; regrouping them into the six tabs of the design is a further step
+  that needs the robot scripts (which click by wording) to be re-pointed first.
+- The costing page, templates, approval rules and checklist keep their own page heads inside the
+  Sales frame (restyled); their inner layout is unchanged.
+
 ## 🧭 Sales Stage 3 — Enquiries and Deals built (21 Nov 2026, report 57); follow-ups and owner decisions
 
 - **Owner decision (1), 21 Nov: "Finance may open the deal" — NOT built yet, one question first.** Making the

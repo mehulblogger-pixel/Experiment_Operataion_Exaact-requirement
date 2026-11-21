@@ -1,4 +1,13 @@
 <?php
+// Stage 4 of the Sales redesign (owner, 21 Nov 2026) — the costing heads and templates in the Sales
+// workspace look: the Sales bar on a laptop, the bottom bar on a phone, the record-page
+// cards. Every field, button, link and rule below is the one it had (the old page is kept
+// in tests/fixtures/pre_stage4/); only the frame around it changed.
+require_once __DIR__ . '/_sxw_ui.php';
+$__sxq4 = !(function_exists('is_embed') && is_embed());   // never inside the in-page popup
+?>
+<?php if ($__sxq4): ?><div class="rec sxw has-bn sxq sxq4"><?php sxw_nav('/quotes'); ?><?php endif; ?>
+<?php
 // Set up → Costing heads: the library every costing role draws its heads from,
 // with the date each value took effect, and the templates a role can start from.
 // Owner, 9 Nov 2026 — "highly configurable as it changes with time".
@@ -147,3 +156,4 @@ $tone = ['PAY' => '#0f5f5c', 'STAT' => '#92400e', 'COST' => '#374151'];
   <?php endforeach; ?>
 </div>
 </div>
+<?php if ($__sxq4): ?></div><?php sxw_bottom('/quotes'); ?><?php endif; ?>

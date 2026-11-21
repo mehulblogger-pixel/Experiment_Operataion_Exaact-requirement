@@ -539,7 +539,9 @@ function crm_quote_playbook($q) {
     $steps[] = ['key'=>'draft', 'label'=>'Build & submit the quotation', 'actionable'=>true,
         'done'=>$rank >= 1,
         'line'=>$rank >= 1 ? 'Drafted and submitted.' : 'Add the line items and terms, then submit it for approval.',
-        'href'=>'/quote-edit?id=' . $qid, 'cta'=>'Edit the quote'];
+        //  DEF-18 — the "Edit the quote" button only for someone the edit screen lets in.
+        'href'=>($qid && $q && (can('crm.quote.create') || can('mod.quotes.edit') || is_master_of('quotes')) && !quote_is_locked($q) && crm_quote_can_work($q)) ? '/quote-edit?id=' . $qid : '',
+        'cta'=>'Edit the quote'];
     $steps[] = ['key'=>'approve', 'label'=>'Get it approved', 'actionable'=>true,
         'done'=>$rank >= 2, 'blocker'=>$rejected,
         'line'=>$rank >= 2 ? 'Approved and ready to go out.'
@@ -2413,73 +2415,143 @@ function crm_quote_scope_gate($route) {
 //  its own switch — on day one on for everyone who could open it (docs/02 19r).
 function crm_quote_can_export() { return is_master() || can('crm.quote.export'); }
 
+//  DEF-06 (owner, 21 Nov 2026, option A): the figure before GST is the main figure
+//  everywhere — it is what approvals, contracts and the board use. A quotation keeps
+//  it as its subtotal; one registered from a portal with only a total, or an older
+//  row with no subtotal, falls back to the total (nothing is invented).
+function crm_quote_before_gst(array $r) {
+    $sub = (float)($r['subtotal'] ?? 0); $tot = (float)($r['total_amount'] ?? 0);
+    return $sub > 0 ? $sub : $tot;
+}
+//  The quotation register's columns (Stage 4, backend item 8). Each sort expression
+//  is declared here — nothing from the request reaches SQL.
+function crm_quote_dt_columns() {
+    $sbuL = function_exists('lk_options_or') ? lk_options_or('sbu', OPS_SBUS) : OPS_SBUS;
+    return [
+        'no'       => ['label' => ucfirst(Tl('quote')), 'sort' => 'q.id', 'render' => fn($r) => ''],
+        'client'   => ['label' => ucfirst(Tl('client')) . ' · subject', 'sort' => "COALESCE(NULLIF(bp.display_name,''), q.client_name)", 'render' => fn($r) =>
+            '<b>' . e($r['client_disp'] ?: $r['client_name'] ?: '—') . '</b><div class="muted" style="font-size:12px">' . e($r['subject'] ?: '—') . '</div>'],
+        'unit'     => ['label' => T('sbu'), 'sort' => 'q.sbu', 'render' => fn($r) => e($sbuL[$r['sbu']] ?? $r['sbu'] ?: '—')],
+        'value'    => ['label' => 'Before GST', 'sort' => 'CASE WHEN q.subtotal>0 THEN q.subtotal ELSE q.total_amount END', 'num' => true, 'render' => fn($r) => ''],
+        'contract' => ['label' => 'Contract', 'sort' => 'q.contract_number', 'render' => fn($r) => ''],
+        'status'   => ['label' => 'Status', 'sort' => 'q.status', 'render' => fn($r) => ''],
+        'owner'    => ['label' => 'Assigned to', 'sort' => 'ou.first_name', 'optional' => true, 'render' => function ($r) {
+            $who = trim((string)($r['owner_first'] ?? '') . ' ' . (string)($r['owner_last'] ?? '')) ?: (string)($r['owner_username'] ?? '');
+            return $who !== '' ? e($who) : '<span class="muted">' . e((string)($r['created_by'] ?? '') ?: '—') . '</span>'; }],
+        'branch'   => ['label' => 'Branch', 'sort' => 'o.name', 'optional' => true, 'render' => fn($r) => !empty($r['office_name']) ? e($r['office_name']) : '<span class="muted">—</span>'],
+        'created'  => ['label' => 'Created', 'sort' => 'q.created_at', 'optional' => true, 'render' => fn($r) => e(fdate(substr((string)$r['created_at'], 0, 10)))],
+        'actions'  => ['label' => '', 'render' => fn($r) => ''],
+    ];
+}
+
+//  Where a quotation's own handlers send the person afterwards: the quotation, or
+//  the Approvals inbox when the decision was made there (Stage 4, item 12).
+function crm_quote_back($q) { return (string)($GLOBALS['__quote_back'] ?? '') === '/approvals' ? '/approvals' : '/quote?id=' . (int)$q['id']; }
+//  May this person withdraw this quotation from its approvers? (Stage 4, item 9 —
+//  the preparer only: the person it is assigned to / who prepared it.)
+function crm_quote_withdraw_problem($q) {
+    $L = Tl('quote');
+    if (empty($q['is_current'])) return 'This is an earlier revision — work on the current one.';
+    if (($q['status'] ?? '') !== 'PENDING_APPROVAL') return 'Only a ' . $L . ' waiting for approval can be taken back to draft.';
+    if (quote_is_locked($q)) return quote_lock_reason($q) ?: 'This ' . $L . ' has gone to the ' . Tl('client') . '.';
+    if (!crm_quote_is_mine($q)) return 'Only the person who prepared this ' . $L . ' can take it back from its approvers.';
+    return '';
+}
+
 function ops_crm_quotes($route, $method) {
     crm_quote_scope_gate($route);   // M14 — object-level branch scope, before anything reads an id
     $pdo = db();
+    //  DEF-23 (owner, 21 Nov 2026, option A) — two addresses that never did anything now
+    //  open the quotation register, instead of an empty page.
+    if ($route === 'quotes-export' || $route === 'quote-final') redirect('/quotes');
     if ($route === 'quotes') {
-        // "Awaiting my approval" — the exact set the dashboard's "quotes to
-        // approve" counts: routed to me (by name, role, a generic step I may
-        // sign, a delegation or an escalation) and inside my branch, because the
-        // approval itself is refused outside it (SA-06). One function feeds both,
-        // so the list can never disagree with the dashboard count.
-        if (($_GET['mine'] ?? '') === 'approve') {
-            $ids = crm_quote_ids_awaiting_me();
-            $rows = $ids ? ops_all(
-                "SELECT q.*, bp.display_name client_disp, o.name office_name
-                 FROM quotations q
-                 LEFT JOIN business_partners bp ON bp.id=q.client_id
-                 LEFT JOIN offices o ON o.id=q.office_id
-                 WHERE q.id IN (" . implode(',', array_map('intval', $ids)) . ") ORDER BY q.id DESC") : [];
-            view('ops/crm/quote_list', ['rows' => $rows, 'view' => 'pending', 'q' => '',
-                'counts' => ['open' => 0, 'pending' => count($rows), 'closed' => 0, 'lost' => 0],
-                'fy' => current_fy(), 'mineApprove' => true]);
-            return;
-        }
-        // "Awaiting a contract number" — accepted quotes Accounts still has to
-        // register. Same scope as quotes_awaiting_contract_count(), so the list
-        // matches the dashboard task.
-        if (($_GET['mine'] ?? '') === 'contract') {
-            [$cw, $ca] = scope_clause('q.office_id', 'q.sbu');
-            $rows = ops_all(
-                "SELECT q.*, bp.display_name client_disp, o.name office_name FROM quotations q
-                 LEFT JOIN business_partners bp ON bp.id=q.client_id
-                 LEFT JOIN offices o ON o.id=q.office_id
-                 WHERE q.is_current=1 AND q.status='ACCEPTED'
-                   AND (q.contract_number IS NULL OR q.contract_number='') AND $cw
-                 ORDER BY q.accepted_date, q.id", $ca);
-            view('ops/crm/quote_list', ['rows' => $rows, 'view' => 'closed', 'q' => '',
-                'counts' => ['open' => 0, 'pending' => 0, 'closed' => count($rows), 'lost' => 0],
-                'fy' => current_fy(), 'mineContract' => true]);
-            return;
-        }
-        $view = $_GET['v'] ?? 'all';   // all | open | pending | closed | lost | expired
-        // EXPIRED is its OWN closed state, not a regretted loss — kept out of "lost"
-        // so the win/loss numbers stay honest (Module 03).
-        $stateSets = ['open' => QUOTE_OPEN_STATES, 'pending' => QUOTE_PENDING_STATES, 'closed' => QUOTE_CLOSED_STATES, 'lost' => ['LOST'], 'expired' => ['EXPIRED']];
-        [$scopeW, $args] = scope_clause('q.office_id', 'q.sbu');
-        $w = [$scopeW, 'q.is_current=1'];
-        if (isset($stateSets[$view])) { $set = $stateSets[$view]; $ph = implode(',', array_fill(0, count($set), '?')); $w[] = "q.status IN ($ph)"; foreach ($set as $s) $args[] = $s; }
-        $qq = trim($_GET['q'] ?? '');
-        if ($qq !== '') { $w[] = '(q.quote_no LIKE ? OR q.subject LIKE ? OR q.client_name LIKE ?)'; array_push($args, "%$qq%", "%$qq%", "%$qq%"); }
-        // Financial-year window (defaults to the current FY; "All years" removes it).
-        $fy = fy_filter();
-        [$fyW, $fyA] = fy_sql('q.created_at', $fy);
-        $rows = ops_all("SELECT q.*, bp.display_name client_disp, o.name office_name FROM quotations q
+        //  Stage 4 (backend item 8, owner 21 Nov 2026): the register is paged, sorted and
+        //  exported by the shared register, with filters by owner, branch and business unit
+        //  and a search that also finds the contact and the contract number. The rows each
+        //  person may see, the two "mine" lists and the headline counts are exactly as before.
+        $mine = (string)($_GET['mine'] ?? '');
+        $join = " FROM quotations q
             LEFT JOIN business_partners bp ON bp.id=q.client_id LEFT JOIN offices o ON o.id=q.office_id
-            WHERE " . implode(' AND ', $w) . $fyW . " ORDER BY q.id DESC", array_merge($args, $fyA));
-        // headline counts (scope-respecting, and within the same FY window)
-        $counts = [];
-        foreach (['open', 'pending', 'closed', 'lost', 'expired'] as $k) {
-            [$sw, $sa] = scope_clause('q.office_id', 'q.sbu'); $set = $stateSets[$k]; $ph = implode(',', array_fill(0, count($set), '?'));
-            foreach ($set as $s) $sa[] = $s;
-            $counts[$k] = (int)ops_val("SELECT COUNT(*) FROM quotations q WHERE $sw AND q.is_current=1 AND q.status IN ($ph)" . $fyW, array_merge($sa, $fyA));
+            LEFT JOIN users ou ON ou.id=q.owner_id";
+        $select = "SELECT q.*, bp.display_name client_disp, o.name office_name,
+                          ou.first_name owner_first, ou.last_name owner_last, ou.username owner_username";
+        $stateSets = ['open' => QUOTE_OPEN_STATES, 'pending' => QUOTE_PENDING_STATES, 'closed' => QUOTE_CLOSED_STATES, 'lost' => ['LOST'], 'expired' => ['EXPIRED']];
+        $fy = fy_filter(); $fyW = ''; $fyA = [];
+        $view = $_GET['v'] ?? 'all';   // all | open | pending | closed | lost | expired
+        if ($mine === 'approve') {
+            // "Awaiting my approval" — the exact set the dashboard's "quotes to
+            // approve" counts: routed to me (by name, role, a generic step I may
+            // sign, a delegation or an escalation) and inside my branch, because the
+            // approval itself is refused outside it (SA-06). One function feeds both,
+            // so the list can never disagree with the dashboard count.
+            $ids = crm_quote_ids_awaiting_me();
+            $w = [$ids ? 'q.id IN (' . implode(',', array_map('intval', $ids)) . ')' : '1=0']; $args = [];
+            $view = 'pending';
+        } elseif ($mine === 'contract') {
+            // "Awaiting a contract number" — accepted quotes Accounts still has to
+            // register. Same scope as quotes_awaiting_contract_count(), so the list
+            // matches the dashboard task.
+            [$cw, $args] = scope_clause('q.office_id', 'q.sbu');
+            $w = ['q.is_current=1', "q.status='ACCEPTED'", "(q.contract_number IS NULL OR q.contract_number='')", $cw];
+            $view = 'closed';
+        } else {
+            $mine = '';
+            // EXPIRED is its OWN closed state, not a regretted loss — kept out of "lost"
+            // so the win/loss numbers stay honest (Module 03).
+            [$scopeW, $args] = scope_clause('q.office_id', 'q.sbu');
+            $w = [$scopeW, 'q.is_current=1'];
+            if (isset($stateSets[$view])) { $set = $stateSets[$view]; $ph = implode(',', array_fill(0, count($set), '?')); $w[] = "q.status IN ($ph)"; foreach ($set as $s) $args[] = $s; }
+            // Financial-year window (defaults to the current FY; "All years" removes it).
+            [$fyW, $fyA] = fy_sql('q.created_at', $fy);
         }
-        // §xxii — the same rows the screen shows, as a spreadsheet.
+        $qq = trim($_GET['q'] ?? '');
+        if ($qq !== '' && $mine === '') {
+            $w[] = '(q.quote_no LIKE ? OR q.subject LIKE ? OR q.client_name LIKE ? OR bp.display_name LIKE ? OR q.contact_name LIKE ? OR q.contract_number LIKE ?)';
+            array_push($args, "%$qq%", "%$qq%", "%$qq%", "%$qq%", "%$qq%", "%$qq%");
+        }
+        //  The three new filters narrow the person's own rows; they never widen them.
+        $fOwner = (int)($_GET['own'] ?? 0); $fBranch = (int)($_GET['br'] ?? 0); $fUnit = trim((string)($_GET['unit'] ?? ''));
+        if ($mine === '') {
+            if ($fOwner > 0) { $w[] = 'q.owner_id=?'; $args[] = $fOwner; }
+            if ($fBranch > 0) { $w[] = 'q.office_id=?'; $args[] = $fBranch; }
+            if ($fUnit !== '') { $w[] = 'q.sbu=?'; $args[] = $fUnit; }
+        }
+        $where = ' WHERE ' . implode(' AND ', $w) . $fyW;
+        $allArgs = array_merge($args, $fyA);
+        // headline counts (scope-respecting, and within the same FY window) — unchanged
+        $counts = [];
+        if ($mine === 'approve') $counts = ['open' => 0, 'pending' => 0, 'closed' => 0, 'lost' => 0];
+        elseif ($mine === 'contract') $counts = ['open' => 0, 'pending' => 0, 'closed' => 0, 'lost' => 0];
+        else {
+            [$fyW2, $fyA2] = fy_sql('q.created_at', $fy);
+            foreach (['open', 'pending', 'closed', 'lost', 'expired'] as $k) {
+                [$sw, $sa] = scope_clause('q.office_id', 'q.sbu'); $set = $stateSets[$k]; $ph = implode(',', array_fill(0, count($set), '?'));
+                foreach ($set as $s) $sa[] = $s;
+                $counts[$k] = (int)ops_val("SELECT COUNT(*) FROM quotations q WHERE $sw AND q.is_current=1 AND q.status IN ($ph)" . $fyW2, array_merge($sa, $fyA2));
+            }
+        }
+        // §xxii — the same rows the screen shows (every page of them), as a spreadsheet.
         if (($_GET['export'] ?? '') === '1') {
             ops_require(crm_quote_can_export(), 'Downloading the ' . Tl('quote') . ' register needs the "Download quotations to Excel / CSV" permission.');
-            csv_download('quotes-' . date('Y-m-d') . '.csv', crm_quotes_export($rows)); return;
+            csv_download('quotes-' . date('Y-m-d') . '.csv', crm_quotes_export(ops_all($select . $join . $where . " ORDER BY q.id DESC", $allArgs) ?: [])); return;
         }
-        view('ops/crm/quote_list', ['rows' => $rows, 'view' => $view, 'q' => $qq, 'counts' => $counts, 'fy' => $fy['fy']]); return;
+        $cols = crm_quote_dt_columns();
+        $dt = dt_state('quotes', $cols, ['default_sort' => 'no', 'default_dir' => 'desc', 'per' => 50]);
+        $total = (int)ops_val("SELECT COUNT(*)" . $join . $where, $allArgs);
+        $rows = ops_all($select . $join . $where . dt_sql_tail($dt, $cols, 'q.id DESC'), $allArgs) ?: [];
+        //  What the filters offer: only owners, branches and units inside the person's own rows.
+        [$sw0, $sa0] = scope_clause('q.office_id', 'q.sbu');
+        $owners = ops_all("SELECT DISTINCT u.id, u.first_name, u.last_name, u.username FROM quotations q JOIN users u ON u.id=q.owner_id
+                           WHERE q.is_current=1 AND $sw0 ORDER BY u.first_name, u.username", $sa0) ?: [];
+        $branches = ops_all("SELECT DISTINCT o.id, o.name FROM quotations q JOIN offices o ON o.id=q.office_id WHERE q.is_current=1 AND $sw0 ORDER BY o.name", $sa0) ?: [];
+        $units = array_values(array_filter(array_map(fn($r) => (string)$r['sbu'],
+                 ops_all("SELECT DISTINCT q.sbu FROM quotations q WHERE q.is_current=1 AND q.sbu<>'' AND $sw0", $sa0) ?: [])));
+        view('ops/crm/quote_list', ['rows' => $rows, 'total' => $total, 'dt' => $dt, 'view' => $view, 'q' => $qq, 'counts' => $counts,
+            'fy' => $mine === '' ? $fy['fy'] : current_fy(), 'mineApprove' => $mine === 'approve', 'mineContract' => $mine === 'contract',
+            'awaitingMe' => count(crm_quote_ids_awaiting_me()),
+            'toRegister' => (can('crm.contract.register') || is_master()) && function_exists('quotes_awaiting_contract_count') ? (int)quotes_awaiting_contract_count() : 0,
+            'owners' => $owners, 'branches' => $branches, 'units' => $units, 'fOwner' => $fOwner, 'fBranch' => $fBranch, 'fUnit' => $fUnit]);
+        return;
     }
     // §xv — a quote we did not write (client / tender portal) still belongs in the
     // register. Same record, marked with where it came from, so the win/loss and
@@ -2893,6 +2965,12 @@ function ops_crm_quotes($route, $method) {
             'stepPeople' => array_map(fn($s) => crm_step_approvers($s), crm_approvals($q['id'])),
             'locs' => crm_quote_locations($q['id']),
             'files' => crm_quote_files($q['id']),
+            //  DEF-05 (owner, 21 Nov 2026, option A): a revision shows the files of the earlier
+            //  revisions, marked with the revision they came from — linked, never copied. They
+            //  stay where they were attached (and are removed only there, under its own rules).
+            'prevFiles' => (int)$q['rev'] > 0 ? (ops_all("SELECT f.id, f.quote_id, f.kind, f.file_name, f.note, f.share_with_inspector, f.uploaded_by, f.uploaded_at,
+                                   LENGTH(f.file_data) AS b64len, pq.rev from_rev FROM quote_files f JOIN quotations pq ON pq.id=f.quote_id
+                                   WHERE pq.quote_no=? AND pq.id<>? AND pq.rev<? ORDER BY pq.rev DESC, f.id DESC", [$q['quote_no'], $q['id'], (int)$q['rev']]) ?: []) : [],
             'fileKinds' => QUOTE_FILE_KINDS,
             // Project costing linked to this quotation (attach / create from here).
             'costing' => function_exists('pc_for_quote') ? pc_for_quote($q['id']) : null,
@@ -3285,13 +3363,19 @@ function ops_crm_quotes($route, $method) {
         redirect('/quote?id=' . $q['id']);
     }
     if ($route === 'quote-approve' && $method === 'POST') {
+        //  Stage 4 (backend item 12, owner 21 Nov 2026): a quotation can be decided from the
+        //  Approvals inbox. The same handler, the same rules (only whom the level waits on,
+        //  a comment to reject, the pre-order checklist, levels in order); only where the
+        //  person lands afterwards differs — back to the inbox when they came from it.
+        $fromInbox = ($_POST['back'] ?? '') === 'approvals';
         $step = ops_one("SELECT * FROM quote_approvals WHERE id=?", [(int)($_POST['step'] ?? 0)]);
-        if (!$step) { flash('Approval step not found.', 'error'); redirect('/quotes'); }
+        if (!$step) { flash('Approval step not found.', 'error'); redirect($fromInbox ? '/approvals' : '/quotes'); }
         $q = crm_quote_get($step['quote_id']); if (!$q) { http_response_code(404); view('notfound'); return; }
+        if ($fromInbox) $GLOBALS['__quote_back'] = '/approvals';
         //  Pressed twice (or from an old tab): it is already signed — say that, not "not an approver" (SALB-028).
         if (strtoupper((string)($step['status'] ?? '')) !== 'PENDING') {
             flash('This step was already ' . strtolower((string)$step['status']) . ($step['acted_by'] ?? '' ? ' by ' . $step['acted_by'] : '') . ' — nothing more to do here.', 'warning');
-            redirect('/quote?id=' . $q['id']);
+            redirect(crm_quote_back($q));
         }
         ops_require(crm_can_act_approval($step), 'You are not an approver for this step.');
         // A step can be signed only while its quotation is waiting for approval.
@@ -3299,7 +3383,7 @@ function ops_crm_quotes($route, $method) {
         // sent, an old step left open must not move it again.
         if (empty($q['is_current']) || ($q['status'] ?? '') !== 'PENDING_APPROVAL') {
             flash('This ' . Tl('quote') . ' is no longer waiting for approval (' . strtolower((string)$q['status']) . ') — there is nothing to sign.', 'error');
-            redirect('/quote?id=' . $q['id']);
+            redirect(crm_quote_back($q));
         }
         // D-05 — levels sign in order. Approvers at the same level may sign in
         // any order; a higher level waits until every lower level has signed —
@@ -3311,22 +3395,22 @@ function ops_crm_quotes($route, $method) {
             $isLast = in_array((int)$step['level'], appr_last_levels($allSteps, 'crm_step_approvers_direct'), true);
             flash($isLast ? 'Level ' . (int)$step['level'] . ' signs last — once every other level has approved. Now with ' . (crm_pending_with($q['id']) ?: 'the levels before it') . '.'
                           : 'Not yet — this ' . Tl('quote') . ' is now with ' . (crm_pending_with($q['id']) ?: 'the level before') . '. It reaches level ' . (int)$step['level'] . ' when they have signed.', 'error');
-            redirect('/quote?id=' . $q['id']);
+            redirect(crm_quote_back($q));
         }
         // D-11 A — its costing may have been reopened while it waited.
-        if (($_POST['decision'] ?? '') !== 'reject' && ($cp = crm_quote_costing_problem($q)) !== '') { flash($cp, 'error'); redirect('/quote?id=' . $q['id']); }
+        if (($_POST['decision'] ?? '') !== 'reject' && ($cp = crm_quote_costing_problem($q)) !== '') { flash($cp, 'error'); redirect(crm_quote_back($q)); }
         // Pre-order control: when the checklist is on and every point is required,
         // an approval cannot be given until the review checklist is complete. Only
         // gates approval — a rejection is always allowed.
         if (($_POST['decision'] ?? '') !== 'reject' && ($cl = crm_quote_checklist_problem($q)) !== '') {
             flash($cl, 'error');
-            redirect('/quote?id=' . $q['id']);
+            redirect(crm_quote_back($q));
         }
         $remarks = trim($_POST['remarks'] ?? '');
         $me = user_name(current_user());
         if (($_POST['decision'] ?? '') === 'reject') {
             // §xiii — a rejection must carry a reason.
-            if ($remarks === '') { flash('Enter a comment saying why you are rejecting it.', 'error'); redirect('/quote?id=' . $q['id']); }
+            if ($remarks === '') { flash('Enter a comment saying why you are rejecting it.', 'error'); redirect(crm_quote_back($q)); }
             $pdo->prepare("UPDATE quote_approvals SET status='REJECTED', acted_by=?, acted_at=?, remarks=? WHERE id=?")
                 ->execute([$me, date('c'), $remarks, $step['id']]);
             // §xvi — the quote itself shows as rejected, by whom and why, rather than
@@ -3364,6 +3448,37 @@ function ops_crm_quotes($route, $method) {
                 flash('Your approval is recorded. Now with ' . ($next ?: 'the next approver') . '.');
             }
         }
+        redirect(crm_quote_back($q));
+    }
+    //  Stage 4 (backend item 9, owner 21 Nov 2026 — a new lifecycle move, docs/03):
+    //  the person who prepared a quotation may take it back from its approvers to
+    //  draft, with a note, while it is waiting for approval and still inside the
+    //  company. The steps still open are closed as withdrawn (never deleted — the
+    //  history says who withdrew it and why, and which levels had already signed);
+    //  the approvers it was waiting on are told. Submitting again builds a new chain.
+    if ($route === 'quote-withdraw' && $method === 'POST') {
+        $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
+        if (($why = crm_quote_withdraw_problem($q)) !== '') { flash($why, 'error'); redirect('/quote?id=' . $q['id']); }
+        $note = trim((string)($_POST['note'] ?? ''));
+        if ($note === '') { flash('Say why you are taking it back — the approvers see your note.', 'error'); redirect('/quote?id=' . $q['id']); }
+        $me = user_name(current_user());
+        //  Who it was waiting on just now — they are told it is no longer theirs.
+        $openL = crm_quote_open_levels($q['id']); $told = [];
+        foreach (ops_all("SELECT * FROM quote_approvals WHERE quote_id=? AND status='PENDING' ORDER BY level, id", [$q['id']]) ?: [] as $ps) {
+            if (!in_array((int)$ps['level'], $openL, true)) continue;
+            foreach (crm_step_approvers($ps) as $ap) {
+                if (isset($told[(int)$ap['id']]) || trim((string)($ap['email'] ?? '')) === '') continue; $told[(int)$ap['id']] = true;
+                ops_mail($ap['email'], 'Withdrawn: ' . quote_label($q),
+                    "Hello,\n\n" . quote_label($q) . " ({$q['client_name']}) has been taken back to draft by $me, who prepared it. It no longer needs your approval.\n\nTheir note: $note\n", '', 'QUOTE_APPROVAL');
+            }
+        }
+        $signed = ops_all("SELECT level, acted_by FROM quote_approvals WHERE quote_id=? AND status='APPROVED' ORDER BY level", [$q['id']]) ?: [];
+        $pdo->prepare("UPDATE quote_approvals SET status='WITHDRAWN', acted_by=?, acted_at=?, remarks=? WHERE quote_id=? AND status='PENDING'")
+            ->execute([$me, date('c'), 'Withdrawn to draft by ' . $me . ' — ' . $note, $q['id']]);
+        $pdo->prepare("UPDATE quotations SET status='DRAFT', submitted_at='' WHERE id=?")->execute([$q['id']]);
+        crm_log_change($q['id'], 'Withdrawn from approval to draft by ' . $me . ' — ' . $note
+            . ($signed ? ' (already signed: ' . implode(', ', array_map(fn($a) => 'level ' . (int)$a['level'] . ' by ' . ($a['acted_by'] ?: 'an approver'), $signed)) . ')' : ''));
+        flash('Taken back to draft. ' . ($told ? count($told) . ' approver(s) were told. ' : '') . 'Change it, then submit it again — it goes through approval afresh.');
         redirect('/quote?id=' . $q['id']);
     }
     // Take an approval back, before it leaves the building.
@@ -4569,7 +4684,7 @@ function ops_quote_delegations($method) {
         }
         redirect('/quote-delegations');
     }
-    view('ops/approval_delegations', [
+    view('ops/approval_delegations', ['salesLook' => true,
         'rows'       => array_values(array_filter(appr_delegations(false), fn($d) => strtoupper((string)$d['entity']) === 'QUOTE')),
         'people'     => ops_all("SELECT id, first_name, last_name, username FROM users WHERE COALESCE(is_active,1)=1 ORDER BY first_name, last_name, username"),
         'offices'    => function_exists('offices_list') ? offices_list() : [],
@@ -4656,6 +4771,19 @@ function crm_quote_ids_awaiting_me() {
         if (crm_can_act_approval($st)) $ids[(int)$st['quote_id']] = true;
     }
     return array_keys($ids);
+}
+//  The approval step of this quotation that the signed-in person may sign NOW — the
+//  same test crm_quote_ids_awaiting_me() applies (open level, scope, may act). Used by
+//  the Approvals inbox to decide a quotation without opening it (Stage 4, item 12).
+function crm_quote_my_open_step($qid) {
+    $qid = (int)$qid; $open = crm_quote_open_levels($qid);
+    foreach (ops_all("SELECT a.*, q.office_id q_office, q.sbu q_sbu FROM quote_approvals a JOIN quotations q ON q.id=a.quote_id
+                      WHERE a.quote_id=? AND a.status='PENDING' AND q.is_current=1 AND q.status='PENDING_APPROVAL' ORDER BY a.level, a.id", [$qid]) ?: [] as $st) {
+        if (!in_array((int)$st['level'], $open, true)) continue;
+        if (function_exists('scope_allows') && !is_master() && !scope_allows($st['q_office'] ?? null, trim((string)($st['sbu'] ?? '')) !== '' ? $st['sbu'] : ($st['q_sbu'] ?? null))) continue;
+        if (crm_can_act_approval($st)) return $st;
+    }
+    return null;
 }
 // Tell the sales owner what the approver decided.
 function crm_notify_owner($q, $what, $remarks = '') {
@@ -5171,7 +5299,9 @@ function ops_crm_reports() {
     $byStatus = []; $bySbu = []; $byClient = []; $wonByClient = []; $lost = []; $months = [];
     $totVal = 0; $wonVal = 0; $openVal = 0; $nWon = 0; $nLost = 0;
     foreach ($rows as $r) {
-        $st = $r['status']; $v = (float)$r['total_amount'];
+        //  DEF-06 (owner, 21 Nov 2026, option A): every value here is the figure BEFORE GST —
+        //  the one approvals, contracts and the board use; the CSV carries both, labelled.
+        $st = $r['status']; $v = crm_quote_before_gst($r);
         $byStatus[lk_options_or('quote_status', QUOTE_STATUS)[$st] ?? $st] = ($byStatus[lk_options_or('quote_status', QUOTE_STATUS)[$st] ?? $st] ?? 0) + 1;
         $sk = $sbuLbl[$r['sbu']] ?? ($r['sbu'] ?: '—'); $bySbu[$sk] = ($bySbu[$sk] ?? 0) + $v;
         $ck = $r['client_disp'] ?: ($r['client_name'] ?: '—'); $byClient[$ck] = ($byClient[$ck] ?? 0) + $v;
@@ -5184,9 +5314,9 @@ function ops_crm_reports() {
         elseif (in_array($st, QUOTE_OPEN_STATES, true)) $openVal += $v;
     }
     if (wants_csv()) {
-        $csv = [['Quote', 'Client', 'Business Unit', 'Status', 'Total', 'Created', 'Accepted', 'Lost reason', 'Contract']];
+        $csv = [['Quote', 'Client', 'Business Unit', 'Status', 'Before GST', 'Total with GST', 'Created', 'Accepted', 'Lost reason', 'Contract']];
         foreach ($rows as $r) $csv[] = [quote_label($r), $r['client_disp'] ?: $r['client_name'], $sbuLbl[$r['sbu']] ?? $r['sbu'],
-            lk_options_or('quote_status', QUOTE_STATUS)[$r['status']] ?? $r['status'], (float)$r['total_amount'], substr((string)$r['created_at'], 0, 10),
+            lk_options_or('quote_status', QUOTE_STATUS)[$r['status']] ?? $r['status'], crm_quote_before_gst($r), (float)$r['total_amount'], substr((string)$r['created_at'], 0, 10),
             $r['accepted_date'], ($r['lost_reason'] === 'OTHER' && $r['lost_reason_other']) ? $r['lost_reason_other'] : ($lostLbl[$r['lost_reason']] ?? $r['lost_reason']), $r['contract_number']];
         csv_download('sales-quotes-' . $fy . '.csv', $csv);
     }

@@ -99,6 +99,16 @@ function approvals_hub_sections() {
             'items' => $items,
         ];
     }
+    //  Contract openings waiting for THIS person's signature (Stage 4, backend item 13,
+    //  owner 21 Nov 2026). The same list and the same signing rules as the Contract
+    //  openings screen; listed here so nobody has to know which screen to look on.
+    if (($ci = approvals_hub_contracts_waiting()) ) $out[] = [
+        'key'   => 'contracts',
+        'title' => 'Contracts waiting for a signature',
+        'sub'   => 'Contract openings that need your first signature or final approval.',
+        'act'   => '/contract-openings',
+        'items' => $ci,
+    ];
     if (function_exists('gate_can_view') && gate_can_view() && function_exists('gate_queue')) {
         $q = gate_queue('PENDING');
         if (!empty($q['act'])) $out[] = [
@@ -113,6 +123,18 @@ function approvals_hub_sections() {
 }
 
 //  How many things are waiting on this person, across everything. For a badge.
+//  Contract openings this person can sign now — the ones the Contract openings
+//  screen offers them a button for (contract_open_stage()'s primary action).
+function approvals_hub_contracts_waiting() {
+    if (!function_exists('can_endorse_contract_open') || !function_exists('contract_open_stage')) return [];
+    if (!(can_endorse_contract_open() || can_approve_contract_open())) return [];
+    $rows = ops_all("SELECT pc.*, q.id quote_id, q.quote_no, q.rev, COALESCE(bp.display_name, bp.legal_name) client_name
+                     FROM partner_contracts pc LEFT JOIN quotations q ON q.id = pc.quotation_id
+                     LEFT JOIN business_partners bp ON bp.id = pc.partner_id
+                     WHERE COALESCE(pc.open_status,'') = 'PENDING' ORDER BY pc.requested_at, pc.id") ?: [];
+    return array_values(array_filter($rows, fn($c) => (contract_open_stage($c)['primary'] ?? '') !== ''));
+}
+
 function approvals_hub_count() {
     $n = 0;
     foreach (approvals_hub_sections() as $s) $n += count($s['items']);
@@ -130,6 +152,7 @@ function approvals_hub_can_view() {
     if (function_exists('crm_quote_ids_awaiting_me') && crm_quote_ids_awaiting_me()) return true;
     if (function_exists('pc_waiting_on_me') && pc_waiting_on_me()) return true;
     if (function_exists('voucher_waiting_on_me') && voucher_waiting_on_me()) return true;
+    if (approvals_hub_contracts_waiting()) return true;   // Stage 4, item 13
     return function_exists('lead_reassign_waiting_on_me') && (bool) lead_reassign_waiting_on_me();
 }
 
@@ -155,6 +178,16 @@ function approvals_hub_row($sectionKey, array $r) {
             'when'  => (string)substr((string)($r['submitted_at'] ?? ''), 0, 10),
             'rule'  => '',
             'url'   => '/quote?id=' . (int)$r['id'],
+        ];
+    }
+    if ($sectionKey === 'contracts') {
+        return [
+            'what'  => (string)($r['contract_number'] ?? '') . ' — ' . (string)($r['client_name'] ?? ''),
+            'kind'  => contract_open_stage($r)['need'] === 'first' ? 'First signature' : 'Final approval',
+            'who'   => (string)($r['requested_by'] ?? ''),
+            'when'  => (string)substr((string)($r['requested_at'] ?? ''), 0, 10),
+            'rule'  => '',
+            'url'   => '/contract-openings',
         ];
     }
     if ($sectionKey === 'costings') {

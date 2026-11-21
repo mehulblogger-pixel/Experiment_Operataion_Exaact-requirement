@@ -401,3 +401,19 @@ carry the Sales bar and phone bottom bar ("SALES — ENQUIRIES AND DEALS" block 
   step), a loss on Overview (why it was lost).
 - **Forms** (inquiry, new deal): numbered sections, an action bar that says where you land after
   saving, the company's own extra fields above the buttons.
+
+**Stage 4 — quotations, costing, templates, approvals (owner, 21 Nov 2026).** The quotation
+register and page, the quotation form, external quotation, templates, approval rules and
+delegations, the pre-order checklist, costing (list, page, heads) and the Quotation report carry
+the Sales bar and phone bottom bar ("SALES — QUOTATIONS…" block in `app.css`); the Approvals inbox
+uses the record-page look without the Sales bar (it serves every module):
+- **Register:** figure tiles, one row of view tabs with "Awaiting your approval" and "To register a
+  contract", the shared register (paging, sorting, Columns) with owner / branch / unit filters;
+  values **before GST first**, the total with GST beside each (DEF-06).
+- **Quotation page:** a header card (status, versions, PDF / Word / Edit / Raise) and three figures —
+  Before GST, With GST, Validity; every panel and tab below as before; "Withdraw to draft" for the
+  preparer; earlier revisions' files listed "from Rev NN" (DEF-05).
+- **Other Stage 4 screens** keep their page head and panels inside the Sales frame (never inside
+  the in-page popup).
+- **Approvals inbox:** figure tiles per queue; quotations decided in the row (Approve / Reject with
+  a comment); contract openings signed in the row; deals held at a stage and lead hand-overs as before.

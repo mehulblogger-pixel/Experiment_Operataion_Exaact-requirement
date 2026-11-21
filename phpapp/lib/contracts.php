@@ -1208,6 +1208,8 @@ function ops_contract_open($route, $method) {
     //  address is honoured). A signer who works from the queue may not be able to
     //  open the quotation at all.
     if (($_POST['from'] ?? '') === 'queue') $back = '/contract-openings';
+    //  …or from the Approvals inbox (Stage 4, item 13) → back to the inbox.
+    if (($_POST['from'] ?? '') === 'inbox') $back = '/approvals';
     $do = $_POST['do'] ?? '';
     $note = trim($_POST['note'] ?? '');
     $me = user_name(current_user());

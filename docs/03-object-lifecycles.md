@@ -232,6 +232,7 @@ stateDiagram-v2
   PENDING_APPROVAL --> REJECTED : any level rejects, reason required · the chain ends there
   APPROVED --> PENDING_APPROVAL : retract before it leaves · quote_can_retract
   PENDING_APPROVAL --> DRAFT : a commercial or terms change on edit cancels the approval in progress (D-07)
+  PENDING_APPROVAL --> DRAFT : withdraw to draft · the preparer only (crm_quote_is_mine), with a note, while not sent · open steps close as WITHDRAWN, approvers told (owner, 21 Nov 2026 — Sales Stage 4)
   APPROVED --> DRAFT : a commercial or terms change on edit cancels the approval (D-07)
   APPROVED --> SENT : send · crm.quote.send/master
   DRAFT --> SENT : send without approval — only when no rule covers its value and the company needs none (D-02/D-03)
@@ -264,6 +265,15 @@ writes one line in the quotation's history (who, what, why).
   to), and if a crossed setup would leave nobody able to sign, the whole group may. Only those levels
   are e-mailed and shown on their dashboard; each signature e-mails the levels it lets in. Taking an
   approval back also resets top management's later approval. No status or transition is added.
+- **Withdraw to draft (owner, 21 Nov 2026 — Sales Stage 4, approved design pack).** A new move,
+  PENDING_APPROVAL → DRAFT, for the person who prepared the quotation (the person it is assigned to,
+  `crm_quote_is_mine()`), while it waits for approval and has not gone out, with a note. Its open
+  approval steps are closed as WITHDRAWN (kept, never deleted); signatures already given stay on
+  record until it is submitted again, which builds a fresh chain; the approvers it was waiting on are
+  e-mailed; the history line names who withdrew it, why, and which levels had signed. A LOST mark
+  still needs a draft or a sent quotation, so "withdraw it to draft first, then mark it lost" now
+  has its button. `crm_quote_withdraw_problem()`, route `/quote-withdraw`, guard rail
+  `tests/test_sales_stage4.php`.
 - **APPROVED → SENT by hand (14 Nov 2026).** Someone with `crm.quote.send` who sends the quotation from
   their own mailbox ("Open in Gmail" or the Outlook .eml) presses "✓ I have sent it — mark sent": the
   same APPROVED → SENT move, follow-ups start, and the client is not e-mailed again by the system. Not

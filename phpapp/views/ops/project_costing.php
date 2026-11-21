@@ -1,4 +1,13 @@
 <?php
+// Stage 4 of the Sales redesign (owner, 21 Nov 2026) — the project costing page (approved design s4-costing) in the Sales
+// workspace look: the Sales bar on a laptop, the bottom bar on a phone, the record-page
+// cards. Every field, button, link and rule below is the one it had (the old page is kept
+// in tests/fixtures/pre_stage4/); only the frame around it changed.
+require_once __DIR__ . '/_sxw_ui.php';
+$__sxq4 = !(function_exists('is_embed') && is_embed());   // never inside the in-page popup
+?>
+<?php if ($__sxq4): ?><div class="rec sxw has-bn sxq sxq4"><?php sxw_nav('/quotes'); ?><?php endif; ?>
+<?php
 // Project costing — the builder / cost sheet.
 $roll = $roll ?? null; if (!$roll) { echo '<p>Not found.</p>'; return; }
 $h = $roll['header']; $lines = $roll['lines']; $T = $roll['totals']; $byHead = $roll['by_head'];
@@ -852,3 +861,4 @@ $nCols = count($shownHeads) + ($canEdit ? 9 : 8);
 
 <?php //  Every step of this costing, every round (owner, 13 Nov 2026: "we must have a trail"). ?>
 <div style="margin-top:16px"><?php if (function_exists('act_render_timeline')) act_render_timeline('PROJECT_COSTING', (int)$h['id'], 'History of this costing'); ?></div>
+<?php if ($__sxq4): ?></div><?php sxw_bottom('/quotes'); ?><?php endif; ?>

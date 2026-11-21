@@ -1,3 +1,12 @@
+<?php
+// Stage 4 of the Sales redesign (owner, 21 Nov 2026) — the external quotation in the Sales
+// workspace look: the Sales bar on a laptop, the bottom bar on a phone, the record-page
+// cards. Every field, button, link and rule below is the one it had (the old page is kept
+// in tests/fixtures/pre_stage4/); only the frame around it changed.
+require_once __DIR__ . '/../_sxw_ui.php';
+$__sxq4 = !(function_exists('is_embed') && is_embed());   // never inside the in-page popup
+?>
+<?php if ($__sxq4): ?><div class="rec sxw has-bn sxq sxq4"><?php sxw_nav('/quotes'); ?><?php endif; ?>
 <div class="master-head">
   <div><h1>Register an external <?= e(Tl('quote')) ?></h1>
     <p class="sub" style="margin:2px 0 0">For an offer submitted straight into the <?= e(Tl('client')) ?>'s portal, a tender portal or by e-mail, where our own format was never used. It still belongs in the register, so win/loss and follow-up numbers stay honest.</p></div>
@@ -144,3 +153,4 @@
     <a class="btn secondary" href="/quotes">Cancel</a>
   </div>
 </form>
+<?php if ($__sxq4): ?></div><?php sxw_bottom('/quotes'); ?><?php endif; ?>

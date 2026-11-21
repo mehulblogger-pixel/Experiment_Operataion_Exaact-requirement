@@ -1,4 +1,13 @@
 <?php
+// Stage 4 of the Sales redesign (owner, 21 Nov 2026) — the approval delegations (Sales look only when opened from Sales) in the Sales
+// workspace look: the Sales bar on a laptop, the bottom bar on a phone, the record-page
+// cards. Every field, button, link and rule below is the one it had (the old page is kept
+// in tests/fixtures/pre_stage4/); only the frame around it changed.
+require_once __DIR__ . '/_sxw_ui.php';
+$__sxq4 = !empty($salesLook) && !(function_exists('is_embed') && is_embed());
+?>
+<?php if ($__sxq4): ?><div class="rec sxw has-bn sxq sxq4"><?php sxw_nav('/quotes'); ?><?php endif; ?>
+<?php
 // Approval delegation — who may act for whom, and when. Data: $rows, $people,
 // $offices, $entities. Gated hiring_admin_can() in the handler; CSRF auto-stamped.
 //
@@ -103,3 +112,4 @@ $state = function ($r) use ($today) {
 </div>
 <style>.ff label{display:block;font-size:12px;font-weight:600;color:var(--ink,#28313f);margin-bottom:4px}
 @media(max-width:820px){.ff-grid{grid-template-columns:1fr !important}}</style>
+<?php if ($__sxq4): ?></div><?php sxw_bottom('/quotes'); ?><?php endif; ?>

@@ -1,6 +1,15 @@
+<?php
+// Stage 4 of the Sales redesign (owner, 21 Nov 2026) — the Quotation report (owner Q5: renamed from "Sales dashboard") in the Sales
+// workspace look: the Sales bar on a laptop, the bottom bar on a phone, the record-page
+// cards. Every field, button, link and rule below is the one it had (the old page is kept
+// in tests/fixtures/pre_stage4/); only the frame around it changed.
+require_once __DIR__ . '/../_sxw_ui.php';
+$__sxq4 = !(function_exists('is_embed') && is_embed());   // never inside the in-page popup
+?>
+<?php if ($__sxq4): ?><div class="rec sxw has-bn sxq sxq4"><?php sxw_nav('/quotes'); ?><?php endif; ?>
 <div class="master-head">
-  <div><h1>Sales dashboard</h1>
-    <p class="sub" style="margin:2px 0 0">Pipeline, win/loss and monthly performance · FY <?= e($fy) ?> · scope applied.</p></div>
+  <div><h1>Quotation report</h1>
+    <p class="sub" style="margin:2px 0 0">Pipeline, win/loss and monthly performance · FY <?= e($fy) ?> · scope applied · every value is before GST.</p></div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
     <form method="get" action="/crm-reports"><select class="form-control" name="fy" onchange="this.form.submit()"><?php foreach ($fyOpts as $f): ?><option value="<?= e($f) ?>" <?= $fy===$f?'selected':'' ?>>FY <?= e($f) ?></option><?php endforeach; ?></select></form>
     <a class="btn secondary" href="/crm-reports?<?= e(http_build_query(array_merge($_GET,['export'=>'csv']))) ?>">⬇ Download CSV</a>
@@ -9,14 +18,14 @@
 
 <div class="kpi-row">
   <div class="kpi"><div class="k-lab"><?= e(THP('quote')) ?></div><div class="k-val"><?= (int)$total ?></div><div class="k-sub">this FY</div></div>
-  <div class="kpi"><div class="k-lab">Pipeline value (open)</div><div class="k-val"><?= fmoney_short($openVal) ?></div><div class="k-sub">of <?= fmoney_short($totVal) ?> quoted</div></div>
-  <div class="kpi"><div class="k-lab">Won value</div><div class="k-val up"><?= fmoney_short($wonVal) ?></div><div class="k-sub"><?= (int)$nWon ?> won</div></div>
+  <div class="kpi"><div class="k-lab">Pipeline value (open, before GST)</div><div class="k-val"><?= fmoney_short($openVal) ?></div><div class="k-sub">of <?= fmoney_short($totVal) ?> quoted</div></div>
+  <div class="kpi"><div class="k-lab">Won value (before GST)</div><div class="k-val up"><?= fmoney_short($wonVal) ?></div><div class="k-sub"><?= (int)$nWon ?> won</div></div>
   <div class="kpi"><div class="k-lab">Win rate</div><div class="k-val <?= $winRate>=50?'up':'' ?>"><?= (int)$winRate ?>%</div><div class="k-sub"><?= (int)$nWon ?> won · <?= (int)$nLost ?> lost</div></div>
 </div>
 
 <div class="panel-split">
   <div class="panel"><h4 class="tab-sub" style="margin-top:0">Quotes by status</h4><?= svg_donut($byStatus) ?></div>
-  <div class="panel"><h4 class="tab-sub" style="margin-top:0">Quoted value by <?= e(Tl('sbu')) ?></h4><?= svg_hbars($bySbu, true) ?></div>
+  <div class="panel"><h4 class="tab-sub" style="margin-top:0">Quoted value by <?= e(Tl('sbu')) ?> (before GST)</h4><?= svg_hbars($bySbu, true) ?></div>
 </div>
 <div class="panel-split">
   <div class="panel"><h4 class="tab-sub" style="margin-top:0">Top <?= e(Tlp('client')) ?> by quoted value</h4><?= svg_hbars($topClients, true) ?></div>
@@ -27,7 +36,7 @@
   <h4 class="tab-sub" style="margin:12px 14px 0">Monthly performance</h4>
   <div class="tbl-scroll" style="overflow-x:auto">
   <table class="dt">
-    <thead><tr><th>Month</th><th class="num">Raised</th><th class="num">Won</th><th class="num">Lost</th><th class="num">Won value</th></tr></thead>
+    <thead><tr><th>Month</th><th class="num">Raised</th><th class="num">Won</th><th class="num">Lost</th><th class="num">Won value (before GST)</th></tr></thead>
     <tbody>
     <?php foreach ($months as $mo=>$m): ?>
     <tr>
@@ -47,3 +56,4 @@
 <?php if ($wonClients): ?>
 <div class="panel"><h4 class="tab-sub" style="margin-top:0">Top <?= e(Tlp('client')) ?> by won value</h4><?= svg_hbars($wonClients, true) ?></div>
 <?php endif; ?>
+<?php if ($__sxq4): ?></div><?php sxw_bottom('/quotes'); ?><?php endif; ?>
