@@ -3140,11 +3140,12 @@ function ops_crm_quotes($route, $method) {
                         if ($o && ($o['status'] ?? '') === 'OPEN') {
                             $stages = pipeline_stages((int)$o['pipeline_id']);
                             $curIdx = -1; $sentId = 0; $sentIdx = -1;
-                            foreach ($stages as $i => $st) {
-                                if ((int)$st['id'] === (int)$o['stage_id']) $curIdx = $i;
-                                if ($sentIdx < 0 && ($st['kind'] ?? '') === 'OPEN'
-                                    && preg_match('/quot|proposal|sent/i', (string)$st['name'])) { $sentIdx = $i; $sentId = (int)$st['id']; }
-                            }
+                            $stages = array_values($stages);
+                            foreach ($stages as $i => $st) if ((int)$st['id'] === (int)$o['stage_id']) $curIdx = $i;
+                            //  D3 (owner, 21 Nov 2026): the same "quotation stage" the move rule uses
+                            //  (opp_quote_stage — the template's quotation step), so sending moves the
+                            //  deal exactly to the stage that needs a quotation.
+                            if (function_exists('opp_quote_stage') && ($qs = opp_quote_stage($stages, (int)$o['pipeline_id']))) { $sentIdx = $qs['idx']; $sentId = (int)$qs['stage']['id']; }
                             if ($sentId && $sentIdx > $curIdx) opp_move($oid, $sentId, [], true);
                         }
                     }

@@ -17,6 +17,8 @@ usort($fu, fn($a, $b) => [$order[$a['r']['_due']] ?? 9, (string) $a['r']['next_a
 $noneMarked = false;
 // Same window the renewals count uses (Sales settings → Renewals, DEF-10).
 $warn = function_exists('sx_renewal_days') ? sx_renewal_days() : 30;
+//  D2 (owner, 21 Nov 2026): Log only on a lead or deal this person may work.
+$canWork = fn($r) => !function_exists('sales_record_can_work') || sales_record_can_work((int) ($r['owner_user_id'] ?? 0));
 ?>
 <div class="rec sxw has-bn">
   <?php sxw_nav('/sales-today'); ?>
@@ -76,7 +78,7 @@ $warn = function_exists('sx_renewal_days') ? sx_renewal_days() : 30;
               <td><span class="k">Next step</span><?= e($r['next_action'] ?: '—') ?></td>
               <td class="r" data-s="<?= $r['_idle'] !== null ? (int) $r['_idle'] : -1 ?>"><span class="k">Idle</span><?= $r['_idle'] !== null ? (int) $r['_idle'] . ' d' : '—' ?></td>
               <td><span class="k">Owner</span><?= e(($r['owner_name'] ?? '') !== '' ? $r['owner_name'] : '—') ?></td>
-              <td class="ac"><div class="sxw-acts"><?= sxw_contact($r['contact_phone'] ?? '', $r['name']) ?><a class="sxw-ib" href="<?= e(sx_log_url('OPPORTUNITY', (int) $r['id'], '/sales-today' . $q)) ?>" aria-label="Log activity on <?= e($r['ref']) ?>"><?= rec_icon('note') ?><span>Log</span></a></div></td>
+              <td class="ac"><div class="sxw-acts"><?= sxw_contact($r['contact_phone'] ?? '', $r['name']) ?><?php if ($canWork($r)): ?><a class="sxw-ib" href="<?= e(sx_log_url('OPPORTUNITY', (int) $r['id'], '/sales-today' . $q)) ?>" aria-label="Log activity on <?= e($r['ref']) ?>"><?= rec_icon('note') ?><span>Log</span></a><?php endif; ?></div></td>
             <?php else: ?>
               <td><a href="/lead?id=<?= (int) $r['id'] ?>"><?= e($r['company_name']) ?></a><div class="sub"><?= e(trim(($r['next_action'] ?: '') . ((float) $r['value'] > 0 ? ' · ' . sx_short($r['value']) . ' est.' : ''), ' ·')) ?></div></td>
               <td><span class="k">Stage</span><?= e($r['stage_name'] ?? '') ?></td>
@@ -84,7 +86,7 @@ $warn = function_exists('sx_renewal_days') ? sx_renewal_days() : 30;
               <td><span class="k">Next step</span><?= e($r['next_action'] ?: '—') ?></td>
               <td class="r" data-s="-1"><span class="k">Idle</span>—</td>
               <td><span class="k">Owner</span><?= e(($r['owner_name'] ?? '') !== '' ? $r['owner_name'] : '—') ?></td>
-              <td class="ac"><div class="sxw-acts"><?= sxw_contact($r['contact_phone'] ?? '', $r['company_name']) ?><a class="sxw-ib" href="<?= e(sx_log_url('LEAD', (int) $r['id'], '/sales-today' . $q)) ?>" aria-label="Log activity on <?= e($r['company_name']) ?>"><?= rec_icon('note') ?><span>Log</span></a></div></td>
+              <td class="ac"><div class="sxw-acts"><?= sxw_contact($r['contact_phone'] ?? '', $r['company_name']) ?><?php if ($canWork($r)): ?><a class="sxw-ib" href="<?= e(sx_log_url('LEAD', (int) $r['id'], '/sales-today' . $q)) ?>" aria-label="Log activity on <?= e($r['company_name']) ?>"><?= rec_icon('note') ?><span>Log</span></a><?php endif; ?></div></td>
             <?php endif; ?>
           </tr>
         <?php endforeach; ?>

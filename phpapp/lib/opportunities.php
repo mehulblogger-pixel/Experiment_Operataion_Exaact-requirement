@@ -405,6 +405,47 @@ function opp_record_move($o, $to) {
                  opp_days_in_stage($o), user_name(current_user()), date('c')]), null);
 }
 
+// ---- D3 (owner, 21 Nov 2026 — findings J4-02, "as recommended") ---------------
+//  "Quotation sent" and every later OPEN stage need a quotation on the deal — or the
+//  person ticks "Sent outside EXAACT" and says why (kept in the deal's history).
+//  WHICH stage is "a quotation has gone" is not a stage name: each industry template
+//  marks its own quotation step ('quote' in INDUSTRY_TEMPLATES — Quotation sent 50%,
+//  Offer submitted 55%, Proposal sent 45%, Tender submitted 30% …; none for staffing
+//  or real estate). A funnel's quotation stage is its first OPEN stage whose chance of
+//  winning reaches that step's — so a company that renames a stage, or adds one, keeps
+//  the rule. The template is the funnel's own (its name, as the template created it),
+//  else the company's industry, else the general template. Sending a quotation moves
+//  the deal to this same stage (crm.php), so "sending moves it there" and "getting
+//  there needs a quotation" always point at one stage.
+function opp_quote_stage_pct($pipelineId = 0) {
+    if (!defined('INDUSTRY_TEMPLATES')) return (int) OPP_DEFAULT_STAGES[2][2];
+    $tpl = null;
+    $pname = $pipelineId ? (string) opp_try(fn() => ops_val("SELECT name FROM pipelines WHERE id=?", [(int) $pipelineId]), '') : '';
+    if ($pname !== '') foreach (INDUSTRY_TEMPLATES as $t)
+        if (strpos($pname, (string) $t['label'] . ' — ') === 0) { $tpl = $t; break; }
+    if (!$tpl) $tpl = INDUSTRY_TEMPLATES[(string) (function_exists('setting_get') ? setting_get('industry_template', '') : '')] ?? INDUSTRY_TEMPLATES['generic'] ?? null;
+    if (!$tpl || !array_key_exists('quote', $tpl)) return (int) OPP_DEFAULT_STAGES[2][2];
+    return $tpl['quote'] === null ? null : (int) $tpl['funnel'][(int) $tpl['quote']][2];
+}
+//  ['idx' => position in $stages, 'stage' => row] of the funnel's quotation stage, or null.
+function opp_quote_stage(array $stages, $pipelineId = 0) {
+    $pct = opp_quote_stage_pct($pipelineId);
+    if ($pct === null) return null;
+    foreach (array_values($stages) as $i => $s)
+        if (($s['kind'] ?? '') === 'OPEN' && (int) $s['probability'] >= $pct) return ['idx' => $i, 'stage' => $s];
+    return null;
+}
+//  Does moving deal $o to $to need a quotation it does not have? Returns the quotation stage's name, or ''.
+function opp_needs_quote_for($o, $to) {
+    if (($to['kind'] ?? '') !== 'OPEN') return '';
+    $stages = array_values(pipeline_stages((int) $o['pipeline_id']) ?: []);
+    $qs = opp_quote_stage($stages, (int) $o['pipeline_id']);
+    if (!$qs) return '';
+    $ti = -1; foreach ($stages as $i => $s) if ((int) $s['id'] === (int) $to['id']) $ti = $i;
+    if ($ti < $qs['idx']) return '';
+    return opp_quotes((int) $o['id']) ? '' : (string) $qs['stage']['name'];
+}
+
 // Moving to a WON or LOST stage is not the same as moving between open stages:
 // it closes the deal, and a loss needs a reason. The stage's `kind` decides,
 // which is why stages are configurable and the rule is not.
@@ -437,6 +478,19 @@ function opp_move($oppId, $stageId, array $b = [], $bypassGate = false) {
     $kind = (string)$to['kind'];
     if ($kind === 'LOST' && trim((string)($b['lost_reason'] ?? '')) === '')
         return ['err' => 'A deal marked lost needs a reason — it is the only thing that makes the loss useful later.'];
+
+    //  D3 — the quotation stage and later need a quotation, or "Sent outside EXAACT"
+    //  with a reason. Asked before the stage gate, so an approval request carries it.
+    //  (The approval replay and sending a quotation pass $bypassGate: the first was
+    //  checked when it was asked, the second has its quotation.)
+    $outside = '';
+    if (!$bypassGate && ($qName = opp_needs_quote_for($o, $to)) !== '') {
+        if (empty($b['sent_outside']))
+            return ['err' => 'A deal reaches "' . $qName . '" (and later) only with a ' . Tl('quote') . ' on it. Make or link the ' . Tl('quote')
+                           . ' first — or, if it went to the ' . Tl('client') . ' outside EXAACT, tick "Sent outside EXAACT" and say why.'];
+        $outside = trim((string) ($b['outside_reason'] ?? ''));
+        if ($outside === '') return ['err' => 'You ticked "Sent outside EXAACT" — say why (for example "e-mailed from Outlook on 18 Nov, ref ABC/123"). It is kept in the deal\'s history.'];
+    } elseif (!empty($b['sent_outside'])) $outside = trim((string) ($b['outside_reason'] ?? ''));
 
     // The gate. Checked after the reason is demanded, so a request that is going
     // to need one carries it, rather than the approver being asked to invent why
@@ -474,6 +528,11 @@ function opp_move($oppId, $stageId, array $b = [], $bypassGate = false) {
                 'Moved to ' . $to['name'] . ($status !== 'OPEN' ? ' — ' . strtolower(OPP_STATUS[$status]) : ''),
                 ['auto' => 1, 'partner_id' => $o['partner_id'] ?: null,
                  'outcome' => $status === 'WON' ? 'won' : ($status === 'LOST' ? 'lost' : '')]);
+    //  D3 — moved on without a quotation in EXAACT: the reason goes into the history.
+    if ($outside !== '' && function_exists('act_log'))
+        act_log('OPPORTUNITY', (int)$o['id'], 'SYSTEM', 'Moved to ' . $to['name'] . ' with no ' . Tl('quote') . ' in EXAACT — sent outside EXAACT ('
+                . ($actor !== '' ? 'by ' . $actor : '') . '): ' . mb_substr($outside, 0, 400),
+                ['auto' => 1, 'partner_id' => $o['partner_id'] ?: null, 'body' => $outside]);
     //  A won deal closes the lead it came from (owner, 12 Nov 2026).
     $leadNote = ($status === 'WON' && function_exists('lead_close_for_won_deal')) ? lead_close_for_won_deal((int)$o['id']) : '';
     return ['ok' => true, 'status' => $status, 'lead_note' => $leadNote];
@@ -1230,7 +1289,11 @@ function ops_opportunities($route, $method) {
             'o' => $o, 'quotes' => opp_quotes((int)$o['id']), 'history' => opp_history((int)$o['id']),
             'stages' => pipeline_stages((int)$o['pipeline_id']),
             'timeline' => function_exists('act_for_entity') ? act_for_entity('OPPORTUNITY', (int)$o['id'], 40) : [],
-            'lostReasons' => opp_lost_reasons(), 'canEdit' => $canEdit, 'sbus' => opp_sbu_options(),
+            //  D2: someone who may edit deals but not THIS one reads it, with the reason.
+            'lostReasons' => opp_lost_reasons(), 'sbus' => opp_sbu_options(),
+            'canEdit' => $canEdit && (!function_exists('sales_record_can_work') || sales_record_can_work((int) ($o['owner_user_id'] ?? 0))),
+            'workNote' => $canEdit && function_exists('sales_record_can_work') && !sales_record_can_work((int) ($o['owner_user_id'] ?? 0))
+                          ? sales_record_lock_words((int) $o['owner_user_id']) : '',
             'costing' => function_exists('pc_for_opportunity') ? pc_for_opportunity((int)$o['id']) : null,
             'costingUnlinked' => function_exists('pc_unlinked') ? pc_unlinked(100, 'opportunity', (int)($o['client_id'] ?? 0)) : [],
             'costingCan' => function_exists('pc_can') && pc_can(),
@@ -1315,6 +1378,27 @@ function ops_opportunities($route, $method) {
 
 
     ops_require($canEdit, 'You cannot change ' . Tla('opportunity') . '.');
+
+    //  D2 (owner, 21 Nov 2026): working ONE deal — its stage, its details, quoting,
+    //  ordering, handing to Accounts, adding its customer — is for the person handling
+    //  it, the people above them and an administrator; everyone else reads it.
+    //  "Work this as a deal" follows the LEAD it comes from. Reopening a closed deal
+    //  (a manager's act), deleting it and Accounts' contract registration keep their rules.
+    if ($method === 'POST' && function_exists('sales_record_can_work')) {
+        $wOwner = null; $wBack = '';
+        if (in_array($route, ['opportunity-edit', 'opportunity-move', 'opportunity-new-quote', 'opportunity-quote', 'opportunity-raise-order',
+                              'opportunity-send-to-accounts', 'opportunity-generate-quote', 'opportunity-add-customer'], true)) {
+            $wid = (int) ($_POST['id'] ?? 0);
+            $wOwner = opp_try(fn() => ops_val("SELECT owner_user_id FROM opportunities WHERE id=?", [$wid]), null); $wBack = '/opportunity?id=' . $wid;
+        } elseif ($route === 'opportunity-from-lead') {
+            $wid = (int) ($_POST['lead_id'] ?? 0);
+            $wOwner = function_exists('leads_try') ? leads_try(fn() => ops_val("SELECT owner_user_id FROM leads WHERE id=?", [$wid]), null) : null; $wBack = '/lead?id=' . $wid;
+        }
+        if ($wBack !== '' && $wOwner !== null && $wOwner !== false && !sales_record_can_work((int) $wOwner)) {
+            flash(sales_record_lock_words((int) $wOwner), 'error');
+            redirect($wBack);
+        }
+    }
 
     if ($route === 'opportunity-new') {
         // On a first visit we prefill from the query string (e.g. opened from a

@@ -605,6 +605,10 @@ stateDiagram-v2
   remarks, on the lead and in bulk alike (`lead_lost_problem()`). The bulk action used to fill in
   "No response" with no remarks.
 
+### D3 — a deal reaches the quotation stage only with a quotation (owner, 21 Nov 2026, findings J4-02)
+
+No status or transition is added: this is a **condition on the existing OPEN → OPEN stage move**. A deal moves to its funnel's **quotation stage, or any later OPEN stage**, only when a quotation is on the deal (`opp_quotes()` — linked, or raised off its lead), **or** the person ticks **"Sent outside EXAACT"** and writes why (kept in the deal's history). Moving to Won or Lost, and to stages before the quotation stage, are unchanged. **Which stage** is not a stage name: each industry template marks its own quotation step (`'quote'` in `INDUSTRY_TEMPLATES` — e.g. Quotation sent 50 %, Offer submitted 55 %, Proposal sent 45 %, Tender submitted 30 %; none for staffing or real estate), and a funnel's quotation stage is its first OPEN stage whose chance of winning reaches that step's (`opp_quote_stage()`), using the funnel's own template, else the company's industry, else the general template. Sending a quotation moves the linked deal forward to this same stage (unchanged behaviour, now the same rule). The approval replay of a stage gate is not asked again. Guard rail `tests/test_owner_decisions_d1_d3.php`.
+
 ### Lead reassignment request (`lead_reassign_requests.status`) — owner, 20 Oct 2026
 
 *"Reassigning shall be done only after manager approval."* Giving a lead that **already has an

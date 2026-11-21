@@ -103,8 +103,15 @@ try {
     //  (and roles built on it) may set targets for the people of their branches.
     $targetSetters = ['MARKETING_MANAGER'];
     $mayGainT = ['g' => ['targets'], 'can' => ['crm.targets.set']];
-    $intended = 0;
-    $compare = function ($got, $want, $label) use ($roleOf, $viewers, $mayGain, $targetSetters, $mayGainT, &$intended, $fx) {
+    //  The third intended change (D1, owner 21 Nov 2026, findings SH-08): Finance (and a
+    //  role built on it) keeps only the Quotes register and the Client register's normal
+    //  view in Sales — so these answers may move from yes to NO, for Finance only.
+    $finance = ['FINANCE'];
+    $mayLoseF = ['g' => ['sx_can', 'opp_view', 'crmdash', 'tiles', 'deal_export', 'roi', 'targets'],
+                 'can' => ['crm.deal.view', 'crm.deal.export', 'crm.deal.edit', 'mod.crm_orders.view', 'mod.crm_orders.add', 'mod.crm_orders.edit',
+                           'mod.crm_orders.archive', 'mod.crm_orders.delete', 'mod.crm_reports.view', 'mod.crm_reports.add', 'mod.crm_reports.edit']];
+    $intended = 0; $narrowed = 0;
+    $compare = function ($got, $want, $label) use ($roleOf, $viewers, $mayGain, $targetSetters, $mayGainT, $finance, $mayLoseF, &$intended, &$narrowed, $fx) {
         $bad = [];
         $su = array_column($fx['users'], 'su', 'u');
         foreach ($want as $user => $w) {
@@ -112,9 +119,13 @@ try {
             if (!$gg) { $bad[] = "$user missing"; continue; }
             $isViewer = in_array($roleOf[$user] ?? '', $viewers, true) && empty($su[$user]);
             $isSetter = in_array($roleOf[$user] ?? '', $targetSetters, true) && empty($su[$user]);
+            $isFin = in_array($roleOf[$user] ?? '', $finance, true) && empty($su[$user]);
             foreach ($w['g'] as $k => $v) {
                 $now = $gg['g'][$k] ?? '?';
                 if ((string) $now === (string) $v) continue;
+                //  D1: a Finance answer may only shrink — a gate from 1 to 0, a tile list to a subset of itself.
+                if ($isFin && in_array($k, $mayLoseF['g'], true)
+                    && ($k === 'tiles' ? !array_diff(array_filter(explode(' ', (string) $now)), array_filter(explode(' ', (string) $v))) : ((int) $v === 1 && (int) $now === 0))) { $narrowed++; continue; }
                 if ($isViewer && in_array($k, $mayGain['g'], true) && ($k === 'tiles' || ((int) $v === 0 && (int) $now === 1))) { $intended++; continue; }
                 if ($isSetter && in_array($k, $mayGainT['g'], true) && (int) $v === 0 && (int) $now === 1) { $intended++; continue; }
                 $bad[] = "$user · $k: before " . var_export($v, true) . ', now ' . var_export($now, true);
@@ -124,6 +135,7 @@ try {
                 if ($now === (int) $v) continue;
                 if ($isViewer && in_array($k, $mayGain['can'], true) && (int) $v === 0 && $now === 1) { $intended++; continue; }
                 if ($isSetter && in_array($k, $mayGainT['can'], true) && (int) $v === 0 && $now === 1) { $intended++; continue; }
+                if ($isFin && in_array($k, $mayLoseF['can'], true) && (int) $v === 1 && $now === 0) { $narrowed++; continue; }
                 $bad[] = "$user · can($k): before $v, now " . ($gg['can'][$k] ?? '?');
             }
         }
@@ -182,10 +194,13 @@ try {
             if (in_array($roleOf[$ru] ?? '', $viewers, true) && in_array($rt, ['leads', 'opportunities'], true) && strpos((string) ($rr[$k] ?? ''), 'csv') !== false) { $intended++; continue; }
             //  DEF-11: the Marketing Manager's Targets screen now offers editing.
             if (in_array($roleOf[$ru] ?? '', $targetSetters, true) && $rt === 'sales-targets' && ($rr[$k] ?? '') === $v . '+edit') { $intended++; continue; }
+            //  D1: Finance is now refused the Sales workspace screens ("Sales is not open to you").
+            if (in_array($roleOf[$ru] ?? '', $finance, true) && in_array($rt, ['sales-targets', 'sales-home'], true) && strpos((string) ($rr[$k] ?? ''), '|refused|') !== false) { $narrowed++; continue; }
             $bad[] = "$k: before $v, now " . ($rr[$k] ?? '?');
         }
         t_ok(!$bad, count($rr) . ' screens and downloads opened as real sign-ins (' . count($routeUsers) . ' people × ' . count($routes) . ' routes) — the same outcome as before' . ($bad ? ': ' . implode(' | ', array_slice($bad, 0, 12)) : ''));
         t_ok($intended > 0, "the owner's 21 Nov change is really there: $intended intended gains, all for the Branch Manager / SBU Head (leads and deals) and the Marketing Manager (targets, DEF-11), nobody else");
+        t_ok($narrowed > 0, "D1 is really there: $narrowed answers narrowed, all for Finance (Sales workspace, deals, Sales reports, Orders / contracts), nobody else");
     } else {
         file_put_contents($writeTo, json_encode($result, JSON_PRETTY_PRINT));
         t_ok(true, 'snapshot written');

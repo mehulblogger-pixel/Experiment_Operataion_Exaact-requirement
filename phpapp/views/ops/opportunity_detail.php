@@ -143,6 +143,10 @@ $lateDays = $nextOn !== '' && $nextOn < $todayYmd ? (int)floor((strtotime($today
                   ['chart', fmoney(opp_weighted($o)), 'Likely value · ' . $prob . '% chance'],
                   ['cal', $o['expected_close'] ? fdate($o['expected_close']) : '—', 'Hoped to close']]); ?>
 </div>
+<?php // D2 (owner, 21 Nov 2026): someone else's deal is read only for you, with the reason.
+      if (!empty($workNote)): ?>
+  <div class="rec-ban info" role="status"><h4><?= rec_icon('lock', 's') ?> View only</h4><p><?= e($workNote) ?></p></div>
+<?php endif; ?>
 
 <section class="rec-card">
   <div class="rec-ch"><h3><?= e(TH('opportunity')) ?> stage</h3><a class="rec-lnk" href="#flow" data-tab-go="History"><?= rec_icon('flow', 's') ?> View flow</a></div>
@@ -528,9 +532,11 @@ $lateDays = $nextOn !== '' && $nextOn < $todayYmd ? (int)floor((strtotime($today
     <b>Won</b> closes it as a sale and lets you raise the order. <b>Lost</b> closes it — and asks why.</p>
   <div class="form-grid" style="gap:12px 16px">
     <div><label for="opp-stage">Move it to</label>
+      <?php //  D3 (owner, 21 Nov 2026): which stages need a quotation this deal does not have yet.
+            $needQ = []; if (function_exists('opp_needs_quote_for')) foreach ($stages as $s) if (opp_needs_quote_for($o, $s) !== '') $needQ[(int)$s['id']] = true; ?>
       <select class="form-control" name="stage_id" id="opp-stage">
         <?php foreach ($stages as $s): ?>
-          <option value="<?= (int)$s['id'] ?>" data-kind="<?= e($s['kind']) ?>" <?= (int)$s['id'] === (int)$o['stage_id'] ? 'selected' : '' ?>>
+          <option value="<?= (int)$s['id'] ?>" data-kind="<?= e($s['kind']) ?>"<?= isset($needQ[(int)$s['id']]) ? ' data-needq="1"' : '' ?> <?= (int)$s['id'] === (int)$o['stage_id'] ? 'selected' : '' ?>>
             <?= e($s['name']) ?><?= (int)$s['probability'] ? ' (' . (int)$s['probability'] . '%)' : '' ?><?= $s['kind'] === 'WON' ? ' — closes it as a sale' : ($s['kind'] === 'LOST' ? ' — closes it as lost' : '') ?>
           </option>
         <?php endforeach; ?>
@@ -552,14 +558,23 @@ $lateDays = $nextOn !== '' && $nextOn < $todayYmd ? (int)floor((strtotime($today
       <div class="ff-wide"><label>What actually happened</label><input class="form-control" name="lost_note" maxlength="500" placeholder="Optional, but useful"></div>
     </div>
   </div>
+  <?php if ($needQ): ?>
+  <div id="opp-needq" style="display:none;margin-top:10px;border-left:3px solid var(--warn,#b45309);padding-left:12px">
+    <p class="muted" style="font-size:12.5px;margin:0 0 8px">This step needs a <?= e(Tl('quote')) ?> on the deal, and it has none yet. Make or link the <?= e(Tl('quote')) ?> first — or, if it went to the <?= e(Tl('client')) ?> outside EXAACT, say so here. The reason is kept in the deal's history.</p>
+    <label style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" name="sent_outside" value="1"> Sent outside EXAACT</label>
+    <div class="ff" style="margin-top:8px"><label for="opp-outr">Why / how it was sent</label>
+      <input class="form-control" id="opp-outr" name="outside_reason" maxlength="400" placeholder="e.g. e-mailed from Outlook on 18 Nov, ref ABC/123"></div>
+  </div>
+  <?php endif; ?>
   <button class="btn" style="margin-top:12px">Move it</button>
 </form>
 <script>
 (function () {
-  var sel = document.getElementById('opp-stage'), lost = document.getElementById('opp-lost');
+  var sel = document.getElementById('opp-stage'), lost = document.getElementById('opp-lost'), nq = document.getElementById('opp-needq');
   if (!sel || !lost) return;
   function sync() {
     var o = sel.options[sel.selectedIndex];
+    if (nq) nq.style.display = (o && o.getAttribute('data-needq') === '1') ? 'block' : 'none';
     lost.style.display = (o && o.getAttribute('data-kind') === 'LOST') ? 'block' : 'none';
   }
   sel.addEventListener('change', sync); sync();

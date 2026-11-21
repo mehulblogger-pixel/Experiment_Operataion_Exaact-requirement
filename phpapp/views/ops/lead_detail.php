@@ -34,6 +34,8 @@ $lost = !$converted && ($l['status'] ?? '') === 'LOST';
 $effLbl = function_exists('act_effort_label') ? act_effort_label($effort ?? []) : '';
 $contacts = $contacts ?? []; $files = $files ?? []; $fileKinds = $fileKinds ?? []; $quotes = $quotes ?? []; $timeline = $timeline ?? []; $history = $history ?? [];
 $canLog = $canEdit && $open;
+//  D2: someone else's lead is read only — no quoting from it either.
+if (!empty($workNote)) $canQuote = false;
 $talked = 0; foreach ($timeline as $a) if (empty($a['auto'])) $talked++;
 $lq = $quotes[0] ?? null; $lqSt = $lq ? (string) $lq['status'] : '';
 $Q = Tl('quote');
@@ -217,6 +219,11 @@ $jsq = fn($s) => e(json_encode((string) $s));
                   ['cal', $l['expected_close'] ? fdate($l['expected_close']) : '—', 'Hoped to close'],
                   ['user', $l['owner_name'] ?: '—', 'Handled by']]); ?>
 </div>
+
+<?php // ---- D2 (owner, 21 Nov 2026): someone else's lead is read only for you ---------
+      if (!empty($workNote)): ?>
+  <div class="rec-ban info" role="status"><h4><?= rec_icon('lock', 's') ?> View only</h4><p><?= e($workNote) ?></p></div>
+<?php endif; ?>
 
 <?php // ---- A reassignment waiting for a manager (owner, 20 Oct 2026) ------------
       $rq = function_exists('lead_reassign_pending') ? lead_reassign_pending($id) : null;

@@ -109,7 +109,8 @@ try {
     $r = bbv_route('opportunity', 'GET', $f['meera'], $oMumInd);
     t_ok($refused($r), 'Finance · a deal page is still refused');
     $r = bbv_route('sales-home', 'GET', $f['meera'], 0, [], []);
-    t_ok(!$refused($r), 'Finance · Sales home still opens');
+    //  D1 (owner, 21 Nov 2026, findings SH-08): Finance's Sales is the Quotes register only.
+    t_ok($refused($r), 'Finance · Sales home is refused (D1 — Finance keeps the Quotes register only)');
     $r = bbv_route('leads', 'GET', $f['neha'], 0, [], ['v' => 'list']);
     t_ok($refused($r), 'Coordinator · leads still refused');
     $r = bbv_route('leads', 'GET', $f['bd'], 0, [], ['v' => 'list']);
