@@ -1473,8 +1473,7 @@ if ($route === 'partner-new') {
     // R1 — client/vendor create runs before the module gate, so guard it here.
     // Editing commercial master data needs the clients/vendors edit right; a
     // coordinator may also onboard a party while raising a call (intake).
-    ops_require(is_master() || can('mod.clients.edit') || can('mod.vendors.edit')
-        || (function_exists('is_coordinator_level') && is_coordinator_level()),
+    ops_require(partner_can_add(),
         'You do not have permission to add ' . Tl('client') . ' / ' . Tl('vendor') . ' records.');
     // Picker mode: the form was opened in a small window from a "+ Add new" link
     // beside a dropdown (quote, call, candidate…). On save we hand the new record

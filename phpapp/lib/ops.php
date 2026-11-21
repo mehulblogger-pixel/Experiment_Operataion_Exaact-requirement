@@ -631,6 +631,13 @@ function is_admin_level() { return in_array(user_role(), MGMT_ROLES, true); }
 // gives the Sales roles the CRM modules only, and Finance per D-07).
 function works_operations() { return is_admin_level() || (function_exists('can') && can('mod.jobs.edit')); }
 function is_coordinator_level() { return is_admin_level() || in_array(user_role(), ['ASST_MANAGER','COORDINATOR'], true); }
+// May the current user add a client / vendor record (/partner-new)? The one rule
+// the add form itself enforces — the "+ Add new" links beside a client picker use
+// it too, so nobody is offered a link that ends in "You do not have permission"
+// (owner test J4-05, 21 Nov 2026). No new right: the same rule, in one place.
+function partner_can_add() {
+    return is_master() || can('mod.clients.edit') || can('mod.vendors.edit') || is_coordinator_level();
+}
 // May the current user CONFIGURE the recruitment module? A full administrator
 // always can; so can any role granted the module-scoped `hiring.admin` permission
 // (a "Recruitment Manager" who configures hiring without system-wide powers).

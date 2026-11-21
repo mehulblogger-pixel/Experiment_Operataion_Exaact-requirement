@@ -643,6 +643,11 @@ function crm_render_quote_playbook($q) {
     echo ob_get_clean();
 }
 function crm_inquiry_get($id) { return ops_one("SELECT * FROM crm_inquiries WHERE id=?", [(int)$id]); }
+// May the current user start a new quotation (/quote-new)? The route's own rule,
+// also read by the Sales home "New quote" tile so it is not offered to someone the
+// form then refuses (owner test SH-03, 21 Nov 2026 — e.g. a Business Director, who
+// approves quotations but does not write them).
+function crm_quote_can_create() { return can('crm.quote.create') || can('mod.quotes.edit') || is_master_of('quotes'); }
 // An enquiry belongs to the branch of the person who recorded it, and branch
 // scope applies to it as to a quotation; one with no branch is everyone's.
 function crm_inquiry_in_scope($inq) {
@@ -2702,7 +2707,7 @@ function ops_crm_quotes($route, $method) {
         return;
     }
     if ($route === 'quote-new' || $route === 'quote-edit') {
-        ops_require(can('crm.quote.create') || can('mod.quotes.edit') || is_master_of('quotes'), 'You cannot create or edit quotations.');
+        ops_require(crm_quote_can_create(), 'You cannot create or edit quotations.');
         $q = null;
         if ($route === 'quote-edit') {
             $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }

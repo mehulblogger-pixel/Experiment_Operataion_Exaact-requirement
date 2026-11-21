@@ -6,7 +6,22 @@
 // tests/fixtures/pre_stage2/lead_convert.php.
 require_once __DIR__ . '/_sxw_ui.php';
 $src = function_exists('lead_source_label') ? lead_source_label($l['source']) : (string)$l['source'];
+//  Already converted (owner test LC-01): say so, and link to what it became.
+if (!empty($done)):
+  $dp = $done['partner'] ?? null; $di = $done['inquiry'] ?? null;
 ?>
+<div class="rec sxw has-bn sxl sxl-form">
+  <?php sxw_nav('/leads'); ?>
+  <?php sxw_head($l['company_name'] . ' is already a customer', $l['ref'] . ' · This lead was converted' . (!empty($l['converted_at']) ? ' on ' . e(date('d M Y', strtotime((string) $l['converted_at']))) : '') . '. Nothing more to do here.', 'swap'); ?>
+  <div class="sxl-ban ok" role="status"><span class="ic"><?= rec_icon('check') ?></span>
+    <div class="tx"><b class="t">Already a customer.</b>
+      <?php if ($dp): ?><a href="/client?id=<?= (int) $dp['id'] ?>">Open the <?= e(Tl('client')) ?> — <?= e($dp['display_name'] ?: $dp['legal_name']) ?></a><?php endif; ?>
+      <?php if ($dp && $di): ?> · <?php endif; ?>
+      <?php if ($di): ?><a href="/inquiry?id=<?= (int) $di['id'] ?>">Open the <?= e(Tl('inquiry')) ?> <?= e((string) ($di['inquiry_no'] ?? '')) ?></a><?php endif; ?>
+      · <a href="/lead?id=<?= (int) $l['id'] ?>">Back to the lead</a></div>
+  </div>
+</div>
+<?php return; endif; ?>
 <div class="rec sxw has-bn sxl sxl-form">
   <?php sxw_nav('/leads'); ?>
   <?php sxw_head('They said yes — make ' . $l['company_name'] . ' a customer',
@@ -28,7 +43,7 @@ $src = function_exists('lead_source_label') ? lead_source_label($l['source']) : 
   <section class="rec-card">
     <div class="rec-ch"><span class="ico"><?= rec_icon('building') ?></span><h3>The customer</h3></div>
     <div class="form-grid">
-      <div class="ff ff-wide"><label for="cv-partner">Attach to a <?= e(Tl('client')) ?> we already have <a href="#" class="addlink" data-qa="client" data-target="select[name='partner_id']">+ Add new</a></label>
+      <div class="ff ff-wide"><label for="cv-partner">Attach to a <?= e(Tl('client')) ?> we already have <?php if (!function_exists('partner_can_add') || partner_can_add()): ?><a href="#" class="addlink" data-qa="client" data-target="select[name='partner_id']">+ Add new</a><?php endif; ?></label>
         <select class="form-control searchable" id="cv-partner" name="partner_id">
           <option value="">— create a new one —</option>
           <?php foreach ($clients as $c): ?>

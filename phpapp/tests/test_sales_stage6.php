@@ -135,6 +135,9 @@ try {
             return !$opens($uid, $href);
         //  DEF-17: "Pipeline board" opens the Sales pipeline board for someone who may open it.
         if ($route === 'crm-dashboard' && $href === '/opportunities') return s6_as($uid, fn() => sx_can());
+        //  Owner findings B1 (21 Nov 2026): the "New quote" tile was /quote-edit with no quotation
+        //  ("Not found"); it is /quote-new now, and only for someone who may write a quotation.
+        if ($route === 'sales-home' && $href === '/quote-edit') return true;
         return false;
     };
     $compare = function ($label, $uid, $route, $get) use ($gone) {

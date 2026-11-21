@@ -1824,6 +1824,18 @@ function ops_leads($route, $method) {
                 : '.'));
             redirect('/lead?id=' . (int)$l['id']);
         }
+        //  Owner test LC-01 (21 Nov 2026): opening this page again for a lead that is
+        //  already a customer showed the whole form. It now says it is done and links
+        //  to the customer and the inquiry; a POST is still refused by lead_convert().
+        if (($l['status'] ?? '') === 'CONVERTED') {
+            $cp = (int) ($l['converted_partner_id'] ?? 0) ?: (int) ($l['partner_id'] ?? 0);
+            $ci = (int) ($l['converted_inquiry_id'] ?? 0);
+            view('ops/lead_convert', ['l' => $l, 'done' => [
+                'partner' => $cp ? ops_one("SELECT id, display_name, legal_name FROM business_partners WHERE id=?", [$cp]) : null,
+                'inquiry' => $ci && function_exists('crm_inquiry_get') ? crm_inquiry_get($ci) : null,
+            ]]);
+            return true;
+        }
         view('ops/lead_convert', [
             'l' => $l, 'stage_id' => (int)($_GET['stage_id'] ?? $l['stage_id']),
             'dup' => lead_possible_duplicate((string)$l['company_name']),

@@ -101,7 +101,12 @@ try {
         t_eq($n['refused'], $o['refused'], "$label · $pg — refused as before");
         $fd = []; foreach ($o['figs'] as $k => $v) if (($n['figs'][$k] ?? null) !== $v) $fd[] = "$k: old \"$v\" new \"" . ($n['figs'][$k] ?? '—') . '"';
         t_eq($fd, [], "$label · $pg — all " . count($o['figs']) . ' figures read the same');
-        t_eq(array_values(array_diff(array_unique($o['hrefs']), $n['hrefs'])), [], "$label · $pg — every link of the old page is on the new one");
+        //  Owner findings B4 (21 Nov 2026): the "+ Add new" customer link (href "#") is no longer
+        //  offered to someone the add form refuses (partner_can_add — the form's own rule).
+        $keep = $_SESSION['uid'] ?? null; bbv_as($uid); $mayAdd = partner_can_add(); if ($keep) bbv_as($keep);
+        $gone = array_values(array_diff(array_unique($o['hrefs']), $n['hrefs']));
+        if ($route === 'lead-convert' && !$mayAdd) $gone = array_values(array_diff($gone, ['#']));
+        t_eq($gone, [], "$label · $pg — every link of the old page is on the new one (except “+ Add new” customer for someone who may not add one — B4)");
         //  A form keeps its address and every field it had (a new page may add one — the business unit).
         $lost = [];
         foreach (array_unique($o['forms']) as $sig) {

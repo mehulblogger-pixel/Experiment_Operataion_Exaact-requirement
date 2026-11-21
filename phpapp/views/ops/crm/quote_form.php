@@ -53,7 +53,7 @@ $__sxq4 = !(function_exists('is_embed') && is_embed());   // never inside the in
 <section class="fs-pane" data-tab="<?= e(T('client')) ?> &amp; header">
   <h3 class="tab-sub" style="margin-top:0"><?= e(T('client')) ?> &amp; header</h3>
   <div class="form-grid">
-    <div class="ff"><label><?= e(T('client')) ?> <a href="#" class="addlink" data-qa="client" data-target="#client_id">+ Add new</a></label>
+    <div class="ff"><label><?= e(T('client')) ?> <?php if (!function_exists('partner_can_add') || partner_can_add()): ?><a href="#" class="addlink" data-qa="client" data-target="#client_id">+ Add new</a><?php endif; ?></label>
       <select class="form-control searchable" name="client_id" id="client_id"><option value="">— not on file, type the name —</option>
         <?php foreach ($clients as $cl): ?><option value="<?= (int)$cl['id'] ?>" <?= (string)$g('client_id')===(string)$cl['id']?'selected':'' ?>><?= e($cl['display_name'] ?: $cl['legal_name']) ?></option><?php endforeach; ?>
       </select></div>

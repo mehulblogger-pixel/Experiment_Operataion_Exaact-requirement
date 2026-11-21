@@ -146,6 +146,11 @@ try {
         $fd = []; foreach ($o['figs'] as $k => $v) if (($n['figs'][$k] ?? null) !== $v) $fd[] = "$k: old \"$v\" new \"" . ($n['figs'][$k] ?? '—') . '"';
         t_eq($fd, [], "$label · $pg — all " . count($o['figs']) . ' figures read the same');
         $lostL = array_values(array_filter(array_diff(array_unique($o['hrefs']), $nn['hrefs']), fn($h) => !$moved($route, $GLOBALS['__s3g'] ?? [], $h)));
+        //  Owner findings B4 (21 Nov 2026): "+ Add new" customer (href "#") is not offered to
+        //  someone the add form refuses (partner_can_add — the form's own rule).
+        $keep = $_SESSION['uid'] ?? null; bbv_as($uid); $mayAdd = partner_can_add(); if ($keep) bbv_as($keep);
+        if (!$mayAdd && in_array($route, ['inquiry-new', 'inquiry-edit', 'opportunity-new', 'opportunity-edit', 'quote-new', 'quote-edit', 'lead-convert'], true))
+            $lostL = array_values(array_diff($lostL, ['#']));
         t_eq($lostL, [], "$label · $pg — every link of the old page is on the new one (moves listed above)");
         //  A form keeps its address and every field it had (a new page may add one). A GET filter
         //  form may be split into several on the same page: every old field must be on one of them.
