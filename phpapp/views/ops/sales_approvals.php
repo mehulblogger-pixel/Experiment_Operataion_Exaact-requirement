@@ -3,7 +3,14 @@
 //  2026). Each tab says the rule in force in plain sentences, then lets it be
 //  changed right there. The same sections make up "Set up Sales" — one copy of
 //  every rule, two ways in.
+//
+//  Stage 6 of the Sales redesign (owner, 21 Nov 2026): the same page inside the Sales
+//  workspace look (Sales bar, record-page cards). Tabs, rules, fields and saves are
+//  unchanged (old page: tests/fixtures/pre_stage6/sales_approvals.php).
+$__s6 = !(function_exists('is_embed') && is_embed());
+if ($__s6) require_once __DIR__ . '/_sxw_ui.php';
 ?>
+<?php if ($__s6): ?><div class="rec sxw has-bn sxq4 sxq6"><?php sxw_nav('/sales-approvals'); ?><?php endif; ?>
 <div class="master-head">
   <div>
     <h1>Sales approvals</h1>
@@ -34,3 +41,4 @@
 </form>
 <?php //  The level cards' own forms — outside the answers form (see the partial).
       foreach ($set['sections'] as $sec) if (($sec['editor'] ?? '') === 'quote_levels') { $mode = 'forms'; $levelsBack = 'sales-approvals'; include __DIR__ . '/crm/approval_levels_inline.php'; } ?>
+<?php if ($__s6): ?></div><?php sxw_bottom('/sales-approvals'); ?><?php endif; ?>

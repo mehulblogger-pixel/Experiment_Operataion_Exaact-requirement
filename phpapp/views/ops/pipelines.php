@@ -1,4 +1,13 @@
-<?php $byKind = []; foreach ($rows as $r) $byKind[$r['entity_kind']][] = $r; ?>
+<?php
+//  Stage 6 of the Sales redesign (owner, 21 Nov 2026): the pipelines list in the Sales
+//  workspace look. Every list, button, form and rule is the one it had (old page kept in
+//  tests/fixtures/pre_stage6/pipelines.php); "In use" — which meant three different things
+//  on these two screens — now says what it counts.
+$byKind = []; foreach ($rows as $r) $byKind[$r['entity_kind']][] = $r;
+$__s6 = !(function_exists('is_embed') && is_embed());
+if ($__s6) require_once __DIR__ . '/_sxw_ui.php';
+?>
+<?php if ($__s6): ?><div class="rec sxw has-bn sxq4 sxq6"><?php sxw_nav('/pipelines'); ?><?php endif; ?>
 <div class="master-head">
   <div><h1>Pipelines &amp; funnels</h1>
   <p class="sub" style="margin:2px 0 0">Have as many as your business needs — new business, renewals, repeat orders, each with its own stages. Adjust any of them to match how you actually work, or build one from scratch.</p></div>
@@ -22,7 +31,7 @@
     <?php else: ?>
       <div class="dt-scroll"><table class="dt">
         <caption class="sr-only"><?= e($label) ?>s</caption>
-        <thead><tr><th scope="col">Name</th><th scope="col" class="num">Stages</th><th scope="col" class="num">In use</th><th scope="col">Default</th><th scope="col">State</th><th scope="col"></th></tr></thead>
+        <thead><tr><th scope="col">Name</th><th scope="col" class="num">Stages</th><th scope="col" class="num" title="Leads or deals on this pipeline now">Records on it</th><th scope="col">Default</th><th scope="col">State</th><th scope="col"></th></tr></thead>
         <tbody>
         <?php foreach ($list as $r): $used = $kind === 'LEAD' ? (int)$r['lead_n'] : (int)$r['opp_n']; ?>
           <tr>
@@ -70,3 +79,4 @@
   <button class="btn" style="margin-top:12px">Create it</button>
 </form>
 <?php endif; ?>
+<?php if ($__s6): ?></div><?php sxw_bottom('/pipelines'); ?><?php endif; ?>

@@ -25,7 +25,17 @@ function sxw_area_tiles() {
     if ($t !== null) return $t;
     $t = [];
     $def = function_exists('ops_area_def') ? ops_area_def('sales') : null;
-    foreach (($def['sections'] ?? []) as $s) foreach ($s['tiles'] as $tile) $t[$tile['route']] = $tile + ['section' => $s['label']];
+    //  Test-book findings F-01 / F-02 (21 Nov 2026): a tile whose screen would refuse this person
+    //  at the door is left out — the dispatcher's own first question, the route's module gate
+    //  (ops_route_module_map). Without it the Sales bar and Sales home offered, e.g., "Leads"
+    //  to someone who holds Enquiries but not the Leads module, and the click was refused.
+    $modOk = function ($route) {
+        $base = ltrim((string) strtok((string) $route, '?'), '/');
+        $mod = function_exists('ops_route_module_map') ? (ops_route_module_map()[$base] ?? null) : null;
+        if ($mod === null && function_exists('ops_module_family')) $mod = ops_module_family($base);
+        return !$mod || can("mod.$mod.view");
+    };
+    foreach (($def['sections'] ?? []) as $s) foreach ($s['tiles'] as $tile) if ($modOk($tile['route'])) $t[$tile['route']] = $tile + ['section' => $s['label']];
     return $t;
 }
 

@@ -89,7 +89,11 @@ $fixN = count(array_filter($health, fn($h) => (int) $h[1] > 0));
       </div>
     <?php rec_card_close(); ?>
     <?php rec_card_open('Where to go', 'list'); ?>
-      <?php $shown = array_values(array_filter($tiles, fn($t) => !function_exists('feat_on') || feat_on($t[4]))); ?>
+      <?php //  Test-book finding F-02 (21 Nov 2026): a tile is shown only when this person may open
+            //  its screen — the Sales area's own tile rules (lib/areas.php, the same gates as the
+            //  routes and the Sales menu page, plus the route's module gate — sxw_area_tiles()) — not
+            //  to everyone. Feature switches as before.
+            $shown = array_values(array_filter($tiles, fn($t) => isset($area[$t[4]]) && (!function_exists('feat_on') || feat_on($t[4])))); ?>
       <div class="sxw-gt" style="--n:6">
         <?php foreach ($shown as [$ic, $t, $s, $who2, $href]): $cn = $area[$href]['count'] ?? null; $tone = $area[$href]['tone'] ?? ''; ?>
           <a href="<?= e($href) ?>" title="<?= e($s . ' · ' . $who2) ?>"><?= rec_icon($ic, 's') ?><?= e($t) ?><?= $cn ? '<em class="' . e($tone) . '">' . (int) $cn . '</em>' : '' ?></a>

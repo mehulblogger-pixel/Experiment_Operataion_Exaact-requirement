@@ -265,7 +265,7 @@ function adv_stalled_deals() {
         'stop' => 'Nothing automatic — this is the list a sales manager works through weekly. The point is that it '
                 . 'is a list of five, not a pipeline of two hundred to read.',
         'who' => 'The deal owner, reviewed by the sales manager',
-        'link' => '/crm-dashboard', 'link_label' => 'Open the sales dashboard',
+        'link' => '/crm-dashboard', 'link_label' => 'Open the Sales funnel report',
         'rows' => array_slice($rows, 0, 12), 'row_url' => '/opportunity?id=',
     ];
 }

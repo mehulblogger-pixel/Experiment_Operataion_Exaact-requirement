@@ -298,7 +298,7 @@ function ops_area_def($area) {
             // The analytics hub was buried under Quality and hard to find; surface it here too.
             $t($fx('tapi_can') && tapi_can(), '📈', 'Analytics & performance', '/analytics', 'KPI cards, trends and drill-down.');
             // Dashboards gathered here from Sales and Admin so there is one home for them.
-            $t($fx('crmdash_can') && crmdash_can(), '📈', 'Sales dashboard', '/crm-dashboard', 'Win rates and value by stage.');
+            $t($fx('crmdash_can') && crmdash_can(), '📈', 'Sales funnel report', '/crm-dashboard', 'The funnel, win rates, stuck deals and why we lose — over the last 30 days to 2 years.');
             $t(licence_enabled('operations') && $fx('mis_can') && mis_can(), '📉', 'Management dashboard', '/mis', 'The MIS overview.');
             break;
 

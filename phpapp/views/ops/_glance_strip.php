@@ -32,7 +32,10 @@ $gsGlance = $glanceWantMgmt
     ? (function_exists('dashboard_glance') ? dashboard_glance() : ['actions'=>[], 'mgmt'=>null])
     : ['actions' => function_exists('action_centre') ? action_centre(4) : [], 'mgmt' => null];
 ?>
-<?php $gsGlance = function_exists('dashboard_glance') ? dashboard_glance() : ['actions'=>[], 'mgmt'=>null];
+<?php //  DEF-20 (owner, 21 Nov 2026: "fix all the defects"): a second assignment here called
+      //  dashboard_glance() again, unconditionally — so the "actions only" choice above was
+      //  thrown away and every Dashboard and Operations home visit worked out the slow
+      //  management pulse (and drew it). The choice made above is now the one used.
       if ($gsGlance['actions'] || $gsGlance['mgmt']): ?>
 <div class="panel" style="margin-top:14px">
   <?php if ($gsGlance['mgmt']): $gsM = $gsGlance['mgmt'];

@@ -1,18 +1,29 @@
-<?php $h = $head; $windows = [30=>'30 days', 90=>'90 days', 180=>'6 months', 365=>'12 months', 730=>'2 years']; ?>
+<?php $h = $head; $windows = [30=>'30 days', 90=>'90 days', 180=>'6 months', 365=>'12 months', 730=>'2 years'];
+//  Stage 6 of the Sales redesign (owner, 21 Nov 2026). DEF-17: this screen is now the
+//  "Sales funnel report", so only one screen is called Sales dashboard (/sales-dashboard).
+//  Its "Pipeline board" button opens the Sales pipeline board when the person may open it
+//  (the deals register otherwise, as before). The window is a rolling one — the last N days —
+//  and now says so. Every figure, list and download is unchanged (old page:
+//  tests/fixtures/pre_stage6/crm_dashboard.php).
+$__s6 = !(function_exists('is_embed') && is_embed());
+if ($__s6) require_once __DIR__ . '/_sxw_ui.php';
+$__board = (function_exists('sx_can') && sx_can() && (!function_exists('feat_on') || feat_on('/sales-board'))) ? '/sales-board' : '/opportunities';
+?>
+<?php if ($__s6): ?><div class="rec sxw has-bn sxq4 sxq6"><?php sxw_nav('/crm-dashboard'); ?><?php endif; ?>
 <div class="master-head">
-  <div><h1>Sales dashboard</h1>
+  <div><h1>Sales funnel report</h1>
   <p class="sub" style="margin:2px 0 0">How selling is going — the funnel, where deals stop moving, and why they are lost.
     <?php if ($industryLabel): ?>Built for <b><?= e($industryLabel) ?></b>.<?php endif; ?>
     <?php if ($canSetIndustry): ?><a href="/industry"><?= $industry ? 'Change the industry template' : 'Set your industry' ?></a><?php endif; ?>
   </p></div>
   <div style="display:flex;gap:8px;flex-wrap:wrap">
     <?php if ($funnel): ?><a class="btn secondary" href="/crm-dashboard?<?= e(http_build_query(array_merge($_GET,['export'=>'csv']))) ?>">⬇ Funnel CSV</a><?php endif; ?>
-    <a class="btn secondary" href="/opportunities">Pipeline board</a>
+    <a class="btn secondary" href="<?= e($__board) ?>">Pipeline board</a>
   </div>
 </div>
 
 <div class="panel" style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-  <span class="muted" style="font-size:12.5px">Window</span>
+  <span class="muted" style="font-size:12.5px" title="A rolling window: the last N days up to today — not the financial year the Sales dashboard uses">Window · last</span>
   <?php foreach ($windows as $d => $lbl): ?>
     <a class="btn small<?= $days===$d?'':' secondary' ?>" href="/crm-dashboard?<?= e(http_build_query(array_merge($_GET,['days'=>$d]))) ?>"><?= e($lbl) ?></a>
   <?php endforeach; ?>
@@ -202,3 +213,4 @@
     <?php endif; ?>
   </div>
 </div>
+<?php if ($__s6): ?></div><?php sxw_bottom('/crm-dashboard'); ?><?php endif; ?>

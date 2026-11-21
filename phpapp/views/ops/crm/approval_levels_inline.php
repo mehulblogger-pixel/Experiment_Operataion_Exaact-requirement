@@ -77,7 +77,7 @@ $levelCard = function ($r, $fid, $isNew) use ($L, $cur, $unit, $card, $field) {
   <?php else: ?>
     <p class="muted" style="margin:2px 0 0;font-size:13px">A <?= e(function_exists('Tl') ? Tl('quote') : 'quotation') ?> goes through every level its value falls in, level 1 first. Pick a role or one named person. "For" limits a level to one <?= e($unit) ?>.</p>
     <?php foreach ($rows as $r) echo $levelCard($r, 'ql-' . (int) $r['id'], false); ?>
-    <?php if (!$rows): ?><p style="margin:10px 0 0">No levels yet. Add the first one:</p><?php endif; ?>
+    <?php if (!$rows): ?><p style="margin:10px 0 0">No levels yet — so a <?= e(function_exists('Tl') ? Tl('quote') : 'quotation') ?> needs no approval (rule 19k). Add the first one:</p><?php endif; ?>
     <?= $levelCard(['level' => $nextLevel, 'min_amount' => $openTop ? '' : $nextFrom, 'max_amount' => 0, 'active' => 1], 'ql-new', true) ?>
     <?php if ($openTop): ?><p class="muted" style="margin:0;font-size:12.5px">One of your levels already has no upper limit; a new level beside it is for a different <?= e($unit) ?> or a second signature.</p><?php endif; ?>
   <?php endif; ?>

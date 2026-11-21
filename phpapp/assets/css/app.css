@@ -2124,3 +2124,69 @@ button.sxw-ib{cursor:pointer;font-family:inherit}
 /* Stage 4: every button inside the restyled panels is at least 34 px tall (tap size) */
 .sxqd .btn,.sxqd .btn.small,.sxq4 .btn,.sxq4 .btn.small,.sxap .btn.small{min-height:34px}
 .sxqd .panel .btn.small,.sxq4 .panel .btn.small{display:inline-flex;align-items:center}
+
+/* ============================================================================
+   SALES — STAGE 6 (owner, 21 Nov 2026: Stage 6 of the Sales redesign — Sales
+   settings, Set up Sales / Sales approvals, Pipelines & funnels, stage gates,
+   Advertising return, Sales funnel report). Look only; the handlers decide what
+   a person may see or do. The framed screens reuse the Stage 4 ".sxq4" look.
+   ============================================================================ */
+/* Sales settings */
+.sxs6-g{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start}
+.sxs6-c{display:flex;flex-direction:column;gap:12px;min-width:0}
+.sxs6-c>.rec-card{margin:0}
+@media (min-width:1000px){ .sxs6-g{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr)} }
+.sxs6-oc .form-control{min-height:38px}
+.sxs6-oc td.n{width:120px}
+.sxs6-oc .sxnum{max-width:110px;text-align:right;margin-left:auto}
+.sxs6-hint{font-size:12px;white-space:nowrap}
+.sxs6-pills{display:flex;flex-wrap:wrap;gap:8px}
+.sxs6-pill{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 12px;border:1px solid var(--line);border-radius:999px;background:var(--card);font-size:13px;font-weight:600;color:var(--ink)}
+.sxs6-pill:hover{text-decoration:none;border-color:var(--brand)}
+.sxs6-pill svg.rec-i{width:15px;height:15px;color:var(--brand-ink)}
+.sxs6-days{display:flex;flex-wrap:wrap;gap:8px}
+.sxs6-days label{position:relative;display:inline-flex;cursor:pointer}
+.sxs6-days input{position:absolute;opacity:0;width:1px;height:1px}
+.sxs6-days span{display:inline-flex;align-items:center;justify-content:center;min-width:48px;min-height:38px;padding:0 12px;border:1px solid var(--line);border-radius:999px;background:var(--card);font-weight:600;font-size:13px}
+.sxs6-days input:checked+span{background:var(--btn-bg);border-color:var(--btn-bg);color:var(--on-brand)}
+.sxs6-days input:focus-visible+span{outline:3px solid var(--focus,#2563eb);outline-offset:2px}
+.sxs6-lab{display:block;font-weight:600;font-size:13px;margin:0 0 6px}
+.sxs6-inl{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.sxs6-inl .form-control{max-width:110px;min-height:38px}
+.sxs6-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:flex-end;background:var(--card);border:1px solid var(--line);border-radius:var(--rec-r,12px);padding:12px 16px;margin:12px 0 0}
+.sxs6-bar>span{margin-right:auto;color:var(--muted);font-size:13px}
+.sxs6-bar .btn,.sxs6-bar .sxw-bt{min-height:40px}
+/* Set up Sales: jump links to each part of the page (nothing hidden) */
+.sxq6-jump{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 4px}
+.sxq6-jump a{display:inline-flex;align-items:center;min-height:36px;padding:0 12px;border:1px solid var(--line);border-radius:999px;background:var(--card);font-size:13px;font-weight:600;color:var(--brand-ink)}
+.sxq6-jump a:hover{text-decoration:none;border-color:var(--brand)}
+.sxq6 .panel[aria-labelledby]{scroll-margin-top:12px}
+.sxq6 form .sxs6-bar{position:sticky;bottom:0;z-index:2}
+.sxq6-back{margin:0 0 8px}
+.sxq6 .btn,.sxq6 .btn.small{min-height:34px}
+.sxq6 .filter-bar .form-control{min-height:36px}
+/* Sales funnel report: its two-column panels and its pipeline picker stay inside the screen
+   (they pushed the page 51–61 px sideways at 768–1024 px before Stage 6, too) */
+.sxq6 .panel-split{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.sxq6 .panel-split>*{min-width:0}
+.sxq6 .panel-split .panel{overflow-x:auto}
+@media (max-width:1100px){ .sxq6 .panel-split{grid-template-columns:minmax(0,1fr)} }
+.sxq6 .panel select{max-width:100%}
+.sxq6 .panel>span{max-width:100%;min-width:0}
+/* Sales approvals: every tab visible (wrapped) rather than scrolled out of sight */
+.sxq6 .appr-tabs{flex-wrap:wrap;overflow:visible}
+/* Pipeline stages: on a phone each stage is a small card, labels from data-l */
+@media (max-width:700px){
+  .sxq6-stages thead{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+  .sxq6-stages,.sxq6-stages tbody,.sxq6-stages tr,.sxq6-stages td{display:block;width:100%}
+  .sxq6-stages tr{border:1px solid var(--line);border-radius:10px;margin:0 0 10px;padding:8px 10px;background:var(--card)}
+  .sxq6-stages td{border:0;padding:4px 0;text-align:left!important;display:flex;gap:8px;align-items:center;justify-content:space-between}
+  .sxq6-stages td[data-l]::before{content:attr(data-l);font-size:12px;font-weight:700;color:var(--muted);flex:none}
+  .sxq6-stages td .form-control{width:auto!important;min-width:0!important;max-width:65%;flex:1}
+  .sxq6-stages td input[type=checkbox].form-control{flex:none;width:22px!important;height:22px;min-height:0;padding:0}
+  .sxq6 .dt-scroll{overflow:visible}
+  .sxs6-hint{white-space:normal}
+}
+@media (max-width:640px){
+  .sxs6-bar{justify-content:stretch}.sxs6-bar>span{flex-basis:100%}.sxs6-bar .btn,.sxs6-bar .sxw-bt{flex:1 1 auto}
+}
