@@ -2,6 +2,18 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🧭 Sales Stage 5 built (21 Nov 2026, report 59) — what is left for Stage 6 and later
+
+- **Sales settings screen (Stage 6):** draw the renewal window field. The handler already saves it
+  (`renew_days` → setting `sales_renewal_days`, 7–365) and passes `renewDays` / `renewExample` to the view.
+- **Targets in ₹ lakh:** the approved picture shows the boxes in ₹ lakh; they stay in rupees (as before) so a
+  figure is never read 1,00,000 times too big or small. Ask the owner if lakh entry is wanted.
+- **Quotation page tabs (C2):** six tabs as approved. The live approval chain with Approve / Reject stays on
+  Overview (the design puts "Your decision" and "Approval chain" there); the Approvals tab is the full read-only
+  record across revisions.
+- **DEF-07 elsewhere:** the Advertising return's "collected" and the contract page's paid figures keep their own
+  meaning; aligning them is outside Sales — ask before changing.
+
 ## 🧭 Sales Stage 4 — Quotations, costing, templates, approvals built (21 Nov 2026, report 58); follow-ups
 
 Built to the approved design pack: register on the shared register (item 8), Withdraw to draft

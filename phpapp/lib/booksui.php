@@ -400,7 +400,8 @@ function ops_books($route, $method) {
         if (!$p) { http_response_code(404); view('notfound'); return true; }
         $from = (string)($_GET['from'] ?? '');
         $to   = (string)($_GET['to'] ?? '');
-        $led  = books_ledger($pid, $from, $to);
+        //  Follows the person's branches; central finance (every branch) sees it whole (owner, 21 Nov 2026).
+        $led  = books_ledger($pid, $from, $to, true);
         if (wants_csv()) {
             $csv = [['Date','Type','Reference','Note','Debit','Credit','Balance']];
             foreach ($led['rows'] as $r)
@@ -408,7 +409,7 @@ function ops_books($route, $method) {
             csv_download('ledger-' . preg_replace('/[^A-Za-z0-9]+/', '-', (string)($p['display_name'] ?: $p['legal_name'])) . '.csv', $csv);
         }
         view('ops/ledger', ['p' => $p, 'led' => $led, 'from' => $from, 'to' => $to,
-                            'sum' => books_outstanding($pid)]);
+                            'sum' => books_outstanding($pid, true), 'scopedAll' => !function_exists('sx_scope_is_all') || sx_scope_is_all()]);
         return true;
     }
 

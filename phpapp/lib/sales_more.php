@@ -267,17 +267,34 @@ function sx_orders($who, $from, $to) {
     if (function_exists('scope_allows')) $rows = array_values(array_filter($rows, fn($q) => empty($q['office_id']) || scope_allows((int) $q['office_id'])));
     $ar = function_exists('ar_can') && ar_can();
     foreach ($rows as &$q) {
-        $q['_billed'] = null; $q['_recv'] = null; $q['_invs'] = [];
+        $q['_billed'] = null; $q['_recv'] = null; $q['_cash'] = null; $q['_tds'] = null; $q['_credit'] = null; $q['_out'] = null; $q['_invs'] = [];
+        //  DEF-06 (owner, 21 Nov 2026, option A): the order's value BEFORE GST is the
+        //  main figure; the total with GST is shown beside it.
+        $q['_value'] = function_exists('crm_quote_before_gst') ? crm_quote_before_gst($q) : (float) ($q['subtotal'] ?? $q['total_amount'] ?? 0);
         if (!$ar) continue;
         $args = [(int) $q['id']]; $w = 'quotation_id=?';
         if (trim((string) ($q['contract_number'] ?? '')) !== '') { $w .= ' OR (partner_id=? AND contract_number=?)'; $args[] = (int) $q['client_id']; $args[] = $q['contract_number']; }
         try {
             $invs = ops_all("SELECT id, invoice_no, invoice_date, due_date, total, status FROM invoices WHERE ($w) AND status NOT IN ('DRAFT','CANCELLED')", $args) ?: [];
         } catch (Throwable $e) { $invs = []; }
-        $b = 0.0; $r = 0.0;
-        //  books_settled() returns the invoice's breakdown; "settled" = cash + TDS + credit notes.
-        foreach ($invs as $i) { $b += (float) $i['total']; if (function_exists('books_settled')) { $st = books_settled((int) $i['id']); $r += (float) (is_array($st) ? ($st['settled'] ?? 0) : $st); } }
-        $q['_billed'] = $b; $q['_recv'] = $r; $q['_invs'] = $invs;
+        $b = 0.0; $cash = 0.0; $tds = 0.0; $cn = 0.0;
+        //  DEF-07 (owner, 21 Nov 2026, option A; Finance: "some payments are without TDS
+        //  and some deduct TDS"): RECEIVED = the payments received PLUS the TDS the
+        //  customer actually deducted on those receipts (a receipt with no TDS adds
+        //  none — no rate is ever assumed). Credit notes reduce what is owed but are
+        //  not money received, so they are kept apart. books_settled() is the same
+        //  breakdown the ledger and the ageing use.
+        foreach ($invs as $i) {
+            $b += (float) $i['total'];
+            if (!function_exists('books_settled')) continue;
+            $st = books_settled((int) $i['id']);
+            if (!is_array($st)) continue;
+            $cash += (float) ($st['cash'] ?? 0); $tds += (float) ($st['tds'] ?? 0); $cn += (float) ($st['credit'] ?? 0);
+        }
+        $q['_billed'] = $b; $q['_cash'] = round($cash, 2); $q['_tds'] = round($tds, 2);
+        $q['_recv'] = round($cash + $tds, 2); $q['_credit'] = round($cn, 2);
+        $q['_out'] = round(max(0.0, $b - $cash - $tds - $cn), 2);
+        $q['_invs'] = $invs;
     }
     unset($q);
     return $rows;
@@ -309,14 +326,55 @@ function sx_avg_days_to_pay($invIds = null) {
 // ---- Renewals -----------------------------------------------------------------
 //  Contracts by days left, including those that ended in the last 30 days
 //  (still worth a call). $days = how far ahead to look.
-function sx_renewals_list($days) {
+//  DEF-10 (owner, 21 Nov 2026): only contracts that are OPEN — not waiting to be
+//  opened, rejected or closed — and one look-ahead window for every Sales screen
+//  (Renewals, Today, Sales home), set in Sales settings (sx_renewal_days()).
+function sx_renewals_list($days = null) {
+    $days = $days === null ? sx_renewal_days() : (int) $days;
     $t = date('Y-m-d');
     try {
+        if (function_exists('contracts_migrate')) contracts_migrate();
         return sx_scope_contracts(ops_all("SELECT c.*, COALESCE(NULLIF(bp.display_name,''), bp.legal_name) client_name, bp.home_branch_id client_branch FROM partner_contracts c
                         LEFT JOIN business_partners bp ON bp.id=c.partner_id
-                        WHERE COALESCE(c.is_active,1)=1 AND COALESCE(c.end_date,'')<>'' AND c.end_date>=? AND c.end_date<=? ORDER BY c.end_date",
+                        WHERE COALESCE(c.is_active,1)=1 AND COALESCE(NULLIF(c.open_status,''),'OPEN')='OPEN'
+                          AND COALESCE(c.end_date,'')<>'' AND c.end_date>=? AND c.end_date<=? ORDER BY c.end_date",
                         [date('Y-m-d', strtotime('-30 days')), date('Y-m-d', strtotime("+$days days"))]) ?: []);
     } catch (Throwable $e) { return []; }
+}
+
+//  The look-ahead window, in days. A setting (Sales settings → "Renewals: look ahead");
+//  60 is the starting value the owner chose, marked as an example until changed.
+const SX_RENEWAL_DAYS_DEFAULT = 60;
+function sx_renewal_days() {
+    $v = (int) (function_exists('setting_get') ? setting_get('sales_renewal_days', '') : 0);
+    return $v >= 7 && $v <= 365 ? $v : SX_RENEWAL_DAYS_DEFAULT;
+}
+function sx_renewal_days_is_example() { return (string) (function_exists('setting_get') ? setting_get('sales_renewal_days', '') : '') === ''; }
+//  Contract money (owner Q2, 21 Nov 2026): a contract's value is shown on the
+//  Renewals list only to people the contract page shows it to.
+function sx_contract_money_can() {
+    return is_master() || (function_exists('can') && (can('data.credit') || can('data.revenue') || can('finance.reconcile')));
+}
+//  Owner Q3, 21 Nov 2026: a renewal call is logged on the client's own timeline,
+//  naming the contract. Whoever may log a conversation on a lead or a deal may log
+//  this one; the contract must be one of the person's branches.
+function sx_renewal_log_can() {
+    return (function_exists('leads_can_edit') && leads_can_edit() && (!function_exists('leads_works_leads') || leads_works_leads()))
+        || (function_exists('opp_can_edit') && opp_can_edit() && (!function_exists('leads_works_leads') || leads_works_leads()));
+}
+function sx_renewal_log(array $b) {
+    $id = (int) ($b['contract_id'] ?? 0);
+    $c = $id ? ops_one("SELECT c.*, bp.home_branch_id client_branch FROM partner_contracts c LEFT JOIN business_partners bp ON bp.id=c.partner_id WHERE c.id=?", [$id]) : null;
+    if (!$c || !(int) $c['partner_id']) return ['err' => 'That contract was not found.'];
+    if (!sx_scope_contracts([$c])) return ['err' => 'That contract belongs to another office / branch.'];
+    $note = trim((string) ($b['note'] ?? ''));
+    if ($note === '') return ['err' => 'Write what was said — one line is enough.'];
+    $method = isset(ACT_KINDS[$b['method'] ?? '']) && in_array($b['method'], ['CALL', 'MEETING', 'VISIT', 'EMAIL', 'WHATSAPP'], true) ? $b['method'] : 'CALL';
+    $no = trim((string) ($c['contract_number'] ?? '')) ?: ('#' . $id);
+    if (!function_exists('act_log')) return ['err' => 'The client timeline is not available here.'];
+    act_log('PARTNER', (int) $c['partner_id'], $method, 'Renewal — contract ' . $no . ($c['end_date'] ? ' (ends ' . fdate($c['end_date']) . ')' : ''),
+            ['body' => mb_substr($note, 0, 2000), 'partner_id' => (int) $c['partner_id'], 'outcome' => mb_substr(trim((string) ($b['outcome'] ?? '')), 0, 60)]);
+    return ['ok' => true, 'no' => $no];
 }
 
 // ---- Targets ------------------------------------------------------------------------
@@ -327,9 +385,19 @@ function sxt_can_set() {
     if (is_master()) return !function_exists('crmdash_can') || crmdash_can();
     return can('crm.targets.set') && (!function_exists('licence_module_live') || licence_module_live('crm_reports'));
 }
-//  The FY's months as YYYY-MM.
-function sxt_months() {
-    try { [$fa] = fy_range(active_fy()); } catch (Throwable $e) { $fa = date('Y') . '-04-01'; }
+//  The FY's months as YYYY-MM. DEF-11 (owner, 21 Nov 2026): any financial year may
+//  be picked (the year picker); the active year when none is asked for.
+function sxt_fy($asked = null) {
+    $asked = trim((string) $asked);
+    return preg_match('/^\d{4}(-\d{2})?$/', $asked) ? $asked : (function_exists('active_fy') ? active_fy() : date('Y'));
+}
+function sxt_fy_options() {
+    $cur = (int) substr(sxt_fy(), 0, 4); $out = [];
+    for ($y = $cur + 1; $y >= $cur - 4; $y--) $out[] = function_exists('fy_label') ? fy_label($y) : (string) $y;
+    return $out;
+}
+function sxt_months($fy = null) {
+    try { [$fa] = fy_range(sxt_fy($fy)); } catch (Throwable $e) { $fa = date('Y') . '-04-01'; }
     $out = []; $t = strtotime(substr($fa, 0, 7) . '-01');
     for ($i = 0; $i < 12; $i++) $out[] = date('Y-m', strtotime("+$i months", $t));
     return $out;
@@ -340,8 +408,12 @@ function sxt_grid(array $months) {
     $g = [];
     if (!$months) return $g;
     $in = implode(',', array_fill(0, count($months), '?'));
-    foreach (ops_all("SELECT * FROM sales_targets WHERE ym IN ($in) ORDER BY id", $months) ?: [] as $r)
-        $g[(int) $r['user_id']][$r['ym']] = (float) $r['amount'];
+    //  DEF-11: a box cleared on purpose is stored as a row with NO amount — "no
+    //  target" — so it reads as empty, not as a target of ₹0, and the history keeps it.
+    foreach (ops_all("SELECT * FROM sales_targets WHERE ym IN ($in) ORDER BY id", $months) ?: [] as $r) {
+        if ($r['amount'] === null) unset($g[(int) $r['user_id']][$r['ym']]);
+        else $g[(int) $r['user_id']][$r['ym']] = (float) $r['amount'];
+    }
     return $g;
 }
 function sxt_target_total($who, $from, $to) {
@@ -357,7 +429,7 @@ function sxt_target_total($who, $from, $to) {
 function sxt_save(array $post, array $months) {
     sx_more_migrate();
     $cur = sxt_grid($months); $n = 0; $me = user_name(current_user()); $changed = [];
-    $people = sx_target_people();
+    $people = sxt_people_for_setter(sx_target_people());
     $GLOBALS['sxt_skipped'] = ['bad' => [], 'clash' => []];
     $fmt = fn($x) => $x === null ? '' : (string) (0 + $x);
     foreach ((array) ($post['t'] ?? []) as $uid => $row) {
@@ -371,6 +443,17 @@ function sxt_save(array $post, array $months) {
             $shown = isset($post['o'][$uid][$ym]) ? trim((string) $post['o'][$uid][$ym]) : null;
             if ($shown !== null && $v === $shown) continue;
             if ($v === '' && !isset($cur[$uid][$ym])) continue;
+            //  DEF-11: emptying a box that had a figure means "no target" — a new row
+            //  with no amount; the earlier figure stays in the history.
+            if ($v === '') {
+                if ($shown !== null && $fmt($cur[$uid][$ym] ?? null) !== $shown) { $GLOBALS['sxt_skipped']['clash'][] = $label; continue; }
+                $prev = (float) $cur[$uid][$ym];
+                db()->prepare("INSERT INTO sales_targets (user_id, ym, amount, prev_amount, set_by, set_at, seen_at) VALUES (?,?,NULL,?,?,?,'')")
+                    ->execute([$uid, $ym, $prev, $me, date('c')]);
+                $changed[$uid][] = [$ym, $prev, null];
+                $n++;
+                continue;
+            }
             //  Whole rupees, never negative, never text.
             if ($v !== '' && (!is_numeric($v) || (float) $v < 0)) { $GLOBALS['sxt_skipped']['bad'][] = $label; continue; }
             $amt = (float) round((float) $v);
@@ -400,7 +483,8 @@ function sxt_mail_change($uid, array $rows, $by) {
     if (!$u || $to === '') return "Could not e-mail $nm: no e-mail address on their login (Admin → Users).";
     $lines = [];
     foreach ($rows as [$ym, $prev, $amt])
-        $lines[] = date('M Y', strtotime($ym . '-01')) . ': ' . ($prev === null ? 'set to ' . sx_money($amt) : sx_money($prev) . ' → ' . sx_money($amt));
+        $lines[] = date('M Y', strtotime($ym . '-01')) . ': ' . ($amt === null ? sx_money($prev) . ' → no target'
+                 : ($prev === null ? 'set to ' . sx_money($amt) : sx_money($prev) . ' → ' . sx_money($amt)));
     $body = 'Hello ' . user_name($u) . ",\n\nYour sales target was changed by $by on " . date('j M Y') . ":\n\n  " . implode("\n  ", $lines)
           . "\n\nSee all your targets under Sales → Targets.\n";
     try { $ok = ops_mail($to, 'Your sales target was changed', $body, '', 'sales_target'); }
@@ -423,6 +507,19 @@ function sxt_changes(array $months) {
     if (!$months) return $out;
     $in = implode(',', array_fill(0, count($months), '?'));
     foreach (ops_all("SELECT * FROM sales_targets WHERE ym IN ($in) ORDER BY id", $months) ?: [] as $r) $out[(int) $r['user_id']][$r['ym']][] = $r;
+    return $out;
+}
+//  DEF-11 (owner, 21 Nov 2026, A): a setter who is not management sets targets only
+//  for the people of their own branches (the person's home branch within the
+//  setter's office scope). Management and the Master Admin set them for anyone.
+function sxt_people_for_setter(array $people) {
+    if (!function_exists('sx_can_see_all') || sx_can_see_all() || is_master()) return $people;
+    if (!function_exists('scope_offices') || scope_offices() === 'ALL') return $people;
+    $out = [];
+    foreach ($people as $uid => $nm) {
+        $home = (int) (ops_val("SELECT COALESCE(home_office_id,0) FROM users WHERE id=?", [(int) $uid]) ?: 0);
+        if ($home && function_exists('scope_office_allows') && scope_office_allows($home)) $out[$uid] = $nm;
+    }
     return $out;
 }
 //  Who can carry a target: the Sales roles plus anyone who owns a lead or deal.
@@ -527,7 +624,25 @@ function ops_sales_more($route, $method) {
             //  person's orders (their invoices); everyone → the person's branches.
             $invIds = null;
             if ($who) { $invIds = []; foreach ($orders as $o) foreach ($o['_invs'] ?? [] as $i) $invIds[] = (int) $i['id']; }
-            view('ops/sx_orders', ['rows' => $orders, 'p' => $p, 'plab' => $plab, 'ar' => function_exists('ar_can') && ar_can(),
+            $ar = function_exists('ar_can') && ar_can();
+            //  Backend item 15 (owner, 21 Nov 2026): the orders on screen as a CSV. The
+            //  billing and payment columns only for people who may see receivables —
+            //  exactly as on the screen.
+            if (($_GET['export'] ?? '') === 'csv') {
+                $head = [T('quote'), 'Revision', T('client'), 'PO', 'PO date', 'Won on', 'Order before GST', 'Order with GST'];
+                if ($ar) array_push($head, 'Billed (with GST)', 'Payments received', 'TDS deducted', 'Received (payments + TDS)', 'Credit notes', 'Still owed', 'To bill (with GST)', 'Invoices');
+                $csv = [$head];
+                foreach ($orders as $o) {
+                    $row = [$o['quote_no'], (int) $o['rev'], $o['cname'], $o['po_number'] ?? '', $o['po_date'] ?? '',
+                            substr((string) ($o['accepted_date'] ?: $o['updated_at']), 0, 10), round((float) $o['_value'], 2), round((float) $o['total_amount'], 2)];
+                    if ($ar) array_push($row, round((float) $o['_billed'], 2), round((float) $o['_cash'], 2), round((float) $o['_tds'], 2), round((float) $o['_recv'], 2),
+                                        round((float) $o['_credit'], 2), round((float) $o['_out'], 2), round(max(0, (float) $o['total_amount'] - (float) $o['_billed']), 2),
+                                        implode(' ', array_column($o['_invs'] ?? [], 'invoice_no')));
+                    $csv[] = $row;
+                }
+                csv_download('orders-and-payments-' . date('Y-m-d') . '.csv', $csv);
+            }
+            view('ops/sx_orders', ['rows' => $orders, 'p' => $p, 'plab' => $plab, 'ar' => $ar,
                 'avgPay' => sx_avg_days_to_pay($invIds), 'who' => $who, 'whoKey' => $_GET['who'] ?? 'me', 'people' => sx_can_see_all() ? sx_people() : [], 'seeAll' => sx_can_see_all(),
                 'recvMonth' => sx_received_this_month($invIds), 'collectHint' => $who ? 'these orders' : (sx_scope_is_all() ? 'all customers' : 'your branches'),
                 //  "Overdue" follows the person picked too (owner, 21 Nov 2026): only the
@@ -536,12 +651,24 @@ function ops_sales_more($route, $method) {
             return true;
 
         case 'sales-renewals':
-            $days = in_array((int) ($_GET['d'] ?? 90), [30, 60, 90, 180], true) ? (int) ($_GET['d'] ?? 90) : 90;
-            view('ops/sx_renewals', ['rows' => sx_renewals_list($days), 'days' => $days]);
+            if ($method === 'POST' && ($_POST['do'] ?? '') === 'log') {
+                ops_require(sx_renewal_log_can(), 'Logging a renewal call needs the right to work leads or deals.');
+                $r = sx_renewal_log($_POST);
+                flash(!empty($r['ok']) ? 'Logged on the ' . Tl('client') . '\'s timeline — contract ' . $r['no'] . '.' : $r['err'], !empty($r['ok']) ? 'success' : 'error');
+                redirect('/sales-renewals' . (isset($_POST['d']) ? '?d=' . (int) $_POST['d'] : ''));
+            }
+            $def = sx_renewal_days();
+            $opts = array_values(array_unique(array_merge([30, 60, 90, 180], [$def]))); sort($opts);
+            $days = in_array((int) ($_GET['d'] ?? $def), $opts, true) ? (int) ($_GET['d'] ?? $def) : $def;
+            view('ops/sx_renewals', ['rows' => sx_renewals_list($days), 'days' => $days, 'opts' => $opts, 'def' => $def,
+                'example' => sx_renewal_days_is_example(), 'money' => sx_contract_money_can(), 'canLog' => sx_renewal_log_can(),
+                'canQuote' => can('crm.quote.create') || can('mod.quotes.edit') || is_master_of('quotes'),
+                'canContract' => is_master() || can('mod.clients.view') || can('mod.vendors.view') || can('crm.contract.register') || can('data.credit') || can('finance.reconcile')]);   // ops_contract_360()'s own gate
             return true;
 
         case 'sales-targets':
-            $months = sxt_months(); $can = sxt_can_set();
+            $fy = sxt_fy($_GET['fy'] ?? $_POST['fy'] ?? null);
+            $months = sxt_months($fy); $can = sxt_can_set();
             if ($method === 'POST' && !empty($_POST['seen'])) {
                 //  The salesperson acknowledges the change notice on their Sales home.
                 db()->prepare("UPDATE sales_targets SET seen_at=? WHERE user_id=? AND COALESCE(seen_at,'')=''")->execute([date('c'), (int) (current_user()['id'] ?? 0)]);
@@ -555,15 +682,25 @@ function ops_sales_more($route, $method) {
                 $sk = $GLOBALS['sxt_skipped'] ?? ['bad' => [], 'clash' => []];
                 if ($sk['bad']) $notes[] = $bad[] = 'Not saved — type a whole amount of 0 or more for: ' . implode(', ', $sk['bad']) . '.';
                 if ($sk['clash']) $notes[] = $bad[] = 'Not saved — someone else changed these after you opened the page: ' . implode(', ', $sk['clash']) . '. Check the figures now shown and change them again if needed.';
-                if (!$n && ($sk['bad'] || $sk['clash'])) { flash(implode(' ', $notes), 'warning'); redirect('/sales-targets'); }
+                $back = '/sales-targets?fy=' . rawurlencode($fy);
+                if (!$n && ($sk['bad'] || $sk['clash'])) { flash(implode(' ', $notes), 'warning'); redirect($back); }
                 flash($n ? "$n target" . ($n === 1 ? '' : 's') . ' saved. Earlier figures stay in the history. ' . implode(' ', $notes) : 'Nothing changed.', $bad ? 'warning' : 'success');
-                redirect('/sales-targets');
+                redirect($back);
             }
             $people = sx_target_people();
-            if (!$can) { $me = (int) (current_user()['id'] ?? 0); $people = isset($people[$me]) ? [$me => $people[$me]] : []; }
+            $me = (int) (current_user()['id'] ?? 0);
+            if (!$can) $people = isset($people[$me]) ? [$me => $people[$me]] : [];
+            else $people = sxt_people_for_setter($people);
+            //  DEF-11: the FULL history, a page at a time (it showed only the last 30),
+            //  limited to the people on this page.
+            $ids = array_map('intval', array_keys($people));
+            $hw = $ids ? 't.user_id IN (' . implode(',', $ids) . ')' : '1=0';
+            $per = 30; $hp = max(1, (int) ($_GET['hp'] ?? 1));
+            $hn = (int) (ops_val("SELECT COUNT(*) FROM sales_targets t WHERE $hw") ?: 0);
+            $hp = min($hp, max(1, (int) ceil($hn / $per)));
             view('ops/sx_targets', ['months' => $months, 'people' => $people, 'grid' => sxt_grid($months), 'won' => sxt_won($months), 'can' => $can, 'changes' => sxt_changes($months),
-                'hist' => ops_all("SELECT t.*, u.first_name, u.last_name FROM sales_targets t LEFT JOIN users u ON u.id=t.user_id"
-                         . ($can ? '' : ' WHERE t.user_id=' . (int) (current_user()['id'] ?? 0)) . " ORDER BY t.id DESC LIMIT 30") ?: []]);
+                'fy' => $fy, 'fys' => sxt_fy_options(), 'histN' => $hn, 'histPage' => $hp, 'histPer' => $per,
+                'hist' => ops_all("SELECT t.*, u.first_name, u.last_name FROM sales_targets t LEFT JOIN users u ON u.id=t.user_id WHERE $hw ORDER BY t.id DESC LIMIT $per OFFSET " . (($hp - 1) * $per)) ?: []]);
             return true;
 
         case 'sales-settings':
@@ -582,6 +719,11 @@ function ops_sales_more($route, $method) {
                 setting_set('sales_outcomes', json_encode($rows, JSON_UNESCAPED_UNICODE));
                 setting_set('sales_weekly_off', implode(',', array_map('intval', array_filter((array) ($_POST['off'] ?? []), fn($d) => (int) $d >= 0 && (int) $d <= 6))));
                 setting_set('sales_stale_days', (string) max(1, min(365, (int) ($_POST['stale'] ?? 15))));
+                //  DEF-10 (owner, 21 Nov 2026): the one renewal look-ahead window, in days
+                //  (Renewals, Today and Sales home). Saved only when the form sends it, so a
+                //  settings form without the field leaves the window as it is.
+                if (isset($_POST['renew_days']) && trim((string) $_POST['renew_days']) !== '')
+                    setting_set('sales_renewal_days', (string) max(7, min(365, (int) $_POST['renew_days'])));
                 $map = [];
                 $skipped = [];
                 foreach ((array) ($_POST['own'] ?? []) as $oid => $uid) {
@@ -601,7 +743,7 @@ function ops_sales_more($route, $method) {
                 redirect('/sales-settings');
             }
             $pipe = pipeline_default('OPPORTUNITY');
-            view('ops/sx_settings', ['outcomes' => sx_outcomes(), 'example' => sx_outcomes_are_example(), 'off' => sx_weekly_off(), 'stale' => sx_stale_days(),
+            view('ops/sx_settings', ['renewDays' => sx_renewal_days(), 'renewExample' => sx_renewal_days_is_example(), 'outcomes' => sx_outcomes(), 'example' => sx_outcomes_are_example(), 'off' => sx_weekly_off(), 'stale' => sx_stale_days(),
                 'map' => sx_owner_map(), 'offices' => function_exists('offices_list') ? offices_list() : [], 'people' => sx_target_people(),
                 'stages' => $pipe ? pipeline_stages((int) $pipe['id']) : [], 'stageEditorOn' => !function_exists('feat_on') || feat_on('/pipelines')]);
             return true;

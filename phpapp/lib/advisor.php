@@ -161,14 +161,17 @@ function adv_overdue_invoices() {
 function adv_unmatched_receipts() {
     if (!adv_on('invoicing') || !function_exists('books_migrate')) return null;
     books_migrate();
+    //  The person's branches (owner, 21 Nov 2026: customer money follows branches;
+    //  central finance — every branch — sees all), by the receipt register's rule.
+    [$rw, $ra] = function_exists('scope_office_clause') ? scope_office_clause('r.office_id') : ['1=1', []];
     $rows = adv_rows(
         "SELECT r.id, r.receipt_no ref, r.receipt_date d, r.partner_name who,
                 (r.amount + r.tds_amount - COALESCE((SELECT SUM(x.amount) FROM receipt_allocations x
                                                      WHERE x.receipt_id = r.id),0)) amount
          FROM receipts r
-         WHERE (r.amount + r.tds_amount) >
+         WHERE $rw AND (r.amount + r.tds_amount) >
                COALESCE((SELECT SUM(x.amount) FROM receipt_allocations x WHERE x.receipt_id = r.id),0) + 0.01
-         ORDER BY amount DESC LIMIT 200");
+         ORDER BY amount DESC LIMIT 200", $ra);
     if (!$rows) return null;
     $total = 0.0; foreach ($rows as $r) $total += (float)$r['amount'];
     return [
@@ -418,7 +421,8 @@ function adv_silent_customers() {
     // Only the ones worth caring about: they have spent money or owe some.
     $rows = []; $value = 0.0;
     foreach ($silent as $s) {
-        $out = function_exists('books_outstanding') ? adv_try(fn() => books_outstanding((int)$s['id']), null) : null;
+        //  The customer's figure for the viewer's branches (whole for central finance).
+        $out = function_exists('books_outstanding') ? adv_try(fn() => books_outstanding((int)$s['id'], true), null) : null;
         $billed = $out ? (float)$out['billed'] : 0.0;
         $owing = $out ? (float)$out['outstanding'] : 0.0;
         if ($billed <= 0 && $owing <= 0) continue;

@@ -2124,3 +2124,20 @@ button.sxw-ib{cursor:pointer;font-family:inherit}
 /* Stage 4: every button inside the restyled panels is at least 34 px tall (tap size) */
 .sxqd .btn,.sxqd .btn.small,.sxq4 .btn,.sxq4 .btn.small,.sxap .btn.small{min-height:34px}
 .sxqd .panel .btn.small,.sxq4 .panel .btn.small{display:inline-flex;align-items:center}
+
+/* ==========================================================================
+   SALES — STAGE 5 (owner, 21 Nov 2026): Orders & payments, Renewals, Targets,
+   Client register (Sales view). Built on the Sales workspace kit above.
+   ========================================================================== */
+.sxw .rec-tbl th.n,.sxw .rec-tbl td.n{text-align:right;white-space:nowrap}
+.sxw .rec-tbl td.nw{white-space:nowrap}
+.sx5-log{display:inline-block}
+.sx5-log>summary{list-style:none}
+.sx5-log>summary::-webkit-details-marker{display:none}
+.sx5-log[open]{display:block;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+.sx5-tg th[scope=row]{white-space:nowrap;min-width:120px}
+.sx5-tg td.n{min-width:92px}
+.sx5-tg .sxnum{min-height:36px;text-align:right}
+.sx5-cl{margin-bottom:10px}
+.sx5-bnsp{display:none}
+@media (max-width:760px){.sx5-bnsp{display:block;height:76px}}

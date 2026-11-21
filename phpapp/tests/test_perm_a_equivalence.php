@@ -99,24 +99,31 @@ try {
     $viewers = defined('ACCESS_LEAD_VIEWERS') ? ACCESS_LEAD_VIEWERS : [];
     $mayGain = ['g' => ['lead_export', 'deal_export', 'roi', 'tiles'],
                 'can' => ['mod.leads.view', 'crm.lead.export', 'crm.deal.export', 'crm.deal.view']];
+    //  The second intended change (DEF-11, owner 21 Nov 2026, A): the Marketing Manager
+    //  (and roles built on it) may set targets for the people of their branches.
+    $targetSetters = ['MARKETING_MANAGER'];
+    $mayGainT = ['g' => ['targets'], 'can' => ['crm.targets.set']];
     $intended = 0;
-    $compare = function ($got, $want, $label) use ($roleOf, $viewers, $mayGain, &$intended, $fx) {
+    $compare = function ($got, $want, $label) use ($roleOf, $viewers, $mayGain, $targetSetters, $mayGainT, &$intended, $fx) {
         $bad = [];
         $su = array_column($fx['users'], 'su', 'u');
         foreach ($want as $user => $w) {
             $gg = $got[$user] ?? null;
             if (!$gg) { $bad[] = "$user missing"; continue; }
             $isViewer = in_array($roleOf[$user] ?? '', $viewers, true) && empty($su[$user]);
+            $isSetter = in_array($roleOf[$user] ?? '', $targetSetters, true) && empty($su[$user]);
             foreach ($w['g'] as $k => $v) {
                 $now = $gg['g'][$k] ?? '?';
                 if ((string) $now === (string) $v) continue;
                 if ($isViewer && in_array($k, $mayGain['g'], true) && ($k === 'tiles' || ((int) $v === 0 && (int) $now === 1))) { $intended++; continue; }
+                if ($isSetter && in_array($k, $mayGainT['g'], true) && (int) $v === 0 && (int) $now === 1) { $intended++; continue; }
                 $bad[] = "$user · $k: before " . var_export($v, true) . ', now ' . var_export($now, true);
             }
             foreach ($w['can'] as $k => $v) {
                 $now = (int) ($gg['can'][$k] ?? -1);
                 if ($now === (int) $v) continue;
                 if ($isViewer && in_array($k, $mayGain['can'], true) && (int) $v === 0 && $now === 1) { $intended++; continue; }
+                if ($isSetter && in_array($k, $mayGainT['can'], true) && (int) $v === 0 && $now === 1) { $intended++; continue; }
                 $bad[] = "$user · can($k): before $v, now " . ($gg['can'][$k] ?? '?');
             }
         }
@@ -173,10 +180,12 @@ try {
             [$ru, $rt] = explode(' ', $k, 2);
             //  The intended change: a Branch Manager / SBU Head now downloads leads and deals.
             if (in_array($roleOf[$ru] ?? '', $viewers, true) && in_array($rt, ['leads', 'opportunities'], true) && strpos((string) ($rr[$k] ?? ''), 'csv') !== false) { $intended++; continue; }
+            //  DEF-11: the Marketing Manager's Targets screen now offers editing.
+            if (in_array($roleOf[$ru] ?? '', $targetSetters, true) && $rt === 'sales-targets' && ($rr[$k] ?? '') === $v . '+edit') { $intended++; continue; }
             $bad[] = "$k: before $v, now " . ($rr[$k] ?? '?');
         }
         t_ok(!$bad, count($rr) . ' screens and downloads opened as real sign-ins (' . count($routeUsers) . ' people × ' . count($routes) . ' routes) — the same outcome as before' . ($bad ? ': ' . implode(' | ', array_slice($bad, 0, 12)) : ''));
-        t_ok($intended > 0, "the owner's 21 Nov change is really there: $intended intended gains, all for the Branch Manager / SBU Head (and roles built on them), nobody else");
+        t_ok($intended > 0, "the owner's 21 Nov change is really there: $intended intended gains, all for the Branch Manager / SBU Head (leads and deals) and the Marketing Manager (targets, DEF-11), nobody else");
     } else {
         file_put_contents($writeTo, json_encode($result, JSON_PRETTY_PRINT));
         t_ok(true, 'snapshot written');

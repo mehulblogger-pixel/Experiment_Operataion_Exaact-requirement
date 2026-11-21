@@ -51,8 +51,8 @@ $fixN = count(array_filter($health, fn($h) => (int) $h[1] > 0));
       <?php endif; ?>
     </div>
     <?php if ($tch): ?>
-      <form method="post" action="/sales-targets"><input type="hidden" name="seen" value="1">
-        <a class="sxw-bt" href="/sales-targets">Open Targets</a><button class="sxw-bt p" type="submit">OK, seen</button></form>
+      <form method="post" action="/sales-home"><input type="hidden" name="seen" value="1">
+        <?php if (!function_exists('feat_on') || feat_on('/sales-targets')): ?><a class="sxw-bt" href="/sales-targets">Open Targets</a><?php endif; ?><button class="sxw-bt p" type="submit">OK, seen</button></form>
     <?php endif; ?>
   </div>
 

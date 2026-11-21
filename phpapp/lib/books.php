@@ -1077,10 +1077,19 @@ function books_cn_insert($invoiceId, array $r) {
 // Every entry against one customer, in date order, with a running balance. This
 // is the answer to "what do they actually owe us", and until now the
 // application could not produce it at all.
-function books_ledger($partnerId, $from = '', $to = '') {
+//  $scoped (owner, 21 Nov 2026: "customer ledger should follow branches but central
+//  finance team can access each and every customer ledger and details irrespective
+//  of the branches"): only the invoices, receipts and credit notes of the signed-in
+//  person's branches, each by its own register's rule. Someone whose data scope is
+//  every branch — central finance, management, a master — sees the whole ledger,
+//  exactly as before. The nightly / CLI callers pass nothing and stay unscoped.
+function books_ledger($partnerId, $from = '', $to = '', $scoped = false) {
     books_migrate();
     $pid = (int)$partnerId;
     $rows = [];
+    [$iw, $ia] = $scoped && function_exists('scope_clause') ? scope_clause('office_id', 'sbu') : ['1=1', []];
+    [$rw, $ra] = $scoped && function_exists('scope_office_clause') ? scope_office_clause('r.office_id') : ['1=1', []];
+    [$cw, $ca] = $scoped && function_exists('scope_office_clause') ? scope_office_clause('office_id') : ['1=1', []];
     $range = function ($col) use ($from, $to) {
         $w = ''; $a = [];
         if ($from !== '') { $w .= " AND $col >= ?"; $a[] = $from; }
@@ -1091,7 +1100,7 @@ function books_ledger($partnerId, $from = '', $to = '') {
     [$w, $a] = $range('invoice_date');
     foreach (books_try(fn() => ops_all(
         "SELECT id, invoice_no, invoice_date, total, status FROM invoices
-         WHERE partner_id=? AND status <> 'DRAFT' AND status <> 'CANCELLED' $w", array_merge([$pid], $a))) as $r)
+         WHERE partner_id=? AND status <> 'DRAFT' AND status <> 'CANCELLED' $w AND $iw", array_merge([$pid], $a, $ia))) as $r)
         $rows[] = ['date' => $r['invoice_date'], 'kind' => 'INVOICE', 'ref' => $r['invoice_no'],
                    'url' => '/invoice?id=' . (int)$r['id'], 'debit' => (float)$r['total'], 'credit' => 0.0,
                    'note' => 'Invoice'];
@@ -1099,7 +1108,7 @@ function books_ledger($partnerId, $from = '', $to = '') {
     [$w, $a] = $range('r.receipt_date');
     foreach (books_try(fn() => ops_all(
         "SELECT r.id, r.receipt_no, r.receipt_date, r.amount, r.tds_amount, r.mode FROM receipts r
-         WHERE r.partner_id=? $w", array_merge([$pid], $a))) as $r) {
+         WHERE r.partner_id=? $w AND $rw", array_merge([$pid], $a, $ra))) as $r) {
         if ((float)$r['amount'] > 0)
             $rows[] = ['date' => $r['receipt_date'], 'kind' => 'RECEIPT', 'ref' => $r['receipt_no'],
                        'url' => '/receipt?id=' . (int)$r['id'], 'debit' => 0.0, 'credit' => (float)$r['amount'],
@@ -1112,8 +1121,8 @@ function books_ledger($partnerId, $from = '', $to = '') {
 
     [$w, $a] = $range('cn_date');
     foreach (books_try(fn() => ops_all(
-        "SELECT id, cn_no, cn_date, total FROM credit_notes WHERE partner_id=? AND status='ISSUED' $w",
-        array_merge([$pid], $a))) as $r)
+        "SELECT id, cn_no, cn_date, total FROM credit_notes WHERE partner_id=? AND status='ISSUED' $w AND $cw",
+        array_merge([$pid], $a, $ca))) as $r)
         $rows[] = ['date' => $r['cn_date'], 'kind' => 'CREDIT', 'ref' => $r['cn_no'],
                    'url' => '/credit-note?id=' . (int)$r['id'], 'debit' => 0.0, 'credit' => (float)$r['total'],
                    'note' => 'Credit note'];

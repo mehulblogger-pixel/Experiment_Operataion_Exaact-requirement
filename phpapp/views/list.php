@@ -1,6 +1,10 @@
 <?php $isClient = $roleField === 'is_client'; $salesView = !empty($salesView); $salesOk = !empty($salesOk);
       //  The Sales view keeps every filter; the switch only changes the columns.
-      $vq = $salesView ? '&view=sales' : ''; ?>
+      $vq = $salesView ? '&view=sales' : '';
+      //  Stage 5 of the Sales redesign (owner, 21 Nov 2026): the Sales view sits in the
+      //  Sales workspace — its section bar on top and the phone bottom bar. The list,
+      //  its filters, columns and every figure below are unchanged.
+      if ($salesView && $isClient) { require_once __DIR__ . '/ops/_sxw_ui.php'; echo '<div class="rec sxw has-bn sx5-cl">'; sxw_nav('/clients?view=sales'); echo '</div>'; } ?>
 <div class="master-head">
   <div><h1><?= e($title) ?></h1>
     <p class="sub"><?= e($subtitle) ?> · <?= (int)$total ?> record<?= $total == 1 ? '' : 's' ?></p></div>
@@ -83,3 +87,4 @@
   <?php if ($page < $pages): ?><a class="btn small secondary" href="<?= $base ?>&page=<?= $page+1 ?>">Next →</a><?php endif; ?>
 </div>
 <?php endif; ?>
+<?php if ($salesView && $isClient) { echo '<div class="sx5-bnsp" aria-hidden="true"></div>'; sxw_bottom('/clients?view=sales'); } ?>

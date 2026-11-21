@@ -112,13 +112,17 @@ function sx_overdue_for($invIds = null) {
     $keep = array_flip(array_map('intval', $invIds));
     return array_values(array_filter($rows, fn($r) => !empty($r['from_books']) && isset($keep[(int) ($r['id'] ?? 0)])));
 }
-//  Contracts ending within the warning window (the existing contract setting).
+//  Contracts ending within the Sales look-ahead window. DEF-10 (owner, 21 Nov 2026):
+//  ONE window for Renewals, Today and Sales home — Sales settings, starting at 60
+//  days (sx_renewal_days()) — and only contracts that are open.
 function sx_renewals($days = null) {
-    $days = $days ?? (function_exists('contract_warn_days') ? contract_warn_days() : 30);
+    $days = $days ?? (function_exists('sx_renewal_days') ? sx_renewal_days() : (function_exists('contract_warn_days') ? contract_warn_days() : 30));
     $t = sx_today(); $to = date('Y-m-d', strtotime("+$days days"));
     try {
+        if (function_exists('contracts_migrate')) contracts_migrate();
         return sx_scope_contracts(ops_all("SELECT c.*, COALESCE(bp.display_name, bp.legal_name) client_name, bp.home_branch_id client_branch FROM partner_contracts c LEFT JOIN business_partners bp ON bp.id=c.partner_id
-                        WHERE COALESCE(c.is_active,1)=1 AND COALESCE(c.end_date,'')<>'' AND c.end_date>=? AND c.end_date<=? ORDER BY c.end_date", [$t, $to]) ?: []);
+                        WHERE COALESCE(c.is_active,1)=1 AND COALESCE(NULLIF(c.open_status,''),'OPEN')='OPEN'
+                          AND COALESCE(c.end_date,'')<>'' AND c.end_date>=? AND c.end_date<=? ORDER BY c.end_date", [$t, $to]) ?: []);
     } catch (Throwable $e) { return []; }
 }
 
@@ -359,6 +363,14 @@ function ops_sales_simple($route, $method) {
             view('ops/sx_dash', $base + ['dd' => sx_dash_data($who, $p), 'p' => $p]);
             return true;
         default: // sales-home
+            //  DEF-12 (21 Nov 2026): "OK, seen" on the target-change notice is answered
+            //  here, on Sales home itself — it used to post to Targets, so with Targets
+            //  switched off the notice could never be put away. Only the person's own rows.
+            if ($method === 'POST' && !empty($_POST['seen'])) {
+                if (function_exists('sx_more_migrate')) sx_more_migrate();
+                db()->prepare("UPDATE sales_targets SET seen_at=? WHERE user_id=? AND COALESCE(seen_at,'')=''")->execute([date('c'), (int) (current_user()['id'] ?? 0)]);
+                redirect('/sales-home');
+            }
             $d = sx_today_data($who);
             $wonFy = 0.0;
             try { [$fa] = fy_range(active_fy());

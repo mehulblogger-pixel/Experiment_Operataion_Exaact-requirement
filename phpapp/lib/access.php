@@ -1499,7 +1499,9 @@ function role_defaults_base($role) {
         case 'BUSINESS_DEV_MANAGER': case 'KEY_ACCOUNTS_MANAGER':
             return ['perms' => ['dash.operations','dash.financial','data.credit','crm.quote.create','crm.quote.send','crm.followup.manage'], 'offices' => 'OWN', 'sbus' => 'ALL'];
         case 'MARKETING_MANAGER':
-            return ['perms' => ['dash.operations','dash.financial','data.credit','data.revenue','data.profitability','crm.quote.create','crm.quote.approve','crm.quote.send','crm.followup.manage','crm.template.manage'], 'offices' => 'OWN', 'sbus' => 'ALL'];
+            //  crm.targets.set — DEF-11 (owner, 21 Nov 2026, A): holders of quotation
+            //  approval set targets too, for the people of their own branches.
+            return ['perms' => ['dash.operations','dash.financial','data.credit','data.revenue','data.profitability','crm.quote.create','crm.quote.approve','crm.quote.send','crm.followup.manage','crm.template.manage','crm.targets.set'], 'offices' => 'OWN', 'sbus' => 'ALL'];
         case 'MARKETING_EXECUTIVE':
             return ['perms' => ['crm.quote.create','crm.followup.manage'], 'offices' => 'OWN', 'sbus' => 'OWN'];
         case 'FINANCE':
@@ -1552,6 +1554,11 @@ function access_owner_grants() {
         //  branch / business unit. View and download only — never add, edit or move.
         'BM-SBU-LEADS-2026-11-21' => ['perms' => ['mod.leads.view', 'crm.deal.view', 'crm.lead.export', 'crm.deal.export'],
                                       'roles' => ACCESS_LEAD_VIEWERS],
+        //  DEF-11 (owner, 21 Nov 2026, A): "Set sales targets for others" for the roles
+        //  that hold quotation approval or lead set-up by default and are not already
+        //  management — the Marketing Manager. For the people of their own branches
+        //  (sxt_people_for_setter()).
+        'DEF-11-2026-11-21' => ['perms' => ['crm.targets.set'], 'roles' => ['MARKETING_MANAGER']],
     ];
 }
 function access_apply_owner_grants($force = false) {
