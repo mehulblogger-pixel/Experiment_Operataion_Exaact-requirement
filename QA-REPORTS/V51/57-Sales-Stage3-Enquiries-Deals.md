@@ -128,3 +128,9 @@ Every field (name, pipeline, customer + Add new / typed name, value, expected cl
 - **Rewritten:** `views/ops/crm/inquiry_list.php`, `views/ops/crm/inquiry_form.php`, `views/ops/opportunities.php`, `views/ops/opportunity_detail.php`, `views/ops/opportunity_form.php`.
 - **Changed:** `lib/crm.php` (register on the shared component, CSV, the new route, return after save), `lib/opportunities.php` (form checks, business unit, win % not taken), `lib/ops.php` (the route), `lib/activity.php`, `lib/chain.php`, `lib/search.php`, `lib/advisor.php`, `views/ops/project_costing.php` (links open the inquiry page), `views/ops/stage_gates.php` (wording), `assets/css/app.css` ("SALES — ENQUIRIES AND DEALS").
 - **Docs:** `docs/02` 19v, `docs/05`, register 52, `PENDING.md`.
+
+## Package for opstest
+
+`EXAACT-V51.1-Sales-Stage3-TEST-COPY-update.zip` — built from commit ada12aa (code 707bf70), files at the top level, 842 files.
+SHA-256 `13f3cce95436d68a76d653b27ba57f837c4e9c7ec8d5b72f89e9cec7ad6ec6e9`.
+It does **not** contain `config.local.php`, the root `tenants.php`, `tests/`, any `*.sqlite`, or the `exaact_data*` / `exaact_backups*` folders, so the test copy stays the test copy. Upload and extract it in the opstest app folder only, then open `/deploy-check.php`.
