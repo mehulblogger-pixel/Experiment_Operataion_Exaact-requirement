@@ -2,6 +2,11 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🔐 Permission screen Q10 — parked by the owner until after Stage 2 (21 Nov 2026)
+
+"Whose records a person sees" (own / team / branch / all) as its own setting. Decide after
+Stage 2 (Leads). See EXAACT-Permission-Screen-Redesign-Proposal.pdf, question 10.
+
 ## 📣 Advertising spend by branch — parked by the owner (21 Nov 2026)
 
 Owner: "Let us do it later." Ads Pro spend (`ads_spend`) is per campaign, not per branch, so
