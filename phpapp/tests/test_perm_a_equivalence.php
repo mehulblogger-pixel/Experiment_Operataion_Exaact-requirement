@@ -89,13 +89,36 @@ try {
     // by this batch is never compared against a "before" that did not have it.
     $oldKeys = $writeTo !== '' ? array_keys(all_permissions()) : ($snap['keys'] ?? []);
     $migrate = function () { setting_set('access_user_diff_q11_applied', ''); return function_exists('access_migrate_user_diffs') ? access_migrate_user_diffs(true) : null; };
-    $compare = function ($got, $want, $label) {
+    //  The ONE intended change since this snapshot (owner, 21 Nov 2026, "Yes but yes
+    //  they shall be able to download"): the Branch Manager and the SBU Head — and a
+    //  custom role built on either — may now OPEN and DOWNLOAD leads and deals. Only
+    //  these answers may move, only for those people, and only from no to yes; every
+    //  other person and every other answer must still be identical.
+    $roleOf = [];
+    foreach ($fx['users'] as $u) $roleOf[$u['u']] = function_exists('role_effective_key') ? role_effective_key(strtoupper((string) $u['role'])) : strtoupper((string) $u['role']);
+    $viewers = defined('ACCESS_LEAD_VIEWERS') ? ACCESS_LEAD_VIEWERS : [];
+    $mayGain = ['g' => ['lead_export', 'deal_export', 'roi', 'tiles'],
+                'can' => ['mod.leads.view', 'crm.lead.export', 'crm.deal.export', 'crm.deal.view']];
+    $intended = 0;
+    $compare = function ($got, $want, $label) use ($roleOf, $viewers, $mayGain, &$intended, $fx) {
         $bad = [];
+        $su = array_column($fx['users'], 'su', 'u');
         foreach ($want as $user => $w) {
             $gg = $got[$user] ?? null;
             if (!$gg) { $bad[] = "$user missing"; continue; }
-            foreach ($w['g'] as $k => $v) if ((string) ($gg['g'][$k] ?? '?') !== (string) $v) $bad[] = "$user · $k: before " . var_export($v, true) . ', now ' . var_export($gg['g'][$k] ?? null, true);
-            foreach ($w['can'] as $k => $v) if ((int) ($gg['can'][$k] ?? -1) !== (int) $v) $bad[] = "$user · can($k): before $v, now " . ($gg['can'][$k] ?? '?');
+            $isViewer = in_array($roleOf[$user] ?? '', $viewers, true) && empty($su[$user]);
+            foreach ($w['g'] as $k => $v) {
+                $now = $gg['g'][$k] ?? '?';
+                if ((string) $now === (string) $v) continue;
+                if ($isViewer && in_array($k, $mayGain['g'], true) && ($k === 'tiles' || ((int) $v === 0 && (int) $now === 1))) { $intended++; continue; }
+                $bad[] = "$user · $k: before " . var_export($v, true) . ', now ' . var_export($now, true);
+            }
+            foreach ($w['can'] as $k => $v) {
+                $now = (int) ($gg['can'][$k] ?? -1);
+                if ($now === (int) $v) continue;
+                if ($isViewer && in_array($k, $mayGain['can'], true) && (int) $v === 0 && $now === 1) { $intended++; continue; }
+                $bad[] = "$user · can($k): before $v, now " . ($gg['can'][$k] ?? '?');
+            }
         }
         t_ok(!$bad, $label . ($bad ? ' — ' . count($bad) . ' differences: ' . implode(' | ', array_slice($bad, 0, 12)) : ''));
     };
@@ -145,8 +168,15 @@ try {
     $result['routes'] = $rr;
     if ($writeTo === '') {
         $bad = [];
-        foreach ($snap['routes'] as $k => $v) if (($rr[$k] ?? '?') !== $v) $bad[] = "$k: before $v, now " . ($rr[$k] ?? '?');
+        foreach ($snap['routes'] as $k => $v) {
+            if (($rr[$k] ?? '?') === $v) continue;
+            [$ru, $rt] = explode(' ', $k, 2);
+            //  The intended change: a Branch Manager / SBU Head now downloads leads and deals.
+            if (in_array($roleOf[$ru] ?? '', $viewers, true) && in_array($rt, ['leads', 'opportunities'], true) && strpos((string) ($rr[$k] ?? ''), 'csv') !== false) { $intended++; continue; }
+            $bad[] = "$k: before $v, now " . ($rr[$k] ?? '?');
+        }
         t_ok(!$bad, count($rr) . ' screens and downloads opened as real sign-ins (' . count($routeUsers) . ' people × ' . count($routes) . ' routes) — the same outcome as before' . ($bad ? ': ' . implode(' | ', array_slice($bad, 0, 12)) : ''));
+        t_ok($intended > 0, "the owner's 21 Nov change is really there: $intended intended gains, all for the Branch Manager / SBU Head (and roles built on them), nobody else");
     } else {
         file_put_contents($writeTo, json_encode($result, JSON_PRETTY_PRINT));
         t_ok(true, 'snapshot written');

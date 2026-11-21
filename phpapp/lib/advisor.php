@@ -202,7 +202,7 @@ function adv_unmatched_receipts() {
 function adv_won_not_ordered() {
     if (!adv_on('leads') || !adv_on('calls') || !function_exists('opp_migrate')) return null;
     opp_migrate();
-    [$w, $a] = scope_office_clause('o.office_id');
+    [$w, $a] = scope_sales_clause('o');
     $rows = adv_rows("SELECT o.id, o.ref, o.name who, o.won_at d, o.value amount
                       FROM opportunities o
                       WHERE $w AND o.status='WON' AND (o.call_id IS NULL OR o.call_id=0)

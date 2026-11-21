@@ -409,7 +409,7 @@ function chain_gaps() {
 
     if (function_exists('opp_migrate') && function_exists('licence_enabled') && licence_enabled('operations')) {
         opp_migrate();
-        [$ow, $oa] = scope_office_clause('o.office_id');
+        [$ow, $oa] = scope_sales_clause('o');
         $g['won_no_order'] = [
             'label' => 'Deals won and never ordered',
             'why'   => 'The deal was won and nobody raised the order, so the work has not started and the customer is waiting.',

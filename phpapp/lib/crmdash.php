@@ -58,7 +58,7 @@ function crmdash_funnel($pipelineId = 0, $days = 365) {
     $stages = crmdash_try(fn() => pipeline_stages($pipe), []) ?: [];
     if (!$stages) return null;
 
-    [$sw, $sa] = scope_office_clause('o.office_id');
+    [$sw, $sa] = scope_sales_clause('o');
     $cut = date('Y-m-d', strtotime("-$days days"));
 
     // DEF-SAL-016 — "reached" counts a deal through EVERY open stage up to the furthest one it
@@ -136,7 +136,7 @@ function crmdash_funnel($pipelineId = 0, $days = 365) {
 // ---- The numbers a sales manager is asked for -------------------------------
 function crmdash_headline($days = 365) {
     $cut = date('Y-m-d', strtotime("-$days days"));
-    [$sw, $sa] = scope_office_clause('o.office_id');
+    [$sw, $sa] = scope_sales_clause('o');
     $open = function_exists('opp_all') ? (crmdash_try(fn() => opp_all(['open' => 1]), []) ?: []) : [];
     $value = $weighted = 0.0; $stalled = 0; $closingSoon = 0;
     $soon = date('Y-m-d', strtotime('+30 days'));
@@ -175,7 +175,7 @@ function crmdash_headline($days = 365) {
 // of the ones that got away, which is the number nobody usually sees.
 function crmdash_effort($days = 365) {
     $cut = date('Y-m-d', strtotime("-$days days"));
-    [$sw, $sa] = scope_office_clause('o.office_id');
+    [$sw, $sa] = scope_sales_clause('o');
     $rows = crmdash_try(fn() => crmdash_rows(
         "SELECT o.status,
                 (SELECT COALESCE(SUM(a.duration_mins),0) FROM activities a
@@ -207,12 +207,12 @@ function crmdash_effort($days = 365) {
 // Where the whole thing starts: leads in, and how many became deals.
 function crmdash_topfunnel($days = 365) {
     $cut = date('Y-m-d', strtotime("-$days days"));
-    [$lw, $la] = scope_office_clause('l.office_id');
+    [$lw, $la] = scope_sales_clause('l');
     $leads = (int)crmdash_val("SELECT COUNT(*) FROM leads l WHERE $lw AND l.created_at >= ?", array_merge($la, [$cut]), 0);
     $toOpp = (int)crmdash_val("SELECT COUNT(*) FROM opportunities o WHERE o.lead_id IS NOT NULL AND o.created_at >= ?", [$cut], 0);
     [$qw, $qa] = scope_clause('q.office_id', 'q.sbu');
     $quotes = (int)crmdash_val("SELECT COUNT(*) FROM quotations q WHERE $qw AND q.is_current=1 AND q.created_at >= ?", array_merge($qa, [$cut]), 0);
-    [$ow, $oa] = scope_office_clause('o.office_id');
+    [$ow, $oa] = scope_sales_clause('o');
     $won = (int)crmdash_val("SELECT COUNT(*) FROM opportunities o WHERE $ow AND o.status='WON' AND o.won_at >= ?", array_merge($oa, [$cut]), 0);
     return ['leads' => $leads, 'to_opp' => $toOpp, 'quotes' => $quotes, 'won' => $won,
             'lead_to_opp' => $leads ? round($toOpp * 100 / $leads) : null];
@@ -222,7 +222,7 @@ function crmdash_topfunnel($days = 365) {
 // pipeline and no wins is a conversation, and it is invisible without this.
 function crmdash_owners($days = 365) {
     $cut = date('Y-m-d', strtotime("-$days days"));
-    [$sw, $sa] = scope_office_clause('o.office_id');
+    [$sw, $sa] = scope_sales_clause('o');
     return crmdash_rows(
         "SELECT COALESCE(NULLIF(o.owner_name,''),'(nobody)') owner,
                 SUM(CASE WHEN o.status='OPEN' THEN 1 ELSE 0 END) open_n,

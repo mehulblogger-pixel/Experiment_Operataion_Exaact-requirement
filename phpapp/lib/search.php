@@ -115,7 +115,7 @@ function search_sources() {
     $add('leads', 'Leads', '🎯', function_exists('leads_can_view') && leads_can_view(),
         function ($q, $n) use ($like) {
             $l = $like($q);
-            [$sw, $sa] = scope_office_clause('l.office_id');
+            [$sw, $sa] = scope_sales_clause('l');
             return array_map(fn($r) => [
                 'title'    => $r['company_name'],
                 'subtitle' => $r['ref'] . ($r['stage_name'] ? ' · ' . $r['stage_name'] : ''),

@@ -17,7 +17,7 @@ Left for later stages, noted here so nothing is lost:
 
 ## 🧭 Sales Stage 3 — Enquiries and Deals built (21 Nov 2026, report 57); follow-ups and owner decisions
 
-- **Owner decision (1), 21 Nov: "Finance may open the deal" — NOT built yet, one question first.** Making the
+- **DONE 21 Nov (docs/02 19x): the owner answered — Finance does not open deals; the Branch Manager and the SBU Head open and download leads and deals of their branch / unit, view only.** Earlier note: Making the
   Deals register and deal page open on "View deals" (`crm.deal.view`) alone, as asked, would ALSO let the
   Branch Manager and the Business Unit Head open deals: since foundation A they hold "View deals" (it came from
   their Quotations / Enquiries view, the old rule of `opp_can_view()`), and they already see deals on Sales home,

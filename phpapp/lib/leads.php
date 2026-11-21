@@ -210,6 +210,14 @@ function leads_can_view() { return can('mod.leads.view') || can('mod.inquiries.v
 //  Foundation A (owner, 21 Nov 2026, Q6): downloading the lead list is its own
 //  switch — on day one on for everyone who could open the list (docs/02 19r).
 function leads_can_export() { return is_master() || can('crm.lead.export'); }
+//  Owner, 21 Nov 2026: the Branch Manager and the SBU Head READ the lead and deal
+//  screens (and download them) but never change them there. Their Enquiries edit
+//  (which leads_can_edit() rides on) comes from a job-title Delete on Enquiries,
+//  not from working leads — so the lead and deal screens also ask that the person
+//  works leads: Add or Edit on Leads (every lead worker holds Add, D-01), or master.
+function leads_works_leads() {
+    return can('mod.leads.add') || can('mod.leads.edit') || is_master_of(['leads', 'inquiries']);
+}
 function leads_can_edit() { return can('mod.leads.edit') || can('mod.inquiries.edit') || is_master_of(['leads','inquiries']); }
 // D-22 (the owner, 20 Oct 2026: "Yes") — a manager may reopen a lost lead or a
 // closed deal, with a reason. "A manager" is someone who already holds sales-
@@ -264,7 +272,7 @@ function lead_can_mark_lost($l) {
 function lead_loss_reasons($days = 365) {
     if (function_exists('leads_migrate')) leads_migrate();
     $cut = date('Y-m-d', strtotime("-$days days"));
-    [$sw, $sa] = scope_office_clause('l.office_id');
+    [$sw, $sa] = scope_sales_clause('l');
     $labels = function_exists('lk_options_or') ? lk_options_or('quote_lost_reason', QUOTE_LOST_REASONS) : QUOTE_LOST_REASONS;
     $out = [];
     try {
@@ -433,7 +441,7 @@ function lead_ref_next() {
 // The filter, built once. Counting rows and fetching a page of them must ask
 // the same question or the pager lies about how many pages there are.
 function leads_where($filter = []) {
-    [$sw, $sa] = scope_office_clause('l.office_id');
+    [$sw, $sa] = scope_sales_clause('l');
     $w = [$sw]; $a = $sa;
     if (!empty($filter['status'])) { $w[] = 'l.status = ?'; $a[] = $filter['status']; }
     if (!empty($filter['open']))   { $w[] = "l.status = 'OPEN'"; }
@@ -1356,7 +1364,7 @@ function lead_board($pipelineId = 0, array $fyWin = [], $only = false) {
 //  all years). Every card counts that same year, so the cards and the board agree.
 function leads_counts(array $fyWin = [], $only = false) {
     leads_migrate();
-    [$sw, $sa] = scope_office_clause('l.office_id');
+    [$sw, $sa] = scope_sales_clause('l');
     $q = function ($extra, $args = []) use ($sw, $sa) {
         return leads_try(fn() => (int)ops_val("SELECT COUNT(*) FROM leads l WHERE $sw AND ($extra)", array_merge($sa, $args)), 0);
     };
@@ -1550,9 +1558,13 @@ function lead_scope_gate($route) {
         $id = (int)leads_try(fn() => ops_val("SELECT lead_id FROM lead_files WHERE id=?", [$id]), 0);
         if ($id <= 0) return;                   // no such file — the route's own 404 answers
     }
-    $office = leads_try(fn() => ops_val("SELECT office_id FROM leads WHERE id=?", [$id]), false);
-    if ($office === false) return;              // no such lead — let the route say "not found"
+    $row = leads_try(fn() => ops_one("SELECT office_id, sbu FROM leads WHERE id=?", [$id]), false);
+    if (!$row) return;                          // no such lead — let the route say "not found"
+    $office = $row['office_id'];
     ops_require(scope_office_allows($office), 'This lead is outside your office / branch scope.');
+    //  An SBU Head (every branch, some units) opens the leads of their units (owner, 21 Nov 2026).
+    ops_require(!function_exists('scope_sales_allows') || scope_sales_allows($office, (string) ($row['sbu'] ?? '')),
+                'This lead belongs to another business unit.');
 }
 
 function ops_leads($route, $method) {
@@ -1562,7 +1574,7 @@ function ops_leads($route, $method) {
     if ($method === 'GET' && in_array($route, ['lead', 'leads'], true) && function_exists('lead_close_won_deals_sweep'))
         lead_close_won_deals_sweep($route === 'lead' ? (int)($_GET['id'] ?? 0) : 0);
     leads_migrate();
-    $canEdit = leads_can_edit();
+    $canEdit = leads_can_edit() && leads_works_leads();   // BM / SBU Head read only (owner, 21 Nov 2026)
 
     if ($route === 'leads-bulk' && $method === 'POST') {
         ops_require($canEdit, 'You cannot change a lead.');

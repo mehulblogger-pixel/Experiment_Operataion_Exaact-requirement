@@ -1070,6 +1070,11 @@ function module_defaults($role) {
     foreach ($view as $k) $out[] = "mod.$k.view";
     if ($ncrRecord) { $out[] = 'mod.ncr.view'; $out[] = perm_verb_key('ncr', 'add'); }
     if (in_array($role, ACCESS_LEAD_WORKERS, true) && !in_array('leads', $edit, true)) { $out[] = 'mod.leads.view'; $out[] = perm_verb_key('leads', 'add'); }
+    //  Owner, 21 Nov 2026 ("Yes but yes they shall be able to download"): the Branch
+    //  Manager opens and downloads the leads and deals of their branch, the SBU Head
+    //  of their business unit — VIEW only. Added here, not to $view, so the job-title
+    //  verbs below (management may delete leads) are NOT carried onto it.
+    if (in_array($role, ACCESS_LEAD_VIEWERS, true)) $out[] = 'mod.leads.view';
     //  R-20 — the old edit tick meant "add / edit", so a role that had it must
     //  now receive BOTH Add and Edit, or every role quietly loses the ability to
     //  create records. And on the four modules where the edit tick also carried
@@ -1542,6 +1547,11 @@ function access_owner_grants() {
         'Q-G-2026-10-19'  => ['perms' => ['mod.vendors.view'],            'roles' => ['FINANCE']],
         'Q-K-2026-10-19'  => ['perms' => ['mod.clients.view'],            'roles' => ['FINANCE']],
         'D-01-2026-10-20' => ['perms' => ['mod.leads.view', 'mod.leads.add'], 'roles' => ACCESS_LEAD_WORKERS],
+        //  Owner, 21 Nov 2026 ("Yes but yes they shall be able to download"): the Branch
+        //  Manager and the SBU Head open, read and download the leads and deals of their
+        //  branch / business unit. View and download only — never add, edit or move.
+        'BM-SBU-LEADS-2026-11-21' => ['perms' => ['mod.leads.view', 'crm.deal.view', 'crm.lead.export', 'crm.deal.export'],
+                                      'roles' => ACCESS_LEAD_VIEWERS],
     ];
 }
 function access_apply_owner_grants($force = false) {
@@ -1592,6 +1602,7 @@ function access_apply_owner_grants($force = false) {
 // The flag makes it idempotent and means a later deliberate narrowing by an
 // administrator is never undone; people added after this ran must be given
 // their offices (the User register flags anyone left without a branch).
+const ACCESS_LEAD_VIEWERS = ['BRANCH_MANAGER', 'SBU_HEAD'];   // owner, 21 Nov 2026 — view + download only
 const ACCESS_CENTRAL_SCOPE_ROLES = ['FINANCE', 'MARKETING_MANAGER'];
 const ACCESS_CENTRAL_SCOPE_FLAG  = 'scope_central_roles_c1_applied';
 function access_migrate_central_roles_scope($force = false) {
@@ -1799,6 +1810,35 @@ function scope_office_clause($officeCol) {
     if (!$off) return [scope_needs_home() ? '1=0' : '1=1', []];
     $ids = implode(',', array_map('intval', $off));
     return ["($officeCol IS NULL OR $officeCol IN ($ids))", []];
+}
+
+// ---- Leads and deals: branch, and business unit for unit-based managers --------
+// Owner, 21 Nov 2026: "branch manager and SBU head can sure open the lead and check
+// all other details as they are also responsible for business individually for
+// their branch and business units respectively." Leads and deals were scoped by
+// branch alone, which is right for a Branch Manager (their branch) but would show
+// an SBU Head — who covers every branch — the whole company. So a person who covers
+// EVERY branch but only SOME business units sees the leads and deals of their
+// units. A record with no unit stays visible, as a record with no branch does.
+// Nobody limited by branch is affected (their branch already limits them).
+function scope_sales_unit_list() {
+    if (function_exists('is_master') && is_master()) return null;
+    $off = scope_offices(); $sbu = scope_sbus();
+    if ($off !== 'ALL') return null;
+    if ($sbu === 'ALL' || !is_array($sbu) || !$sbu) return null;
+    return array_values(array_map('strval', $sbu));
+}
+function scope_sales_clause($alias) {
+    [$w, $a] = scope_office_clause("$alias.office_id");
+    $units = scope_sales_unit_list();
+    if ($units === null) return [$w, $a];
+    $q = implode(',', array_map(fn($u) => db()->quote($u), $units));
+    return ["($w) AND (COALESCE($alias.sbu,'') = '' OR $alias.sbu IN ($q))", $a];
+}
+function scope_sales_allows($officeId, $sbu) {
+    if (function_exists('scope_office_allows') && !scope_office_allows($officeId)) return false;
+    $units = scope_sales_unit_list();
+    return $units === null || trim((string) $sbu) === '' || in_array((string) $sbu, $units, true);
 }
 
 // Build a WHERE fragment scoping calls/jobs by office + Business Unit. $officeCol is the

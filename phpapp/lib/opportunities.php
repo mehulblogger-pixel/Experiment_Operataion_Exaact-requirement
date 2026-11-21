@@ -184,7 +184,7 @@ const OPP_SELECT = "SELECT o.*, s.name stage_name, s.kind stage_kind, s.probabil
                 COALESCE(bp.display_name, bp.legal_name) client_name ";
 
 function opp_where(array $f = []) {
-    [$sw, $sa] = scope_office_clause('o.office_id');
+    [$sw, $sa] = scope_sales_clause('o');
     $w = [$sw]; $a = $sa;
     if (!empty($f['status']))   { $w[] = 'o.status = ?'; $a[] = $f['status']; }
     if (!empty($f['open']))     { $w[] = "o.status = 'OPEN'"; }
@@ -272,7 +272,7 @@ function opp_counts() {
         $weighted += opp_weighted($o);
         if (opp_stalled($o)) $stalled++;
     }
-    [$sw, $sa] = scope_office_clause('o.office_id');
+    [$sw, $sa] = scope_sales_clause('o');
     $n = fn($extra) => (int)opp_try(fn() => ops_val("SELECT COUNT(*) FROM opportunities o WHERE $sw AND ($extra)", $sa), 0);
     return ['open' => count($open), 'value' => $value, 'weighted' => $weighted,
             'stalled' => $stalled, 'won' => $n("o.status='WON'"), 'lost' => $n("o.status='LOST'")];
@@ -283,7 +283,7 @@ function opp_counts() {
 function opp_win_rate($days = 365) {
     opp_migrate();
     $cut = date('Y-m-d', strtotime("-$days days"));
-    [$sw, $sa] = scope_office_clause('o.office_id');
+    [$sw, $sa] = scope_sales_clause('o');
     $q = fn($st) => opp_try(fn() => ops_one(
         "SELECT COUNT(*) n, COALESCE(SUM(o.value),0) v FROM opportunities o
          WHERE $sw AND o.status=? AND COALESCE(NULLIF(o.won_at,''), o.updated_at, o.created_at) >= ?",
@@ -301,7 +301,7 @@ function opp_win_rate($days = 365) {
 function opp_loss_reasons($days = 365) {
     opp_migrate();
     $cut = date('Y-m-d', strtotime("-$days days"));
-    [$sw, $sa] = scope_office_clause('o.office_id');
+    [$sw, $sa] = scope_sales_clause('o');
     $labels = opp_lost_reasons();
     $out = [];
     foreach (opp_try(fn() => ops_all(
@@ -1142,16 +1142,20 @@ function opp_sbu_err($sbu) { return function_exists('lead_sbu_err') ? lead_sbu_e
 function opp_scope_gate($route) {
     $id = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
     if ($id <= 0) return;
-    $office = opp_try(fn() => ops_val("SELECT office_id FROM opportunities WHERE id=?", [$id]), false);
-    if ($office === false) return;              // no such deal — the route's own 404 answers
+    $row = opp_try(fn() => ops_one("SELECT office_id, sbu FROM opportunities WHERE id=?", [$id]), false);
+    if (!$row) return;                          // no such deal — the route's own 404 answers
+    $office = $row['office_id'];
     ops_require(scope_office_allows($office), 'This ' . Tl('opportunity') . ' is outside your office / branch scope.');
+    //  An SBU Head (every branch, some units) opens the deals of their units (owner, 21 Nov 2026).
+    ops_require(!function_exists('scope_sales_allows') || scope_sales_allows($office, (string) ($row['sbu'] ?? '')),
+                'This ' . Tl('opportunity') . ' belongs to another business unit.');
 }
 
 function ops_opportunities($route, $method) {
     opp_scope_gate($route);   // M14 — object-level branch scope, before anything reads an id
     ops_require(opp_can_view(), 'You cannot open the ' . Tl('opportunity') . ' register.');
     opp_migrate();
-    $canEdit = opp_can_edit();
+    $canEdit = opp_can_edit() && leads_works_leads();   // BM / SBU Head read only (owner, 21 Nov 2026)
 
     if ($route === 'opportunities') {
         $view = $_GET['v'] ?? 'board';
@@ -1266,7 +1270,7 @@ function ops_opportunities($route, $method) {
             'canRegisterContract' => can('crm.contract.register') || is_master(),
             'winQuote' => opp_winning_quote((int)$o['id']),
             'quoteNow' => opp_quote_now((int)$o['id']),
-            'canAddCustomer' => function_exists('leads_can_edit') && leads_can_edit(),
+            'canAddCustomer' => function_exists('leads_can_edit') && leads_can_edit() && leads_works_leads(),
             'contractRow' => !empty($o['contract_id'])
                 ? ops_one("SELECT * FROM partner_contracts WHERE id=?", [(int)$o['contract_id']])
                 : null,
@@ -1416,7 +1420,7 @@ function ops_opportunities($route, $method) {
     //  The same people who may make a lead a customer — nobody new.
     if ($route === 'opportunity-add-customer' && $method === 'POST') {
         $id = (int)($_POST['id'] ?? 0);
-        ops_require(function_exists('leads_can_edit') && leads_can_edit(), 'Only someone who works leads and deals can add the customer.');
+        ops_require(function_exists('leads_can_edit') && leads_can_edit() && leads_works_leads(), 'Only someone who works leads and deals can add the customer.');
         $r = opp_add_customer($id, $_POST);
         if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/opportunity?id=' . $id . (!empty($r['near']) ? '&samename=1' : '') . '#opp=actions'); }
         flash($r['name'] . ' is now a customer (' . $r['code'] . '). Next: send the deal to Accounts to register the contract. The customer record is short — GSTIN or PAN, address and e-mail are completed before the first ' . Tl('call') . '.'

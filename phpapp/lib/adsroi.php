@@ -90,7 +90,7 @@ function roi_chain($fromDate = '', $toDate = '', $withMoney = null) {
     // DEF-01: the viewer's branches only, by the same clause the lead register
     // uses (a lead with no branch, or an advertising lead not yet in the CRM,
     // stays visible, exactly as it does there).
-    [$sw, $sa] = scope_office_clause('l.office_id');
+    [$sw, $sa] = scope_sales_clause('l');
     $w[] = $sw; $a = array_merge($a, $sa);
     $where = 'WHERE ' . implode(' AND ', $w);
 
@@ -106,7 +106,7 @@ function roi_chain($fromDate = '', $toDate = '', $withMoney = null) {
 
     // Opportunities converted from those leads.
     $opps = [];
-    [$ow, $oa] = scope_office_clause('o.office_id');
+    [$ow, $oa] = scope_sales_clause('o');
     foreach (roi_try(fn() => ops_all(
         "SELECT o.id, o.lead_id, o.value, o.status, o.call_id FROM opportunities o
          WHERE o.lead_id IS NOT NULL AND $ow", $oa), []) ?: [] as $o) $opps[(int)$o['lead_id']][] = $o;
