@@ -1254,9 +1254,28 @@ function find_duplicate_partner($name, $gstin, $pan, $tan, $excludeId = 0) {
     $rows = null;
     try { $rows = ops_all("SELECT $cols, merged_into_id FROM business_partners WHERE id <> ?", [$excludeId]); }
     catch (Throwable $e) { $rows = ops_all("SELECT $cols FROM business_partners WHERE id <> ?", [$excludeId]); }
+    //  Owner, 21 Nov 2026 (D1): one customer is one PAN, billed at one or more
+    //  places. A GSTIN held as a billing location of a customer is that customer
+    //  just as surely as its main GSTIN.
+    //  Only the billing-location case is decided here: a main GSTIN is matched in
+    //  the loop below, which keeps the retired-record detail (dup_hit's 'retired'
+    //  and 'matched') that staff are shown.
+    if ($g && function_exists('custid_gstin_owner') && ($own = custid_gstin_owner($g, (int) $excludeId)) && !empty($own['addr_id'])) {
+        $ownRow = ops_one("SELECT bp.id, bp.code, bp.legal_name, bp.gstin, bp.pan, bp.tan, bp.status
+                             FROM partner_addresses pa JOIN business_partners bp ON bp.id = pa.partner_id WHERE pa.id=?", [(int) $own['addr_id']]);
+        if ($ownRow) return dup_hit($ownRow, 'GSTIN', 'EXACT');
+    }
+    $panHit = null;
     foreach ($rows ?: [] as $r) {
         if ($g && $r['gstin'] && strtoupper($r['gstin']) === $g) return dup_hit($r, 'GSTIN', 'EXACT');
-        if ($p && $r['pan'] && strtoupper($r['pan']) === $p) return dup_hit($r, 'PAN', 'EXACT');
+        //  The same PAN with a DIFFERENT GSTIN is the same company in another state:
+        //  not a second customer, and not a refusal either — a new billing location
+        //  of the one on file ('LOCATION'). Remembered, so an exact GSTIN further
+        //  down the list still wins.
+        if ($p && $r['pan'] && strtoupper($r['pan']) === $p) {
+            if ($g && trim((string) $r['gstin']) !== '' && strtoupper($r['gstin']) !== $g) { if ($panHit === null) $panHit = dup_hit($r, 'PAN', 'LOCATION'); continue; }
+            return dup_hit($r, 'PAN', 'EXACT');
+        }
         if ($t && ($r['tan'] ?? '') && strtoupper($r['tan']) === $t) return dup_hit($r, 'TAN', 'EXACT');
         //  A name hit is remembered but NOT returned yet: an authoritative
         //  identifier further down the list outranks it, and returning the name
@@ -1264,7 +1283,7 @@ function find_duplicate_partner($name, $gstin, $pan, $tan, $excludeId = 0) {
         if ($nameHit === null && $norm !== '' && normalize_name($r['legal_name']) === $norm)
             $nameHit = dup_hit($r, 'name', 'POSSIBLE');
     }
-    return $nameHit;
+    return $panHit ?? $nameHit;
 }
 
 // Another company's contact with the same mobile or e-mail (owner, test book
@@ -1337,6 +1356,11 @@ function partner_find_or_problem($name, $gstin = '', $pan = '', $tan = '', $excl
     //  Staff see the record, because they are entitled to: this is the internal
     //  register. The PUBLIC path never uses this wording — see connect_org.php.
     $who = trim((string)($row['code'] ?? '')) . ' — ' . (string)($row['legal_name'] ?? '');
+    if ($conf === 'LOCATION')
+        return ['confidence' => $conf, 'row' => $row, 'by' => (string) $hit['by'],
+                'message' => $who . ' already has this PAN, so it is the same company. Add '
+                           . (function_exists('custid_state_name') ? custid_state_name(substr(clean_gstin($gstin), 0, 2)) . ' (' . clean_gstin($gstin) . ')' : clean_gstin($gstin))
+                           . ' as a new billing location of it instead of a second ' . Tl('client') . '.'];
     return ['confidence' => $conf, 'row' => $row, 'by' => (string)$hit['by'],
             'message' => $conf === 'EXACT'
                 ? 'This company already exists as ' . $who . ' (matched by ' . $hit['by'] . '). Open it and add the extra role instead of creating a second record.'
@@ -3478,6 +3502,7 @@ function ops_route_module_map() {
         'receivables'=>'invoicing',
         'invoices'=>'invoicing','invoice'=>'invoicing','invoice-new'=>'invoicing','invoice-line-add'=>'invoicing',
         'invoice-line-delete'=>'invoicing','invoice-issue'=>'invoicing','invoice-cancel'=>'invoicing',
+        'invoice-set-branch'=>'invoicing','invoice-bill-to'=>'invoicing',
         'to-bill'=>'invoicing','receipts'=>'invoicing','receipt'=>'invoicing','receipt-new'=>'invoicing',
         'receipt-allocate'=>'invoicing','receipt-unallocate'=>'invoicing','credit-note-new'=>'invoicing',
         'ledger'=>'invoicing',
@@ -4357,7 +4382,7 @@ function ops_dispatch($route, $method) {
             return ops_advisor($route, $method);
         // The books: invoices, money in, credit notes, the customer ledger.
         case in_array($route, ['invoices','invoice','invoice-print','invoice-new','invoice-line-add','invoice-line-delete',
-                               'invoice-issue','invoice-cancel','to-bill','receipts','receipt','receipt-new',
+                               'invoice-issue','invoice-cancel','invoice-set-branch','invoice-bill-to','to-bill','receipts','receipt','receipt-new',
                                'receipt-allocate','receipt-unallocate','credit-note-new','ledger'], true):
             return ops_books($route, $method);
         case $route === 'pipelines' || strncmp($route, 'pipeline', 8) === 0:

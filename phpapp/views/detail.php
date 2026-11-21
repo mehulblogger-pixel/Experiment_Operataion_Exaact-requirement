@@ -81,6 +81,8 @@ function addr_name($a) { return (lk_options_or('address_type', ADDRESS_TYPES)[$a
     <?php foreach ($subsidiaries as $s): ?><div class="child">↳ <?= e(partner_name($s)) ?> <span class="muted">(<?= e($s['code']) ?>)</span></div><?php endforeach; ?>
     <?php if (!$subsidiaries): ?><div class="child muted">No subsidiaries linked.</div><?php endif; ?>
   </div>
+  <?php // Billing locations: one PAN, one client, billed in each state (owner, 21 Nov 2026: D1).
+        include __DIR__ . '/ops/_billing_locations.php'; ?>
 
 <?php elseif ($tab === 'general'): ?>
   <dl class="kv">

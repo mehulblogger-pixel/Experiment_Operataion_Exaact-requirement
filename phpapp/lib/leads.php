@@ -612,10 +612,13 @@ function lead_possible_duplicate($company, $email = '') {
         if ($hit) return ['kind' => 'partner', 'by' => $hit['by'], 'row' => $hit['row'],
                           'confidence' => (string)($hit['confidence'] ?? 'POSSIBLE')];
     }
-    $l = leads_try(fn() => ops_one(
-        "SELECT id, ref, company_name, status FROM leads WHERE LOWER(company_name)=? AND status='OPEN' LIMIT 1",
-        [strtolower($company)]), null);
-    if ($l) return ['kind' => 'lead', 'by' => 'name', 'row' => $l];
+    //  Owner, 21 Nov 2026 (Q-02): "Sunrise Valves" is the same name as an open lead
+    //  for "Sunrise Valves Pvt Ltd" — compared without Pvt Ltd / Ltd / LLP / Co / Inc
+    //  and punctuation (normalize_name), as the customer list already is.
+    $norm = normalize_name($company);
+    if ($norm === '') return null;
+    foreach (leads_try(fn() => ops_all("SELECT id, ref, company_name, status FROM leads WHERE status='OPEN' ORDER BY id"), []) ?: [] as $l)
+        if (normalize_name($l['company_name']) === $norm) return ['kind' => 'lead', 'by' => 'name', 'row' => $l];
     return null;
 }
 
@@ -1039,18 +1042,21 @@ function lead_convert($leadId, array $b = []) {
         //  offers, and convert again. Converting anyway would build a parallel
         //  relationship — two records, two sets of calls, two sets of figures.
         $near = null;
-        if (function_exists('partner_find_or_problem')) {
-            $hit = partner_find_or_problem($name, (string)($b['gstin'] ?? ''), (string)($b['pan'] ?? ''), '', 0);
-            if (($hit['confidence'] ?? 'NONE') === 'EXACT') return $release(['err' => $hit['message']]);
-            //  A name is evidence, not proof: allowed, and recorded.
-            if (($hit['confidence'] ?? 'NONE') === 'POSSIBLE') $near = $hit['row'];
-        }
+        //  Owner, 21 Nov 2026 (D1–D4): winning a customer needs its GSTIN and PAN
+        //  (or a recorded reason), matched against the central customer list: the
+        //  same GSTIN is that customer; the same PAN with a new GSTIN is a billing
+        //  location of it; a similar name is allowed and recorded.
+        $res = custid_resolve_new_customer($name, $b);
+        if (!empty($res['err'])) return $release(['err' => $res['err'], 'loc_offer' => (int) ($res['offer']['id'] ?? 0)]);
+        if (!empty($res['attach'])) { $partnerId = (int) $res['attach']; goto lead_convert_have_partner; }
+        $near = $res['near'] ?? null;
         $code = gen_partner_code(($l['office_id'] ?? '') !== '' ? (int) $l['office_id'] : null, $name); // the one numbering rule
         //  The customer belongs to the lead's branch (test book SALA-011); payment terms are asked on its record.
         $pdo->prepare("INSERT INTO business_partners (code,legal_name,display_name,is_client,is_vendor,status,state,created_at)
                        VALUES (?,?,?,1,0,'ACTIVE',?,?)")
             ->execute([$code, $name, $name, (string)($b['state'] ?? ''), date('c')]);
         $partnerId = (int)$pdo->lastInsertId();
+        custid_save($partnerId, $res['cid']);
         if (!empty($l['office_id'])) { try { $pdo->prepare("UPDATE business_partners SET home_branch_id=? WHERE id=? AND home_branch_id IS NULL")->execute([(int)$l['office_id'], $partnerId]); } catch (Throwable $e) {} }
         if (function_exists('partner_audit_created'))
             partner_audit_created($partnerId, 'Created by converting lead ' . (string)$l['ref']
@@ -1072,6 +1078,7 @@ function lead_convert($leadId, array $b = []) {
             }
         }
     }
+    lead_convert_have_partner:
 
     // And an inquiry, so the funnel that already exists takes over.
     //
@@ -1809,7 +1816,7 @@ function ops_leads($route, $method) {
         if (!$l) { http_response_code(404); view('notfound'); return true; }
         if ($method === 'POST') {
             $r = lead_convert((int)$l['id'], $_POST);
-            if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/lead-convert?id=' . (int)$l['id']); }
+            if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/lead-convert?id=' . (int)$l['id'] . (!empty($r['loc_offer']) ? '&loc=' . (int) $r['loc_offer'] : '')); }
             //  Owner, 12 Nov 2026 — plain words, and back to the lead, which now
             //  shows the customer and the enquiry it led to.
             flash('Done — ' . $l['company_name'] . ' is now a customer' . ($r['inquiry_id']

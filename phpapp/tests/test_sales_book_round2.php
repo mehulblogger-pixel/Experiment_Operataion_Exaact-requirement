@@ -44,7 +44,8 @@ try {
 
     // "They said yes": branch, Won stage, business unit.
     $L3 = lead_create(['company_name' => 'Fx Yes Co ' . uniqid(), 'office_id' => (string) $f['mum'], 'contact_name' => 'Fx Buyer']); $made['l'][] = (int) $L3['id'];
-    $r3 = lead_convert((int) $L3['id'], ['stage_id' => (string) lead_row($L3['id'])['stage_id'], 'company_name' => lead_row($L3['id'])['company_name'], 'sbu' => 'IND']);
+    //  21 Nov 2026 (D1–D4): a NEW customer carries its tax identity — here a recorded exception.
+    $r3 = lead_convert((int) $L3['id'], ['stage_id' => (string) lead_row($L3['id'])['stage_id'], 'company_name' => lead_row($L3['id'])['company_name'], 'sbu' => 'IND', 'tax_status' => 'UNREGISTERED', 'pan' => 'AABPB' . sprintf('%04d', random_int(0, 9999)) . 'B', 'tax_reason' => 'test — below the GST threshold']);
     $l3 = lead_row($L3['id']); $made['p'][] = (int) ($r3['partner_id'] ?? 0);
     t_eq((int) ops_val("SELECT home_branch_id FROM business_partners WHERE id=?", [(int) ($r3['partner_id'] ?? 0)]), (int) $f['mum'], 'SALA-011 · the new customer belongs to the lead\'s branch');
     t_eq((string) (stage_row((int) $l3['stage_id'])['kind'] ?? ''), 'WON', 'SALA-015 · a lead that became a customer sits on the Won stage (the CSV no longer says "New enquiry")');

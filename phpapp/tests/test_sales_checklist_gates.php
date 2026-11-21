@@ -103,10 +103,12 @@ t_eq($st($q2), 'APPROVED', 'once waived, the approver can sign');
 
 // ---- acceptance is held ------------------------------------------------------------------------
 $q3 = $quote('SENT');    // sent before the checklist was required
-$r = $drive($BDM, 'quote-status', 'POST', ['id' => $q3], ['to' => 'ACCEPTED']);
+//  21 Nov 2026 (D1–D4): a NEW customer carries its tax identity — here a recorded exception.
+$cid3 = ['tax_status' => 'UNREGISTERED', 'pan' => 'AABPG' . sprintf('%04d', random_int(0, 9999)) . 'G', 'tax_reason' => 'test — below the GST threshold'];
+$r = $drive($BDM, 'quote-status', 'POST', ['id' => $q3], ['to' => 'ACCEPTED'] + $cid3);
 t_eq($st($q3), 'SENT', 'the customer\'s acceptance is not recorded while the checklist is incomplete: ' . $said($r));
 $tick($BDM, $q3, $keys);
-$drive($BDM, 'quote-status', 'POST', ['id' => $q3], ['to' => 'ACCEPTED']);
+$drive($BDM, 'quote-status', 'POST', ['id' => $q3], ['to' => 'ACCEPTED'] + $cid3);
 t_eq($st($q3), 'ACCEPTED', 'with every point ticked, it is');
 $r = $tick($BDM, $q3, []);
 t_eq(count(preorder_checklist_state(ops_one("SELECT preorder_checklist FROM quotations WHERE id=?", [$q3]))), 2,

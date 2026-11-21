@@ -69,7 +69,8 @@ t_eq([$row($q1)['status'], (int) $row($q1)['client_id']], ['ACCEPTED', $acme], '
 t_eq($partners(), $p0, '…and no second customer was created');
 
 $q2 = $sent('Acme Valves Ltd.');
-$drive($BDM, 'quote-status', 'POST', ['id' => $q2], ['to' => 'ACCEPTED', 'new_company' => '1']);
+//  21 Nov 2026 (D1–D4): a NEW customer carries its tax identity — here a recorded exception.
+$drive($BDM, 'quote-status', 'POST', ['id' => $q2], ['to' => 'ACCEPTED', 'new_company' => '1', 'tax_status' => 'UNREGISTERED', 'pan' => 'AABPD' . sprintf('%04d', random_int(0, 9999)) . 'D', 'tax_reason' => 'test — below the GST threshold']);
 t_eq($row($q2)['status'], 'ACCEPTED', '"a different company": accepted');
 t_eq($partners(), $p0 + 1, '…and a new customer is created, because a person said it is a different one');
 
@@ -87,7 +88,8 @@ t_as_admin();
 $lead = lead_create(['company_name' => 'Race Brothers Engineering', 'contact_name' => 'Asha', 'contact_email' => 'asha@race.test']);
 $lid = (int) $lead['id'];
 $p1 = $partners(); $i1 = (int) ops_val("SELECT COUNT(*) FROM crm_inquiries");
-$c = $cmdFor($BD, 'lead-convert', 'POST', ['id' => $lid], ['id' => $lid]);
+//  21 Nov 2026 (D1–D4): a NEW customer carries its tax identity — here a recorded exception.
+$c = $cmdFor($BD, 'lead-convert', 'POST', ['id' => $lid], ['id' => $lid, 'tax_status' => 'UNREGISTERED', 'pan' => 'AABPR' . sprintf('%04d', random_int(0, 9999)) . 'R', 'tax_reason' => 'test — below the GST threshold']);
 // Each worker boots, then waits for the same start instant, so the three
 // conversions really are simultaneous (see the worker's SALES_WORKER_START_AT).
 $go = 'SALES_WORKER_START_AT=' . sprintf('%.3f', microtime(true) + 4) . ' ';
@@ -97,7 +99,7 @@ t_eq($partners(), $p1 + 1, 'three simultaneous Convert presses create ONE custom
 t_eq((int) ops_val("SELECT COUNT(*) FROM crm_inquiries") - $i1, 1, '…and one enquiry');
 $lead2 = lead_create(['company_name' => 'Stale Claim Works']);
 $pdo->prepare("UPDATE leads SET converted_at=? WHERE id=?")->execute([date('c', time() - 600), (int) $lead2['id']]);
-t_ok(empty(lead_convert((int) $lead2['id'])['err']), 'a conversion that died half-way ten minutes ago does not leave the lead stuck');
+t_ok(empty(lead_convert((int) $lead2['id'], ['tax_status' => 'UNREGISTERED', 'pan' => 'AABPS' . sprintf('%04d', random_int(0, 9999)) . 'S', 'tax_reason' => 'test — below the GST threshold'])['err']), 'a conversion that died half-way ten minutes ago does not leave the lead stuck');
 
 // ---- converted enquiries take the shared numbering -----------------------------------------------
 $nos = array_column(ops_all("SELECT inquiry_no FROM crm_inquiries") ?: [], 'inquiry_no');

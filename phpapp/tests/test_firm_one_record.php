@@ -40,7 +40,8 @@ try {
     leads_migrate();
     $L = lead_create(['company_name' => 'Fx Lead Firm ' . uniqid(), 'contact_name' => 'Fx Person', 'contact_phone' => '9825099991', 'source' => 'REFERRAL']);
     $leads[] = (int) $L['id'];
-    $r = lead_convert((int) $L['id'], []);
+    //  21 Nov 2026 (D1–D4): a new customer carries its tax identity — here a recorded exception.
+    $r = lead_convert((int) $L['id'], ['tax_status' => 'UNREGISTERED', 'pan' => 'AABPF' . sprintf('%04d', random_int(0, 9999)) . 'F', 'tax_reason' => 'test — below the GST threshold']);
     t_ok(!empty($r['ok']) && !empty($r['partner_id']), 'lead → customer · converts' . (!empty($r['err']) ? ' — ' . $r['err'] : ''));
     if (!empty($r['partner_id'])) { $made[] = (int) $r['partner_id'];
         t_ok(preg_match($fmt, (string) ops_val("SELECT code FROM business_partners WHERE id=?", [$r['partner_id']])) === 1, 'lead → customer · numbered by the one rule (was C-NAME-0042)'); }

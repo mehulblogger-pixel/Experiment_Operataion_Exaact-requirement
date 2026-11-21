@@ -40,7 +40,8 @@ try {
     $nobody = lead_row($mk('LSP Nobody Co', null, '', null));
     t_eq(lead_enquiry_assignee($nobody)[0], (int) current_user()['id'], 'a lead nobody owns: the person pressing the button gets the enquiry');
     $lid = $mk('LSP Fabricators ' . getmypid(), null, 'Lata Sharma', null);
-    $r = lead_convert($lid, []);
+    //  21 Nov 2026 (D1–D4): a new customer carries its tax identity — here a recorded exception.
+    $r = lead_convert($lid, ['tax_status' => 'UNREGISTERED', 'pan' => 'AABPL' . sprintf('%04d', random_int(0, 9999)) . 'L', 'tax_reason' => 'test — below the GST threshold']);
     t_ok(!empty($r['ok']) && !empty($r['inquiry_id']), 'ARMING · the lead becomes a customer and an enquiry');
     $inq = ops_one("SELECT status, assigned_to, office_id FROM crm_inquiries WHERE id=?", [(int) $r['inquiry_id']]);
     t_eq([$inq['status'], (int) $inq['assigned_to'], (int) $inq['office_id']], ['OPEN', $lata, $off], 'the enquiry is Open, assigned to the lead\'s owner, in their branch');

@@ -177,8 +177,8 @@
         <input class="form-control" name="legal_name" required placeholder="e.g. Jindal Steel &amp; Power Ltd — Mumbai"></div>
       <div class="ff" style="min-width:160px;margin:0"><label>Short name</label>
         <input class="form-control" name="display_name" placeholder="Jindal Mumbai"></div>
-      <div class="ff" style="min-width:170px;margin:0"><label>GSTIN</label>
-        <input class="form-control" name="gstin" maxlength="15" style="text-transform:uppercase" placeholder="27AAAAA0000A1Z5"></div>
+      <div class="ff" style="min-width:170px;margin:0"><label>GSTIN * <span class="muted" style="font-weight:400">(the same PAN as this client becomes its billing location)</span></label>
+        <input class="form-control" name="gstin" required maxlength="15" style="text-transform:uppercase" placeholder="27AAAAA0000A1Z5"></div>
       <div class="ff" style="min-width:180px;margin:0"><label>Owned by office *</label>
         <select class="form-control" name="home_branch_id" required>
           <option value="">— pick an office —</option>

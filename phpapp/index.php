@@ -195,6 +195,7 @@ try {
     require __DIR__ . '/lib/booksbridge.php';
     require __DIR__ . '/lib/chain.php';
     require __DIR__ . '/lib/customer360.php';
+    require __DIR__ . '/lib/custid.php';          // A customer's GSTIN, PAN and billing locations (owner, 21 Nov 2026: D1–D4)
     require __DIR__ . '/lib/advisor.php';
     require __DIR__ . '/lib/stagegate.php';
     require __DIR__ . '/lib/mghsso.php';
@@ -1484,9 +1485,6 @@ if ($route === 'partner-new') {
         // A refused save re-shows the form WITH what was typed ('old'), never empty.
         $formVars = ['partner' => null, 'defaultRole' => !empty($b['is_vendor']) && empty($b['is_client']) ? 'is_vendor' : 'is_client',
                      'offices' => offices_list(), 'picker' => $picker, 'old' => $_POST];
-        if (!empty($b['gstin']) && !is_valid_gstin($b['gstin'])) {
-            return view('form', $formVars + ['error' => 'GSTIN should be 15 characters, e.g. 24ADUPL3517E2ZJ.']);
-        }
         // sub-contractor is a manpower vendor → force the vendor role on
         if (!empty($b['is_subcontractor'])) $b['is_vendor'] = 1;
         if (empty($b['is_client']) && empty($b['is_vendor']) && empty($b['is_subcontractor'])) {
@@ -1500,14 +1498,49 @@ if ($route === 'partner-new') {
         }
         if (($why = partner_status_reason_problem($b['status'] ?? 'ACTIVE', $b['status_reason'] ?? '')) !== '')
             return view('form', $formVars + ['error' => $why]);
-        $gstin = clean_gstin($b['gstin'] ?? '');
-        $pan = $gstin ? pan_from_gstin($gstin) : '';
-        $state = $gstin ? state_from_gstin($gstin) : '';
-        // duplicate guard — by GSTIN / PAN / TAN / name
-        $dup = find_duplicate_partner($b['legal_name'] ?? '', $gstin, $pan, $b['tan'] ?? '', 0);
-        if ($dup) {
-            return view('form', $formVars + ['error' => "This company already exists as {$dup['row']['code']} — {$dup['row']['legal_name']} (matched by {$dup['by']}). Open it from the Clients/Vendors list and tick the extra role instead of creating a duplicate."]);
+        //  Owner, 21 Nov 2026 (D1–D4): a CLIENT needs its GSTIN and PAN — or a
+        //  recorded reason for not having them — and is matched against the central
+        //  customer list. The GSTIN's check digit is verified; the PAN is the one
+        //  inside the GSTIN. A vendor-only record keeps them optional.
+        $cid = custid_from_input($b, !empty($b['is_client']));
+        if ($cid['err'] !== '') return view('form', $formVars + ['error' => $cid['err']]);
+        $gstin = $cid['gstin']; $pan = $cid['pan']; $state = $cid['state'];
+        $m = custid_match($b['legal_name'] ?? '', $gstin, $pan, 0);
+        if ($m['kind'] === 'GSTIN')
+            return view('form', $formVars + ['error' => custid_match_message($m, $gstin)]);
+        if ($m['kind'] === 'PAN') {
+            $other = $m['row'];
+            //  The same PAN with a new GSTIN: the same company in another state. Not a
+            //  second record — a billing location of the one on file, once the person
+            //  says so (and may edit that record).
+            if (!empty($b['is_client']) && $gstin !== '' && (int) ($b['add_location_to'] ?? 0) === (int) $other['id']) {
+                $tp = find_partner((int) $other['id']);
+                ops_require($tp && custid_can_edit($tp), 'You cannot change ' . ($other['legal_name'] ?? 'that record') . '.');
+                $r = custid_add_location((int) $other['id'], ['gstin' => $gstin, 'label' => trim((string) ($b['display_name'] ?? '')) ?: state_from_gstin($gstin)]);
+                if (!empty($r['err'])) return view('form', $formVars + ['error' => $r['err']]);
+                if ($picker) {
+                    $payload = json_encode(['type' => 'exaact:partner-added', 'id' => (int) $other['id'], 'name' => (string) $other['legal_name'], 'code' => (string) $other['code'],
+                                            'roles' => ['client' => true, 'vendor' => false]], JSON_UNESCAPED_UNICODE);
+                    header('Content-Type: text/html; charset=utf-8');
+                    echo '<!doctype html><meta charset="utf-8"><title>Saved</title><body style="font:15px/1.5 system-ui,Segoe UI,Arial;padding:2rem;color:#1e293b">'
+                       . '<p><strong>' . htmlspecialchars($other['code'] . ' — ' . $other['legal_name'], ENT_QUOTES) . '</strong>: billing location added and selected on the form.</p>'
+                       . '<script>try{(window.opener||window.parent).postMessage(' . $payload . ',location.origin);}catch(e){}setTimeout(function(){try{window.close();}catch(e){}},200);</script>';
+                    exit;
+                }
+                flash(state_from_gstin($gstin) . ' (GSTIN ' . $gstin . ') added as a billing location of ' . $other['code'] . ' — ' . $other['legal_name'] . '. No second ' . Tl('client') . ' was created.');
+                redirect('/partner?id=' . (int) $other['id'] . '#billing-locations');
+            }
+            $offer = (!empty($b['is_client']) && $gstin !== '') ? ['id' => (int) $other['id'], 'name' => trim($other['code'] . ' — ' . $other['legal_name'])] : null;
+            return view('form', $formVars + ['error' => $offer ? custid_match_message($m, $gstin)
+                : "This company already exists as {$other['code']} — {$other['legal_name']} (matched by PAN). Open it from the Clients/Vendors list and tick the extra role instead of creating a duplicate.",
+                'cidOffer' => $offer]);
         }
+        //  A TAN is an identifier too.
+        if (trim((string) ($b['tan'] ?? '')) !== '' && ($dup = find_duplicate_partner('', '', '', $b['tan'], 0)))
+            return view('form', $formVars + ['error' => "This company already exists as {$dup['row']['code']} — {$dup['row']['legal_name']} (matched by TAN). Open it from the Clients/Vendors list and tick the extra role instead of creating a duplicate."]);
+        //  A similar NAME is a warning only (owner Q-02): the person confirms it is a different company.
+        if ($m['kind'] === 'NAME' && empty($b['dup_ok']))
+            return view('form', $formVars + ['error' => custid_match_message($m) . ' Open it and tick the extra role if it is the same company.', 'dupOffer' => true]);
         $b['client_type'] = resolve_new_lookup('client_type', $b['client_type'] ?? '', $b['client_type_new'] ?? '');
         $b['industry'] = resolve_new_lookup('industry', $b['industry'] ?? '', $b['industry_new'] ?? '');
         $branchId = ($b['home_branch_id'] ?? '') !== '' ? (int)$b['home_branch_id'] : null;
@@ -1515,6 +1548,7 @@ if ($route === 'partner-new') {
         $ins = $pdo->prepare("INSERT INTO business_partners (code,legal_name,display_name,is_client,is_vendor,is_subcontractor,client_type,industry,ownership_type,status,gstin,pan,cin,tan,msme_udyam,state,website,description,payment_terms,credit_days,home_branch_id,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
         $ins->execute([$code, $b['legal_name'], $b['display_name'] ?? '', !empty($b['is_client'])?1:0, !empty($b['is_vendor'])?1:0, !empty($b['is_subcontractor'])?1:0, $b['client_type'] ?? '', $b['industry'] ?? '', $b['ownership_type'] ?? '', $b['status'] ?? 'ACTIVE', $gstin, $pan, $b['cin'] ?? '', $b['tan'] ?? '', $b['msme_udyam'] ?? '', $state, $b['website'] ?? '', $b['description'] ?? '', $b['payment_terms'] ?? '', (int)($b['credit_days'] ?? 0), $branchId, date('c')]);
         $id = $pdo->lastInsertId();
+        if (!empty($b['is_client']) || $gstin !== '' || $pan !== '') custid_save((int) $id, $cid);
         $pdo->prepare("UPDATE business_partners SET status_reason=? WHERE id=?")
             ->execute([partner_status_needs_reason($b['status'] ?? 'ACTIVE') ? substr(trim((string)($b['status_reason'] ?? '')), 0, 400) : '', $id]);
         $pdo->prepare("UPDATE business_partners SET inspection_types=? WHERE id=?")
@@ -1573,6 +1607,47 @@ if ($route === 'partner-new') {
     return view('form', ['partner' => null, 'defaultRole' => $_GET['role'] ?? 'is_client', 'error' => null, 'offices' => offices_list(), 'pcfvals' => [], 'picker' => $picker]);
 }
 
+// A customer's billing locations (owner, 21 Nov 2026: D1/D4) — added, renamed
+// or stopped by whoever may edit the client record, within its office.
+if ($route === 'partner-billing-location' && $method === 'POST') {
+    $p = find_partner((int)($_GET['id'] ?? 0));
+    if (!$p) { http_response_code(404); return view('notfound'); }
+    ops_require(custid_can_edit($p), 'You do not have permission to edit ' . Tl('client') . ' records.');
+    $do = (string) ($_POST['do'] ?? '');
+    if ($do === 'add') {
+        $r = custid_add_location((int) $p['id'], $_POST);
+        flash(!empty($r['err']) ? $r['err'] : 'Billing location added.', !empty($r['err']) ? 'error' : 'success');
+    } elseif ($do === 'update') {
+        $e = custid_update_location((int) $p['id'], (int) ($_POST['loc'] ?? 0), $_POST);
+        flash($e !== '' ? $e : 'Billing location saved.', $e !== '' ? 'error' : 'success');
+    } elseif ($do === 'stop') {
+        $e = custid_stop_location((int) $p['id'], (int) ($_POST['loc'] ?? 0));
+        flash($e !== '' ? $e : 'That location is no longer offered for new bills. Bills already raised keep it.', $e !== '' ? 'error' : 'success');
+    }
+    redirect('/partner?id=' . (int) $p['id'] . '#billing-locations');
+}
+
+// D1 — move an existing branch company (same PAN) under its main customer as a
+// billing location. Preview on GET; only a person pressing the button, with a
+// reason, does it. The same people who may merge duplicate records.
+if ($route === 'partner-move-under') {
+    $p = find_partner((int)($_GET['id'] ?? 0));
+    if (!$p) { http_response_code(404); return view('notfound'); }
+    ops_require((is_master() || can('settings.manage') || can('mod.clients.edit')) && custid_can_edit($p),
+        'You cannot join ' . Tlp('client') . '.');
+    $pv = custid_move_preview((int) $p['id']);
+    if (empty($pv['err']) && !custid_can_edit($pv['main'])) $pv = ['err' => 'The main ' . Tl('client') . ' belongs to an office you cannot change.', 'branch' => $p];
+    if ($method === 'POST') {
+        if (!empty($pv['err'])) { flash($pv['err'], 'error'); redirect('/partner?id=' . (int) $p['id']); }
+        if (empty($_POST['confirm'])) { flash('Tick that you have checked the list first.', 'error'); redirect('/partner-move-under?id=' . (int) $p['id']); }
+        $r = custid_move_apply((int) $p['id'], (string) ($_POST['reason'] ?? ''));
+        if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/partner-move-under?id=' . (int) $p['id']); }
+        flash($p['code'] . ' — ' . $p['legal_name'] . ' is now part of ' . $pv['main']['legal_name'] . (!empty($r['location_id']) ? ', as a billing location' : '') . '. Its invoices print exactly as before.');
+        redirect('/partner?id=' . (int) $r['main_id'] . '#billing-locations');
+    }
+    return view('ops/partner_move', ['pv' => $pv]);
+}
+
 if ($route === 'partner-edit') {
     // R1 — client/vendor edit runs before the module gate; guard it here.
     ops_require(is_master() || can('mod.clients.edit') || can('mod.vendors.edit')
@@ -1595,20 +1670,37 @@ if ($route === 'partner-edit') {
         if (!empty($b['is_subcontractor'])) $b['is_vendor'] = 1; // sub-contractor ⇒ vendor
         $b['client_type'] = resolve_new_lookup('client_type', $b['client_type'] ?? '', $b['client_type_new'] ?? '');
         $b['industry'] = resolve_new_lookup('industry', $b['industry'] ?? '', $b['industry_new'] ?? '');
-        $gstin = clean_gstin($b['gstin'] ?? '');
-        $pan = $gstin ? pan_from_gstin($gstin) : $p['pan'];
-        $state = $gstin ? state_from_gstin($gstin) : $p['state'];
         if (($why = partner_status_reason_problem($b['status'] ?? 'ACTIVE', $b['status_reason'] ?? '')) !== '')
             return view('form', ['partner' => $p, 'defaultRole' => 'is_client', 'offices' => offices_list(), 'old' => $_POST, 'error' => $why]);
-        $dup = find_duplicate_partner($b['legal_name'] ?? '', $gstin, $pan ?: ($p['pan'] ?? ''), $b['tan'] ?? '', $p['id']);
-        if ($dup) {
-            return view('form', ['partner' => $p, 'defaultRole' => 'is_client', 'offices' => offices_list(), 'old' => $_POST,
-                'error' => "Another company already uses these details: {$dup['row']['code']} — {$dup['row']['legal_name']} (matched by {$dup['by']})."]);
+        //  Owner, 21 Nov 2026 (D3): a client without its GSTIN and PAN — or a reason
+        //  for not having them — is asked for them at its next edit. The GSTIN's
+        //  check digit is verified (it was not checked on an edit at all before).
+        $editFail = fn($msg, $extra = []) => view('form', ['partner' => $p, 'defaultRole' => 'is_client', 'offices' => offices_list(), 'old' => $_POST, 'error' => $msg] + $extra);
+        $cid = custid_from_input($b, !empty($b['is_client']));
+        if ($cid['err'] !== '') return $editFail($cid['err']);
+        $gstin = $cid['gstin'];
+        //  A vendor-only record that leaves the GSTIN blank keeps its PAN and state, as before.
+        $pan = $cid['pan'] !== '' || !empty($b['is_client']) ? $cid['pan'] : (string) $p['pan'];
+        $state = $cid['state'] !== '' || !empty($b['is_client']) ? $cid['state'] : (string) $p['state'];
+        $m = custid_match(($b['legal_name'] ?? '') !== $p['legal_name'] ? ($b['legal_name'] ?? '') : '', $gstin, $pan, (int) $p['id']);
+        if ($m['kind'] === 'GSTIN') return $editFail('Another company already uses this GSTIN: ' . trim($m['row']['code'] . ' — ' . $m['row']['legal_name']) . '.');
+        if ($m['kind'] === 'PAN') {
+            //  The same PAN inside one group (a branch company and its main record) is
+            //  the case D1 joins with "Move under the main customer" — editing either
+            //  of them stays allowed. Two unrelated records sharing a PAN is refused.
+            $grp = function_exists('partner_group_ids') ? array_map('intval', (array) partner_group_ids((int) $p['id'])) : [];
+            if (!in_array((int) $m['row']['id'], $grp, true))
+                return $editFail('Another company already has this PAN: ' . trim($m['row']['code'] . ' — ' . $m['row']['legal_name']) . '. One PAN is one ' . Tl('client') . ' — add this GSTIN as a billing location of that record instead.');
         }
+        if (trim((string) ($b['tan'] ?? '')) !== '' && ($dup = find_duplicate_partner('', '', '', $b['tan'], $p['id'])))
+            return $editFail("Another company already uses these details: {$dup['row']['code']} — {$dup['row']['legal_name']} (matched by TAN).");
+        if ($m['kind'] === 'NAME' && empty($b['dup_ok']))
+            return $editFail(custid_match_message($m), ['dupOffer' => true]);
         $pdo->prepare("UPDATE business_partners SET legal_name=?,display_name=?,is_client=?,is_vendor=?,is_subcontractor=?,client_type=?,industry=?,ownership_type=?,status=?,gstin=?,pan=?,cin=?,tan=?,msme_udyam=?,state=?,website=?,description=?,payment_terms=?,credit_days=? WHERE id=?")
             ->execute([$b['legal_name'], $b['display_name'] ?? '', !empty($b['is_client'])?1:0, !empty($b['is_vendor'])?1:0, !empty($b['is_subcontractor'])?1:0, $b['client_type'] ?? '', $b['industry'] ?? '', $b['ownership_type'] ?? '', $b['status'] ?? 'ACTIVE', $gstin, $pan, $b['cin'] ?? '', $b['tan'] ?? '', $b['msme_udyam'] ?? '', $state, $b['website'] ?? '', $b['description'] ?? '', $b['payment_terms'] ?? '', (int)($b['credit_days'] ?? 0), $p['id']]);
         $pdo->prepare("UPDATE business_partners SET inspection_types=? WHERE id=?")
             ->execute([implode(',', array_filter((array)($b['inspection_types'] ?? []))), $p['id']]);
+        if (!empty($b['is_client'])) custid_save((int) $p['id'], $cid);
         $newSt = strtoupper((string)($b['status'] ?? 'ACTIVE'));
         $newWhy = partner_status_needs_reason($newSt) ? substr(trim((string)($b['status_reason'] ?? '')), 0, 400) : '';
         $pdo->prepare("UPDATE business_partners SET status_reason=? WHERE id=?")->execute([$newWhy, $p['id']]);

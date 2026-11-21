@@ -162,6 +162,20 @@ function ops_books($route, $method) {
         redirect('/invoice?id=' . $id);
     }
 
+    // Where a draft is billed to — one of the customer's billing locations (owner,
+    // 21 Nov 2026: D1). The place of supply, the buyer GSTIN and CGST+SGST / IGST
+    // follow it; fixed once issued.
+    if ($route === 'invoice-bill-to' && $method === 'POST') {
+        ops_require($canIssue, 'You cannot change the books.');
+        $id = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
+        $chk = books_invoice($id);
+        if ($chk && function_exists('scope_allows') && !empty($chk['office_id']))
+            ops_require(scope_allows((int)$chk['office_id']), 'This invoice is outside your office / branch scope.');
+        $e = function_exists('custid_invoice_set_location') ? custid_invoice_set_location($id, (int)($_POST['billing_address_id'] ?? 0)) : 'Not available.';
+        flash($e !== '' ? $e : 'Billing location set — tax and GSTIN follow it.', $e !== '' ? 'error' : 'success');
+        redirect('/invoice?id=' . $id);
+    }
+
     // ---- One invoice ---------------------------------------------------------
     if ($route === 'invoice') {
         $inv = books_invoice($_GET['id'] ?? 0);
@@ -218,6 +232,10 @@ function ops_books($route, $method) {
         $settled   = books_settled((int)$inv['id']);
         $office    = !empty($inv['office_id']) ? ops_one("SELECT * FROM offices WHERE id=?", [(int)$inv['office_id']]) : null;
         $buyerAddr = function_exists('partner_primary_address') ? partner_primary_address((int)$inv['partner_id']) : null;
+        //  An invoice that carries its own copy of who it was made out to prints that
+        //  copy; older invoices read the customer record as they always did (D1).
+        if ((int) ($inv['bill_snap'] ?? 0) === 1)
+            $buyerAddr = trim((string) ($inv['bill_address'] ?? '')) !== '' ? ['line1' => (string) $inv['bill_address']] : null;
         require __DIR__ . '/../views/ops/invoice_print.php';
         return true;
     }

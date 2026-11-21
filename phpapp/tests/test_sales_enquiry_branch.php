@@ -81,7 +81,8 @@ t_ok(!empty($pg['has']['INQ-EB-OLD']) && !empty($pg['has']['All branches']), 'an
 t_as_admin();
 $lead = lead_create(['company_name' => 'EB Lead Works', 'contact_name' => 'Asha', 'contact_email' => 'asha@eb.test']);
 $pdo->prepare("UPDATE leads SET office_id=?, owner_user_id=?, owner_name='Eb_south Probe' WHERE id=?")->execute([$B, $SB, (int) $lead['id']]);
-$res = lead_convert((int) $lead['id']);
+//  21 Nov 2026 (D1–D4): a NEW customer carries its tax identity — here a recorded exception.
+$res = lead_convert((int) $lead['id'], ['tax_status' => 'UNREGISTERED', 'pan' => 'AABPN' . sprintf('%04d', random_int(0, 9999)) . 'N', 'tax_reason' => 'test — below the GST threshold']);
 $ci = ops_one("SELECT * FROM crm_inquiries WHERE lead_id=? OR notes LIKE ?", [(int) $lead['id'], '%' . $lead['ref'] . '%']);
 t_ok($ci !== null, 'arranged: the lead is converted (' . ($res['err'] ?? 'ok') . ')');
 t_eq((int) $ci['office_id'], $B, 'the enquiry takes the lead\'s branch');

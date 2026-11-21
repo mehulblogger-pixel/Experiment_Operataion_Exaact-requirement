@@ -39,7 +39,10 @@ $src = function_exists('lead_source_label') ? lead_source_label($l['source']) : 
         <div class="ff-help">Type to search. Leave it on “create a new one” to make a new <?= e(Tl('client')) ?> from the name below.</div></div>
       <div class="ff ff-wide"><label for="cv-name">…or the name for the new one</label>
         <input class="form-control" id="cv-name" name="company_name" value="<?= e($l['company_name']) ?>" maxlength="200"></div>
-      <div class="ff"><label for="cv-state">State <span class="muted">(for tax on the invoice side)</span></label><input class="form-control" id="cv-state" name="state" maxlength="60"></div>
+      <div class="ff ff-wide" style="min-width:0"><?php $cidVals = ['state' => '']; $cidId = 'cv-cid'; $cidNote = 'Needed when this lead becomes a new ' . Tl('client') . ' — not when you attach it to one already on file above.'; include __DIR__ . '/_custid_fields.php'; ?></div>
+      <?php if ((int) ($_GET['loc'] ?? 0) > 0 && ($locRow = ops_one("SELECT id, code, legal_name FROM business_partners WHERE id=?", [(int) $_GET['loc']]))): ?>
+        <label class="ff ff-wide" style="display:flex;gap:8px;align-items:flex-start;font-weight:600"><input type="checkbox" name="add_location_to" value="<?= (int) $locRow['id'] ?>" style="margin-top:3px"> Yes — it is <?= e($locRow['code'] . ' — ' . $locRow['legal_name']) ?> (same PAN): add this GSTIN as its billing location and convert the lead to that <?= e(Tl('client')) ?></label>
+      <?php endif; ?>
       <?php if (trim((string)($l['sbu'] ?? '')) === ''): //  The enquiry needs a business unit; this lead has none. ?>
       <div class="ff"><label for="cv-sbu"><?= e(ucfirst(Tl('sbu'))) ?> for the <?= e(Tl('inquiry')) ?> *</label>
         <select class="form-control" id="cv-sbu" name="sbu" required><option value="">— choose —</option>

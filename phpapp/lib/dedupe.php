@@ -85,13 +85,19 @@ function dd_holdings($id) {
 // Candidate pairs, most alike first. Only pairs that share a role — a client
 // and a site of the same name may genuinely be two records, and often are.
 function dd_candidates($limit = 60) {
-    $rows = ops_all("SELECT id, code, legal_name, display_name, is_client, is_vendor, gstin, pan, status, created_at
+    $rows = ops_all("SELECT id, code, legal_name, display_name, is_client, is_vendor, gstin, pan, status, created_at, parent_id
                      FROM business_partners ORDER BY id");
     $out = [];
     $n = count($rows);
     for ($i = 0; $i < $n; $i++) {
         for ($j = $i + 1; $j < $n; $j++) {
             $a = $rows[$i]; $b = $rows[$j];
+            //  A branch company and its main record (or two branches of one group) are
+            //  not duplicates to merge: with the same PAN they are one customer billed
+            //  in two states, joined by "Move under the main customer" on the branch's
+            //  record, which keeps its invoices as printed (owner, 21 Nov 2026: D1).
+            $ap = (int) ($a['parent_id'] ?? 0); $bp = (int) ($b['parent_id'] ?? 0);
+            if ($ap === (int) $b['id'] || $bp === (int) $a['id'] || ($ap && $ap === $bp)) continue;
             // Different tax identities are different companies, full stop.
             $ga = strtoupper(trim((string)$a['gstin'])); $gb = strtoupper(trim((string)$b['gstin']));
             if ($ga !== '' && $gb !== '' && $ga !== $gb) continue;

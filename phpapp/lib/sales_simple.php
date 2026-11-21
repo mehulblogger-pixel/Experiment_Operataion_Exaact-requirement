@@ -329,9 +329,21 @@ function sx_health($who) {
         foreach (ops_all("SELECT office_id FROM opportunities WHERE status='LOST' AND COALESCE(lost_reason,'')=''" . ($who ? " AND owner_user_id=" . (int) $who : '')) ?: [] as $r)
             if ($sc($r['office_id'] ?? 0)) $lostNo++;
     } catch (Throwable $e) {}
-    $gst = 0;
-    try { foreach (ops_all("SELECT gstin, home_branch_id FROM business_partners WHERE COALESCE(gstin,'')<>''") ?: [] as $p)
-            if ($sc($p['home_branch_id'] ?? 0) && !preg_match('/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/', strtoupper(trim($p['gstin'])))) $gst++; } catch (Throwable $e) {}
+    //  Customers only (a vendor's GSTIN is not ours to chase here), and the GSTIN's
+    //  real check digit, not only its shape. D3 (owner, 21 Nov 2026): customers with
+    //  no GSTIN and PAN — and no reason recorded — are listed, and government
+    //  departments without a PAN are flagged for Finance.
+    $gst = 0; $noId = 0; $govt = 0;
+    if (function_exists('custid_migrate')) custid_migrate();
+    try { foreach (ops_all("SELECT * FROM business_partners WHERE is_client=1 AND COALESCE(status,'') NOT IN ('MERGED','RETIRED')") ?: [] as $p) {
+            if (!$sc($p['home_branch_id'] ?? 0)) continue;
+            $g = strtoupper(trim((string) ($p['gstin'] ?? '')));
+            $govtRow = strtoupper((string) ($p['tax_status'] ?? '')) === 'GOVT_NO_PAN';
+            if ($g !== '' && ($govtRow ? (function_exists('custid_govt_gstin_problem') && custid_govt_gstin_problem($g) !== '')
+                                       : (function_exists('custid_gstin_problem') ? custid_gstin_problem($g) !== '' : !preg_match('/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/', $g)))) $gst++;
+            if (function_exists('custid_complete') && !custid_complete($p)) $noId++;
+            if ($govtRow) $govt++;
+        } } catch (Throwable $e) {}
     $today = !function_exists('feat_on') || feat_on('/sales-today');   // switched off → the Pipeline board
     return [
         ['Deals with a ⚠ health warning (late follow-up or past close date)', $late, $today ? '/sales-today' : '/sales-board'],
@@ -339,6 +351,9 @@ function sx_health($who) {
         ['Customers with a GSTIN that does not look right', $gst, '/clients'],
         ['Quotes waiting for approval or expired', $q, '/quotes'],
         ['Lost deals without a reason', $lostNo, '/opportunities?status=LOST'],
+        //  21 Nov 2026 (D3) — added at the end so the rows above keep their place.
+        ['Customers without GSTIN and PAN (asked at their next invoice)', $noId, '/clients'],
+        ['Government departments without a PAN (for Finance to check)', $govt, '/clients'],
     ];
 }
 

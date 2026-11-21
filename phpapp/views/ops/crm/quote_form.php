@@ -59,6 +59,19 @@ $__sxq4 = !(function_exists('is_embed') && is_embed());   // never inside the in
       </select></div>
     <div class="ff"><label>…or <?= e(Tl('client')) ?> name <span class="muted" id="cn_hint"></span></label>
       <input class="form-control" name="client_name" id="client_name" value="<?= e($g('client_name')) ?>"></div>
+    <?php // Billed at which of the customer's GST registrations — shown only for a customer
+          // with more than one billing location (owner, 21 Nov 2026: D1). CGST + SGST or
+          // IGST, and the invoices raised from this quotation, follow it.
+      $locMap = function_exists('custid_location_map') ? custid_location_map() : []; ?>
+    <?php if ($locMap): ?>
+    <div class="ff" id="bill_loc_ff" hidden><label for="billing_address_id">Billing location</label>
+      <select class="form-control" name="billing_address_id" id="billing_address_id" data-cur="<?= (int) ($posted['billing_address_id'] ?? ($q['billing_address_id'] ?? 0)) ?>"></select></div>
+    <script>(function(){ var map = <?= json_encode($locMap, JSON_UNESCAPED_UNICODE) ?>, c = document.getElementById('client_id'), s = document.getElementById('billing_address_id'), ff = document.getElementById('bill_loc_ff');
+      if (!c || !s || !ff) return; var cur = s.getAttribute('data-cur');
+      function sync(){ var l = map[c.value] || []; s.innerHTML = ''; l.forEach(function(o){ var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; if (String(o[0]) === cur) op.selected = true; s.appendChild(op); });
+        ff.hidden = l.length < 2; s.disabled = l.length < 2; }
+      c.addEventListener('change', sync); sync(); })();</script>
+    <?php endif; ?>
     <div class="ff"><label><?= e(T('sbu')) ?> (primary)</label>
       <select class="form-control searchable" name="sbu"><option value="">—</option>
         <?php foreach ($sbuOpts as $k=>$v): ?><option value="<?= e($k) ?>" <?= $g('sbu')===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?></select></div>

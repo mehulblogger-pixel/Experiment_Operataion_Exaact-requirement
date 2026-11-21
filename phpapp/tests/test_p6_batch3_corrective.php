@@ -1,4 +1,5 @@
 <?php
+//  21 Nov 2026: the made-up GSTINs below carry their real check character — sign-up now checks it (D1–D4).
 // ============================================================================
 //  PHASE 6 · BATCH 3 — CORRECTIVE IMPLEMENTATION
 //
@@ -249,13 +250,13 @@ t_eq((int)ops_val("SELECT COUNT(*) FROM vendor_users WHERE LOWER(TRIM(email))=?"
 // =============================================================================
 t_section('P6-B3C · CC — the public form is not a lookup service (A3 · Q26)');
 // =============================================================================
-$ccKnown = $ccPartner('Hawkridge Energy Ltd', ['gstin' => '24HHHKK1111H1Z9', 'pan' => 'HHHKK1111H']);
+$ccKnown = $ccPartner('Hawkridge Energy Ltd', ['gstin' => '24HHHKK1111H1Z1', 'pan' => 'HHHKK1111H']);
 $ccNew  = connect_org_register(['name' => 'Ilford Marine Services Ltd', 'org_type' => 'COMPANY',
                                 'contact_email' => 'new@ilford.test', 'password' => 'password123']);
 $ccByName = connect_org_register(['name' => 'Hawkridge Energy Ltd', 'org_type' => 'COMPANY',
                                   'contact_email' => 'x1@hawk.test', 'password' => 'password123']);
 $ccByTax  = connect_org_register(['name' => 'Totally Unrelated Ltd', 'org_type' => 'COMPANY',
-                                  'contact_email' => 'x2@hawk.test', 'gstin' => '24HHHKK1111H1Z9', 'password' => 'password123']);
+                                  'contact_email' => 'x2@hawk.test', 'gstin' => '24HHHKK1111H1Z1', 'password' => 'password123']);
 t_ok($ccNew[0], 'CC0 · a genuinely new company registers — the probe has a positive case');
 t_eq((string)$ccByName[1], (string)$ccNew[1], 'CC1 · *** a KNOWN company by name reads exactly like a new one ***');
 t_eq((string)$ccByTax[1],  (string)$ccNew[1], 'CC2 · *** and a KNOWN company by tax identifier does too ***');
@@ -349,7 +350,7 @@ t_section('P6-B3C · CF — merge safety and survivor resolution (R4 · §12)');
 // =============================================================================
 //  A correctly formed GSTIN (15 characters): since 22 Oct 2026 the public sign-up
 //  in CF13 refuses a malformed one, which the 14-character value used here was.
-$cfGst = '24MRGAA0001M1Z9';
+$cfGst = '24MRGAA0001M1Z1';
 $cfKeep = $ccPartner('Kingsley Marine Services Pvt Ltd', ['gstin' => $cfGst]);
 $cfDrop = $ccPartner('Kingsley Marine Services Private Limited', ['gstin' => $cfGst]);
 $cfFindings = fn() => count(array_filter(identity_state_findings(),

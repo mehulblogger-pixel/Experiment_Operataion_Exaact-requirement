@@ -184,6 +184,9 @@ function books_migrate() {
     //  while it is a draft and frozen once issued — so a later change of a branch's GSTIN never
     //  rewrites an invoice already sent (owner, 20 Nov 2026: branch GSTIN).
     if (function_exists('ensure_column')) ensure_column('invoices', 'supplier_gstin', "VARCHAR(20) DEFAULT ''");
+    //  Where the customer is billed and the copy of who the bill is made out to
+    //  (owner, 21 Nov 2026: D1) — lib/custid.php.
+    if (function_exists('custid_migrate_invoices')) { custid_migrate(); custid_migrate_invoices(); }
 
     // TDS the customer will withhold — captured on the invoice so the bill can show
     // the net payable, not only at receipt time. Additive & defaulted to 0, so every
@@ -340,16 +343,19 @@ function books_our_gstin($officeId = null) {
     return strtoupper(trim((string)(function_exists('setting_get') ? setting_get('company_gstin', '') : '')));
 }
 
-function books_their_state($partnerId) {
+function books_their_state($partnerId, $locId = 0) {
+    //  Owner, 21 Nov 2026 (D1): a customer billed at one of its other states
+    //  (a billing location with its own GSTIN) is taxed by THAT state.
+    if ((int) $locId > 0 && function_exists('custid_their_state')) return custid_their_state((int) $partnerId, (int) $locId);
     $p = books_try(fn() => ops_one("SELECT gstin, state FROM business_partners WHERE id=?", [(int)$partnerId]), null);
     if (!$p || !function_exists('tally_state_code')) return '';
     $s = function_exists('tally_gstin_state') ? (string)tally_gstin_state((string)$p['gstin']) : '';
     return $s !== '' ? $s : (string)tally_state_code((string)$p['state']);
 }
 
-function books_is_igst($partnerId, $officeId = null) {
+function books_is_igst($partnerId, $officeId = null, $locId = 0) {
     $sup  = books_our_state($officeId);   // the billing branch's own state when it has its own GSTIN
-    $cust = books_their_state($partnerId);
+    $cust = books_their_state($partnerId, $locId);
     // Neither known: do not guess. 0 means CGST+SGST, the local case, and
     // books_issue_missing() refuses to issue until somebody sets the state — so
     // the guess never reaches a customer.
@@ -427,6 +433,18 @@ function books_net_payable($inv) {
 // ---- Reading ----------------------------------------------------------------
 function books_invoice($id) {
     books_migrate();
+    return books_invoice_with_bill_to(books_invoice_raw($id));
+}
+//  An invoice raised with a copy of who it was made out to (bill_snap = 1) reads
+//  that copy; every invoice raised before then reads the customer record exactly
+//  as it always did, so its print does not change (owner, 21 Nov 2026: D1/D3).
+function books_invoice_with_bill_to($inv) {
+    if (!$inv || (int) ($inv['bill_snap'] ?? 0) !== 1) return $inv;
+    $inv['client_name'] = (string) $inv['bill_name'];
+    $inv['client_gstin'] = (string) $inv['bill_gstin'];
+    return $inv;
+}
+function books_invoice_raw($id) {
     return books_try(fn() => ops_one(
         "SELECT i.*, o.name office_name, COALESCE(bp.display_name, bp.legal_name) client_name, bp.gstin client_gstin
          FROM invoices i
@@ -595,7 +613,15 @@ function books_invoice_create(array $b) {
     $due  = trim((string)($b['due_date'] ?? ''));
     if ($due === '') $due = $days > 0 ? date('Y-m-d', strtotime($date . " +$days days")) : $date;
 
-    $igst = books_is_igst($pid, $off);
+    //  Where the customer is billed (owner, 21 Nov 2026: D1). Given on the form,
+    //  else the location its quotation / contract names, else the main one.
+    $locId = 0;
+    if (function_exists('custid_location_id_for')) {
+        $locId = custid_location_id_for($pid, (int) ($b['billing_address_id'] ?? 0))
+              ?: custid_default_location($pid, (int) ($b['quotation_id'] ?? 0), (string) ($b['contract_number'] ?? ''));
+    }
+    $loc = ($locId && function_exists('custid_location')) ? custid_location($pid, $locId) : null;
+    $igst = books_is_igst($pid, $off, $locId);
     $u = current_user();
     db()->prepare("INSERT INTO invoices
         (invoice_no,series,fy,kind,partner_id,partner_name,office_id,sbu,invoice_date,due_date,
@@ -606,12 +632,18 @@ function books_invoice_create(array $b) {
         books_series($off), current_fy(), (string)($b['kind'] ?? 'TAX'), $pid,
         (string)($p['display_name'] ?: $p['legal_name']), $off, (string)($b['sbu'] ?? ''),
         $date, $due, (string)($b['payment_terms'] ?? ''), $days,
-        books_their_state($pid), books_our_state($off), (string)$p['gstin'], $igst,
+        books_their_state($pid, $locId), books_our_state($off), $loc ? (string) $loc['gstin'] : (string)$p['gstin'], $igst,
         (string)($b['po_number'] ?? ''), (string)($b['contract_number'] ?? ''),
         (int)($b['quotation_id'] ?? 0) ?: null,
         (string)($b['notes'] ?? ''), $u ? user_name($u) : '', date('c'), date('c')]);
     $id = (int)db()->lastInsertId();
     books_try(fn() => db()->prepare("UPDATE invoices SET supplier_gstin=? WHERE id=?")->execute([books_our_gstin($off), $id]), null);
+    //  The copy of who it is made out to — name, GSTIN, state, address — so a later
+    //  edit of the customer never rewrites this bill (refreshed while a draft).
+    if (function_exists('custid_invoice_snapshot')) {
+        books_try(fn() => db()->prepare("UPDATE invoices SET billing_address_id=? WHERE id=?")->execute([$locId, $id]), null);
+        books_try(fn() => custid_invoice_snapshot($id), null);
+    }
     // Optional TDS rate (the customer's withholding) and marketplace-voucher
     // provenance — additive columns, set here so callers need not touch the header
     // INSERT. Both default to 0/unset for an ordinary manual invoice.
@@ -644,9 +676,15 @@ function books_set_office($invoiceId, $officeId) {
     $off = (int)$officeId;
     if (!$off || !books_try(fn() => ops_val("SELECT id FROM offices WHERE id=? AND is_active=1", [$off]), 0))
         return 'Choose an active branch to bill from.';
-    $igst = books_is_igst((int)$inv['partner_id'], $off);
+    //  The place of supply and the buyer GSTIN follow where the customer is billed,
+    //  so the three never drift apart (owner, 21 Nov 2026: D1).
+    $locId = function_exists('custid_location_id_for') ? custid_location_id_for((int) $inv['partner_id'], (int) ($inv['billing_address_id'] ?? 0)) : 0;
+    $igst = books_is_igst((int)$inv['partner_id'], $off, $locId);
     db()->prepare("UPDATE invoices SET office_id=?, series=?, is_igst=?, supplier_state=?, updated_at=? WHERE id=?")
        ->execute([$off, books_series($off), $igst, books_our_state($off), date('c'), (int)$inv['id']]);
+    if ($locId && function_exists('custid_location') && ($loc = custid_location((int) $inv['partner_id'], $locId)))
+        db()->prepare("UPDATE invoices SET place_of_supply=?, gstin=? WHERE id=?")->execute([(string) $loc['state_code'], (string) $loc['gstin'], (int) $inv['id']]);
+    if (function_exists('custid_invoice_snapshot')) books_try(fn() => custid_invoice_snapshot((int) $inv['id']), null);
     books_try(fn() => db()->prepare("UPDATE invoices SET supplier_gstin=? WHERE id=?")->execute([books_our_gstin($off), (int)$inv['id']]), null);
     if (function_exists('act_log')) act_log('INVOICE', (int)$inv['id'], 'BRANCH_SET', 'Billing branch set');
     return '';
@@ -764,8 +802,15 @@ function books_issue_missing(array $inv) {
     if (!$lines) $why[] = 'It has no lines, so there is nothing to charge for.';
     if ((float)$inv['total'] <= 0 && $lines) $why[] = 'It totals nothing. Check the rates.';
     if (trim((string)$inv['invoice_date']) === '') $why[] = 'It has no date.';
-    if (trim((string)$inv['place_of_supply']) === '' && trim((string)$inv['client_gstin'] ?? '') === '')
+    if (trim((string)$inv['place_of_supply']) === '' && trim((string)($inv['client_gstin'] ?? '')) === '')
         $why[] = 'The place of supply is unknown, so CGST/SGST against IGST is a guess. Set the customer\'s GSTIN or state.';
+    //  D3 (owner, 21 Nov 2026): a customer with no GSTIN and PAN — and no reason
+    //  recorded for not having them — is asked for them at its next invoice.
+    if (!empty($inv['partner_id']) && function_exists('custid_complete')) {
+        custid_migrate();
+        $cp = ops_one("SELECT * FROM business_partners WHERE id=?", [(int) $inv['partner_id']]);
+        if ($cp && !custid_complete($cp)) $why[] = custid_missing_words($cp);
+    }
     if (!$inv['office_id']) $why[] = 'No branch is set, so it has no numbering series.';
     return $why;
 }
@@ -776,6 +821,9 @@ function books_issue($invoiceId) {
     if (!$inv) return 'That invoice no longer exists.';
     $why = books_issue_missing($inv);
     if ($why) return implode(' ', $why);
+    //  The copy of who it is made out to is taken once more as it is issued; from
+    //  then on the print reads only the copy (owner, 21 Nov 2026: D1).
+    if (function_exists('custid_invoice_snapshot')) books_try(fn() => custid_invoice_snapshot((int) $inv['id']), null);
 
     $series = (string)$inv['series'] ?: books_series((int)$inv['office_id']);
     $fy = (string)$inv['fy'] ?: current_fy();
