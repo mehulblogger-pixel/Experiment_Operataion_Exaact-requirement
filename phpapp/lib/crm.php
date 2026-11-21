@@ -2412,7 +2412,7 @@ function crm_quote_scope_gate($route) {
     $q = ops_one("SELECT office_id, sbu, owner_id, created_by FROM quotations WHERE id=?", [$id]);
     if (!$q) return;                            // no such quote — the route's own 404 answers
     //  Q10 — "own" / "team" (owner, 21 Nov 2026): a quotation is its owner's, else its maker's.
-    ops_require(!function_exists('sales_owner_allows') || sales_owner_allows((int) (crm_quote_owner_user_id($q) ?? 0)),
+    ops_require(!function_exists('sales_owner_allows') || sales_owner_allows((int) (crm_quote_owner_user_id($q) ?? 0), false),
                 'This ' . Tl('quote') . ' belongs to someone outside the records you see (your "whose records" setting).');
     ops_require(scope_allows($q['office_id'] ?? null, $q['sbu'] ?? null),
                 'This quotation is outside your office / branch scope.');

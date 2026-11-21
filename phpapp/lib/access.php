@@ -1918,13 +1918,23 @@ function sales_rec_ids() {
     $me = (int) ($u['id'] ?? 0);
     return $mode === 'own' ? [$me] : sales_team_ids($me);
 }
-function sales_owner_sql($col) {
+//  Unassigned records (owner, 21 Nov 2026, answer "a"): a lead, deal or inquiry
+//  with NO owner stays visible to an Own / Team person inside their branches and
+//  units, so somebody picks it up ("Take these myself" / assigning). The branch
+//  and unit limits are applied beside this, never widened by it. A quotation
+//  always has a maker, so its callers pass $unassigned = false (unchanged).
+function sales_owner_sql($col, $unassigned = true) {
     $ids = sales_rec_ids();
-    return $ids === null ? '1=1' : "COALESCE($col,0) IN (" . implode(',', array_map('intval', $ids ?: [0])) . ")";
+    if ($ids === null) return '1=1';
+    $ids = array_map('intval', $ids ?: []);
+    if ($unassigned) $ids[] = 0;
+    return "COALESCE($col,0) IN (" . implode(',', array_values(array_unique($ids ?: [0]))) . ")";
 }
-function sales_owner_allows($ownerId) {
+function sales_owner_allows($ownerId, $unassigned = true) {
     $ids = sales_rec_ids();
-    return $ids === null || in_array((int) $ownerId, $ids, true);
+    if ($ids === null) return true;
+    if ((int) $ownerId <= 0) return (bool) $unassigned;
+    return in_array((int) $ownerId, $ids, true);
 }
 //  A quotation's owner: owner_id, else the person who made it (created_by holds a
 //  username or a full name — crm_quote_owner_user_id()'s own rule).

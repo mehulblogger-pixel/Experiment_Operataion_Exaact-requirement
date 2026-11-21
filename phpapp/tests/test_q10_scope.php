@@ -158,11 +158,13 @@ try {
 
     // ---- 2. Team / Own / Branch for a role -------------------------------------------------------
     $setRole('MARKETING_MANAGER', 'team');
-    t_eq($seen($M), ['l' => 'ABM', 'o' => 'ABM', 'q' => 'ABM', 'i' => 'ABM', 'r' => 'ABM', 'hl' => 'M', 'hd' => 'M'],
-         'Team · the manager sees their own and their whole line (Asha, and Bala below her) — not Chetan, not unowned — on leads, deals, quotations, inquiries, orders');
+    //  Unassigned (owner, 21 Nov 2026, answer "a"): the unowned lead, deal and inquiry of their branch
+    //  stay visible so someone picks them up; quotations / orders always have a maker (unchanged).
+    t_eq($seen($M), ['l' => '-ABM', 'o' => '-ABM', 'q' => 'ABM', 'i' => '-ABM', 'r' => 'ABM', 'hl' => 'M', 'hd' => 'M'],
+         'Team · the manager sees their own, their whole line (Asha, and Bala below her) and the unassigned lead / deal / inquiry of their branch — not Chetan — on leads, deals, quotations, inquiries, orders');
     bbv_as($M); $_GET['who'] = 'all'; t_eq(sx_person(), $M, 'Team · without "See other salespeople\'s lists" there is no "Everyone" (?who=all is ignored)'); unset($_GET['who']);
     $setRole('MARKETING_MANAGER', 'own');
-    t_eq($seen($M), ['l' => 'M', 'o' => 'M', 'q' => 'M', 'i' => 'M', 'r' => 'M', 'hl' => 'M', 'hd' => 'M'], 'Own · only their own records, everywhere');
+    t_eq($seen($M), ['l' => '-M', 'o' => '-M', 'q' => 'M', 'i' => '-M', 'r' => 'M', 'hl' => 'M', 'hd' => 'M'], 'Own · only their own records, plus the unassigned lead / deal / inquiry of their branch; Sales home / Today "Me" still only their own');
     $setRole('MARKETING_MANAGER', 'branch');
     t_eq($seen($M)['l'], $all5, 'Branch · back to every record of their branch');
     //  Own never ADDS a branch: an Ahmedabad coordinator set to Team still sees no Mumbai record.
@@ -172,7 +174,7 @@ try {
 
     // ---- 3. A person's own choice beats the role ----------------------------------------------------
     $setUser($A, 'own');
-    t_eq($seen($A)['l'], 'A', 'person · Asha set to Own (her role is Branch) sees only her lead');
+    t_eq($seen($A)['l'], '-A', 'person · Asha set to Own (her role is Branch) sees her lead and the unassigned one');
     $setRole('BUSINESS_DEV_MANAGER', 'own'); $setUser($A, 'branch');
     t_eq($seen($A)['l'], $all5, 'person · Asha set to Branch while her role is Own sees the whole branch');
     $setRole('BUSINESS_DEV_MANAGER', 'branch'); $setUser($A, '');
@@ -190,6 +192,33 @@ try {
     t_ok($open('inquiry', $made['i']['B']) && !$open('inquiry', $made['i']['C']), 'opening · Team: Bala\'s inquiry opens, Chetan\'s does not');
     $setRole('MARKETING_MANAGER', 'branch');
     t_ok($open('lead', $made['l']['C']) && $open('opportunity', $made['o']['C']), 'opening · Branch (day one): Chetan\'s lead and deal open again');
+
+    // ---- 3b. Unassigned records (owner, 21 Nov 2026, answer "a") -------------------------------------
+    $ahm = $f['ahm'];
+    $lAhm = (int) lead_create(['company_name' => "Q10L-AHM-$tag", 'contact_phone' => '9825011112', 'source' => 'REFERRAL', 'value' => 100000])['id'];
+    $pdo->prepare("UPDATE leads SET owner_user_id=NULL, office_id=? WHERE id=?")->execute([$ahm, $lAhm]); $made['l']['AHM'] = $lAhm;
+    $pdo->prepare("INSERT INTO crm_inquiries (subject, client_name, office_id, sbu, assigned_to, status, received_date, created_at) VALUES (?,?,?,?,NULL, 'OPEN', ?, ?)")
+        ->execute(["Q10I-AHM-$tag", 'Q10 Co', $ahm, '', $acc, date('c')]); $made['i']['AHM'] = (int) $pdo->lastInsertId();
+    foreach (['own', 'team'] as $mode) {
+        $setRole('MARKETING_MANAGER', $mode);
+        bbv_as($M);
+        $L = array_map('intval', array_column(leads_all() ?: [], 'id'));
+        t_ok(in_array($made['l']['-'], $L, true) && !in_array($lAhm, $L, true), "unassigned · $mode: the unassigned Mumbai lead is listed, the unassigned Ahmedabad one is not (branch never widened)");
+        t_ok(!in_array($made['l']['C'], $L, true), "unassigned · $mode: Chetan's owned lead is still hidden");
+        t_ok(crm_inquiry_in_scope(crm_inquiry_get($made['i']['-'])) && !crm_inquiry_in_scope(crm_inquiry_get($made['i']['AHM'])), "unassigned · $mode: the unassigned Mumbai inquiry is in scope, the Ahmedabad one is not");
+        t_ok(sales_owner_allows(0) && !sales_owner_allows(0, false), "unassigned · $mode: a record with no owner is allowed; a quotation (no unassigned) is not");
+    }
+    $setRole('MARKETING_MANAGER', 'own');
+    $open2 = function ($route, $id) use ($M) { $r = bbv_route($route, 'GET', $M, 0, [], ['id' => $id]);
+        foreach ((array) ($r['flash'] ?? []) as $fl) if (strpos((string) $fl, 'error:') === 0) return false;
+        return !empty($r['view_ok']); };
+    t_ok($open2('lead', $made['l']['-']) && $open2('opportunity', $made['o']['-']) && $open2('inquiry', $made['i']['-']), 'unassigned · opening by address: the unassigned lead, deal and inquiry of their branch open (same rule as the list)');
+    t_ok(!$open2('lead', $lAhm) && !$open2('lead', $made['l']['C']), 'unassigned · opening by address: the Ahmedabad unassigned lead and Chetan\'s lead are refused');
+    bbv_as($M); $_POST = [];
+    $msg = leads_bulk('mine', [$made['l']['-']]);
+    t_eq((int) ops_val("SELECT owner_user_id FROM leads WHERE id=?", [$made['l']['-']]), $M, 'unassigned · "Take these myself" on the register makes it theirs (' . $msg . ')');
+    $pdo->prepare("UPDATE leads SET owner_user_id=NULL WHERE id=?")->execute([$made['l']['-']]);
+    $setRole('MARKETING_MANAGER', 'branch');
 
     // ---- 4. Sales home / Today: "My team" picker ------------------------------------------------------
     bbv_as($M);
