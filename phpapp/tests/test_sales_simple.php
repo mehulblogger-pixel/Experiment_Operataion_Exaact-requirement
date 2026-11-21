@@ -74,7 +74,8 @@ try {
         t_ok($opened($r, $view), "screen · /$route opens for a manager" . (($r['view_err'] ?? '') !== '' ? ' — ' . $r['view_err'] : ''));
     }
     $r = bbv_route('sales-today', 'GET', $f['master'], 0, [], ['who' => 'all']);
-    t_ok(strpos($r['out'], 'Who has what today') !== false && strpos($r['out'], 'Deal follow-ups') !== false, 'Today · shows "who has what" and the deal follow-ups');
+    //  Stage 1 of the Sales redesign (owner, 21 Nov 2026): deal and lead follow-ups are one list, each row marked.
+    t_ok(strpos($r['out'], 'Who has what today') !== false && strpos($r['out'], 'Deal and lead follow-ups') !== false, 'Today · shows "who has what" and the deal follow-ups');
     $r = bbv_route('sales-home', 'GET', $f['master'], 0, [], ['who' => 'all']);
     t_ok(strpos($r['out'], 'Right now') !== false && strpos($r['out'], 'Data health') !== false && strpos($r['out'], 'Your daily routine') !== false, 'Home · right now, daily routine and data health');
     $r = bbv_route('sales-home', 'GET', $f['amit'], 0);

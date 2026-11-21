@@ -129,8 +129,13 @@
               //  the area's screens as tiles), not a folding accordion. Visibility
               //  and the highlight route-set both come from lib/areas.php, so the
               //  rail and the landing page can never disagree. ?>
-        <?php if (ops_area_has('sales')): ?>
-        <a class="s-item<?= $navOn(ops_area_routes('sales')) ?>" href="/sales"><span class="s-ic">🎯</span><span>Sales</span></a>
+        <?php if (ops_area_has('sales')):
+              //  Owner, 21 Nov 2026 (Sales redesign, decision 1): Sales home is the Sales landing
+              //  page. Only the address of this one link changes, and only for a person who may
+              //  open Sales home with its feature on; everyone else still lands on /sales, which
+              //  keeps working for all (nothing redirects). ?>
+        <?php $navSalesHref = (function_exists('sx_can') && sx_can() && (!function_exists('feat_on') || feat_on('/sales-home'))) ? '/sales-home' : '/sales'; ?>
+        <a class="s-item<?= $navOn(ops_area_routes('sales')) ?>" href="<?= e($navSalesHref) ?>"><span class="s-ic">🎯</span><span>Sales</span></a>
         <?php endif; ?>
 
         <?php // Connect — the technical-manpower marketplace, its own rail item,

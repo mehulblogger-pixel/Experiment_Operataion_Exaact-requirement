@@ -1,84 +1,111 @@
 <?php
-// Simple Sales — Dashboard (the owner's Excel DASHBOARD): pick a person and a
-// period and every figure updates. The 8 key numbers are the Excel's.
-require __DIR__ . '/_sx_ui.php';
+// Sales dashboard (owner, 21 Nov 2026: Stage 1 of the Sales redesign). The same
+// eight figures and six panels as before, from the same sx_dash_data(): only the
+// look changes — clearer labels (won value is deals won, not invoices; collections
+// are Accounts' outstanding invoices), a column chart for won vs target and a ring
+// for the pipeline by stage, every number written out so nothing needs a hover.
+// The old page is kept in tests/fixtures/pre_stage1/.
+require __DIR__ . '/_sxw_ui.php';
 $k = $dd['k'];
 $periods = ['fy' => 'This financial year', 'quarter' => 'This quarter', 'month' => 'This month', '90' => 'Last 90 days'];
 $wq = '&who=' . rawurlencode((string) $whoKey);
 $bars = function (array $rows, $vKey, $labKey, $color, $fmt) {
     $max = max(array_map(fn($r) => (float) $r[$vKey], $rows) ?: [0]) ?: 1;
-    echo '<div class="sxbars">';
-    foreach ($rows as $r) echo '<div class="sxbar"><span>' . e($r[$labKey]) . '</span><i style="width:' . max(1, round(100 * (float) $r[$vKey] / $max)) . '%;background:' . e($color) . '"></i><em>' . e($fmt($r[$vKey])) . '</em></div>';
+    echo '<div class="sxw-bars">';
+    foreach ($rows as $r) echo '<div class="b"><span>' . e($r[$labKey]) . '</span><i style="width:' . max(1, round(100 * (float) $r[$vKey] / $max)) . '%;background:' . e($color) . '"></i><em>' . e($fmt($r[$vKey])) . '</em></div>';
     echo '</div>';
 };
+$per = '<nav class="sxw-seg" aria-label="Period">';
+foreach ($periods as $pk => $pl) $per .= '<a href="/sales-dashboard?p=' . e($pk . $wq) . '"' . ($p === $pk ? ' class="on" aria-current="true"' : '') . '>' . e($pl) . '</a>';
+$per .= '</nav>';
+$ring = ['var(--info)', 'var(--brand)', 'var(--warn)', '#7a5bb5', 'var(--ok)', '#8a6a3a', '#c95b5b', 'var(--muted)'];
 ?>
-<div class="sx">
-  <div class="sxhead"><h1>📊 Sales dashboard</h1>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <nav class="sxchips" aria-label="Period"><?php foreach ($periods as $pk => $pl): ?><a class="sxchip<?= $p === $pk ? ' on' : '' ?>" href="/sales-dashboard?p=<?= e($pk . $wq) ?>"><?= e($pl) ?></a><?php endforeach; ?></nav>
-      <?php sx_person_chips('sales-dashboard', $whoKey, $people, $seeAll, '&p=' . $p); ?>
-    </div></div>
-  <p class="sxwhy"><b>Why you're here:</b> the health of sales in 30 seconds. <?= e($dd['label']) ?>: <?= e(fdate($dd['from'])) ?> – <?= e(fdate($dd['to'])) ?>.</p>
-  <div class="sxkpis">
-    <?php sx_kpi('blue', '🧲 New leads', (string) $k['leads'], $k['deals_new'] . ' deals started', '/leads');
-          sx_kpi('green', '🏆 Won value', sx_short($k['won_v']), $k['won_n'] . ' deals won', '/opportunities?status=WON');
-          sx_kpi('teal', '🎯 Win rate', $k['rate'] === null ? '—' : $k['rate'] . '%', $k['won_n'] . ' won · ' . $k['lost_n'] . ' lost');
-          sx_kpi('purple', '💵 Avg deal size', $k['avg'] === null ? '—' : sx_short($k['avg']), 'per won deal');
-          sx_kpi('slate', '💼 Open pipeline', sx_short($k['open_v']), $k['open_n'] . ' open deals (today)', '/sales-board');
-          sx_kpi('orange', '📈 Weighted forecast', sx_short($k['weighted']), 'pipeline × win %');
-          sx_kpi('pink', '🎯 Target', $k['target'] > 0 ? sx_short($k['target']) : 'Not set', $k['target'] > 0 ? 'for the whole ' . preg_replace('/^this /', '', strtolower((string) ($dd['label'] ?? 'period'))) : 'set monthly targets');
-          sx_kpi('brown', '✅ Achievement', $k['ach'] === null ? '—' : $k['ach'] . '%', 'won ÷ target'); ?>
+<div class="rec sxw has-bn">
+  <?php sxw_nav('/sales-dashboard'); ?>
+  <?php sxw_head('Sales dashboard', 'Why you\'re here: the health of sales in 30 seconds. ' . $dd['label'] . ': ' . fdate($dd['from']) . ' – ' . fdate($dd['to']) . '.', 'chart',
+        '<div class="sxw-ctl">' . $per . sxw_person('sales-dashboard', $whoKey, $people, $seeAll, '&p=' . $p) . '</div>'); ?>
+
+  <div class="sxw-kp" style="--n:4">
+    <?php sxw_kpi('info', 'users', 'New leads', 'New leads', (string) $k['leads'], $k['deals_new'] . ' deals started', '/leads');
+          sxw_kpi('ok', 'trophy', 'Won value', 'Won value', sx_short($k['won_v']), $k['won_n'] . ' deals won — deals marked won, not invoices', '/opportunities?status=WON');
+          sxw_kpi('teal', 'target', 'Win rate', 'Win rate', $k['rate'] === null ? '—' : $k['rate'] . '%', $k['won_n'] . ' won · ' . $k['lost_n'] . ' lost');
+          sxw_kpi('grey', 'brief', 'Avg deal size', 'Avg deal size', $k['avg'] === null ? '—' : sx_short($k['avg']), 'per won deal');
+          sxw_kpi('info', 'flow', 'Open pipeline', 'Open pipeline', sx_short($k['open_v']), $k['open_n'] . ' open deals (today)', '/sales-board');
+          sxw_kpi('grey', 'chart', 'Weighted forecast', 'Weighted forecast', sx_short($k['weighted']), 'pipeline × win %');
+          sxw_kpi('grey', 'target', 'Target', 'Target', $k['target'] > 0 ? sx_short($k['target']) : 'Not set', $k['target'] > 0 ? 'for the whole ' . preg_replace('/^this /', '', strtolower((string) ($dd['label'] ?? 'period'))) : 'set monthly targets');
+          sxw_kpi('warn', 'task', 'Achievement', 'Achievement', $k['ach'] === null ? '—' : $k['ach'] . '%', 'won ÷ target'); ?>
   </div>
 
-  <div class="sxgrid2" style="margin-top:12px">
-    <div class="sxcard"><h2>💼 Pipeline by stage · open deals today</h2>
-      <?php if (!$dd['stages']): ?><p class="sxempty">No open deals.</p><?php else: ?>
-      <div class="tbl"><table class="sxt"><tr><th>Stage</th><th class="n">Deals</th><th class="n">Value</th><th class="n">Win %</th><th class="n">Weighted</th></tr>
-        <?php foreach ($dd['stages'] as $s): ?><tr><td><?= e($s['name']) ?></td><td class="n"><?= (int) $s['n'] ?></td><td class="n"><?= e(sx_money($s['v'])) ?></td><td class="n"><?= (int) $s['p'] ?>%<?php $ep = $s['v'] > 0 ? (int) round($s['w'] * 100 / $s['v']) : 0; if ($s['v'] > 0 && $ep !== (int) $s['p']): ?><br><small class="muted" title="Some deals here have their own chance of winning, set on the deal">deals: <?= $ep ?>%</small><?php endif; ?></td><td class="n"><?= e(sx_money($s['w'])) ?></td></tr><?php endforeach; ?>
-      </table></div>
-      <p class="muted" style="font-size:12px;margin:6px 0 0">Weighted = value × chance of winning. A deal's own chance (set on the deal) is used where there is one; otherwise the stage's win %.</p><?php endif; ?></div>
-    <div class="sxcard"><h2>📅 Won vs target, by month</h2>
+  <div class="sxw-g2">
+    <?php rec_card_open('Won vs target, by month', 'cal'); ?>
       <?php $mx = max(array_map(fn($m) => max($m['won'], $m['target']), $dd['months']) ?: [0]) ?: 1; ?>
-      <div class="sxbars">
+      <div class="sxw-cc" role="img" aria-label="Won against target for each month">
         <?php foreach ($dd['months'] as $ym => $m): ?>
-          <div class="sxbar"><span><?= e(date('M Y', strtotime($ym . '-01'))) ?></span>
-            <i style="width:<?= max(1, round(100 * $m['won'] / $mx)) ?>%;background:var(--sx-green)" title="Won"></i>
-            <em><?= e(sx_short($m['won'])) ?><?= $m['target'] > 0 ? ' / ' . e(sx_short($m['target'])) : '' ?></em></div>
+          <div title="<?= e(date('M Y', strtotime($ym . '-01')) . ': won ' . sx_short($m['won']) . ($m['target'] > 0 ? ' / target ' . sx_short($m['target']) : '')) ?>">
+            <i style="height:<?= max(1, round(100 * $m['won'] / $mx)) ?>%"></i><?php if ($m['target'] > 0): ?><u style="bottom:<?= round(100 * $m['target'] / $mx, 1) ?>%"></u><?php endif; ?></div>
         <?php endforeach; ?>
       </div>
-      <p class="sxempty" style="margin-top:6px">Green = won. "/ figure" = that month's target, once targets are set.</p></div>
+      <div class="sxw-cx"><?php foreach ($dd['months'] as $ym => $m): ?><span><?= e(date('M', strtotime($ym . '-01'))) ?></span><?php endforeach; ?></div>
+      <div class="sxw-cv">
+        <?php foreach ($dd['months'] as $ym => $m): ?><div><span><?= e(date('M Y', strtotime($ym . '-01'))) ?></span><b><?= e(sx_short($m['won'])) ?><?= $m['target'] > 0 ? ' / ' . e(sx_short($m['target'])) : '' ?></b></div><?php endforeach; ?>
+      </div>
+      <p class="rec-note">Green = won. Black mark and "/ figure" = that month's target, once targets are set.</p>
+    <?php rec_card_close(); ?>
+    <?php rec_card_open('Pipeline by stage · open deals today', 'flow'); ?>
+      <?php if (!$dd['stages']): ?><p class="sxw-empty">No open deals.</p><?php else:
+            $tv = array_sum(array_map(fn($s) => (float) $s['v'], $dd['stages'])); $a = 0; $seg = [];
+            foreach ($dd['stages'] as $i => $s) { $st = $a; $a += $tv > 0 ? 360 * (float) $s['v'] / $tv : 0; $seg[] = $ring[$i % count($ring)] . ' ' . round($st, 2) . 'deg ' . round($a, 2) . 'deg'; } ?>
+        <div class="sxw-ring">
+          <div class="d" style="background:<?= $tv > 0 ? 'conic-gradient(' . e(implode(',', $seg)) . ')' : 'var(--line)' ?>" role="img" aria-label="Open pipeline by stage"><div><b><?= e(sx_short($tv)) ?></b><span><?= array_sum(array_map(fn($s) => (int) $s['n'], $dd['stages'])) ?> deals</span></div></div>
+          <div class="sxw-lg">
+            <?php foreach ($dd['stages'] as $i => $s): $ep = $s['v'] > 0 ? (int) round($s['w'] * 100 / $s['v']) : 0; ?>
+              <div class="r"><i style="background:<?= e($ring[$i % count($ring)]) ?>"></i><span><?= e($s['name']) ?> · <?= (int) $s['n'] ?></span><b><?= e(sx_money($s['v'])) ?></b>
+                <span class="m"><?= (int) $s['p'] ?>% win<?= ($s['v'] > 0 && $ep !== (int) $s['p']) ? ' (deals: ' . $ep . '%)' : '' ?> · weighted <?= e(sx_money($s['w'])) ?></span></div>
+            <?php endforeach; ?>
+          </div>
+        </div>
+        <p class="rec-note">Weighted = value × chance of winning. A deal's own chance (set on the deal) is used where there is one; otherwise the stage's win %.</p>
+      <?php endif; ?>
+    <?php rec_card_close(); ?>
   </div>
 
-  <div class="sxgrid2" style="margin-top:12px">
-    <div class="sxcard"><h2>🧲 Lead source performance</h2>
-      <?php if (!$dd['sources']): ?><p class="sxempty">No new leads in this period.</p><?php else: ?>
-      <div class="tbl"><table class="sxt"><tr><th>Source</th><th class="n">Leads</th><th class="n">Deals</th><th class="n">Won</th><th class="n">Conversion</th></tr>
+  <div class="sxw-g2">
+    <?php rec_card_open('Lead source performance', 'trend'); ?>
+      <?php if (!$dd['sources']): ?><p class="sxw-empty">No new leads in this period.</p><?php else: ?>
+      <div class="rec-scroll"><table class="sxw-fu"><thead><tr><th>Source</th><th class="r">Leads</th><th class="r">Deals</th><th class="r">Won</th><th class="r">Conversion</th></tr></thead><tbody>
         <?php foreach ($dd['sources'] as $s): $cv = $s['leads'] ? round(100 * $s['deals'] / $s['leads']) : 0; ?>
-          <tr><td><?= e($s['label']) ?></td><td class="n"><?= (int) $s['leads'] ?></td><td class="n"><?= (int) $s['deals'] ?></td><td class="n"><?= e(sx_short($s['won'])) ?></td><td class="n"><span class="sxp <?= $cv >= 40 ? 'p-ok' : ($cv >= 20 ? 'p-warn' : 'p-bad') ?>"><?= $cv ?>%</span></td></tr>
+          <tr><td><?= e($s['label']) ?></td><td class="r"><span class="k">Leads</span><?= (int) $s['leads'] ?></td><td class="r"><span class="k">Deals</span><?= (int) $s['deals'] ?></td><td class="r"><span class="k">Won</span><?= e(sx_short($s['won'])) ?></td><td class="r"><span class="k">Conversion</span><span class="sxw-due <?= $cv >= 40 ? 'p-ok' : ($cv >= 20 ? 'p-warn' : 'p-bad') ?>"><?= $cv ?>%</span></td></tr>
         <?php endforeach; ?>
-      </table></div><?php endif; ?></div>
-    <div class="sxcard"><h2>❌ Why we lose</h2>
-      <?php if (!$dd['lost']): ?><p class="sxempty">No lost deals in this period.</p><?php else: $bars($dd['lost'], 'n', 'label', 'var(--sx-red)', fn($v) => (int) $v . ' deal' . ((int) $v === 1 ? '' : 's')); endif; ?>
-      <?php if ($dd['ageing'] !== null): ?><h2 style="margin-top:14px">💰 Collections ageing (outstanding)</h2>
-        <?php $ag = array_map(fn($a) => $a, array_values($dd['ageing'])); $bars($ag, 'v', 'label', 'var(--sx-brown)', fn($v) => sx_short($v)); endif; ?></div>
+      </tbody></table></div><?php endif; ?>
+    <?php rec_card_close(); ?>
+    <?php rec_card_open('Why we lose', 'alert'); ?>
+      <?php if (!$dd['lost']): ?><p class="sxw-empty">No lost deals in this period.</p><?php else: $bars($dd['lost'], 'n', 'label', 'var(--bad)', fn($v) => (int) $v . ' deal' . ((int) $v === 1 ? '' : 's')); endif; ?>
+    <?php rec_card_close(); ?>
   </div>
 
-  <?php if ($dd['team']): ?>
-  <div class="sxcard"><h2>🏅 Team leaderboard</h2><div class="tbl"><table class="sxt">
-    <tr><th>Salesperson</th><th class="n">Open pipeline</th><th class="n">Won</th><th class="n">Activities (30 days)</th><th class="n">Target</th><th class="n">Achievement</th></tr>
-    <?php foreach ($dd['team'] as $r): $a = $r['target'] > 0 ? round(100 * $r['won'] / $r['target']) : null; ?>
-      <tr><td><a href="/sales-dashboard?p=<?= e($p) ?>&who=<?= (int) $r['id'] ?>"><?= e($r['name']) ?></a></td><td class="n"><?= e(sx_short($r['open'])) ?></td><td class="n"><?= e(sx_short($r['won'])) ?></td><td class="n"><?= (int) $r['acts'] ?></td>
-        <td class="n"><?= $r['target'] > 0 ? e(sx_short($r['target'])) : '—' ?></td><td class="n"><?= $a === null ? '—' : '<span class="sxp ' . ($a >= 90 ? 'p-ok' : ($a >= 60 ? 'p-warn' : 'p-bad')) . '">' . $a . '%</span>' ?></td></tr>
-    <?php endforeach; ?>
-  </table></div></div>
-  <?php endif; ?>
-
-  <div class="sxcard"><h2>🔝 Top 10 open deals</h2>
-    <?php if (!$dd['top']): ?><p class="sxempty">No open deals.</p><?php else: ?>
-    <div class="tbl"><table class="sxt"><tr><th>Deal</th><th>Customer</th><th>Stage</th><th class="n">Value</th><th class="n">Win %</th><th>Owner</th><th>Next step</th></tr>
-      <?php foreach ($dd['top'] as $o): [$lab, $cls] = sx_due_label($o['next_action_on'] ?? ''); ?>
-        <tr><td><a href="/opportunity?id=<?= (int) $o['id'] ?>"><?= e($o['ref']) ?></a> <?= e($o['name']) ?></td><td><?= e($o['client_name'] ?: $o['partner_name']) ?></td><td><?= e($o['stage_name']) ?></td>
-          <td class="n"><?= e(sx_money($o['value'])) ?></td><td class="n"><?= (int) ($o['probability'] ?: $o['stage_prob']) ?>%</td><td><?= e($o['owner_name'] ?: '—') ?></td><td><span class="sxp <?= e($cls) ?>"><?= e($lab) ?></span></td></tr>
+  <div class="sxw-g2">
+    <?php if ($dd['ageing'] !== null): rec_card_open('Collections ageing (outstanding)', 'rupee'); ?>
+      <?php $ag = array_map(fn($a) => $a, array_values($dd['ageing'])); $bars($ag, 'v', 'label', '#8a6a3a', fn($v) => sx_short($v)); ?>
+      <p class="rec-note">Accounts' outstanding invoices — shown only to people who may see receivables.</p>
+    <?php rec_card_close(); endif; ?>
+    <?php if ($dd['team']): rec_card_open('Team leaderboard', 'trophy'); ?>
+      <div class="rec-scroll"><table class="sxw-fu"><thead><tr><th>Salesperson</th><th class="r">Open pipeline</th><th class="r">Won</th><th class="r">Activities (30 days)</th><th class="r">Target</th><th class="r">Achievement</th></tr></thead><tbody>
+      <?php foreach ($dd['team'] as $r): $a = $r['target'] > 0 ? round(100 * $r['won'] / $r['target']) : null; ?>
+        <tr><td><a href="/sales-dashboard?p=<?= e($p) ?>&who=<?= (int) $r['id'] ?>"><?= e($r['name']) ?></a></td><td class="r"><span class="k">Open pipeline</span><?= e(sx_short($r['open'])) ?></td><td class="r"><span class="k">Won</span><?= e(sx_short($r['won'])) ?></td><td class="r"><span class="k">Activities (30 days)</span><?= (int) $r['acts'] ?></td>
+          <td class="r"><span class="k">Target</span><?= $r['target'] > 0 ? e(sx_short($r['target'])) : '—' ?></td><td class="r"><span class="k">Achievement</span><?= $a === null ? '—' : '<span class="sxw-due ' . ($a >= 90 ? 'p-ok' : ($a >= 60 ? 'p-warn' : 'p-bad')) . '">' . $a . '%</span>' ?></td></tr>
       <?php endforeach; ?>
-    </table></div><?php endif; ?></div>
+      </tbody></table></div>
+    <?php rec_card_close(); endif; ?>
+  </div>
+
+  <?php rec_card_open('Top 10 open deals', 'list'); ?>
+    <?php if (!$dd['top']): ?><p class="sxw-empty">No open deals.</p><?php else: ?>
+    <div class="rec-scroll"><table class="sxw-fu"><thead><tr><th>Deal</th><th>Customer</th><th>Stage</th><th class="r">Value</th><th class="r">Win %</th><th>Owner</th><th>Next step</th></tr></thead><tbody>
+      <?php foreach ($dd['top'] as $o): ?>
+        <tr><td><a href="/opportunity?id=<?= (int) $o['id'] ?>"><?= e($o['ref']) ?></a> <?= e($o['name']) ?></td><td><span class="k">Customer</span><?= e($o['client_name'] ?: $o['partner_name']) ?></td><td><span class="k">Stage</span><?= e($o['stage_name']) ?></td>
+          <td class="r"><span class="k">Value</span><?= e(sx_money($o['value'])) ?></td><td class="r"><span class="k">Win %</span><?= (int) ($o['probability'] ?: $o['stage_prob']) ?>%</td><td><span class="k">Owner</span><?= e($o['owner_name'] ?: '—') ?></td><td><span class="k">Next step</span><?= sxw_due($o['next_action_on'] ?? '') ?></td></tr>
+      <?php endforeach; ?>
+    </tbody></table></div><?php endif; ?>
+  <?php rec_card_close(); ?>
 </div>
+<?php sxw_bottom('/sales-dashboard'); ?>

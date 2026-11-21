@@ -344,3 +344,31 @@ order next). Look and feel only — it decides nothing about who may do what.
   "RECORD PAGE KIT" block in `assets/css/app.css`. Never set a column count as an
   inline `grid-template-columns` — pass `--n` instead (the phone stylesheet
   collapses inline grids to one column).
+
+### The Sales workspace screens (owner, 21 Nov 2026 — Sales redesign Stage 1)
+
+Sales home (the Sales Command Centre), Today / My work, the Pipeline board and the
+Sales dashboard share one look, built on the record page kit above. Look and feel
+only: every figure, list and permission comes from the same handlers as before.
+
+- **Sales section bar** (laptop and tablet): one dark-teal bar listing the Sales
+  screens the person may open (read from the Sales area itself, `ops_area_def`),
+  plus "All Sales screens" (/sales). It is the only dark-teal element; the app's
+  own menu and header are not restyled.
+- **Phone bottom bar** on these four screens: Home · Leads · Pipeline · Actions
+  (Today) · Reports (Sales dashboard), each only when the person may open it and
+  its feature is on. It never covers content (the page keeps room below).
+- **Figure tiles:** status colours only (red overdue, amber due/warning, blue
+  information, green won/on track, teal renewals, grey neutral); a tile that opens
+  a screen is a link; numbers are written out, never only on hover.
+- **Person filter:** Me · Everyone, and a list of salespeople — the same addresses
+  as before (?who=…), managers only.
+- **Long lists** (Today's follow-ups): a searchable, sortable table on a wide page,
+  cards with Call · WhatsApp · Log on a narrow one; deals and leads in one list,
+  each row marked Deal / Lead.
+- **Board:** a Leads / Deals switch, a box per stage (count · value · win %) and a
+  Total box; on a phone, tap a stage box to see its cards. No drag-and-drop — a
+  stage is changed on the record, as before.
+- Built with `views/ops/_sxw_ui.php` and the "SALES WORKSPACE" block in
+  `assets/css/app.css`. The left menu's "Sales" opens Sales home for a person who
+  may open it; everyone else still lands on /sales, which keeps working.
