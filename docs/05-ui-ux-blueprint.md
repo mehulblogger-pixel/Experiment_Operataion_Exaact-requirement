@@ -372,3 +372,16 @@ only: every figure, list and permission comes from the same handlers as before.
 - Built with `views/ops/_sxw_ui.php` and the "SALES WORKSPACE" block in
   `assets/css/app.css`. The left menu's "Sales" opens Sales home for a person who
   may open it; everyone else still lands on /sales, which keeps working.
+
+**Stage 2 — the lead screens (owner, 21 Nov 2026).** The leads register, the full lead
+form, the quick lead, the lead → customer screen and the lead page carry the same
+Sales bar and phone bottom bar ("SALES — LEADS" block in `app.css`):
+- **Register:** six figure tiles (the "Not pursued" count included), one control row
+  (Board · List, year, status on the list, pipeline on the board, find, one CSV),
+  a board of stage columns that stack on a phone, and the shared register for the
+  list with Call · WhatsApp · Log on each open lead and "Preview first" for bulk actions.
+  Codes are shown in words (a lead's source).
+- **Forms:** numbered steps (later steps fold on a phone until used), a right-hand
+  column that says what happens next, and the buttons at the end of the form — never
+  floating over it on a phone. A possible duplicate is shown under step 1 with an
+  explicit "save it anyway" choice; nothing typed is lost after a refused save.

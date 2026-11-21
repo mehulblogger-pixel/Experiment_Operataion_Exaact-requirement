@@ -1,0 +1,188 @@
+<?php $c = $counts; $view = $view ?? 'board';
+  // The year every card counts — said on the card, so a number is never read for another year.
+  $isYear = ($fy ?? '') !== '' && strtoupper((string)($fy ?? '')) !== 'ALL';
+  $fyTag = $isYear ? ' (FY ' . $fy . ')' : ' (all years)';
+  // Open leads carry forward from earlier years unless "only this year" is ticked.
+  $openTag = $isYear ? (!empty($onlyYear) ? ' (created in FY ' . $fy . ')' : ' (FY ' . $fy . ' + carried forward)') : ' (all years)'; ?>
+<div class="master-head">
+  <div><h1>Leads</h1>
+  <p class="sub" style="margin:2px 0 0">People we are chasing before they are customers. When one says yes it becomes a customer and an <?= e(Tl('inquiry')) ?> by itself — nothing is typed twice.</p></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <?php if ($canEdit): ?><a class="btn" href="/lead-new">+ New lead</a><?php endif; ?>
+    <?php // The list carries its own export, inside the register, so it can say
+          // it is exporting what the filters match. Only the board needs one here. ?>
+    <?php if ($view !== 'list' && (!function_exists('leads_can_export') || leads_can_export())): ?>
+      <a class="btn secondary" href="/leads?<?= e(http_build_query(array_merge($_GET,['export'=>'csv']))) ?>">⬇ CSV</a>
+    <?php endif; ?>
+  </div>
+</div>
+
+<div class="qcards" style="margin-top:16px">
+  <div class="qcard tone-info"><div class="qic">◎</div><div class="qn"><?= (int)$c['open'] ?></div><div class="ql">Open<?= e($openTag) ?></div></div>
+  <div class="qcard tone-ok"><div class="qic">₹</div><div class="qn" style="font-size:20px"><?= fmoney_short($c['value']) ?></div><div class="ql">Open pipeline value<?= e($openTag) ?></div></div>
+  <div class="qcard <?= $c['stalled'] ? 'tone-bad' : '' ?>"><div class="qic">◷</div><div class="qn"><?= (int)$c['stalled'] ?></div><div class="ql">Past their stage's service level</div></div>
+  <div class="qcard tone-warn"><div class="qic">✓</div><div class="qn"><?= (int)$c['converted'] ?></div><div class="ql">Won — now customers<?= e($fyTag) ?></div></div>
+  <?php // Module 17 — leads needing attention now (past stage SLA, or an overdue follow-up date). ?>
+  <?php $dueCount = $dueCount ?? 0; ?>
+  <div class="qcard <?= $dueCount ? 'tone-bad' : '' ?>"><div class="qic">🔔</div><div class="qn"><?= (int)$dueCount ?></div><div class="ql">Need attention now</div></div>
+</div>
+<?php if (!empty($dueCount)): ?>
+<div class="panel" style="border-left:3px solid var(--bad);margin-top:12px">
+  <b><?= (int)$dueCount ?> lead<?= $dueCount==1?'':'s' ?> need attention</b>
+  <span class="muted" style="font-size:12.5px">— past their stage's service level, or with a follow-up date that has passed.
+  A lead left silent is the cheapest deal in the funnel to lose. See the ranked list on the
+  <a href="/advisor">business advisor</a>, or sort the register by <em>Days in stage</em> below.</span>
+</div>
+<?php endif; ?>
+
+<div class="panel" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+  <a class="btn small<?= $view==='board'?'':' secondary' ?>" href="/leads?v=board">Board</a>
+  <a class="btn small<?= $view==='list'?'':' secondary' ?>" href="/leads?v=list">List</a>
+  <?php // Financial-year filter (owner, 12 Nov 2026). The list shows leads created in
+        // that year. The board and the cards also carry forward the open leads of
+        // earlier years, marked, unless "Only leads created in FY …" is ticked.
+        // Changing the year keeps the pipeline and the tick. ?>
+  <form method="get" action="/leads" style="display:inline-flex;gap:6px;align-items:center">
+    <input type="hidden" name="v" value="<?= e($view) ?>">
+    <?php if ($view === 'board' && !empty($board['pipeline'])): ?><input type="hidden" name="pipeline" value="<?= (int)$board['pipeline'] ?>"><?php endif; ?>
+    <?php if (!empty($onlyYear)): ?><input type="hidden" name="only" value="1"><?php endif; ?>
+    <?php if (($_GET['q'] ?? '') !== ''): ?><input type="hidden" name="q" value="<?= e($_GET['q']) ?>"><?php endif; ?>
+    <label class="muted" style="font-size:12px">Year</label><?= fy_select_html($fy ?? current_fy()) ?>
+  </form>
+  <?php // Which pipeline the board shows. Offered whenever more than one exists,
+        // so leads on a non-default pipeline are one click away rather than lost. ?>
+  <?php if ($view === 'board' && count($pipelines ?? []) > 1): $curPipe = (int)($board['pipeline'] ?? 0); ?>
+    <form method="get" action="/leads" style="display:inline-flex;gap:6px;align-items:center">
+      <input type="hidden" name="v" value="board">
+      <input type="hidden" name="fy" value="<?= e($fy ?? current_fy()) ?>">
+      <?php if (!empty($onlyYear)): ?><input type="hidden" name="only" value="1"><?php endif; ?>
+      <label class="muted" style="font-size:12px">Pipeline</label>
+      <select class="form-control" name="pipeline" onchange="this.form.submit()" style="height:30px;padding:2px 8px;font-size:13px">
+        <?php foreach ($pipelines as $pp): ?>
+          <option value="<?= (int)$pp['id'] ?>" <?= $curPipe === (int)$pp['id'] ? 'selected' : '' ?>><?= e($pp['name']) ?><?= !empty($pp['is_default']) ? ' (default)' : '' ?></option>
+        <?php endforeach; ?>
+      </select>
+    </form>
+  <?php endif; ?>
+  <?php if ($view !== 'list'): ?>
+    <form method="get" action="/leads" style="display:flex;gap:8px;margin-left:auto">
+      <input type="hidden" name="v" value="list">
+      <label class="sr-only" for="lead-find">Find a lead</label>
+      <input class="form-control" id="lead-find" name="q" value="<?= e($_GET['q'] ?? '') ?>" placeholder="Find a company or reference">
+      <button class="btn small secondary">Find</button>
+    </form>
+  <?php endif; ?>
+</div>
+
+<?php if ($view === 'board'): ?>
+  <?php // Named apart from $cols, which is the register's column definitions.
+        // Two different things under one name is how a page 500s a screen later. ?>
+  <?php $boardCols = $board['columns']; ?>
+  <?php if ($isYear && (!empty($board['other_years_open']) || !empty($onlyYear))): $n = (int)$board['other_years_open'];
+        $q = fn($only) => http_build_query(array_filter(['v' => 'board', 'fy' => $fy, 'pipeline' => (int)($board['pipeline'] ?? 0), 'only' => $only ? 1 : null])); ?>
+    <div class="panel" style="margin-top:12px;border-left:3px solid var(--info,#2f6fde);padding:10px 14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <?php if (empty($onlyYear)): ?>
+        <span>↻ <?= $n ?> open lead<?= $n === 1 ? '' : 's' ?> carried forward from earlier years — still being chased, marked on the board.</span>
+        <a class="btn small secondary" href="/leads?<?= e($q(true)) ?>">Only leads created in FY <?= e($fy) ?></a>
+      <?php else: ?>
+        <span>Showing only leads created in FY <?= e($fy) ?><?= $n ? ' — ' . $n . ' open lead' . ($n === 1 ? '' : 's') . ' carried forward from earlier years ' . ($n === 1 ? 'is' : 'are') . ' not shown' : '' ?>.</span>
+        <a class="btn small secondary" href="/leads?<?= e($q(false)) ?>">Include carried-forward leads</a>
+      <?php endif; ?>
+    </div>
+  <?php endif; ?>
+  <div class="board-wrap mt-4">
+    <div class="board">
+      <?php foreach ($board['stages'] as $s): $col = $boardCols[(int)$s['id']] ?? ['leads'=>[],'value'=>0]; ?>
+        <div class="panel board-col">
+          <div style="display:flex;justify-content:space-between;align-items:baseline">
+            <b style="font-size:13.5px"><?= e($s['name']) ?></b>
+            <span class="muted" style="font-size:12px"><?= (int)($col['total'] ?? count($col['leads'])) ?></span>
+          </div>
+          <div class="muted" style="font-size:12px;margin-bottom:8px">
+            <?= $col['value'] ? fmoney_short($col['value']) : '—' ?>
+            <?= (int)$s['probability'] ? ' · ' . (int)$s['probability'] . '%' : '' ?>
+          </div>
+          <?php foreach ($col['leads'] as $l):
+                if (!empty($l['_closed'])): // a won / not-pursued lead: no score, no "late" edge ?>
+            <a href="/lead?id=<?= (int)$l['id'] ?>" style="display:block;border:1px solid var(--line);border-radius:8px;padding:9px;margin-bottom:8px;text-decoration:none;background:var(--soft)">
+              <b style="font-size:13px"><?= e($l['company_name']) ?></b>
+              <div class="muted" style="font-size:11.5px;margin-top:2px"><?= e($l['ref']) ?><?= $l['value'] ? ' · ' . fmoney_short($l['value']) : '' ?></div>
+              <div style="font-size:11.5px;margin-top:4px"><?= $l['_closed'] === 'CONVERTED'
+                ? '<span class="pill p-ok" style="font-size:10.5px">✓ Won — customer</span>'
+                : '<span class="pill p-mut" style="font-size:10.5px">Not pursued</span>' ?></div>
+            </a>
+          <?php continue; endif; $sc = lead_score($l); $st = lead_stalled($l); ?>
+            <a href="/lead?id=<?= (int)$l['id'] ?>" style="display:block;border:1px solid var(--line);border-radius:8px;padding:9px;margin-bottom:8px;text-decoration:none<?= $st ? ';border-left:3px solid var(--bad)' : '' ?>">
+              <b style="font-size:13px"><?= e($l['company_name']) ?></b>
+              <div class="muted" style="font-size:11.5px;margin-top:2px"><?= e($l['ref']) ?><?= $l['value'] ? ' · ' . fmoney_short($l['value']) : '' ?></div>
+              <?php if (!empty($l['_carried_from'])): ?><div style="font-size:11.5px;margin-top:3px;color:var(--info,#2f6fde)" title="Created in FY <?= e($l['_carried_from']) ?> and still open">↻ Carried forward from FY <?= e($l['_carried_from']) ?></div><?php endif; ?>
+              <div style="font-size:11.5px;margin-top:4px">
+                <span class="pill <?= $sc['score']>=60?'p-ok':($sc['score']>=35?'p-warn':'p-mut') ?>" style="font-size:10.5px"><?= (int)$sc['score'] ?></span>
+                <?php if ($st): ?><span class="pill p-bad" style="font-size:10.5px"><?= lead_days_in_stage($l) ?>d</span><?php endif; ?>
+                <?php if (lead_close_overdue($l)): ?><span class="pill p-bad" style="font-size:10.5px" title="Expected to close by <?= e(fdate(substr((string)$l['expected_close'], 0, 10))) ?> — that date has passed">⏰ close date passed</span><?php endif; ?>
+                <?php // Field #5 — this lead has been worked as a deal. Show it on the
+                      //   board so the transfer is visible here; the card opens the lead,
+                      //   which carries "Open the deal →". ?>
+                <?php if (!empty($l['deal_id'])): ?><span class="pill p-info" style="font-size:10.5px" title="A deal has been opened from this lead — open the lead to jump to it">◆ deal</span><?php endif; ?>
+              </div>
+            </a>
+          <?php endforeach; ?>
+          <?php if (!empty($col['more'])): ?><a class="muted" style="font-size:12px" href="/leads?v=list&amp;status=<?= e($col['more_status']) ?>">+<?= (int)$col['more'] ?> more — see the list</a><?php endif; ?>
+          <?php if (!$col['leads']): ?><p class="muted" style="font-size:12px;margin:0">—</p><?php endif; ?>
+        </div>
+      <?php endforeach; ?>
+    </div>
+  </div>
+  <p class="muted" style="margin-top:10px;font-size:12.5px">A red edge means it has sat in that stage longer than the stage allows. The number is a score with its reasoning on the lead — it is a rules engine, not a guess.</p>
+
+<?php else: ?>
+<?php
+  // The two controls the bulk actions need, hidden until the action that uses
+  // them is chosen. Reported from a real test: a lost-reason dropdown sat on the
+  // register permanently, next to a button called "Assign to me", and read as
+  // one confusing control rather than two unrelated ones.
+  $bulkExtra = '';
+  if ($canEdit) {
+      $bulkExtra = '<span class="bulk-ctl" data-for="assign" hidden>'
+        . '<label class="sr-only" for="lead-assign-to">Allocate to</label>'
+        . '<select class="form-control" id="lead-assign-to" name="assign_to" style="min-width:11rem">'
+        . '<option value="">— choose a person —</option>';
+      foreach (($users ?? []) as $u)
+          $bulkExtra .= '<option value="' . (int)$u['id'] . '">'
+            . e(trim($u['first_name'] . ' ' . $u['last_name']) ?: $u['username']) . '</option>';
+      $bulkExtra .= '</select>'
+        . '<label class="sr-only" for="lead-assign-why">Why (for leads that already have an owner)</label>'
+        . '<input class="form-control" id="lead-assign-why" name="reassign_reason" maxlength="500" placeholder="Why — needed if they already have an owner" style="min-width:14rem"></span>';
+      // Taking leads that belong to someone else is a reassignment too.
+      $bulkExtra .= '<span class="bulk-ctl" data-for="mine" hidden>'
+        . '<label class="sr-only" for="lead-mine-why">Why (for leads that already have an owner)</label>'
+        . '<input class="form-control" id="lead-mine-why" name="reassign_reason_mine" maxlength="500" placeholder="Why — needed if they already have an owner" style="min-width:14rem"></span>';
+
+      $bulkExtra .= '<span class="bulk-ctl" data-for="lost" hidden>'
+        . '<label class="sr-only" for="lead-lost-reason">Why they were lost</label>'
+        . '<select class="form-control" id="lead-lost-reason" name="lost_reason" style="min-width:11rem">';
+      foreach (($lostReasons ?: ['NO_RESPONSE' => 'No response']) as $k => $v)
+          $bulkExtra .= '<option value="' . e($k) . '">' . e($v) . '</option>';
+      $bulkExtra .= '</select>'
+        . '<label class="sr-only" for="lead-lost-note">Remarks</label>'
+        . '<input class="form-control" id="lead-lost-note" name="lost_note" maxlength="500" placeholder="Remarks — required" style="min-width:14rem"></span>';
+  }
+?>
+<div style="margin-top:16px">
+  <?= dt_render($dt, $rows, $total, [
+        'caption'     => 'Lead register',
+        'search'      => true,
+        'search_hint' => 'Company, contact or reference…',
+        'export'      => !function_exists('leads_can_export') || leads_can_export(),
+        'empty'       => 'Nothing yet. Leads land here from the website form, a phone call, or by typing one in.',
+        'bulk_action' => '/leads-bulk',
+        'bulk_extra'  => $bulkExtra,
+        'bulk'        => !$canEdit ? [] : [
+          'assign' => ['label' => 'Allocate to…', 'confirm' => 'Allocate the ticked leads to the person chosen beside this button?'],
+          'mine'   => ['label' => 'Take these myself', 'confirm' => 'Take ownership of these leads?'],
+          'lost'   => ['label' => 'Mark lost', 'danger' => true,
+                       'confirm' => 'Mark these leads lost, with the reason chosen beside this button?'],
+        ],
+      ]) ?>
+</div>
+<?php endif; ?>

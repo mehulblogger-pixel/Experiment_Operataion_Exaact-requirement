@@ -2,6 +2,16 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🧭 Sales Stage 2 — Leads built (21 Nov 2026, report 56); follow-ups
+
+- **Duplicate list shows other branches' lead numbers.** The quick lead's check (now also on the full
+  form) lists an open lead with the same name or mobile in ANY branch, with its reference and a link
+  (the link itself is refused outside the person's branches). Unchanged behaviour, reused as approved;
+  if the owner wants it limited to the person's branches, it is a one-line change in `sx_lead_dupes()`.
+- **Quick lead's 10-digit mobile rule** is still only on the quick lead (the full form accepts any
+  telephone, e.g. a landline). Left as it was; ask before making them the same.
+- Q10 (whose records a person sees) is to be asked now that Stage 2 is built — see below.
+
 ## 🔐 "Who can do what" — batch B built (21 Nov 2026); follow-ups
 
 The new permission screen (`/who-can`, docs/02 19t) is built and tested; the old Roles screen

@@ -99,7 +99,9 @@ try {
         'deal' => 'action="/opportunity-from-lead"', 'delete' => 'action="/lead-delete"', 'remove' => 'id="remove"', 'cannotdel' => 'cannot be deleted', 'move' => 'action="/lead-move"',
         'lostform' => 'name="lost_reason"', 'reopen' => 'action="/lead-reopen"', 'locked' => '>Why it was lost<', 'wonban' => 'is now a customer',
         'reass' => 'Reassignment waiting for a manager', 'decide' => 'action="/approval-lead-decide"', 'first' => 'Log your first contact',
-        'openq' => 'Open ', 'sentpill' => ' sent', 'v3' => 'class="rec"',
+        'openq' => 'Open ', 'sentpill' => ' sent',
+        //  Sales Stage 2 (owner, 21 Nov 2026): the lead page also carries the Sales bar and phone bottom bar.
+        'v3' => 'class="rec sxw has-bn"',
     ];
     $page = function ($uid, $lid, array $get = [], array $session = []) use ($N) {
         $r = lp3_drive($uid, 'lead', 'GET', ['id' => $lid] + $get, [], array_values($N), $session);

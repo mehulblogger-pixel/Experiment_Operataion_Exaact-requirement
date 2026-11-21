@@ -1,52 +1,86 @@
-<div class="master-head"><div><h1>They said yes — make <?= e($l['company_name']) ?> a customer</h1>
-  <p class="sub" style="margin:2px 0 0"><?= e($l['ref']) ?> · Check the details below and press the button. <?= e($l['company_name']) ?> goes onto your customer list and an <?= e(Tl('inquiry')) ?> is raised for what they want — everything comes from the lead, nothing is typed again.</p></div></div>
+<?php
+// Lead → customer (owner, 21 Nov 2026: Sales redesign Stage 2, approved design
+// s2-convert). The same boxes and the same save (lead_convert() in lib/leads.php),
+// with the client list searchable, the source in words, and a plain list of what
+// happens when Yes is pressed. The old page is kept in
+// tests/fixtures/pre_stage2/lead_convert.php.
+require_once __DIR__ . '/_sxw_ui.php';
+$src = function_exists('lead_source_label') ? lead_source_label($l['source']) : (string)$l['source'];
+?>
+<div class="rec sxw has-bn sxl sxl-form">
+  <?php sxw_nav('/leads'); ?>
+  <?php sxw_head('They said yes — make ' . $l['company_name'] . ' a customer',
+      $l['ref'] . ' · Check the details and press the button. ' . $l['company_name'] . ' goes onto your customer list and an ' . Tl('inquiry') . ' is raised for what they want — everything comes from the lead, nothing is typed again.', 'swap'); ?>
 
 <?php if ($dup && $dup['kind'] === 'partner'): ?>
-<div class="panel" style="margin-top:16px;border-left:3px solid var(--warn)">
-  <b>They may already be on the master.</b>
-  <p style="margin:6px 0 0"><?= e($dup['row']['display_name'] ?? $dup['row']['legal_name']) ?>
-    matched on <?= e($dup['by']) ?>. Attach the lead to them below rather than creating a second record.</p>
-</div>
+  <div class="sxl-ban warn" role="status"><span class="ic"><?= rec_icon('alert') ?></span>
+    <div class="tx"><b class="t">They may already be on the master.</b>
+      <?= e($dup['row']['display_name'] ?? $dup['row']['legal_name']) ?> matched on <?= e($dup['by']) ?>.
+      Attach the lead to them below rather than creating a second record. An exact match is refused; a similar one is allowed and noted in the <?= e(Tl('client')) ?>'s history.</div>
+  </div>
 <?php endif; ?>
 
-<form method="post" action="/lead-convert" class="panel" style="margin-top:16px;max-width:820px">
+<div class="sxl-fg">
+<form method="post" action="/lead-convert" class="sxl-main">
   <input type="hidden" name="id" value="<?= (int)$l['id'] ?>">
   <input type="hidden" name="stage_id" value="<?= (int)$stage_id ?>">
 
-  <h3 style="margin-top:0">The customer</h3>
-  <div class="form-grid" style="gap:12px 16px">
-    <div class="ff-wide"><label>Attach to a customer we already have <a href="#" class="addlink" data-qa="client" data-target="select[name='partner_id']">+ Add new</a></label>
-      <select class="form-control" name="partner_id">
-        <option value="">— create a new one —</option>
-        <?php foreach ($clients as $c): ?>
-          <option value="<?= (int)$c['id'] ?>"<?= (int)$l['partner_id'] === (int)$c['id'] ? ' selected' : '' ?>>
-            <?= e($c['display_name'] ?: $c['legal_name']) ?></option>
-        <?php endforeach; ?>
-      </select></div>
-    <div class="ff-wide"><label>…or the name for the new one</label>
-      <input class="form-control" name="company_name" value="<?= e($l['company_name']) ?>" maxlength="200"></div>
-    <div><label>State <span class="muted">(for tax on the invoice side)</span></label><input class="form-control" name="state" maxlength="60"></div>
-    <?php if (trim((string)($l['sbu'] ?? '')) === ''): //  The enquiry needs a business unit; this lead has none. ?>
-    <div><label><?= e(ucfirst(Tl('sbu'))) ?> for the <?= e(Tl('inquiry')) ?> *</label>
-      <select class="form-control" name="sbu" required><option value="">— choose —</option>
-        <?php foreach ((function_exists('lk_options_or') ? lk_options_or('sbu', OPS_SBUS) : OPS_SBUS) as $sk => $sv): ?><option value="<?= e($sk) ?>"><?= e($sv) ?></option><?php endforeach; ?></select></div>
-    <?php endif; ?>
-  </div>
+  <section class="rec-card">
+    <div class="rec-ch"><span class="ico"><?= rec_icon('building') ?></span><h3>The customer</h3></div>
+    <div class="form-grid">
+      <div class="ff ff-wide"><label for="cv-partner">Attach to a <?= e(Tl('client')) ?> we already have <a href="#" class="addlink" data-qa="client" data-target="select[name='partner_id']">+ Add new</a></label>
+        <select class="form-control searchable" id="cv-partner" name="partner_id">
+          <option value="">— create a new one —</option>
+          <?php foreach ($clients as $c): ?>
+            <option value="<?= (int)$c['id'] ?>"<?= (int)$l['partner_id'] === (int)$c['id'] ? ' selected' : '' ?>>
+              <?= e($c['display_name'] ?: $c['legal_name']) ?></option>
+          <?php endforeach; ?>
+        </select>
+        <div class="ff-help">Type to search. Leave it on “create a new one” to make a new <?= e(Tl('client')) ?> from the name below.</div></div>
+      <div class="ff ff-wide"><label for="cv-name">…or the name for the new one</label>
+        <input class="form-control" id="cv-name" name="company_name" value="<?= e($l['company_name']) ?>" maxlength="200"></div>
+      <div class="ff"><label for="cv-state">State <span class="muted">(for tax on the invoice side)</span></label><input class="form-control" id="cv-state" name="state" maxlength="60"></div>
+      <?php if (trim((string)($l['sbu'] ?? '')) === ''): //  The enquiry needs a business unit; this lead has none. ?>
+      <div class="ff"><label for="cv-sbu"><?= e(ucfirst(Tl('sbu'))) ?> for the <?= e(Tl('inquiry')) ?> *</label>
+        <select class="form-control" id="cv-sbu" name="sbu" required><option value="">— choose —</option>
+          <?php foreach ((function_exists('lk_options_or') ? lk_options_or('sbu', OPS_SBUS) : OPS_SBUS) as $sk => $sv): ?><option value="<?= e($sk) ?>"><?= e($sv) ?></option><?php endforeach; ?></select>
+        <div class="ff-help">Asked only because the lead has none.</div></div>
+      <?php endif; ?>
+    </div>
+  </section>
 
-  <h3>What comes across</h3>
-  <table class="grid">
-    <tr><th>Contact</th><td><?= e($l['contact_name'] ?: '—') ?></td>
-        <th>E-mail</th><td><?= e($l['contact_email'] ?: '—') ?></td></tr>
-    <tr><th>Telephone</th><td><?= e($l['contact_phone'] ?: '—') ?></td>
-        <th>Source</th><td><?= e($l['source'] ?: '—') ?></td></tr>
-    <tr><th>Value</th><td><?= $l['value'] ? fmoney($l['value']) : '—' ?></td>
-        <th>Owner</th><td><?= e($l['owner_name'] ?: '—') ?></td></tr>
-    <tr><th>What they want</th><td colspan="3" style="white-space:pre-wrap"><?= e($l['requirement'] ?: '—') ?></td></tr>
-  </table>
-  <p class="muted" style="margin-top:10px;font-size:12.5px">The contact becomes the customer's primary contact, and the requirement becomes the inquiry's service requirement. From there the existing quotation flow takes over.</p>
+  <section class="rec-card">
+    <div class="rec-ch"><span class="ico"><?= rec_icon('list') ?></span><h3>What comes across</h3></div>
+    <div class="sxl-kv">
+      <div><span>Contact</span><b><?= e($l['contact_name'] ?: '—') ?></b></div>
+      <div><span>E-mail</span><b><?= e($l['contact_email'] ?: '—') ?></b></div>
+      <div><span>Telephone</span><b><?= e($l['contact_phone'] ?: '—') ?></b></div>
+      <div><span>Source</span><b><?= e($src ?: '—') ?></b></div>
+      <div><span>Value</span><b><?= $l['value'] ? fmoney($l['value']) : '—' ?></b></div>
+      <div><span>Owner</span><b><?= e($l['owner_name'] ?: '—') ?></b></div>
+      <div class="w"><span>What they want</span><b style="white-space:pre-wrap;font-weight:500"><?= e($l['requirement'] ?: '—') ?></b></div>
+    </div>
+    <p class="sxl-hint" style="margin:10px 0 0">The contact becomes the <?= e(Tl('client')) ?>'s primary contact, and the requirement becomes the <?= e(Tl('inquiry')) ?>'s service requirement. From there the existing quotation flow takes over.</p>
+  </section>
 
-  <div style="margin-top:14px;display:flex;gap:10px">
-    <button class="btn">Yes — make them a customer</button>
+  <div class="sxl-act">
     <a class="btn secondary" href="/lead?id=<?= (int)$l['id'] ?>">Not yet</a>
+    <button class="btn">Yes — make them a customer</button>
   </div>
 </form>
+
+<aside class="sxl-side">
+  <?php rec_card_open('What happens when you press Yes', 'check'); ?>
+    <ol class="sxl-ol">
+      <li>The <?= e(Tl('client')) ?> is created with the next code — or the one you picked is used</li>
+      <li><?= e($l['contact_name'] ?: 'The contact') ?> becomes its primary contact</li>
+      <li>An <?= e(Tl('inquiry')) ?> is raised for the person who handles <?= e(Tlp('inquiry')) ?><?= ($l['office_name'] ?? '') !== '' ? ' in ' . e($l['office_name']) : '' ?></li>
+      <li>The lead closes as <b>Won — customer</b></li>
+      <li>Any deal from this lead is linked to the <?= e(Tl('client')) ?></li>
+    </ol>
+    <p class="sxl-hint" style="margin:8px 0 0">Already converted, or not pursued? It is refused. Two people pressing at once: only the first goes through.</p>
+  <?php rec_card_close(); ?>
+</aside>
+</div>
+</div>
+<?php sxw_bottom('/leads'); ?>

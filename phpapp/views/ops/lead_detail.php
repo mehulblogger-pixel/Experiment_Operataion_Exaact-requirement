@@ -22,6 +22,7 @@
 //  Every form posts to the same addresses with the same field names as before.
 // ============================================================================
 require_once __DIR__ . '/_rec_ui.php';
+require_once __DIR__ . '/_sxw_ui.php';   // Sales Stage 2 (21 Nov 2026): the Sales bar above, the phone bottom bar below
 $open = $l['status'] === 'OPEN';
 $id = (int) $l['id'];
 $curStage = '';
@@ -129,7 +130,8 @@ $tel = function_exists('sx_tel') ? sx_tel($l['contact_phone'] ?? '') : '';
 $wa = function_exists('sx_wa') ? sx_wa($l['contact_phone'] ?? '') : '';
 $jsq = fn($s) => e(json_encode((string) $s));
 ?>
-<div class="rec"<?= $editRetry ? ' data-retry-skip' : '' ?>>
+<div class="rec sxw has-bn"<?= $editRetry ? ' data-retry-skip' : '' ?>>
+<?php sxw_nav('/leads'); ?>
 <?= ($hasNext && function_exists('chain_strip')) ? chain_strip('LEAD', $id, 'LEAD', $id) : '' ?>
 
 <div class="rec-top">
@@ -381,6 +383,8 @@ $jsq = fn($s) => e(json_encode((string) $s));
               ['cal', 'Hoped to close', $l['expected_close'] ? e(fdate($l['expected_close'])) : '—'],
               ['user', 'Handled by', e($l['owner_name'] ?: '—')],
               ['pin', 'Branch', e($l['office_name'] ?: '—')],
+              //  DEF-15 (owner, 21 Nov 2026): the business unit is shown, and set under "Edit the details".
+              ['brief', ucfirst(Tl('sbu')), e(($l['sbu'] ?? '') !== '' ? ((function_exists('lk_options_or') ? lk_options_or('sbu', OPS_SBUS) : OPS_SBUS)[$l['sbu']] ?? $l['sbu']) : '—')],
               ['msg', 'Best reached by', e(($l['pref_contact'] ?? '') !== '' ? (LEAD_PREF_CONTACT[$l['pref_contact']] ?? $l['pref_contact']) : '—')],
               ['cal', 'Next by', $l['next_action_on'] ? e(fdate($l['next_action_on'])) : '—'],
               ['task', 'Next thing to do', e($l['next_action'] ?: '—')],
@@ -416,6 +420,13 @@ $jsq = fn($s) => e(json_encode((string) $s));
           <input class="form-control" id="le-val" type="number" step="0.01" min="0" name="value" value="<?= e($ev('value')) ?>"></div>
         <div class="ff"><label for="le-cl">Hoped to close</label>
           <input class="form-control" id="le-cl" type="date" name="expected_close" value="<?= e($ev('expected_close')) ?>"></div>
+        <?php //  DEF-15 — the business unit: the units this person's scope covers, and the lead's own (kept as it is if not changed). ?>
+        <div class="ff"><label for="le-sbu"><?= e(ucfirst(Tl('sbu'))) ?></label>
+          <select class="form-control" id="le-sbu" name="sbu"><option value="">— not decided yet —</option>
+            <?php $sbuOpts = $sbus ?? []; $sbuCur = (string) $ev('sbu');
+              if ($sbuCur !== '' && !isset($sbuOpts[$sbuCur])) $sbuOpts = [$sbuCur => ((function_exists('lk_options_or') ? lk_options_or('sbu', OPS_SBUS) : OPS_SBUS)[$sbuCur] ?? $sbuCur)] + $sbuOpts;
+              foreach ($sbuOpts as $sk => $sv): ?><option value="<?= e($sk) ?>"<?= $sbuCur === (string) $sk ? ' selected' : '' ?>><?= e($sv) ?></option><?php endforeach; ?>
+          </select></div>
         <div class="ff"><label for="le-own">Handled by</label>
           <select class="form-control searchable" id="le-own" name="owner_user_id">
             <option value="">— nobody yet —</option>
@@ -619,3 +630,4 @@ $jsq = fn($s) => e(json_encode((string) $s));
 
 </div><!-- /data-tabs (lead) -->
 </div><!-- /rec -->
+<?php sxw_bottom('/leads'); ?>

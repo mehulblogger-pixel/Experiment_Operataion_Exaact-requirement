@@ -552,8 +552,15 @@ function lead_score($l) {
     else                   { $why[] = 'no value recorded'; }
 
     // Somebody actually talking to them is the strongest signal we have.
+    //  DEF-21 (21 Nov 2026): this read only the conversations logged against the
+    //  lead's CLIENT, so a lead with no client yet — most leads — said "nobody has
+    //  logged a conversation" while its own History showed the call. It now takes
+    //  the later of the two: the client's last touch (as before) and the last
+    //  conversation logged on the lead itself.
     $touch = function_exists('act_last_touch') && !empty($l['partner_id'])
         ? act_last_touch((int)$l['partner_id']) : '';
+    $own = !empty($l['id']) ? lead_last_conversation((int)$l['id']) : '';
+    if ($own !== '' && ($touch === '' || strcmp(substr($own, 0, 19), substr($touch, 0, 19)) > 0)) $touch = $own;
     $days = $touch ? (int)floor((time() - strtotime($touch)) / 86400) : null;
     if ($days === null)   { $why[] = 'nobody has logged a conversation'; }
     elseif ($days <= 7)   { $score += 20; $why[] = 'spoken to this week'; }
@@ -568,6 +575,18 @@ function lead_score($l) {
         $score -= 15; $why[] = 'no way to contact them';
     }
     return ['score' => max(0, min(100, $score)), 'why' => $why];
+}
+
+//  DEF-21 — the last conversation logged by a person on the lead itself: the same
+//  entries its History shows as a call, WhatsApp, e-mail, meeting or site visit
+//  (a "note to self" and the system's own lines are not a conversation).
+const LEAD_CONVERSATION_KINDS = ['CALL', 'WHATSAPP', 'EMAIL', 'MEETING', 'VISIT'];
+function lead_last_conversation($leadId) {
+    if ((int)$leadId <= 0 || !function_exists('act_migrate')) return '';
+    act_migrate();
+    $in = "'" . implode("','", LEAD_CONVERSATION_KINDS) . "'";
+    return (string)leads_try(fn() => ops_val("SELECT MAX(occurred_at) FROM activities
+        WHERE entity_kind='LEAD' AND entity_id=? AND COALESCE(auto,0)=0 AND kind IN ($in)", [(int)$leadId]), '');
 }
 
 // ---- Writing ---------------------------------------------------------------
@@ -606,6 +625,49 @@ function lead_fields_err(array $b) {
         if (array_key_exists($k, $b) && !lead_real_date($b[$k])) return $w . ' is not a real date.';
     return '';
 }
+//  DEF-15 (owner, 21 Nov 2026) — a lead's business unit, set on the forms. The
+//  choices are the company's business units (Masters), narrowed to the units this
+//  person's data scope covers, as the branch list is narrowed to their branches.
+function lead_sbu_options() {
+    $all = function_exists('lk_options_or') ? lk_options_or('sbu', OPS_SBUS) : OPS_SBUS;
+    $mine = function_exists('scope_sbus') ? scope_sbus() : 'ALL';
+    if (is_array($mine) && $mine && !(function_exists('is_master') && is_master()))
+        $all = array_intersect_key($all, array_flip(array_map('strval', $mine)));
+    return $all;
+}
+//  '' = fine. A unit that is not on the list, or outside the person's scope, is refused.
+function lead_sbu_err($sbu) {
+    $sbu = trim((string)$sbu);
+    if ($sbu === '') return '';
+    return isset(lead_sbu_options()[$sbu]) ? '' : 'That ' . (function_exists('Tl') ? Tl('sbu') : 'business unit') . ' is not one you can choose.';
+}
+
+//  Possible duplicates for the full lead form — the quick lead's own check
+//  (sx_lead_dupes: same name, same mobile on an open lead, a contact with that
+//  mobile), owner-approved backend item 1 (21 Nov 2026). When a client on the
+//  master is picked, the client itself is not a duplicate: only an open lead for
+//  it, or one with the same mobile, is.
+function lead_form_dupes(array $b) {
+    if (!function_exists('sx_lead_dupes')) return [];
+    $company = trim((string)($b['company_name'] ?? ''));
+    $phone = trim((string)($b['contact_phone'] ?? ''));
+    $pid = (int)($b['partner_id'] ?? 0);
+    if ($pid) {
+        $bp = ops_one("SELECT id, display_name, legal_name FROM business_partners WHERE id=?", [$pid]);
+        if ($bp) $company = (string)($bp['display_name'] ?: $bp['legal_name']);
+    }
+    if ($company === '' && $phone === '') return [];
+    $out = sx_lead_dupes($company, $phone);
+    if ($pid) {
+        $out = array_values(array_filter($out, fn($d) => strpos((string)$d['url'], '/partner?id=' . $pid) === false));
+        foreach (leads_try(fn() => ops_all("SELECT id, ref, company_name FROM leads WHERE status='OPEN' AND partner_id=? LIMIT 3", [$pid]), []) ?: [] as $l) {
+            $u = '/lead?id=' . (int)$l['id'];
+            if (!array_filter($out, fn($d) => $d['url'] === $u)) $out[] = ['text' => 'An open lead for this ' . Tl('client') . ': ' . $l['ref'] . ' — ' . $l['company_name'], 'url' => $u];
+        }
+    }
+    return array_slice($out, 0, 6);
+}
+
 function lead_create(array $b) {
     leads_migrate();
 
@@ -1316,6 +1378,16 @@ function leads_counts(array $fyWin = [], $only = false) {
 // Sortable by anything a sales manager sorts by: biggest first, oldest in stage
 // first, nearest expected close first. Each 'sort' is an expression this file
 // wrote, which is why the sort key in the address bar can never be dangerous.
+//  A lead's source in words ("They telephoned us"), not its code (CALL_IN) —
+//  the same list the forms offer (Masters → lead sources). Sales Stage 2.
+function lead_source_label($code) {
+    $code = (string)$code;
+    if ($code === '') return '';
+    static $map = null;
+    if ($map === null) $map = function_exists('lk_options_or') ? lk_options_or('lead_source', LEAD_SOURCES) : LEAD_SOURCES;
+    return (string)($map[$code] ?? $code);
+}
+
 function leads_dt_columns() {
     return [
         'ref' => ['label' => 'Ref', 'sort' => 'l.ref', 'render' => fn($l) =>
@@ -1333,7 +1405,7 @@ function leads_dt_columns() {
         'branch' => ['label' => 'Branch', 'sort' => 'o.name', 'optional' => true,
             'render' => fn($l) => e($l['office_name'] ?: '—')],
         'source' => ['label' => 'Source', 'sort' => 'l.source', 'optional' => true,
-            'render' => fn($l) => e($l['source'] ?: '—')],
+            'render' => fn($l) => e(lead_source_label($l['source']) ?: '—')],
         'close' => ['label' => 'Expected close', 'sort' => 'l.expected_close', 'optional' => true,
             'render' => fn($l) => $l['expected_close'] ? e(fdate($l['expected_close'])) : '—'],
         'instage' => ['label' => 'In stage', 'sort' => 'l.stage_since', 'num' => true,
@@ -1353,6 +1425,16 @@ function leads_dt_columns() {
         'status' => ['label' => 'Status', 'sort' => 'l.status', 'render' => fn($l) =>
             '<span class="pill ' . ($l['status'] === 'CONVERTED' ? 'p-ok' : ($l['status'] === 'LOST' ? 'p-bad' : 'p-warn'))
             . '">' . e(LEAD_STATUS[$l['status']] ?? $l['status']) . '</span>'],
+        //  Sales Stage 2 (owner-approved design, 21 Nov 2026): call, WhatsApp and Log on
+        //  each open lead — the same links Today gives. Log only for those who may edit leads.
+        'act' => ['label' => 'Reach them', 'render' => function ($l) {
+            if (($l['status'] ?? 'OPEN') !== 'OPEN') return '<span class="muted" style="font-size:12px">closed</span>';
+            $h = function_exists('sxw_contact') ? sxw_contact((string)($l['contact_phone'] ?? ''), (string)$l['company_name']) : '';
+            if (leads_can_edit() && function_exists('sx_log_url'))
+                $h .= '<a class="sxw-ib" href="' . e(sx_log_url('LEAD', (int)$l['id'], '/leads?v=list')) . '" aria-label="Log activity on ' . e($l['company_name']) . '">'
+                    . (function_exists('rec_icon') ? rec_icon('note') : '') . '<span>Log</span></a>';
+            return '<div class="sxw-acts">' . $h . '</div>';
+        }],
     ];
 }
 
@@ -1537,7 +1619,7 @@ function ops_leads($route, $method) {
             foreach ($rowsCsv as $r) {
                 $sc = ($r['status'] ?? 'OPEN') === 'OPEN' ? lead_score($r) : ['score' => ''];
                 $csv[] = [$r['ref'], $r['company_name'], $r['contact_name'], $r['stage_name'], LEAD_STATUS[$r['status']] ?? $r['status'],
-                          (float)$r['value'], $r['owner_name'], $r['office_name'], $r['source'],
+                          (float)$r['value'], $r['owner_name'], $r['office_name'], lead_source_label($r['source']),
                           $r['expected_close'], lead_days_in_stage($r), $sc['score'],
                           substr((string)$r['created_at'], 0, 10), !empty($r['_carried_from']) ? 'FY ' . $r['_carried_from'] : ''];
             }
@@ -1593,6 +1675,7 @@ function ops_leads($route, $method) {
                     : 0)],
             ]) : ['mins' => 0, 'touches' => 0],
             'canEdit' => $canEdit, 'days' => lead_days_in_stage($l), 'stalled' => lead_stalled($l),
+            'sbus' => lead_sbu_options(),
             'clients' => ops_all("SELECT id, display_name, legal_name FROM business_partners WHERE is_client=1 AND " . partner_office_sql() . " ORDER BY COALESCE(display_name, legal_name) LIMIT 500"),
             // Who a lead can be allocated to. Active logins only — allocating
             // work to somebody who cannot sign in is the same as not allocating it.
@@ -1635,16 +1718,39 @@ function ops_leads($route, $method) {
 
     if ($route === 'lead-new') {
         if ($method === 'POST') {
+            $fileAgain = !empty($_FILES['files']['name'][0]) ? ' Choose the file(s) again — a browser never keeps a chosen file after a refused save.' : '';
+            //  DEF-15 — the business unit, when given, must be one the person may choose.
+            if (($se = lead_sbu_err($_POST['sbu'] ?? '')) !== '') { form_stash('lead-new', $_POST); flash($se . $fileAgain, 'error'); redirect('/lead-new'); }
+            //  Backend item 1 — the quick lead's duplicate check, on save too. Nothing
+            //  is saved; the form comes back with the matches and "Save anyway".
+            if (empty($_POST['confirm']) && trim((string)($_POST['company_name'] ?? '')) . (string)($_POST['partner_id'] ?? '') !== '' && lead_form_dupes($_POST)) {
+                form_stash('lead-new', $_POST + ['_dupcheck' => '1']);
+                flash('This looks like one we already have — see the matches at the top. Open one of them, or press “Save anyway”.' . $fileAgain, 'warning');
+                redirect('/lead-new');
+            }
             $r = lead_create($_POST);
-            if (!empty($r['err'])) { form_stash('lead-new', $_POST); flash($r['err'] . (!empty($_FILES['files']['name'][0]) ? ' Choose the file(s) again — a browser never keeps a chosen file after a refused save.' : ''), 'error'); redirect('/lead-new'); }
+            if (!empty($r['err'])) { form_stash('lead-new', $_POST); flash($r['err'] . $fileAgain, 'error'); redirect('/lead-new'); }
             [$fn, $fsk] = lead_attach_uploads((int)$r['id'], $_FILES['files'] ?? null, (string)($_POST['file_kind'] ?? 'REQUIREMENT'), (string)($_POST['file_note'] ?? ''));
             flash('Lead ' . $r['ref'] . ' created.' . ($fn ? ' ' . $fn . ' file(s) attached.' : '') . ($fsk ? ' Not attached: ' . implode(', ', $fsk) . '.' : ''), $fsk ? 'warning' : 'success');
             redirect('/lead?id=' . $r['id']);
         }
+        //  While typing (backend item 1): the form asks this same address for the
+        //  quick lead's matches and shows them under step 1. Read-only; the same
+        //  right as the form itself.
+        if (($_GET['dupcheck'] ?? '') === '1') {
+            header('Content-Type: application/json');
+            echo json_encode(['dupes' => lead_form_dupes(['company_name' => (string)($_GET['company_name'] ?? ''),
+                'contact_phone' => (string)($_GET['contact_phone'] ?? ''), 'partner_id' => (string)($_GET['partner_id'] ?? '')])]);
+            return true;
+        }
         // Warn about a company we already know, before anything is typed twice.
         $dup = ($_GET['company'] ?? '') !== '' ? lead_possible_duplicate((string)$_GET['company']) : null;
+        //  After a save that found matches: the list again, and "Save anyway".
+        $dupes = (form_is_retry() && form_old('_dupcheck', '') === '1')
+            ? lead_form_dupes(['company_name' => form_old('company_name', ''), 'contact_phone' => form_old('contact_phone', ''), 'partner_id' => form_old('partner_id', '')]) : [];
         view('ops/lead_form', [
-            'pipelines' => pipelines_all(), 'dup' => $dup, 'prefill' => $_GET,
+            'pipelines' => pipelines_all(), 'dup' => $dup, 'prefill' => $_GET, 'dupes' => $dupes,
+            'sbus' => lead_sbu_options(),
             // The client master, so a company we already know is picked, not
             // re-typed. Individuals and brand-new companies are still typed.
             'clients' => function_exists('clients_list') ? clients_list() : [],
@@ -1743,11 +1849,16 @@ function ops_leads($route, $method) {
         //  The same checks as when the lead was created (test book SALA-003).
         if (trim((string)($_POST['company_name'] ?? '')) === '') $refuse('A lead needs a company or person to chase.');
         if (($fe = lead_fields_err($_POST)) !== '') $refuse($fe);
+        //  DEF-15 (owner, 21 Nov 2026) — the business unit, when the form sends it. Not
+        //  sent (an older page) means "leave it as it is", as for the deputation fields.
+        $sbuSent = array_key_exists('sbu', $_POST);
+        $sbu = $sbuSent ? trim((string)$_POST['sbu']) : (string)($cur['sbu'] ?? '');
+        if ($sbuSent && $sbu !== (string)($cur['sbu'] ?? '') && ($se = lead_sbu_err($sbu)) !== '') $refuse($se);
         db()->prepare("UPDATE leads SET company_name=?, contact_name=?, contact_email=?, contact_phone=?,
                        source=?, requirement=?, value=?, expected_close=?, owner_user_id=?, owner_name=?,
                        next_action_on=?, next_action=?, pref_contact=?,
                        deputation_kind=?, manpower_count=?, manpower_skills=?, site_location=?,
-                       updated_at=? WHERE id=?")
+                       sbu=?, updated_at=? WHERE id=?")
             ->execute([mb_substr(trim((string)($_POST['company_name'] ?? '')), 0, 200),
                 mb_substr(trim((string)($_POST['contact_name'] ?? '')), 0, 150),
                 substr(trim((string)($_POST['contact_email'] ?? '')), 0, 200),
@@ -1760,7 +1871,7 @@ function ops_leads($route, $method) {
                 $pref,
                 $dep, $mpCount,
                 $mpSkills, substr($site, 0, 300),
-                date('c'), $id]);
+                substr($sbu, 0, 20), date('c'), $id]);
         if (function_exists('ads_queue_lead')) ads_queue_lead($id, 'Details edited');
         // Who it belongs to changes through the one rule (manager approval),
         // never as a side effect of saving the other details.

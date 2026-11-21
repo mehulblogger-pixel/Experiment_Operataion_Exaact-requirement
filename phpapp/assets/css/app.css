@@ -1915,3 +1915,94 @@ details[open]>summary .chev{transform:rotate(45deg)}
   .wc-save .btn{flex:1}
   .wc-cmp label{min-width:0;width:100%}
 }
+
+/* ============================================================================
+   SALES — LEADS (owner, 21 Nov 2026: Stage 2 of the Sales redesign — register,
+   full form, quick lead, conversion). Look only, built on the Sales workspace
+   above; what a person may see or do is decided by the handlers.
+   ============================================================================ */
+.sxl-ban{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-left:4px solid var(--info);border-radius:9px;padding:10px 14px;margin:0 0 12px;font-size:13px}
+.sxl-ban[hidden]{display:none}
+.sxl .sxw-seg a{gap:6px}
+.sxl-ban>.ic{flex:none;display:grid;place-items:center;width:30px;height:30px;border-radius:8px;background:var(--info-bg);color:var(--info)}
+.sxl-ban .tx{flex:1;min-width:220px;line-height:1.45}
+.sxl-ban .tx b.t{display:block;font-size:14px;margin:0 0 2px}
+.sxl-ban.warn{border-left-color:var(--warn);background:color-mix(in srgb,var(--warn-bg) 55%,var(--card))}.sxl-ban.warn>.ic{background:var(--warn-bg);color:var(--warn)}
+.sxl-ban.bad{border-left-color:var(--bad);background:color-mix(in srgb,var(--bad-bg) 55%,var(--card))}.sxl-ban.bad>.ic{background:var(--bad-bg);color:var(--bad)}
+.sxl-ban.info{border-left-color:var(--info)}
+.sxl-ctl{display:flex;gap:8px 12px;align-items:center;flex-wrap:wrap;margin:0 0 6px}
+.sxl-f{display:inline-flex;gap:6px;align-items:center;margin:0}
+.sxl-f .lab{font-size:12.5px;font-weight:600;color:var(--muted)}
+.sxl-f{min-width:0;max-width:100%}
+.sxl-f select{min-height:36px;max-width:100%}
+.sxl-f select.form-control{min-height:36px;height:36px;padding:2px 28px 2px 10px;font-size:13px;width:auto;max-width:240px}
+/* the shared register's own buttons, at a comfortable size inside Sales */
+.sxl-reg .btn.small,.sxl-reg .dt-bar select,.sxl-reg .dt-search input{min-height:36px}
+.sxl-reg .dt-bulk .btn.small{min-height:38px}
+.sxl-find{margin-left:auto}
+.sxl-note{font-size:12.5px;color:var(--muted);margin:0 0 12px}
+.sxl-board{overflow-x:auto;margin:0 0 8px;padding-bottom:4px}
+.sxl-board .sxw-bd{min-width:calc(var(--n,6) * 170px)}
+.sxl-pills{display:flex !important;flex-wrap:wrap;gap:4px;margin-top:5px}
+.sxl-pills .pill{font-size:10.5px}
+.sxl-cf{color:var(--info) !important;font-size:11.5px !important;margin-top:3px}
+.sxw-cd.sxl-cl{background:var(--soft)}
+.sxl-more{display:block;font-size:12px;color:var(--muted);padding:2px 4px}
+.sxl-reg{padding:12px}
+.sxl-reg .dt-bulk-ctls{display:flex;flex-direction:column;gap:6px}
+.sxl-prev{display:flex;align-items:flex-start;gap:8px;font-size:12.5px;min-height:34px;padding:6px 0}
+.sxl-prev input{width:18px;height:18px;margin:1px 0 0;flex:none}
+.sxl-prev svg.rec-i{width:16px;height:16px;flex:none;margin-top:1px;color:var(--brand-ink)}
+.sxl-hint{font-size:12.5px;color:var(--muted);line-height:1.45}
+.sxl-reg td .sxw-acts{justify-content:flex-start;flex-wrap:nowrap}
+.sxl-reg td .sxw-ib span{position:absolute;left:-9999px}
+/* forms: numbered steps, a side column of explanations */
+.sxl-fg{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start}
+.sxl-main{min-width:0;margin:0}
+.sxl-side{min-width:0;display:flex;flex-direction:column;gap:12px}
+.sxl-side .rec-card{margin:0}
+.sxl-step{background:var(--card);border:1px solid var(--line);border-radius:var(--sxw-r,10px);margin:0 0 12px}
+.sxl-step>summary{list-style:none;display:flex;align-items:center;gap:12px;min-height:54px;padding:8px 14px;cursor:pointer}
+.sxl-step>summary::-webkit-details-marker{display:none}
+.sxl-step>summary i{font-style:normal;flex:none;display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--brand);color:var(--on-brand);font-size:12.5px;font-weight:700}
+.sxl-step>summary .x{flex:1;min-width:0;line-height:1.3}
+.sxl-step>summary .x b{display:block;font-size:14.5px}
+.sxl-step>summary .x small{display:block;color:var(--muted);font-size:12.5px}
+.sxl-step>summary svg.rec-i{transition:transform .15s;color:var(--muted)}
+.sxl-step[open]>summary svg.rec-i{transform:rotate(180deg)}
+.sxl-sb{padding:4px 14px 14px;border-top:1px solid var(--line)}
+.sxl-sb>.form-grid{margin-top:10px}
+.sxl-sb .sxl-ban{margin:12px 0 0}
+.sxl-dl{margin:4px 0 6px;padding-left:18px}
+.sxl-dl li{margin:2px 0}
+.sxl-ok{display:flex;align-items:center;gap:8px;font-weight:600;min-height:36px}
+.sxl-ok input{width:18px;height:18px;margin:0}
+.sxl-act{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;box-shadow:0 -4px 14px rgba(0,0,0,.05)}
+.sxl-act .sp{flex:1;min-width:200px;font-size:12.5px;color:var(--muted)}
+.sxl-act .btn{min-height:40px}
+.sxl-path{list-style:none;margin:0;padding:0;counter-reset:p}
+.sxl-path li{position:relative;padding:5px 0 5px 28px;font-size:13px;counter-increment:p}
+.sxl-path li::before{content:counter(p);position:absolute;left:0;top:5px;width:20px;height:20px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;font-size:11px;font-weight:700;color:var(--muted)}
+.sxl-path li.on::before{background:var(--brand);border-color:var(--brand);color:var(--on-brand)}
+.sxl-ul,.sxl-ol{margin:0;padding-left:20px;font-size:13px;line-height:1.7}
+.sxl-kv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 16px}
+.sxl-kv>div{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:13px;min-width:0}
+.sxl-kv>div span{color:var(--muted);flex:none}
+.sxl-kv>div b{text-align:right;overflow-wrap:anywhere;min-width:0}
+.sxl-kv>.w{grid-column:1/-1;flex-direction:column;gap:2px}
+.sxl-kv>.w b{text-align:left}
+@media (max-width:1100px){ .sxl-fg{grid-template-columns:minmax(0,1fr)} }
+@media (max-width:640px){
+  .sxl-find{margin-left:0;width:100%}
+  .sxl-find .sxw-srch{flex:1}
+  .sxl-f{flex-wrap:wrap}
+  .sxl-f select.form-control{max-width:100%}
+  .sxl-board{overflow:visible}
+  .sxl-board .sxw-bd{min-width:0;display:block}
+  .sxl-board .sxw-col{margin:0 0 10px}
+  .sxl-act{flex-direction:column;align-items:stretch;position:static;box-shadow:none}
+  .sxl-act .btn{width:100%}
+  .sxl-act .sp{min-width:0}
+  .sxl-kv{grid-template-columns:minmax(0,1fr)}
+  .sxl-reg{padding:8px}
+}

@@ -56,6 +56,11 @@ function rec_icon_paths() {
         'hat' => '<path d="M3 17h18M5 17v-3a7 7 0 0 1 14 0v3M10 7V5h4v2"/>',
         'wa' => '<path d="M21 12a8 8 0 0 1-12 7l-5 1 1-4.5A8 8 0 1 1 21 12z"/><path d="M9 9c0 3 3 6 6 6l1-1.5-2-1-1 .8c-1-.4-2-1.4-2.4-2.4l.8-1-1-2z"/>',
         'eye' => '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+        //  Sales Stage 2 (21 Nov 2026): board/list switch, download, time in stage, quick entry.
+        'grid' => '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+        'dl' => '<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>',
+        'hour' => '<path d="M6 3h12M6 21h12M7 3c0 5 10 5 10 9s-10 4-10 9M17 3c0 5-10 5-10 9s10 4 10 9"/>',
+        'bolt' => '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
     ];
     return $p;
 }
