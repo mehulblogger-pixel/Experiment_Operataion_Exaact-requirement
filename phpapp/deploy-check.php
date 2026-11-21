@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = '06eb340 · 2026-11-21 06:11 UTC · 746 files';
+$RELEASE = 'c1a747b · 2026-11-21 07:18 UTC · 746 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -153,7 +153,7 @@ $EXPECT  = [
     'lib/install_mode.php' => ['s'=>4935,'h'=>'0c1d5ab96ff54b68'],
     'lib/invready.php' => ['s'=>6922,'h'=>'0f7637be388be1fc'],
     'lib/joblock.php' => ['s'=>13155,'h'=>'47c05d15e9e8e13b'],
-    'lib/leads.php' => ['s'=>114420,'h'=>'5bcd8c3e95d2aa2b'],
+    'lib/leads.php' => ['s'=>121958,'h'=>'eae5622dc18539dc'],
     'lib/licence.php' => ['s'=>31138,'h'=>'ae1f563479d4009c'],
     'lib/licenceissue.php' => ['s'=>33731,'h'=>'509a3d0e2d93d72f'],
     'lib/licencekey.php' => ['s'=>29869,'h'=>'db9ba00546be996a'],
@@ -349,7 +349,7 @@ $EXPECT  = [
     'views/ops/_ops_registers.php' => ['s'=>6510,'h'=>'403bb12d7870ae8e'],
     'views/ops/_perm_verb_grid.php' => ['s'=>5876,'h'=>'8c4af262a49e2628'],
     'views/ops/_perm_verb_grid_assets.php' => ['s'=>9794,'h'=>'6a34014ee132d672'],
-    'views/ops/_rec_ui.php' => ['s'=>10636,'h'=>'aad001ee0d03b965'],
+    'views/ops/_rec_ui.php' => ['s'=>11184,'h'=>'05557fd8461188cc'],
     'views/ops/_recruit_triage.php' => ['s'=>13073,'h'=>'f8a23127583795ae'],
     'views/ops/_setup_sections.php' => ['s'=>3430,'h'=>'c80b52dfec51aebf'],
     'views/ops/_subscription_builder.php' => ['s'=>3981,'h'=>'702e6e3d22959301'],
@@ -544,10 +544,10 @@ $EXPECT  = [
     'views/ops/job_detail.php' => ['s'=>92849,'h'=>'1c76636c42832c1b'],
     'views/ops/job_form.php' => ['s'=>58256,'h'=>'febdd33268c6e59e'],
     'views/ops/jobs.php' => ['s'=>7058,'h'=>'54c963c415ee7600'],
-    'views/ops/lead_convert.php' => ['s'=>3639,'h'=>'4994bccc5c3b066d'],
-    'views/ops/lead_detail.php' => ['s'=>50047,'h'=>'bf25886ce0753bdc'],
-    'views/ops/lead_form.php' => ['s'=>14421,'h'=>'9851b05d85a6acab'],
-    'views/ops/leads.php' => ['s'=>14632,'h'=>'7d87b04aeaf666f3'],
+    'views/ops/lead_convert.php' => ['s'=>5805,'h'=>'ea17223807a790f1'],
+    'views/ops/lead_detail.php' => ['s'=>51341,'h'=>'951d9857ee31e7e3'],
+    'views/ops/lead_form.php' => ['s'=>20525,'h'=>'5726038370de7a98'],
+    'views/ops/leads.php' => ['s'=>16244,'h'=>'28760da8e310f9a5'],
     'views/ops/ledger.php' => ['s'=>4304,'h'=>'414f7ffeb7052c79'],
     'views/ops/licence.php' => ['s'=>10341,'h'=>'0d30ee2ac4f1a785'],
     'views/ops/licence_issue.php' => ['s'=>12371,'h'=>'6da20bc55a394a9a'],
@@ -654,7 +654,7 @@ $EXPECT  = [
     'views/ops/sx_board.php' => ['s'=>8318,'h'=>'ffab34fd595ab1e1'],
     'views/ops/sx_dash.php' => ['s'=>10213,'h'=>'b369f3a038b80a23'],
     'views/ops/sx_home.php' => ['s'=>11715,'h'=>'2dc51c5bbe6b0b83'],
-    'views/ops/sx_lead.php' => ['s'=>5690,'h'=>'7b1c3eeda730265e'],
+    'views/ops/sx_lead.php' => ['s'=>7087,'h'=>'3776cf2127563d1b'],
     'views/ops/sx_orders.php' => ['s'=>4280,'h'=>'9a2ff87dffea24cf'],
     'views/ops/sx_renewals.php' => ['s'=>2886,'h'=>'6ae05e57195455cc'],
     'views/ops/sx_settings.php' => ['s'=>5093,'h'=>'1fd6dd22a647a57d'],
