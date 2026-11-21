@@ -144,3 +144,17 @@ Every bullet of the 57-page inventory you received on 21 Nov was checked against
 - **Targets in ₹ lakh** — the boxes stay in rupees (as before), so a figure can never be read 1,00,000 times too big; say if you want lakh entry.
 - **Old permission screen** — kept one release behind "Old layout"; remove after you have used the new one.
 - Small controls outside the redesign (§4).
+
+## Addendum — F-03, found by the full test book (21 Nov 2026)
+
+The robot run for the full Sales test book (case O-09) found that Today and Sales
+home still **wrote** "in 30 days" (from the older contract-warning setting) while,
+since DEF-10, they **count** renewals over the window set in Sales settings
+(default 60 days). Example: the Today tile counted 4 contracts ending within 60
+days but labelled them "in 30 days".
+
+Fix: `views/ops/sx_home.php` and `views/ops/sx_today.php` now take the label from
+`sx_renewal_days()`, the same window as the count. Words only; no rule, figure or
+permission changed. New test `tests/test_f03_renewal_label.php` (7/7). Re-run
+after the fix: stage1 428/428, sales_simple 31/31, sales_book_round2 35/35,
+stage5 62/62, stage6 1146/1146, q10_scope 37/37.

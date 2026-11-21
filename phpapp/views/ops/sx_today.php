@@ -15,7 +15,8 @@ foreach ($d['deals'] as $o) $fu[] = ['k' => 'D', 'r' => $o];
 foreach ($d['leads'] as $l) $fu[] = ['k' => 'L', 'r' => $l];
 usort($fu, fn($a, $b) => [$order[$a['r']['_due']] ?? 9, (string) $a['r']['next_action_on']] <=> [$order[$b['r']['_due']] ?? 9, (string) $b['r']['next_action_on']]);
 $noneMarked = false;
-$warn = function_exists('contract_warn_days') ? contract_warn_days() : 30;
+// Same window the renewals count uses (Sales settings → Renewals, DEF-10).
+$warn = function_exists('sx_renewal_days') ? sx_renewal_days() : 30;
 ?>
 <div class="rec sxw has-bn">
   <?php sxw_nav('/sales-today'); ?>

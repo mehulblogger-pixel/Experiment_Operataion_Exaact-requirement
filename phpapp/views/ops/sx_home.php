@@ -76,7 +76,7 @@ $fixN = count(array_filter($health, fn($h) => (int) $h[1] > 0));
           sxw_kpi('info', 'flow', 'Open pipeline', 'Open pipeline', sx_short($openV), count($d['open_deals']) . ' open deals', '/sales-board' . $q);
           sxw_kpi('ok', 'trophy', 'Won this FY', 'Won this FY', sx_short($wonFy), 'since the start of the year', '/sales-dashboard' . $q);
           if ($d['ar']) sxw_kpi('bad', 'rupee', 'Overdue payments', 'Overdue payments', sx_short($d['overdue_amt']), $d['overdue_n'] . ' invoice' . ($d['overdue_n'] === 1 ? '' : 's'), $tUrl('#pay', ''));
-          sxw_kpi('teal', 'swap', 'Renewals due', 'Renewals due', (string) count($d['renewals']), 'in ' . (function_exists('contract_warn_days') ? contract_warn_days() : 30) . ' days', $tUrl('#renew', '/sales-renewals')); ?>
+          sxw_kpi('teal', 'swap', 'Renewals due', 'Renewals due', (string) count($d['renewals']), 'in ' . (function_exists('sx_renewal_days') ? sx_renewal_days() : 30) . ' days', $tUrl('#renew', '/sales-renewals')); ?>
   </div>
 
   <div class="sxw-g2 w">
