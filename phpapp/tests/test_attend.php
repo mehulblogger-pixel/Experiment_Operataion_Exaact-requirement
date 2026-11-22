@@ -51,9 +51,13 @@ ok(attend_punch($insp3, $today, 'OUT', '', [])['ok'] === true, 'Mark OUT of a no
 
 head('6. The mark flows onto the availability board (status shows accordingly)');
 ok(ops_one("SELECT status FROM inspector_day_status WHERE inspector_id=? AND day=?", [$insp, $today])['status'] === 'OFFICE', 'In-office shows OFFICE on the availability board');
-attend_punch($insp3, $today, 'IN', 'SITE', ['lat'=>'19.1','lon'=>'72.9']);
-ok(ops_one("SELECT status FROM inspector_day_status WHERE inspector_id=? AND day=?", [$insp3, $today])['status'] === 'ON_JOB', 'On-site maps to ON_JOB on the board');
-ok((int)ops_val("SELECT COUNT(*) FROM inspector_day_status WHERE inspector_id=? AND day=?", [$insp3, $today]) === 1, 'one day-status per inspector per day (no duplicates)');
+// A fresh person: since 22 Nov 2026 a second Mark IN the same day is refused (section 9),
+// so the On-site mapping is checked on its own first arrival.
+db()->prepare("INSERT INTO inspectors (name, status) VALUES ('Sita Site','ACTIVE')")->execute();
+$insp4 = (int)db()->lastInsertId();
+attend_punch($insp4, $today, 'IN', 'SITE', ['lat'=>'19.1','lon'=>'72.9']);
+ok(ops_one("SELECT status FROM inspector_day_status WHERE inspector_id=? AND day=?", [$insp4, $today])['status'] === 'ON_JOB', 'On-site maps to ON_JOB on the board');
+ok((int)ops_val("SELECT COUNT(*) FROM inspector_day_status WHERE inspector_id=? AND day=?", [$insp4, $today]) === 1, 'one day-status per inspector per day (no duplicates)');
 
 head('7. Auto-links to that date’s report (inspector + date)');
 db()->prepare("INSERT INTO jobs (inspector_id, scheduled_date, stage, created_at) VALUES (?,?, 'REPORT_PENDING', ?)")->execute([$insp, $today, date('c')]);
@@ -80,3 +84,18 @@ if ($__standalone) {
     echo "\n==================== ATTEND: {$g['pass']} passed, {$g['fail']} failed ====================\n";
     exit($g['fail'] === 0 ? 0 : 1);
 }
+
+head('9. One arrival per day — a second Mark IN keeps the first time (22 Nov 2026)');
+db()->prepare("INSERT INTO inspectors (name, status) VALUES ('Dev Double','ACTIVE')")->execute();
+$insp5 = (int)db()->lastInsertId();
+ok(attend_punch($insp5, $today, 'IN', 'OFFICE', $loc)['ok'] === true, 'the first Mark IN is recorded');
+db()->prepare("UPDATE attendance SET check_in_at=? WHERE inspector_id=? AND att_date=?")->execute([$today . 'T09:05:00+05:30', $insp5, $today]);
+$r2 = attend_punch($insp5, $today, 'IN', 'SITE', $loc);
+ok($r2['ok'] === false && strpos($r2['error'], 'already marked IN today at 09:05') !== false, 'a second Mark IN (back button / double tap) is refused and names the first time: ' . ($r2['error'] ?? ''));
+$row5 = attend_today($insp5, $today);
+ok(substr((string)$row5['check_in_at'], 11, 5) === '09:05' && $row5['status'] === 'OFFICE', 'the first arrival time and status are kept');
+ok((int)ops_val("SELECT COUNT(*) FROM attendance WHERE inspector_id=? AND att_date=? AND source='SELF'", [$insp5, $today]) === 1, 'still one attendance row for the day');
+if (function_exists('attendreview_migrate')) attendreview_migrate();
+db()->prepare("UPDATE attendance SET review_status='RETURNED' WHERE inspector_id=? AND att_date=?")->execute([$insp5, $today]);
+ok(attend_punch($insp5, $today, 'IN', 'OFFICE', $loc)['ok'] === true, 'an entry a reviewer sent back (RETURNED) may still be re-marked by its owner, as before');
+ok(attend_punch($insp5, $today, 'OUT', '', $loc)['ok'] === true && attend_punch($insp5, $today, 'IN', 'OFFICE', $loc)['ok'] === false, 'after the re-mark, Mark OUT works and a further Mark IN is refused again');

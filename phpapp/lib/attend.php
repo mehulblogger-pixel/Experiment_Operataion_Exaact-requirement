@@ -88,6 +88,19 @@ function attend_punch($inspectorId, $date, $kind, $status, $data = []) {
         if (!array_key_exists($status, attend_status_options())) return ['ok'=>false, 'error'=>'Pick a valid attendance status.'];
         if (attend_loc_required($status) && ($lat === '' || $lon === ''))
             return ['ok'=>false, 'error'=>'A location is required to mark IN as "' . (attend_status_options()[$status] ?? $status) . '". Allow location access and try again.'];
+        //  One arrival per person per day (owner build 22 Nov 2026, proposal review): a
+        //  re-submitted Mark IN — the back button, a double tap — used to overwrite the
+        //  first arrival time. The first time stands, as on the site punch
+        //  (site_checkin(): "A day has one arrival"). The one exception is the existing
+        //  re-mark path: an entry a reviewer sent back (review_status RETURNED) is
+        //  re-marked by its owner, which is what attend_review_reset() below expects.
+        $prev = attend_today($inspectorId, $date);
+        if ($prev && trim((string) ($prev['check_in_at'] ?? '')) !== ''
+            && strtoupper((string) ($prev['review_status'] ?? '')) !== 'RETURNED') {
+            $t = substr((string) $prev['check_in_at'], 11, 5);
+            return ['ok' => false, 'error' => 'You already marked IN today' . ($t !== '' ? ' at ' . $t : '')
+                . '. A day has one arrival — the first time is kept. Mark OUT when you leave.'];
+        }
         $id = attend_row($inspectorId, $date);
         db()->prepare("UPDATE attendance SET status=?, check_in_at=?, in_lat=?, in_lon=?, in_acc=?, marked_at=?, marked_by=? WHERE id=?")
             ->execute([$status, $now, $lat !== '' ? $lat : null, $lon !== '' ? $lon : null, $acc, $now, $actor, $id]);
