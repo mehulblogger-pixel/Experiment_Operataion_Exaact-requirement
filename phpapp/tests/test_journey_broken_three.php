@@ -127,8 +127,12 @@ try {
     //  21 Nov 2026 (owner: the Branch Manager and SBU Head open leads and deals READ ONLY, a88afc2):
     //  the gate also asks leads_works_leads(), so a reader who holds Enquiries edit cannot add a
     //  customer from a deal they may now only read.
-    t_ok(strpos($opp, "ops_require(function_exists('leads_can_edit') && leads_can_edit() && leads_works_leads(), 'Only someone who works leads and deals can add the customer.');") !== false,
-        'who may: exactly the people who may already make a lead a customer — nobody new');
+    //  22 Nov 2026 (owner answer 9): the gate is now its own switch, "Add a customer from a won deal
+    //  that had no lead", held on day one by exactly the people the old rule let in (see
+    //  test_owner_answers_2211). A reader who only views leads and deals still cannot use it.
+    t_ok(strpos($opp, "ops_require(opp_can_add_customer(),") !== false
+         && strpos($opp, "return can('crm.deal.add_customer') && (!function_exists('leads_works_leads') || leads_works_leads());") !== false,
+        'who may: the add-customer switch, and only for someone who works leads and deals (a reader never)');
     $view = (string)file_get_contents(__DIR__ . '/../views/ops/opportunity_detail.php');
     t_ok(strpos($view, 'action="/opportunity-add-customer"') !== false && strpos($view, '＋ Add as a customer') !== false, 'the won deal shows the "＋ Add as a customer" form where it used to say only "add them first"');
     t_ok(strpos($view, "<?php elseif (!empty(\$o['sent_to_accounts_at'])): ?>") !== false && strpos($view, "if (!empty(\$winQuote)):") !== false, 'and shows the quotation road in place of "Send to Accounts" when the deal was won through a quotation');

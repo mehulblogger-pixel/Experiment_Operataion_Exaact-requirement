@@ -74,7 +74,10 @@ function opp_can_edit() { return (can('crm.deal.edit') && opp_sales_live()) || i
 // it is held by exactly the people the old rule let in (perm_split_rules()); module
 // masters of Leads / Enquiries keep their usual override. docs/02 19y4.
 function opp_can_add_customer() {
-    return is_master() || (function_exists('is_master_of') && is_master_of(['leads', 'inquiries'])) || can('crm.deal.add_customer');
+    if (is_master() || (function_exists('is_master_of') && is_master_of(['leads', 'inquiries']))) return true;
+    //  The switch alone is not enough: the owner's 21 Nov rule (a88afc2) still holds — a person who
+    //  only READS leads and deals (Branch Manager / SBU Head view) does not add customers from them.
+    return can('crm.deal.add_customer') && (!function_exists('leads_works_leads') || leads_works_leads());
 }
 function opp_can_export() { return is_master() || can('crm.deal.export'); }
 

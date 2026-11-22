@@ -135,8 +135,19 @@ try {
     t_ok(in_array('ADD-CUSTOMER-SWITCH-2026-11-22', $done, true) && in_array('crm.deal.add_customer', $st['BUSINESS_DEV_MANAGER'], true), 'answer 9 · a saved BDM grid that works leads gains the switch once');
     t_ok(!in_array('crm.deal.add_customer', $st['COORDINATOR'], true), 'answer 9 · a saved grid that only views leads does not');
     t_eq(access_apply_owner_grants(true), [], 'answer 9 · the one-time rule does not run twice');
+    //  The switch never overrides the 21 Nov read-only rule: a Branch Manager given it, who only
+    //  reads leads and deals, still cannot add a customer; given lead work as well, they can.
+    $bmP = array_values(array_diff(role_perms('BRANCH_MANAGER'), ['mod.leads.add', 'mod.leads.edit']));
+    setting_set('role_access', json_encode(['BRANCH_MANAGER' => array_merge($bmP, ['crm.deal.add_customer', PERM_SPLIT_TAG])]));
+    bbv_as($f['kiran']);
+    t_ok(can('crm.deal.add_customer') && !opp_can_add_customer(), 'answer 9 · a reader who is given the switch still cannot add a customer (Branch Manager view, 21 Nov)');
+    setting_set('role_access', json_encode(['BRANCH_MANAGER' => array_merge($bmP, ['mod.leads.add', 'crm.deal.add_customer', PERM_SPLIT_TAG])]));
+    bbv_as($f['kiran']);
+    t_ok(opp_can_add_customer(), 'answer 9 · the same person who also works leads can');
+    bbv_as($f['master']);
     setting_set('role_access', (string) $prevRA); setting_set('access_owner_grants_applied', (string) $prevApplied);
 } finally {
+    if (isset($prevRA)) { setting_set('role_access', (string) $prevRA); setting_set('access_owner_grants_applied', (string) $prevApplied); }
     setting_set('call_rate_max', $prevMax === null ? '' : (string) $prevMax);
     $del = function ($table, $ids) use ($pdo) { if ($ids) try { $pdo->exec("DELETE FROM $table WHERE id IN (" . implode(',', array_map('intval', $ids)) . ")"); } catch (Throwable $e) {} };
     try { if ($made['jobs']) $pdo->exec("DELETE FROM site_visits WHERE job_id IN (" . implode(',', $made['jobs']) . ")"); } catch (Throwable $e) {}
