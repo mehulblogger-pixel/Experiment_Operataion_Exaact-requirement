@@ -190,7 +190,7 @@ document.addEventListener('DOMContentLoaded', function () {
   <h3 class="tab-sub" style="margin-top:0">3. When</h3>
   <div class="form-grid">
     <div class="ff"><label><?= e(TH('call')) ?> received <span class="muted">— the day the contracting <?= e(Tl('office')) ?> got it</span></label>
-      <input class="form-control" type="date" name="call_received_date" value="<?= e($call['call_received_date'] ?? date('Y-m-d')) ?>"></div>
+      <input class="form-control" type="date" name="call_received_date" max="<?= e(date('Y-m-d')) ?>" value="<?= e($call['call_received_date'] ?? date('Y-m-d')) ?>"></div>
     <div class="ff"><label><?= e(TH('client')) ?>'s required date <span class="muted">— when they want it</span></label>
       <input class="form-control" type="date" id="req_date" name="inspection_required_date" value="<?= e($call['inspection_required_date'] ?? '') ?>"></div>
     <div class="ff"><label>Shape of the engagement</label>
@@ -348,7 +348,7 @@ document.addEventListener('DOMContentLoaded', function () {
           // can only ever read 10,000. ?>
     <div class="form-grid" id="samebox">
       <div class="ff"><label>Unit rate — <strong>excluding GST</strong> (<?= e(cur_sym()) ?>) <span class="muted">— as quoted</span></label>
-        <input class="form-control" type="number" step="0.01" id="billable_rate" name="billable_rate" value="<?= e($call['billable_rate'] ?? '') ?>"></div>
+        <input class="form-control" type="number" step="0.01" min="0"<?= function_exists('call_rate_max') && call_rate_max() > 0 ? ' max="' . e((string) call_rate_max()) . '"' : '' ?> id="billable_rate" name="billable_rate" value="<?= e($call['billable_rate'] ?? '') ?>"></div>
       <div class="ff"><label>Basis <span class="muted">— as quoted</span></label>
         <select class="form-control" id="billable_basis" name="billable_basis"><option value="">—</option>
           <?php foreach (lk_options_or('charge_unit', CHARGE_UNITS) as $k=>$v): ?><option value="<?= e($k) ?>" <?= ($call && ($call['billable_basis']??'')===$k)?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?>

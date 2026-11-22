@@ -75,9 +75,11 @@ stateDiagram-v2
   Invoiced --> [*]
 ```
 
-- **`job-close` has no `ops_require`** — it is gated only by business blocks (deadline
-  lock, bills on file, site check-in, open visit-days, final docs). Comment says
-  "Inspector (or coordinator) closes" (`ops.php:5560`). **⚠ implicit — see gaps doc.**
+- **`job-close` is gated on who may close** (R2): Master Admin, the right `ops.job.close`
+  (coordinators, branch / operation managers), or the job's own assigned engineer — for the
+  form (GET) and the save (POST) alike — and then by the business blocks (deadline lock,
+  bills on file, site check-in, open visit-days, final docs). Corrected 22 Nov 2026: this
+  line used to say it had no permission check (Operations test book finding F-OP-06).
 - Re-close is refused if already closed (`ops.php:5573`).
 - **A terminated job closes without its final documents** (owner, 8 Nov 2026). The close
   gate that asks for the Final Inspection Report and Release Note (§WO-6,

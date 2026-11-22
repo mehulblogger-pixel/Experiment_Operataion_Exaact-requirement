@@ -391,6 +391,16 @@ function site_visit_window($jobId) {
 // ============================================================================
 
 // The inspector identity of the signed-in user, or 0 if they are not one.
+// F-OP-01 — is this inspector assigned to the job: its main engineer, or given a day
+// of it through the per-day plan (job_visits)? The one rule the job page, its form
+// and /site-checkin share.
+function site_checkin_is_assigned($jobId, $inspectorId) {
+    $inspectorId = (int) $inspectorId; $jobId = (int) $jobId;
+    if ($inspectorId <= 0 || $jobId <= 0) return false;
+    if ((int) ops_val("SELECT COUNT(*) FROM jobs WHERE id=? AND inspector_id=?", [$jobId, $inspectorId]) > 0) return true;
+    try { return (int) ops_val("SELECT COUNT(*) FROM job_visits WHERE job_id=? AND inspector_id=?", [$jobId, $inspectorId]) > 0; }
+    catch (Throwable $e) { return false; }
+}
 function punch_user_inspector_id() {
     $u = function_exists('current_user') ? current_user() : null;
     return $u ? (int)($u['inspector_id'] ?? 0) : 0;
@@ -897,7 +907,17 @@ function ops_trust($route, $method) {
     }
     if ($route === 'site-checkin' && $method === 'POST') {
         $jobId = (int)($_POST['job_id'] ?? 0);
-        $why = site_checkin($jobId, $_POST, $_FILES['photo'] ?? null);
+        //  F-OP-01 (owner, 22 Nov 2026: "Yes fix it") — a site check-in is a personal,
+        //  on-site fact. Only the person assigned to the job records it (the same rule
+        //  as the top-bar /punch); anyone else signed in — a coordinator, another
+        //  engineer, a sales person — is refused, and nothing is written.
+        $insp = punch_user_inspector_id();
+        if (!site_checkin_is_assigned($jobId, $insp)) {
+            flash('Only the ' . Tl('engineer') . ' assigned to this ' . Tl('job') . ' can record a site check-in on it — '
+                . 'on their own phone, on site.', 'error');
+            redirect('/job?id=' . $jobId);
+        }
+        $why = site_checkin($jobId, $_POST, $_FILES['photo'] ?? null, $insp);
         flash($why !== '' ? $why : 'Checked in. That is a fact recorded on site, at the time — which is what the '
             . 'photographs are later compared against.', $why !== '' ? 'error' : 'success');
         redirect('/job?id=' . $jobId);

@@ -228,6 +228,13 @@ $BASELINE = [
     // "+ Add new" links ask the same question; clients and vendors are CORE (section E),
     // so a master keeps it on any plan. Same answer for a master as before.
     'crm_quote_can_create', 'partner_can_add',
+    // Owner's answers of 22 Nov 2026. job_invoice_record_can() (Q-OP-04) is the
+    // /job-invoice check (is_master() || finance.reconcile) lifted into a function — asked
+    // only inside that Jobs handler and on the job page, both behind the Operations gate
+    // (Category B). opp_can_add_customer() (answer 9) is the won-deal add-customer step's
+    // check, asked only inside /opportunity-add-customer and the deal page, Sales routes the
+    // M5 gate refuses without Sales (Category B). Same answer for a master as before.
+    'job_invoice_record_can', 'opp_can_add_customer',
 ];
 $unclassified = array_values(array_diff($open, $BASELINE));
 t_ok(!$unclassified,

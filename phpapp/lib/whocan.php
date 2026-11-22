@@ -141,6 +141,7 @@ function whocan_sales_features() {
         whocan_row('crm.deal.view', 'View ' . Tlp('opportunity')),
         whocan_row('crm.deal.edit', 'Add and edit ' . Tlp('opportunity')),
         whocan_row('crm.deal.export', 'Download ' . Tlp('opportunity') . ' to Excel / CSV'),
+        whocan_row('crm.deal.add_customer', 'Add a ' . Tl('client') . ' from a won ' . Tl('opportunity') . ' that had no lead'),
     ]];
     $f[] = ['f' => 'Pipelines & stages', 'd' => 'The steps a lead or deal moves through', 'rows' => [
         whocan_row('crm.pipeline.manage', 'Change pipelines and stages'),

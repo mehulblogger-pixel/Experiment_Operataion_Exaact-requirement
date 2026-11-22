@@ -338,7 +338,7 @@
       </select></div>
     <?php // Field-finding #11 — the who-carries-it-out message lives ON this (Engineer) tab, and the
           // script below jumps here when it's missing, instead of bouncing to the first tab. ?>
-    <p id="who-msg" class="msg msg-error" hidden style="margin:0 0 8px">Choose an <?= e(Tl('engineer')) ?> / engineer, or a sub-contracting agency, before allocating.</p>
+    <p id="who-msg" class="msg msg-error" hidden style="margin:0 0 8px">Choose <?= e(Tla('engineer')) ?>, or a sub-contracting agency, before allocating.</p>
     <div class="ff"><label>Sub-con cost (<?= e(cur_sym()) ?>)</label><input class="form-control" type="number" step="0.01" name="subcon_cost" value="<?= e($job['subcon_cost'] ?? '') ?>"></div>
     <?php // Anything else this one cost that is not salary, a claimed expense or
           // a sub-contractor — a hired instrument, a permit, a courier. Without

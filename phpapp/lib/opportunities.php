@@ -69,6 +69,13 @@ function opp_sales_live() { return !function_exists('licence_module_live') || li
 function opp_can_view() { return (can('crm.deal.view') && opp_sales_live()) || is_master_of(['leads','quotes','inquiries']); }
 function opp_can_edit() { return (can('crm.deal.edit') && opp_sales_live()) || is_master_of(['leads','quotes','inquiries']); }
 //  Q6 — downloading the deal list is its own switch (on day one: everyone who could open it).
+// Owner, 22 Nov 2026 (answer 9): a switch in the permission list, not a fixed rule —
+// "Add a customer from a won deal that had no lead" (crm.deal.add_customer). On day one
+// it is held by exactly the people the old rule let in (perm_split_rules()); module
+// masters of Leads / Enquiries keep their usual override. docs/02 19y4.
+function opp_can_add_customer() {
+    return is_master() || (function_exists('is_master_of') && is_master_of(['leads', 'inquiries'])) || can('crm.deal.add_customer');
+}
 function opp_can_export() { return is_master() || can('crm.deal.export'); }
 
 function opp_try($fn, $fb = []) {
@@ -1356,7 +1363,7 @@ function ops_opportunities($route, $method) {
             'canRegisterContract' => can('crm.contract.register') || is_master(),
             'winQuote' => opp_winning_quote((int)$o['id']),
             'quoteNow' => opp_quote_now((int)$o['id']),
-            'canAddCustomer' => function_exists('leads_can_edit') && leads_can_edit() && leads_works_leads(),
+            'canAddCustomer' => opp_can_add_customer(),
             'contractRow' => !empty($o['contract_id'])
                 ? ops_one("SELECT * FROM partner_contracts WHERE id=?", [(int)$o['contract_id']])
                 : null,
@@ -1527,7 +1534,7 @@ function ops_opportunities($route, $method) {
     //  The same people who may make a lead a customer — nobody new.
     if ($route === 'opportunity-add-customer' && $method === 'POST') {
         $id = (int)($_POST['id'] ?? 0);
-        ops_require(function_exists('leads_can_edit') && leads_can_edit() && leads_works_leads(), 'Only someone who works leads and deals can add the customer.');
+        ops_require(opp_can_add_customer(), 'Adding a customer from a won deal is not switched on for you (Who can do what → "Add a customer from a won deal that had no lead").');
         $r = opp_add_customer($id, $_POST);
         if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/opportunity?id=' . $id . (!empty($r['near']) ? '&samename=1' : '') . (!empty($r['loc_offer']) ? '&loc=' . (int) $r['loc_offer'] : '') . '#opp=actions'); }
         if (empty($r['code'])) {   // the same PAN: it is the customer already on file, billed at a new location

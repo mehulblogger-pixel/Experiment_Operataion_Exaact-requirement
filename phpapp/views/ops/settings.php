@@ -209,6 +209,12 @@
     <div class="ff ff-check"><label><input type="checkbox" name="job_lock_enabled" value="1" <?= job_lock_enabled() ? 'checked' : '' ?>>
       Lock <?= e(Tlp('job')) ?> that are not closed in time</label>
       <small class="muted">Untick to turn the deadline off entirely — nothing locks, and no alerts are sent.</small></div>
+    <?php // Owner, 22 Nov 2026 (Q-OP-03): "Call rates shall be max 2.5 lacs" — the owner's
+          // value is the starting figure; an administrator changes it here, never in code. ?>
+    <div class="ff"><label>Highest unit rate on a <?= e(Tl('call')) ?> (<?= e(cur_sym()) ?>)</label>
+      <input class="form-control" type="number" step="1" min="0" name="call_rate_max" value="<?= e((string)(function_exists('call_rate_max') ? call_rate_max() : '')) ?>">
+      <small class="muted">A rate above this is refused when a <?= e(Tl('call')) ?> is saved. Starting value <?= e(cur_sym()) ?>2,50,000 — the owner's figure of 22 Nov 2026.
+        0 means no limit. <?= e(Tlp('call')) ?> already saved are not changed.</small></div>
     <div class="ff"><label>Employee code prefix <span class="muted">(own staff)</span></label>
       <input class="form-control" name="emp_code_prefix" value="<?= e(setting_get('emp_code_prefix','')) ?>" placeholder="EMP">
       <small class="muted">Sub-contractors stay <code>SC-</code>, freelancers <code>FL-</code>.</small></div>

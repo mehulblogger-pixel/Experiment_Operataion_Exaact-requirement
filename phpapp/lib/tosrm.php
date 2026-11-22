@@ -1666,6 +1666,13 @@ function tosrm_delay_auto_days($job, $call = null) {
     if ($req === '' || $sch === '' || !function_exists('days_between')) return null;
     return days_between($req, $sch);   // + => scheduled after required (a delay)
 }
+// F-OP-02 — what is wrong with a posted delay, in words, or '' when it may be saved.
+function tosrm_delay_problem(array $d) {
+    $miss = [];
+    if (!isset(TOSRM_DELAY_REASONS[strtoupper(trim((string)($d['reason'] ?? '')))])) $miss[] = 'the reason';
+    if (!isset(TOSRM_DELAY_RESP[strtoupper(trim((string)($d['responsibility'] ?? '')))])) $miss[] = 'who is responsible';
+    return $miss ? 'The delay was not recorded — pick ' . implode(' and ', $miss) . ' from the list. Nothing else you typed was lost.' : '';
+}
 function tosrm_delay_add($jobId, $data) {
     tosrm_migrate_d();
     $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)$jobId]); if (!$job) return 0;
@@ -1832,9 +1839,10 @@ function tosrm_render_call_sla($call) {
         <form method="post" action="/delay-add" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center">
           <input type="hidden" name="_csrf" value="<?=$esc($csrf)?>">
           <select name="job_id"><?php foreach ($jobs as $j): ?><option value="<?=(int)$j['id']?>"><?=$esc($j['job_code'])?><?=$j['scheduled_date']?' · '.$esc($j['scheduled_date']):''?></option><?php endforeach; ?></select>
-          <select name="reason"><?php foreach (TOSRM_DELAY_REASONS as $k=>$v): ?><option value="<?=$esc($k)?>"><?=$esc($v)?></option><?php endforeach; ?></select>
-          <select name="responsibility"><?php foreach (TOSRM_DELAY_RESP as $k=>$v): ?><option value="<?=$esc($k)?>"><?=$esc($v)?></option><?php endforeach; ?></select>
-          <input type="text" name="impact" placeholder="Impact / action" style="flex:1;min-width:160px">
+          <?php $dOld = (array)($_SESSION['tosrm_delay_old'] ?? []); unset($_SESSION['tosrm_delay_old']); ?>
+          <select name="reason" required aria-label="Reason"><option value="">— reason —</option><?php foreach (TOSRM_DELAY_REASONS as $k=>$v): ?><option value="<?=$esc($k)?>"<?= ($dOld['reason'] ?? '') === $k ? ' selected' : '' ?>><?=$esc($v)?></option><?php endforeach; ?></select>
+          <select name="responsibility" required aria-label="Responsibility"><option value="">— responsibility —</option><?php foreach (TOSRM_DELAY_RESP as $k=>$v): ?><option value="<?=$esc($k)?>"<?= ($dOld['responsibility'] ?? '') === $k ? ' selected' : '' ?>><?=$esc($v)?></option><?php endforeach; ?></select>
+          <input type="text" name="impact" placeholder="Impact / action" style="flex:1;min-width:160px" value="<?= $esc($dOld['impact'] ?? '') ?>">
           <button class="btn btn-sm" type="submit">Record delay</button>
         </form>
         <div class="muted" style="font-size:12px">Delay days auto-computed from required vs scheduled; expediting delays link to Phase 6 rather than duplicating it.</div>
@@ -1857,6 +1865,17 @@ function ops_tosrm_delay_action($route, $method) {
     ops_require(tosrm_can_edit(), 'You do not have permission to record a delay.');
     if (!$job) { flash('Job not found.', 'error'); redirect('/calls'); }
     ops_require(tosrm_job_scope_ok($job), tosrm_job_scope_msg());   // B2 — before any write
+    //  F-OP-02 (owner, 22 Nov 2026: "Yes fix it") — a delay with no reason or no
+    //  responsibility used to save. Both are what the SLA reports group by, so both
+    //  are required and must be one of the listed choices. What was typed is kept.
+    $why = tosrm_delay_problem($_POST);
+    if ($why !== '') {
+        $_SESSION['tosrm_delay_old'] = ['job_id' => $jobId, 'reason' => (string)($_POST['reason'] ?? ''),
+            'responsibility' => (string)($_POST['responsibility'] ?? ''), 'impact' => (string)($_POST['impact'] ?? '')];
+        flash($why, 'error');
+        redirect($back);
+    }
+    unset($_SESSION['tosrm_delay_old']);
     tosrm_delay_add($jobId, ['reason'=>$_POST['reason'] ?? '', 'category'=>$_POST['category'] ?? '', 'responsibility'=>$_POST['responsibility'] ?? '', 'impact'=>$_POST['impact'] ?? '', 'action'=>$_POST['action'] ?? '']);
     flash('Delay recorded.');
     redirect($back);

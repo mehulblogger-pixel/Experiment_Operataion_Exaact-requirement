@@ -268,9 +268,10 @@
       // and it is the fallback for a phone that strips location from its
       // pictures — which many corporate phones do.
       $visits = function_exists('site_visits') ? site_visits((int)$job['id']) : [];
-      $canCheckIn = !$job['closed_flag'] && function_exists('site_checkin')
-          && (is_coordinator_level() || ($fieldInspector
-              && (int)(current_user()['inspector_id'] ?? 0) === (int)($job['inspector_id'] ?? 0))); ?>
+      //  F-OP-01 (owner, 22 Nov 2026): only the engineer assigned to this job records
+      //  its check-in — the same rule /site-checkin enforces. Coordinators see the record.
+      $canCheckIn = !$job['closed_flag'] && function_exists('site_checkin_is_assigned')
+          && site_checkin_is_assigned((int)$job['id'], (int)(current_user()['inspector_id'] ?? 0)); ?>
 <div class="panel" id="checkin" data-tab="Schedule &amp; site">
   <div class="ctitle" style="margin-top:0"><h3>Site check-in <span class="muted">(<?= count($visits) ?>)</span></h3></div>
   <?php // The timesheet is not typed — it is built from these punches. Say so here,
@@ -398,6 +399,8 @@
     });
   })();
   </script>
+  <?php elseif (!$job['closed_flag']): ?>
+  <p class="sub" style="margin-top:6px">Check-in is recorded by the <?= e(Tl('engineer')) ?> assigned to this <?= e(Tl('job')) ?>, on site, from their own login.</p>
   <?php endif; ?>
 </div>
 
@@ -1217,6 +1220,12 @@ if (function_exists('hwp_for_job')):
   <?php // The old manual checkbox/number entry, kept for corrections and installs
         // not using the Money module — tucked away so the real invoice above is the
         // one thing people look at (§INV-1 "one invoice truth"). ?>
+  <?php if (function_exists('job_invoice_record_can') && !job_invoice_record_can()): ?>
+    <p class="muted" style="margin:4px 2px">Invoice raised: <b><?= !empty($job['invoice_raised']) ? 'yes' . (trim((string)($job['invoice_number'] ?? '')) !== '' ? ' — ' . e($job['invoice_number']) : '') : 'no' ?></b> ·
+      Payment received: <b><?= !empty($job['payment_received']) ? 'yes' : 'no' ?></b> ·
+      Inter-office credit received: <b><?= !empty($job['credit_received']) ? 'yes' : 'no' ?></b>.
+      Finance records these.</p>
+  <?php else: ?>
   <details<?= $bInv ? '' : ' open' ?> style="margin-top:4px">
     <summary class="muted" style="cursor:pointer;font-size:13px">Manual invoice / payment entry<?= $bInv ? ' (the real invoice is shown above)' : '' ?></summary>
   <form method="post" action="/job-invoice?id=<?= (int)$job['id'] ?>" style="margin-top:10px">
@@ -1235,6 +1244,7 @@ if (function_exists('hwp_for_job')):
     <div style="margin-top:8px"><button class="btn small" type="submit">Save invoice / payment</button></div>
   </form>
   </details>
+  <?php endif; /* job_invoice_record_can */ ?>
 </div>
 <?php else: /* Field-finding #12 — executing office on a cross-office job: credit + invoiced capsule only */ ?>
 <div class="panel" id="invoice" data-tab="Money">

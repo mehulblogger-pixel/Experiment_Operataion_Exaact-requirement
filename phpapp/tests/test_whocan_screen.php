@@ -167,6 +167,11 @@ try {
 
     // ---- (1)+(2) Roles: the same Save stores the same value --------------------------------
     setting_set('role_access', json_encode($fx['grid']));
+    //  A one-time owner rule still pending (e.g. ADD-CUSTOMER-SWITCH-2026-11-22) would be
+    //  applied by whichever request comes first and so change only ONE of the two saves
+    //  compared below. Apply what is pending first, so both screens start from one state.
+    if (function_exists('access_apply_owner_grants')) access_apply_owner_grants(true);
+    if (function_exists('access_apply_owner_revokes')) access_apply_owner_revokes(true);
     $grid0 = (string) setting_get('role_access', '');
     $saveRole = function ($fields) use ($master) { wc_route('access', 'POST', $master, [], $fields); return (string) setting_get('role_access', ''); };
     $flip = function ($fields, $key, $field) {

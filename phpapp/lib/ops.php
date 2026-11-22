@@ -647,6 +647,51 @@ function hiring_admin_can() { return is_admin_level() || (function_exists('can')
 // The edit form carries the row's `updated_at` as a baseline; on save we compare it
 // with the row's current value and refuse if it moved under us. A fresh version token
 // is stamped on every save. (Second-plus-random granularity — unique per save.)
+// The company's ceiling on a call's unit rate (Settings → Financial & norms). The owner's
+// value, 22 Nov 2026: ₹2,50,000 ("Call rates shall be max 2.5 lacs"). 0 = no ceiling.
+const CALL_RATE_MAX_OWNER_DEFAULT = 250000;
+// Owner, 22 Nov 2026 (Q-OP-04, "Finance"): recording an invoice or payment on a job
+// (/job-invoice) is Finance's — the credit-reconciliation right Finance holds — or the
+// Master Admin's. Seeing the inter-office credit figures (data.credit, coordinators and
+// managers) no longer lets a person record them. docs/02 19z.
+function job_invoice_record_can() { return (function_exists('is_master') && is_master()) || can('finance.reconcile'); }
+function call_rate_max() {
+    $v = trim((string) (function_exists('setting_get') ? setting_get('call_rate_max', '') : ''));
+    return $v === '' ? (float) CALL_RATE_MAX_OWNER_DEFAULT : max(0.0, (float) $v);
+}
+// What is wrong with the dates and rate of a call being saved: [message, [fields]] or ['', []].
+// $call is the stored row on an edit (null when new): an edit is checked only on the
+// values it changes.
+function call_entry_problems(array $b, $call = null) {
+    $isNew = empty($call['id']);
+    $chg = fn($k) => $isNew || trim((string)($b[$k] ?? '')) !== trim((string)($call[$k] ?? ''));
+    $today = date('Y-m-d');
+    $recv = substr(trim((string)($b['call_received_date'] ?? '')), 0, 10);
+    $req  = substr(trim((string)($b['inspection_required_date'] ?? '')), 0, 10);
+    $msg = []; $bad = [];
+    //  Q-OP-01 — a call cannot be received tomorrow.
+    if ($recv !== '' && $chg('call_received_date') && $recv > $today) {
+        $msg[] = 'The received date cannot be after today (' . (function_exists('fdate') ? fdate($today) : $today) . ').';
+        $bad[] = 'call_received_date';
+    }
+    //  Q-OP-02 — the client cannot need it before we received it.
+    if ($recv !== '' && $req !== '' && ($chg('call_received_date') || $chg('inspection_required_date')) && $req < $recv) {
+        $msg[] = 'The client\'s required date cannot be earlier than the received date (' . (function_exists('fdate') ? fdate($recv) : $recv) . ').';
+        $bad[] = 'inspection_required_date';
+    }
+    //  F-OP-03 / Q-OP-03 — a unit rate is never negative, and not above the company's ceiling.
+    $rateRaw = trim((string)($b['billable_rate'] ?? ''));
+    $rateChanged = $isNew || (float)$rateRaw !== (float)($call['billable_rate'] ?? 0);
+    if ($rateRaw !== '' && $rateChanged) {
+        $rate = (float)$rateRaw; $max = call_rate_max();
+        if ($rate < 0) { $msg[] = 'The unit rate cannot be below 0.'; $bad[] = 'billable_rate'; }
+        elseif ($max > 0 && $rate > $max) {
+            $msg[] = 'The unit rate cannot be above ' . cur_sym() . nf($max, 0) . ' — the limit set under Settings → Financial & norms ("Highest unit rate on a ' . Tl('call') . '"). Ask an administrator to change it there if this rate is right.';
+            $bad[] = 'billable_rate';
+        }
+    }
+    return [implode(' ', $msg), $bad];
+}
 function row_version_token() { return date('c') . '.' . bin2hex(random_bytes(2)); }
 function stale_edit_block($table, $id, $postedVersion) {
     if (!in_array($table, ['calls', 'jobs', 'quotations'], true)) return '';   // allow-list — never interpolate arbitrary names
@@ -5962,6 +6007,15 @@ function ops_calls($route, $method) {
             if ($creditAuto && $creditRate > 0) $b['expected_credit'] = round($creditRate * $qty, 2);
             // The client's expected date is the first visit, so the two never disagree.
             if ($dates && ($b['inspection_required_date'] ?? '') === '') $b['inspection_required_date'] = $dates[0];
+            //  Owner, 22 Nov 2026 (Operations test book F-OP-03, Q-OP-01/02/03): the
+            //  received date, the client's required date and the unit rate are checked
+            //  before anything is saved. An existing call is only checked on what this
+            //  save actually changes, so an unrelated edit is never blocked by old data.
+            [$entryErr, $entryBad] = call_entry_problems($b, $call);
+            if ($entryErr !== '') {
+                view('ops/call_form', array_merge(call_form_vars($call, $b), ['error' => $entryErr, 'errorFields' => $entryBad]));
+                return;
+            }
             $fields = call_save_fields();
             // Drop any field whose column is missing (partial upload) so the whole
             // save cannot crash on one unknown column — it is added on next boot.
@@ -6059,6 +6113,7 @@ function ops_calls($route, $method) {
                 $ph = implode(',', array_fill(0, count($cols), '?'));
                 $pdo->prepare("INSERT INTO calls (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
                 $id = $pdo->lastInsertId();
+                touch_row_version('calls', (int)$id);   // F-OP-04 — protected from its first edit
                 custom_save('call', $id, $b);
                 $coordNamed = (int)($b['coordinator_id'] ?? 0) > 0;
                 if ($execOffice || $coordNamed) send_forward_email($id);
@@ -6066,6 +6121,14 @@ function ops_calls($route, $method) {
                     : ($coordNamed ? ' Forwarded to the coordinator — email sent.' : ' Now allocate a job.')));
                 redirect('/call?id=' . $id);
             }
+        }
+        //  F-OP-04 (owner, 22 Nov 2026) — a call saved before versions existed has none,
+        //  so two people opening it together had no baseline to compare and the second
+        //  save overwrote the first. Stamp one as the form opens: both editors carry it,
+        //  and the second save is refused like any other clash.
+        if ($route === 'call-edit' && !empty($call['id']) && trim((string)($call['updated_at'] ?? '')) === '') {
+            touch_row_version('calls', (int)$call['id']);
+            $call['updated_at'] = (string) ops_val("SELECT updated_at FROM calls WHERE id=?", [(int)$call['id']]);
         }
         view('ops/call_form', call_form_vars($call));
         return;
@@ -9030,7 +9093,7 @@ function ops_jobs($route, $method) {
                         $why = ($who ?: ucfirst(Tl('engineer'))) . ' is already booked on ' . implode(', ', $clash) . '.';
                         $vars = array_merge(call_job_form_vars($job, $call), ['error' => $why
                             . ($canOv ? ' To go ahead anyway, state the reason in the box below.'
-                                      : ' Pick a ' . Tl('engineer') . ' who is free, or change the dates.')]);
+                                      : ' Pick ' . Tla('engineer') . ' who is free, or change the dates.')]);
                         if ($canOv) $vars['dblBookBlock'] = $why;
                         view('ops/job_form', $vars);
                         return;
@@ -9140,7 +9203,7 @@ function ops_jobs($route, $method) {
         redirect('/job?id=' . $job['id']);
     }
     if ($route === 'job-invoice') {
-        ops_require(can('data.credit') || can('finance.reconcile'), 'You cannot record invoices.');
+        ops_require(job_invoice_record_can(), 'Only Finance records an invoice or payment on a ' . Tl('job') . '.');
         $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)($_GET['id'] ?? 0)]);
         if (!$job) { http_response_code(404); view('notfound'); return; }
         if ($method === 'POST') {
@@ -11373,6 +11436,9 @@ function ops_settings($method) {
         $gd = trim((string)($_POST['job_close_grace_days'] ?? ''));
         if ($gd !== '') setting_set('job_close_grace_days', (string)max(0, min(365, (int)$gd)));
         setting_set('job_lock_enabled', !empty($_POST['job_lock_enabled']) ? '1' : '0');
+        //  Q-OP-03 — only written when the form carried it (Operations plans only).
+        if (isset($_POST['call_rate_max']) && trim((string)$_POST['call_rate_max']) !== '')
+            setting_set('call_rate_max', (string) max(0, round((float)$_POST['call_rate_max'], 2)));
         // P2 — e-mail the client when their report is issued (portal link + verify
         // code only, never the report itself). On by default; a customer can switch
         // it off here.

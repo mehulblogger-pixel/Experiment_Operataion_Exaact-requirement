@@ -277,6 +277,9 @@ const PERMISSIONS = [
     'crm.deal.export'     => 'Download deals to Excel / CSV',
     'crm.quote.export'    => 'Download quotations to Excel / CSV',
     'crm.settings.manage' => 'Change Sales settings (working days, follow-up days, who gets new leads)',
+    //  Owner, 22 Nov 2026 (answer 9: "Don't hardcode it but allowed from permission list"):
+    //  the "add the customer" step on a won deal that never had a lead (19y4).
+    'crm.deal.add_customer' => 'Add a customer from a won deal that had no lead',
     'data.customer_money' => 'See what customers were billed and paid (Sales screens and Receivables)',
     'costing.view'        => 'View project costings',
     'costing.prepare'     => 'Prepare project costings',
@@ -293,7 +296,7 @@ function permission_groups() {
         'Money'                          => ['finance.reconcile','data.customer_money'],
         'Marketing & Sales (CRM)'        => ['crm.quote.create','crm.quote.approve','crm.quote.send','crm.followup.manage','crm.contract.register','crm.template.manage',
                                              'crm.sales.see_all','crm.targets.set','crm.deal.view','crm.deal.edit','crm.pipeline.manage',
-                                             'crm.lead.export','crm.deal.export','crm.quote.export','crm.settings.manage'],
+                                             'crm.lead.export','crm.deal.export','crm.quote.export','crm.settings.manage','crm.deal.add_customer'],
         'Project costing'                => ['costing.view','costing.prepare','costing.heads.manage'],
         'Recruitment'                    => ['hiring.admin','hiring.material_change.propose','hiring.review.clear'],
         'Identity documents (personal data)' => ['person.iddoc.view','person.iddoc.manage'],
@@ -401,7 +404,7 @@ function permission_nav_groups() {
     $fine = [
         'Sales'                   => ['crm.quote.create','crm.quote.approve','crm.quote.send','crm.followup.manage','crm.contract.register','crm.template.manage',
                                       'crm.sales.see_all','crm.targets.set','crm.deal.view','crm.deal.edit','crm.pipeline.manage',
-                                      'crm.lead.export','crm.deal.export','crm.quote.export','crm.settings.manage',
+                                      'crm.lead.export','crm.deal.export','crm.quote.export','crm.settings.manage','crm.deal.add_customer',
                                       'costing.view','costing.prepare','costing.heads.manage'],
         'Operations'              => ['ops.call.create','ops.job.allocate','ops.job.close','ops.call.delete','workforce.availability','workforce.report.approve'],
         //  R-14, second half. module_groups() gave recruitment its own heading on
@@ -572,6 +575,7 @@ function perm_help($key) {
             'crm.deal.export'     => 'Download the deal list to Excel / CSV. A file can leave the company — grant deliberately.',
             'crm.quote.export'    => 'Download the quotation register to Excel / CSV. A file can leave the company — grant deliberately.',
             'crm.settings.manage' => 'Change Sales settings: follow-up outcomes and days, weekly off, when a deal is stale, and who gets new leads in each office. Not the other company settings.',
+            'crm.deal.add_customer' => 'On a deal that was won without a lead, add its customer to the master (with GSTIN / PAN, checked against the customers already on file). A deal from a lead gets its customer by converting the lead. Who: the people who work leads and deals.',
             'data.customer_money' => 'See what customers were billed, what they paid and what is overdue — on the Sales screens (Orders, Today, Sales home, Advertising return, client register) and in Receivables. Who: finance and those who chase payment.',
             'costing.view'        => 'Open project costings — the cost build-up behind a quotation, including salary figures. Who: sales, recruitment and managers who price work.',
             'costing.prepare'     => 'Prepare and change a project costing and submit it for approval. Approving stays with the approval levels.',
@@ -917,6 +921,10 @@ function perm_split_rules() {
         'crm.quote.export'    => fn($h, $mgmt) => $h('mod.quotes.view'),
         //  /sales-settings: is_master() || can('settings.manage')
         'crm.settings.manage' => fn($h, $mgmt) => $h('settings.manage'),
+        //  Owner, 22 Nov 2026 (answer 9): the won-deal "add the customer" step was
+        //  leads_can_edit() && leads_works_leads() — Leads or Enquiries edit, and Leads
+        //  add or edit. That rule, kept, is who holds the switch on day one.
+        'crm.deal.add_customer' => fn($h, $mgmt) => ($h('mod.leads.edit') || $h('mod.inquiries.edit')) && ($h('mod.leads.add') || $h('mod.leads.edit')),
         //  ar_can(): finance.reconcile || data.credit (|| master), with Invoicing
         'data.customer_money' => fn($h, $mgmt) => $h('finance.reconcile') || $h('data.credit'),
         //  pc_can() / pc_can_edit(): Quotations, Recruitment or Enquiries — or a
@@ -1570,7 +1578,19 @@ function access_owner_grants() {
         //  management — the Marketing Manager. For the people of their own branches
         //  (sxt_people_for_setter()).
         'DEF-11-2026-11-21' => ['perms' => ['crm.targets.set'], 'roles' => ['MARKETING_MANAGER']],
+        //  Owner, 22 Nov 2026 (answer 9): the new switch "Add a customer from a won deal
+        //  that had no lead" reaches a set SAVED after foundation A (stamped @split1, so the
+        //  split rule above no longer reads it) on exactly the old rule — never by role.
+        'ADD-CUSTOMER-SWITCH-2026-11-22' => ['perms' => ['crm.deal.add_customer'],
+                                             'rule' => fn($h) => perm_split_rules()['crm.deal.add_customer']($h, false)],
     ];
+}
+//  Does owner grant $g apply to a set held by a person / role of base role $role?
+//  By its role list, or (a rule-based grant) by what the set already holds.
+function access_owner_grant_applies(array $g, $role, array $set) {
+    if (isset($g['roles'])) return in_array($role, $g['roles'], true);
+    if (isset($g['rule']) && is_callable($g['rule'])) return (bool) ($g['rule'])(fn($p) => perm_set_has($set, $p));
+    return false;
 }
 function access_apply_owner_grants($force = false) {
     static $ran = false;
@@ -1586,13 +1606,18 @@ function access_apply_owner_grants($force = false) {
         if (is_array($store)) {
             foreach ($pending as $g)
                 foreach ($store as $roleKey => $perms)
-                    if (is_array($perms) && in_array($base($roleKey), $g['roles'], true))
+                    if (is_array($perms) && access_owner_grant_applies($g, $base($roleKey), $perms))
                         $store[$roleKey] = array_values(array_unique(array_merge($perms, $g['perms'])));
             setting_set('role_access', json_encode($store));
         }
         foreach (ops_all("SELECT id, role, permissions FROM users WHERE COALESCE(permissions,'')<>'' AND COALESCE(is_superuser,0)=0") ?: [] as $u) {
             $grant = [];
-            foreach ($pending as $g) if (in_array($base($u['role']), $g['roles'], true)) $grant = array_merge($grant, $g['perms']);
+            //  A rule-based grant reads what the person actually holds (role + differences
+            //  resolved, or the frozen copy itself).
+            $held = strpos((string) $u['permissions'], PERM_DIFF_TAG) !== false
+                ? perm_resolve_stored((string) $u['permissions'], $base($u['role']))
+                : array_values(array_filter(explode(',', (string) $u['permissions'])));
+            foreach ($pending as $g) if (access_owner_grant_applies($g, $base($u['role']), $held)) $grant = array_merge($grant, $g['perms']);
             if (!$grant) continue;
             if (strpos((string) $u['permissions'], PERM_DIFF_TAG) !== false) {
                 //  Stored as differences (Q11): the person's access plus the rule.
