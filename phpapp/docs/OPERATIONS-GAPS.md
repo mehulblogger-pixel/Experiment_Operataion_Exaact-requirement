@@ -72,7 +72,19 @@ invoicing. **Builds new:** the contract itself and the generator.
 
 ### G2 — Proof the person was there
 
-**What is missing.** Site check-in does not exist. It is *referred to* in the
+> **Correction, 22 Nov 2026 (Operations discovery, Batch 1).** This gap is out of date:
+> site check-in **is built**, in `lib/trust.php` (with `lib/geofence.php`). What exists:
+> arrival and departure punches from the job page (`/site-checkin`, the job's own Site
+> check-in panel); a one-tap punch bar at the top of every screen for a person with a
+> team-member record and a site visit due today (`punch_bar()`, `POST /punch`) — one
+> arrival and one departure per day; an optional required photo; a geofence check against
+> the site (Settings → Evidence & check-in, `/checkin-settings`); a flag for suspiciously
+> round coordinates; server time recorded beside the device time; check-in photos opened
+> only within the viewer's branch scope (`/checkin-photo`). Since Operations Batch 1 the
+> phone bottom bar also carries a Punch button for anyone who may punch today. The text
+> below is kept as the original record of the gap.
+
+**What was missing (Aug 2026).** Site check-in did not exist. It is *referred to* in the
 compliance text — "the site check-in on the job carries the fact instead" — and
 that was written about a feature nobody built. No arrival time, no location, no
 photograph timestamp beyond what IDEMS already keeps.

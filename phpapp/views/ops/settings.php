@@ -231,6 +231,37 @@
       <small class="muted">Rename <?= e(Tlp('client')) ?>, <?= e(Tlp('call')) ?>, <?= e(Tlp('job')) ?> and every other business word.</small></div>
   </div>
 
+  <?php // Phone bottom bar (owner, 22 Nov 2026 — Operations answer 2: "make it configurable,
+        // admin can set that"). Which screens each area's phone bar carries, in order, at most
+        // AREA_BN_MAX. A person still sees only the ones they may open; Punch in / out is added
+        // by itself for anyone who may punch today. Saved with the rest of this form.
+  if (function_exists('area_bn_candidates')): ?>
+  <h3 class="tab-sub" id="bottom-bar">Phone bottom bar</h3>
+  <p class="sub" style="margin-bottom:10px">The buttons along the bottom of the screen on a phone. Pick up to <?= (int) AREA_BN_MAX ?>, in order; leave a position empty to skip it. Each person still sees only the screens they may open, and anyone who may punch in or out today also gets a <b>Punch</b> button.</p>
+  <input type="hidden" name="bn_form" value="1">
+  <div class="bn-sets" style="display:grid;gap:14px">
+  <?php foreach (AREA_BN_SETS as $bnArea => $bnSets):
+          if (function_exists('licence_enabled') && !licence_enabled($bnArea === 'operations' ? 'operations' : 'sales')) continue;
+          foreach ($bnSets as $bnSet => $bnWho):
+            $bnOpts = area_bn_candidates($bnArea, $bnSet);
+            $bnCur = area_bn_routes($bnArea, $bnSet); ?>
+    <fieldset class="bn-set" style="border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:0;min-width:0">
+      <legend style="font-weight:700;padding:0 4px"><?= e($bnArea === 'operations' ? 'Operations' : 'Sales') ?> — <?= e($bnWho) ?></legend>
+      <div class="form-grid">
+      <?php for ($bi = 0; $bi < AREA_BN_MAX; $bi++): $bv = $bnCur[$bi] ?? ''; ?>
+        <div class="ff"><label for="bn_<?= e($bnArea . '_' . $bnSet . '_' . $bi) ?>">Position <?= $bi + 1 ?></label>
+          <select class="form-control" id="bn_<?= e($bnArea . '_' . $bnSet . '_' . $bi) ?>" name="bn[<?= e($bnArea) ?>][<?= e($bnSet) ?>][]">
+            <option value="">— empty —</option>
+            <?php foreach ($bnOpts as $br => $bl): ?><option value="<?= e($br) ?>"<?= $bv === $br ? ' selected' : '' ?>><?= e($bl) ?></option><?php endforeach; ?>
+            <?php if ($bv !== '' && !isset($bnOpts[$bv])): ?><option value="<?= e($bv) ?>" selected><?= e($bv) ?> (not available to you)</option><?php endif; ?>
+          </select></div>
+      <?php endfor; ?>
+      </div>
+    </fieldset>
+  <?php endforeach; endforeach; ?>
+  </div>
+  <?php endif; ?>
+
   <?php if (!function_exists('licence_enabled') || licence_enabled('sales')): // quotation T&C is a Sales concept ?>
   <h3 class="tab-sub">Default terms &amp; conditions</h3>
   <p class="sub" style="margin-bottom:10px">Carried onto every new <?= e(Tl('quote')) ?>, where it can still be edited for that one <?= e(Tl('quote')) ?>. Changing it here does not alter <?= e(Tlp('quote')) ?> already written.</p>

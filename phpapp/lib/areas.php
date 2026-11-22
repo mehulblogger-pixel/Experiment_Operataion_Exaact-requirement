@@ -568,3 +568,214 @@ function ops_area_home($area, $method) {
     view('ops/area_home', ['def' => $def]);
     return true;
 }
+
+// ============================================================================
+//  AREA WORKSPACE BAR + PHONE BOTTOM BAR — shared by Sales and Operations
+//  (owner, 22 Nov 2026 — Operations Batch 1, answers 1–3 and 5).
+//
+//  1. "Use the same [bar] to make it universal" — every area workspace (Sales,
+//     Operations, and any area that adopts the kit later) draws the same dark
+//     bar in the theme's own colour (app.css --area-bar). Which screens it lists
+//     is read from the permission-filtered sources that already exist, never a
+//     second list: ops_area_def() for the flat areas, ops_nav_index() for
+//     Operations (whose home is its own handler, not an area definition).
+//  2. "Make [the phone bottom bar] configurable — admin can set that." The
+//     items of each area's phone bottom bar are a company setting
+//     (area_bottom_bar), edited on Settings → Display & terms by whoever already
+//     manages settings. A person still sees only the items they may open.
+//  3. "Ease of access to punch in and punch out from mobile and laptop." The
+//     bottom bar adds a Punch button for anyone who may punch TODAY under the
+//     existing rules (lib/trust.php: a team-member record and a visit due today).
+//     It drives the same punch bar at the top of the page — same photo, same
+//     geofence, same server time. Nobody who could not punch before can now.
+// ============================================================================
+
+// The screens of one area this person may open, keyed by route:
+// route => ['label','route','section','count'?]. Cached per request and person.
+function area_screen_tiles($area) {
+    static $cache = [];
+    $u = function_exists('current_user') ? current_user() : null;
+    $key = $area . '|' . ($u ? (int) ($u['id'] ?? 0) : 0) . '|' . (function_exists('db_epoch') ? db_epoch() : 0);
+    if (isset($cache[$key])) return $cache[$key];
+    //  Test-book findings F-01 / F-02 (21 Nov 2026): a tile whose screen would refuse this person
+    //  at the door is left out — the dispatcher's own first question, the route's module gate
+    //  (ops_route_module_map).
+    $modOk = function ($route) {
+        $base = ltrim((string) strtok((string) $route, '?#'), '/');
+        if ($base === '') return true;
+        $mod = function_exists('ops_route_module_map') ? (ops_route_module_map()[$base] ?? null) : null;
+        if ($mod === null && function_exists('ops_module_family')) $mod = ops_module_family($base);
+        return !$mod || can("mod.$mod.view");
+    };
+    $t = [];
+    if ($area === 'operations') {
+        foreach ((function_exists('ops_nav_index') ? ops_nav_index() : []) as $e)
+            if (($e['area'] ?? '') === 'Operations' && ($e['kind'] ?? '') === 'screen' && $modOk($e['url']) && !isset($t[$e['url']]))
+                $t[$e['url']] = ['label' => $e['label'], 'route' => $e['url'], 'section' => 'Operations'];
+        //  Answer 5 — the TPIA dashboards (the analytics hub, which lives in Insights) are
+        //  linked from the Operations bar too. A link only: same address, same gate (tapi_can).
+        if (function_exists('tapi_can') && tapi_can() && $modOk('/analytics') && (!function_exists('feat_on') || feat_on('/analytics')))
+            $t['/analytics'] = ['label' => 'TPIA dashboards', 'route' => '/analytics', 'section' => 'Insights'];
+    } else {
+        $def = function_exists('ops_area_def') ? ops_area_def($area) : null;
+        foreach (($def['sections'] ?? []) as $s) foreach ($s['tiles'] as $tile)
+            if ($modOk($tile['route'])) $t[$tile['route']] = $tile + ['section' => $s['label']];
+    }
+    return $cache[$key] = $t;
+}
+
+// The bar's fixed order per area: [route, label]. A screen the person may not
+// open is simply skipped; anything not named here is still one tap away under
+// "All … screens". Labels follow the company's own wording where it has one.
+function area_bar_order($area) {
+    $T = fn($k, $d) => function_exists('THP') ? THP($k) : $d;
+    if ($area === 'operations') return [
+        ['/operations', 'Operations home'], ['/calls', $T('call', 'Calls')], ['/jobs', $T('job', 'Jobs')],
+        ['/schedule', 'Scheduling board'], ['/availability', 'Availability'], ['/recurring', 'Recurring'],
+        ['/contract-overrides', 'Contract exceptions'], ['/contract-openings', 'Contract openings'],
+        ['/attendance-recon', 'Attendance'], ['/timesheet', 'Timesheet'], ['/vouchers', $T('voucher', 'Vouchers')],
+        ['/ratings', 'Ratings'], ['/expediting', 'Expediting'], ['/issues', 'NC & CAPA'], ['/analytics', 'TPIA dashboards'],
+    ];
+    return [['/sales-home', 'Sales home'], ['/sales-today', 'Today'], ['/sales-board', 'Pipeline board'], ['/sales-dashboard', 'Sales dashboard'],
+            ['/leads', 'Leads'], ['/opportunities', function_exists('TP') ? TP('opportunity') : 'Deals'], ['/quotes', $T('quote', 'Quotes')],
+            ['/inquiries', $T('inquiry', 'Inquiries')], ['/sales-orders', 'Orders & payments'], ['/sales-renewals', 'Renewals'],
+            ['/sales-targets', 'Targets'], ['/clients?view=sales', function_exists('T_REG') ? T_REG('client') : 'Client register'],
+            ['/sales-settings', 'Sales settings']];
+}
+// Where "All … screens" goes: the area's own page of every screen.
+function area_bar_all($area, $current = '') {
+    if ($area === 'operations') return ['label' => 'All Operations screens', 'href' => ($current === '/operations' ? '#screens' : '/operations#screens')];
+    return ['label' => 'All Sales screens', 'href' => '/sales'];
+}
+
+// ---- Phone bottom bar: the setting -----------------------------------------
+//  Sets per area. "field" is the field engineer's bar (the one that replaced the
+//  drawer on a phone — layout_bottom.php); everyone else gets "office".
+const AREA_BN_SETS = [
+    'sales'      => ['office' => 'Everyone who opens Sales'],
+    'operations' => ['office' => 'Office staff (Operations screens)', 'field' => 'Field staff (inspectors) — on every screen'],
+];
+//  Today's items as the starting point (the Operations ones as approved in the
+//  Batch 1 design, 22 Nov 2026). An administrator changes them on Settings.
+const AREA_BN_DEFAULTS = [
+    'sales'      => ['office' => ['/sales-home', '/leads', '/sales-board', '/sales-today', '/sales-dashboard']],
+    'operations' => ['office' => ['/operations', '/calls', '/jobs', '/schedule', '/my-work'],
+                     'field'  => ['/', '/my-jobs', '/vouchers', '/my-work']],
+];
+const AREA_BN_MAX = 5;
+
+// The screens a set may offer: [route => label]. For an office set, the area's
+// own screens (as the person configuring them may open them) plus My Work; for
+// the field set, the field engineer's own screens.
+function area_bn_candidates($area, $set) {
+    $T = fn($k, $d) => function_exists('THP') ? THP($k) : $d;
+    if ($area === 'operations' && $set === 'field') return [
+        '/' => 'Home', '/my-jobs' => 'My ' . $T('job', 'Jobs'), '/vouchers' => $T('voucher', 'Vouchers'), '/my-work' => 'My Work',
+        '/documents' => 'My ' . $T('report', 'Reports'), '/endorsements' => $T('endorsement', 'Endorsements'),
+    ];
+    $out = [];
+    $names = [];
+    foreach (area_bar_order($area) as [$r, $l]) $names[$r] = $l;
+    foreach (area_screen_tiles($area) as $r => $tile) $out[$r] = $names[$r] ?? $tile['label'];
+    $out['/my-work'] = 'My Work';
+    return $out;
+}
+
+// The configured routes of one set, in order (the default when nothing is saved).
+function area_bn_routes($area, $set) {
+    $def = AREA_BN_DEFAULTS[$area][$set] ?? [];
+    $raw = function_exists('setting_get') ? (string) setting_get('area_bottom_bar', '') : '';
+    $cfg = $raw !== '' ? json_decode($raw, true) : null;
+    $got = is_array($cfg) && isset($cfg[$area][$set]) && is_array($cfg[$area][$set]) ? $cfg[$area][$set] : null;
+    if ($got === null) return $def;
+    $out = [];
+    foreach ($got as $r) { $r = (string) $r; if ($r !== '' && !in_array($r, $out, true)) $out[] = $r; }
+    return array_slice($out, 0, AREA_BN_MAX);
+}
+
+// Save from the Settings form: bn[area][set][] = route (in order). Only a
+// route the set offers is kept; repeats dropped; at most AREA_BN_MAX. Returns
+// the list of problems ('' when none). An empty set is allowed (no bar).
+function area_bn_save($post) {
+    $cfg = [];
+    $raw = function_exists('setting_get') ? (string) setting_get('area_bottom_bar', '') : '';
+    $old = $raw !== '' ? (json_decode($raw, true) ?: []) : [];
+    $bad = [];
+    foreach (AREA_BN_SETS as $area => $sets) foreach ($sets as $set => $_) {
+        if (!isset($post[$area][$set]) || !is_array($post[$area][$set])) { if (isset($old[$area][$set])) $cfg[$area][$set] = $old[$area][$set]; continue; }
+        $ok = area_bn_candidates($area, $set);
+        //  A screen already in the bar stays allowed even if the person saving may not open it
+        //  themselves (their own access must not quietly strip another role's bar).
+        foreach (area_bn_routes($area, $set) as $keep) $ok[$keep] = $ok[$keep] ?? $keep;
+        $list = [];
+        foreach ($post[$area][$set] as $r) {
+            $r = trim((string) $r);
+            if ($r === '') continue;
+            if (!isset($ok[$r])) { $bad[] = $r; continue; }
+            if (!in_array($r, $list, true)) $list[] = $r;
+        }
+        if (count($list) > AREA_BN_MAX) { $bad[] = 'more than ' . AREA_BN_MAX . ' items'; $list = array_slice($list, 0, AREA_BN_MAX); }
+        $cfg[$area][$set] = $list;
+    }
+    if (function_exists('setting_set')) setting_set('area_bottom_bar', json_encode($cfg));
+    return $bad ? 'Not kept: ' . implode(', ', $bad) . '.' : '';
+}
+
+// ---- Phone bottom bar: what one person sees ----------------------------------
+//  A short label and an icon per known route; anything else uses its own name.
+function area_bn_look($route, $label) {
+    $T = fn($k, $d) => function_exists('THP') ? THP($k) : $d;
+    $m = ['/sales-home' => ['Home', 'home'], '/leads' => ['Leads', 'users'], '/sales-board' => ['Pipeline', 'flow'],
+          '/sales-today' => ['Actions', 'task'], '/sales-dashboard' => ['Reports', 'chart'],
+          '/operations' => ['Home', 'home'], '/calls' => [$T('call', 'Calls'), 'file'], '/jobs' => [$T('job', 'Jobs'), 'brief'],
+          '/schedule' => ['Schedule', 'cal'], '/my-work' => ['My work', 'task'], '/vouchers' => [$T('voucher', 'Vouchers'), 'rupee'],
+          '/availability' => ['Availability', 'user'], '/timesheet' => ['Timesheet', 'clock'], '/analytics' => ['Dashboards', 'chart']];
+    return $m[$route] ?? [$label, 'file'];
+}
+
+// The items one person sees in an office set: [route, icon, label], only the
+// screens they may open (My Work is open to everyone signed in).
+function area_bn_items($area, $set = 'office') {
+    $tiles = area_screen_tiles($area);
+    $names = area_bn_candidates($area, $set);
+    $out = [];
+    foreach (area_bn_routes($area, $set) as $r) {
+        if ($r !== '/my-work' && !isset($tiles[$r])) continue;
+        [$lab, $ic] = area_bn_look($r, $names[$r] ?? ($tiles[$r]['label'] ?? $r));
+        $out[] = [$r, $ic, $lab];
+    }
+    return $out;
+}
+
+// The field engineer's bar: [route, emoji, label] — only what they may open.
+function area_bn_field_items() {
+    $emoji = ['/' => '🏠', '/my-jobs' => '🗂', '/vouchers' => '🧾', '/my-work' => '📌', '/documents' => '📑', '/endorsements' => '✅'];
+    //  The words the bar has always used for its first three items are kept.
+    $words = ['/' => 'Home', '/my-jobs' => 'My Jobs', '/vouchers' => 'Voucher', '/my-work' => 'My Work'];
+    $names = area_bn_candidates('operations', 'field');
+    $out = [];
+    foreach (area_bn_routes('operations', 'field') as $r) {
+        if (!isset($names[$r])) continue;
+        if (in_array($r, ['/documents', '/endorsements'], true) && !(function_exists('can') && can('mod.idems.view'))) continue;
+        $out[] = [$r, $emoji[$r] ?? '•', $words[$r] ?? $names[$r]];
+    }
+    return $out;
+}
+
+// Punch — for someone who may punch TODAY under the existing rules (a
+// team-member record and a visit due today; lib/trust.php). Returns null or
+// ['label' => 'Punch in' | 'Punch out' | 'Punched', 'href' => …].
+function area_bn_punch() {
+    if (!function_exists('punch_user_inspector_id') || !function_exists('punch_today_jobs') || !function_exists('site_checkin')) return null;
+    $insp = punch_user_inspector_id();
+    if (!$insp) return null;
+    $jobs = punch_today_jobs($insp);
+    if (!$jobs) return null;
+    $next = 'DONE';
+    foreach ($jobs as $j) {
+        $st = punch_state((int) $j['id'], $insp)['status'] ?? 'OUT';
+        if ($st === 'ON_SITE') { $next = 'EXIT'; break; }
+        if ($st === 'OUT') $next = 'ENTRY';
+    }
+    return ['label' => $next === 'EXIT' ? 'Punch out' : ($next === 'ENTRY' ? 'Punch in' : 'Punched'), 'href' => '/my-work#punchBar', 'next' => $next];
+}

@@ -97,6 +97,21 @@ the first time somebody changes it. The literal `--red` / `--green` / `--amber`
 remain because existing screens use them, and because a fill genuinely is a
 colour.
 
+### Area workspace bar — one colour for every area (22 Nov 2026)
+
+`--area-bar` (defined on `:root` in app.css) is the background of every area
+workspace bar — the dark strip of screen links at the top of Sales and
+Operations pages (`.sxw-nav`, drawn by `sxw_nav($current, $area)` in
+`views/ops/_sxw_ui.php`). It is `color-mix(var(--brand) 78%, black)`, so it
+follows the theme: change the brand colour in Settings → Branding & theme and
+every area bar changes with it (owner, Operations answer 1: "use the same, make
+it universal"). Never give an area its own bar colour.
+
+The phone bottom bar (`.sxw-bn` for office screens, `.botnav` for field staff) is
+drawn by `sxw_bottom($current, $due, $area)` and `layout_bottom.php`; its items
+are a company setting (Settings → Display & terms → Phone bottom bar —
+`lib/areas.php`, `area_bn_*`), never a list written into a view.
+
 ### State — so hover and focus are never re-invented
 
 `--hover` · `--selected` · `--focus-ring`

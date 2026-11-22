@@ -2199,7 +2199,9 @@ const TOSRM_DISRUPT_RANGES = ['month'=>'This month','lastmonth'=>'Last month','f
 
 // Self-contained card (tiles + recent table) — reused on the Operations
 // dashboard and the management (Analytics) dashboards.
-function tosrm_disruptions_html($d, $rangeLabel = '') {
+//  $withCards = false (Operations Batch 1, 22 Nov 2026): the new Operations home draws the four
+//  counts as its own KPI cards above, so only the table / clean-run line is wanted here.
+function tosrm_disruptions_html($d, $rangeLabel = '', $withCards = true) {
     if (!$d) return '';
     $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES);
     $any = ((int)$d['client_cancel'] + (int)$d['office_cancel'] + (int)$d['engineer_change'] + (int)$d['noshow']) > 0 || !empty($d['recent']);
@@ -2212,7 +2214,7 @@ function tosrm_disruptions_html($d, $rangeLabel = '') {
         . '.dz.warn{border-left-color:var(--warn,#d97706)}.dz.warn .v{color:var(--warn,#d97706)}'
         . '@media(max-width:820px){.dz-row{grid-template-columns:repeat(2,1fr)}}'
         . '</style>'; }
-    $h .= '<div class="dz-row">'
+    if ($withCards) $h .= '<div class="dz-row">'
         . '<div class="dz bad"><div class="v">'  . (int)$d['client_cancel']   . '</div><div class="l">Client cancelled</div><div class="h">the call was called off</div></div>'
         . '<div class="dz warn"><div class="v">' . (int)$d['engineer_change'] . '</div><div class="l">Engineer changes</div><div class="h">reassigned to another</div></div>'
         . '<div class="dz bad"><div class="v">'  . (int)$d['office_cancel']   . '</div><div class="l">Office cancelled</div><div class="h">executing branch pulled it</div></div>'

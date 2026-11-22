@@ -2285,3 +2285,25 @@
     });
   });
 })();
+
+// ---- Punch from the phone bottom bar (owner, 22 Nov 2026 — Operations answer 3) ----------
+//  "Ease of access to mark Punch in and punch out easily from mobile and laptop." The bottom
+//  bar's Punch button (lib/areas.php area_bn_punch) drives the SAME punch bar at the top of the
+//  page (lib/trust.php punch_bar): same photo, same location, same server checks — it only saves
+//  the scroll. Where the page has no punch bar (the job page keeps its own check-in panel), the
+//  link opens My Work at the punch bar instead.
+(function () {
+  document.addEventListener('click', function (e) {
+    var a = e.target && e.target.closest ? e.target.closest('a[data-punch]') : null;
+    if (!a) return;
+    var bar = document.getElementById('punchBar');
+    if (!bar) return;   // follow the link to /my-work#punchBar
+    e.preventDefault();
+    try { bar.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (x) { bar.scrollIntoView(); }
+    var photo = bar.querySelector('input[type=file][name=photo]');
+    if (photo && !(photo.files && photo.files.length)) { photo.click(); return; }   // a photo is required first
+    var next = a.getAttribute('data-punch');
+    var btn = document.getElementById(next === 'EXIT' ? 'pbOut' : 'pbIn');
+    if (btn && !btn.disabled) btn.click();
+  });
+})();

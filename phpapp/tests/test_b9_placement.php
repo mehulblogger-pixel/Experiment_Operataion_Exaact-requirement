@@ -20,7 +20,9 @@ $areaV  = (string) file_get_contents($root . '/views/ops/area_home.php');
 
 // ---- B9-1 · Operations home density -----------------------------------------
 t_ok(strpos($regs, "details class=\"fold\"") !== false, 'B9-1 · registers defer their overflow into the existing details.fold');
-t_ok(strpos($opsHome, "details class=\"fold\"") !== false, 'B9-1 · the pending-scheduling list defers its overflow the same way');
+//  Operations Batch 1 (owner, 22 Nov 2026): the Operations home is now in the Sales kit, whose fold is
+//  details.sxw-fold (the same <details> behaviour, the kit's look).
+t_ok(strpos($opsHome, "details class=\"fold\"") !== false || strpos($opsHome, "details class=\"sxw-fold") !== false, 'B9-1 · the pending-scheduling list defers its overflow the same way');
 t_ok(strpos($regs, '$regCap') !== false && strpos($opsHome, '$pendCap') !== false, 'B9-1 · both caps are named, not magic numbers inline');
 // The data layer's own limits are untouched — this is presentation only.
 t_ok(strpos($tosrm, "tosrm_ops_backlog(\$offices, 60)") !== false

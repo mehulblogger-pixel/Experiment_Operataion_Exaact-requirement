@@ -8,10 +8,22 @@
     $bcur = $cur ?? trim(parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH), '/');
     $bon = function($routes) use ($bcur){ foreach($routes as $r){ if($bcur===$r || ($r!==''&&strpos($bcur,$r)===0)) return ' on'; } return ($bcur===''&&in_array('',$routes,true))?' on':''; };
 ?>
+  <?php //  Its items are a company setting (Settings → Display & terms → Phone bottom bar,
+        //  "Field staff"; owner, 22 Nov 2026: "make it configurable, admin can set that"),
+        //  starting from Home · My Jobs · Voucher · My Work. Punch in / out is added for
+        //  anyone who may punch today (existing rules, lib/trust.php — answer 3).
+        $bnItems = function_exists('area_bn_field_items') ? area_bn_field_items()
+                 : [['/', '🏠', 'Home'], ['/my-jobs', '🗂', 'My Jobs'], ['/vouchers', '🧾', 'Voucher']];
+        $bnPunch = function_exists('area_bn_punch') ? area_bn_punch() : null;
+        $bnMatch = ['/' => [''], '/my-jobs' => ['my-jobs'], '/vouchers' => ['vouchers', 'voucher'], '/my-work' => ['my-work'],
+                    '/documents' => ['documents', 'document'], '/endorsements' => ['endorsements', 'endorsement']]; ?>
   <nav class="botnav">
-    <a class="bn<?= $bon(['']) ?>" href="/"><span>🏠</span><em>Home</em></a>
-    <a class="bn<?= $bon(['my-jobs']) ?>" href="/my-jobs"><span>🗂</span><em>My Jobs</em></a>
-    <a class="bn<?= $bon(['vouchers','voucher']) ?>" href="/vouchers"><span>🧾</span><em>Voucher</em></a>
+    <?php foreach ($bnItems as [$bnR, $bnI, $bnL]): ?>
+    <a class="bn<?= $bon($bnMatch[$bnR] ?? [ltrim($bnR, '/')]) ?>" href="<?= e($bnR) ?>"><span><?= $bnI ?></span><em><?= e($bnL) ?></em></a>
+    <?php endforeach; ?>
+    <?php if ($bnPunch): ?>
+    <a class="bn" href="<?= e($bnPunch['href']) ?>" data-punch="<?= e($bnPunch['next']) ?>"><span>📍</span><em><?= e($bnPunch['label']) ?></em></a>
+    <?php endif; ?>
   </nav>
 <?php endif; ?>
 <?php endif; ?>

@@ -31,6 +31,7 @@ try {
 }
 
 $oh = (string)file_get_contents(__DIR__ . '/../views/ops/operations_home.php');
-t_ok(strpos($oh, 'Pending scheduling — every') !== false, 'the Operations desk shows the cumulative pending-scheduling panel');
+//  Operations Batch 1 (owner, 22 Nov 2026, approved design): the panel is the card "Waiting for a person (n)".
+t_ok(strpos($oh, 'Pending scheduling — every') !== false || strpos($oh, "'Waiting for a person ('") !== false, 'the Operations desk shows the cumulative pending-scheduling panel');
 $src = (string)file_get_contents(__DIR__ . '/../lib/tosrm.php');
 t_ok(strpos($src, "'pending' => \$pending") !== false, 'the Operations home is given the pending list');

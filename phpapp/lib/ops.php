@@ -11392,6 +11392,12 @@ function ops_settings($method) {
         // Display
         setting_set('currency_symbol', trim($_POST['currency_symbol'] ?? '') ?: '₹');
         $df = trim($_POST['date_format'] ?? ''); setting_set('date_format', in_array($df, array_keys(DATE_FORMATS), true) ? $df : 'd M Y');
+        // Phone bottom bar per area (owner, 22 Nov 2026 — Operations answer 2: "admin can set that").
+        // Only when the section was on the form; only screens each bar offers are kept (lib/areas.php).
+        if (($_POST['bn_form'] ?? '') === '1' && function_exists('area_bn_save')) {
+            $bnBad = area_bn_save((array) ($_POST['bn'] ?? []));
+            if ($bnBad !== '') flash('Phone bottom bar: ' . $bnBad, 'warning');
+        }
         // Reporting controls
         $esd = array_values(array_intersect(array_keys(SOURCE_DOC_TYPES), (array)($_POST['expected_source_docs'] ?? [])));
         setting_set('expected_source_docs', implode(',', $esd));

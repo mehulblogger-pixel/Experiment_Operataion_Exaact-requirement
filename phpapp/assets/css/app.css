@@ -1518,7 +1518,12 @@ body.embed .container.embed-main{max-width:none;margin:0}
    the pages and the handlers, never here. The dark teal is used ONLY for the
    Sales section navigation; the app's own menu and header are untouched.
    ============================================================================ */
-.sxw{--sxw-teal:color-mix(in srgb,var(--brand) 78%,#000);--sxw-r:10px}
+/* The AREA BAR colour (owner, 22 Nov 2026 — Operations Batch 1, answer 1: "use the same, make it
+   universal … based on the theme setting"). One token for every area workspace bar (Sales, Operations,
+   and any area that adopts the kit), derived from the theme's brand colour, so a theme change recolours
+   every bar at once. Defined on :root so it does not depend on the .sxw wrapper. */
+:root{--area-bar:color-mix(in srgb,var(--brand) 78%,#000)}
+.sxw{--sxw-teal:var(--area-bar);--sxw-r:10px}
 .sxw .rec-card{border-radius:var(--sxw-r)}
 .sxw .rec-ch{flex-wrap:wrap}
 .sxw-team{min-width:520px}
@@ -1812,7 +1817,7 @@ a.sxw-kpi:focus-visible{outline:3px solid var(--focus,#2563eb);outline-offset:2p
 .wc-ahd::-webkit-details-marker,.wc-fhd::-webkit-details-marker{display:none}
 .wc-ahd .an{flex:1;font-size:15px;min-width:0}
 .wc-ahd .ac{font-size:12.5px;font-weight:600;color:var(--muted);white-space:nowrap}
-.wc-area.sales>.wc-ahd{background:var(--sxw-teal,color-mix(in srgb,var(--brand) 78%,#000));color:#fff}
+.wc-area.sales>.wc-ahd{background:var(--area-bar);color:#fff}
 .wc-area.sales>.wc-ahd .ac{color:#d9ecea}
 .chev{width:9px;height:9px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);transition:transform .15s;flex:none;opacity:.7}
 details[open]>summary .chev{transform:rotate(45deg)}
@@ -2210,3 +2215,40 @@ button.sxw-ib{cursor:pointer;font-family:inherit}
 /* Closing check (21 Nov 2026): the two lead forms' "attach files" box is at least 36 px tall,
    like every other control on the Sales screens (the browser's own file box was 28 px). */
 #lf-new-files,#sl_files{min-height:36px;padding:6px 0;box-sizing:border-box}
+
+/* ============================================================================
+   OPERATIONS WORKSPACE — Operations home in the Sales look (owner, 22 Nov 2026,
+   Operations Batch 1). Built on the RECORD PAGE KIT and SALES WORKSPACE above:
+   the area bar, the KPI card, rec-card, sxw-fold, sxw-seg and the phone bottom
+   bar are shared — only what those kits do not already have lives here.
+   Look and feel only: what a person may see or do is decided by the handlers.
+   ============================================================================ */
+.ox-acts{display:flex;gap:8px;flex-wrap:wrap}
+.ox-live{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:12.5px;margin:-4px 0 12px}
+.ox-live .dot{width:7px;height:7px;border-radius:50%;background:var(--green,#16a34a);flex:none}
+.ox-2{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:12px;align-items:start}
+.ox-col{min-width:0}
+.ox-sub{font-size:12px}
+.ox-seg{margin:-4px 0 10px;max-width:100%;overflow-x:auto}
+.ox-in{margin:8px 0 0}
+.ox-in .fb{overflow-x:auto}
+.ox-row{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1.3fr) auto auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px}
+.ox-row:last-child{border-bottom:0}
+.ox-row .c b{display:block;font-size:13.5px}
+.ox-row .c small,.ox-row .s small{color:var(--muted);display:block;font-size:12px}
+.ox-row .a{display:flex;gap:6px;flex-wrap:wrap}
+.ox-tabs{margin-top:6px}
+.ox-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.ox-tile{display:flex;gap:11px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--card);color:var(--ink);min-width:0}
+.ox-tile:hover{text-decoration:none;border-color:var(--field-line)}
+.ox-tile .ic{width:34px;height:34px;flex:none;border-radius:8px;background:color-mix(in srgb,var(--brand) 9%,var(--card));display:grid;place-items:center;font-size:17px}
+.ox-tile .b{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.ox-tile b{font-size:14px}
+.ox-tile small{color:var(--muted);font-size:12.5px;line-height:1.4}
+.ox-tile .st{display:flex;gap:12px;flex-wrap:wrap;margin-top:6px;font-size:12px;color:var(--muted)}
+.ox-tile .st em{font-style:normal;font-weight:800;color:var(--ink);font-size:14px}
+.ox-tile>svg.rec-i{flex:none;align-self:center;color:var(--muted)}
+@media (max-width:900px){.ox-2{grid-template-columns:1fr}.ox-grid{grid-template-columns:1fr}}
+@media (max-width:620px){.ox-row{grid-template-columns:minmax(0,1fr) auto}.ox-row .s{grid-column:1/2}.ox-row .a{grid-column:1/3}}
+/* Phone bottom bar: the Punch button (lib/areas.php area_bn_punch) — the same punch bar at the top of the page does the work. */
+.botnav .bn[data-punch] span{color:var(--brand-ink)}

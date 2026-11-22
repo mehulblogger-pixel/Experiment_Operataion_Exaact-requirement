@@ -2,6 +2,19 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🛠️ Operations Batch 1 — Operations home in the Sales look (22 Nov 2026) — built / parked
+- **Built:** Operations home redesigned on the Sales kit; one theme-based area-bar colour for every area (--area-bar);
+  the phone bottom bar per area is a setting (Settings → Display & terms → Phone bottom bar); Punch in / out on the phone
+  bottom bar for anyone who may punch today; "Nothing is removed" note removed; TPIA dashboards (/analytics) linked from the
+  Operations bar.
+- **Parked — KPI figure strip on record pages (owner, 22 Nov 2026: KPI cards "must have colour bar with bottom white").**
+  D8 already gives every Sales figure card that look (sxw_kpi → app-wide .kpi). The small figure strip on the lead and deal
+  record pages (rec_kpis in views/ops/_rec_ui.php) still uses the old style: change it to the same .kpi card (coloured band on
+  top, white below) in a later round, together with any Operations record pages.
+- **Question for the owner — who may punch.** Punch in / out (lib/trust.php) is open only to a person with a team-member
+  (inspector) record who has a site visit due today; an office login with no such record cannot punch. The bottom-bar button
+  follows exactly that rule. Widening it to office staff (an office attendance punch) is a new rule — not built; owner to decide.
+
 ## 🗳️ Owner's answers, 21 Nov 2026 (after the complete package) — built / parked
 
 - **Unassigned records for Own / Team — answer "a": BUILT.** An unassigned lead, deal or inquiry stays

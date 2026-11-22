@@ -17,58 +17,46 @@ function sxw_head($title, $sub, $icon, $rightHtml = '') {
        . ($sub !== '' ? '<p>' . e($sub) . '</p>' : '') . '</div></div>' . $rightHtml . '</div>';
 }
 
-//  The Sales screens this person may open, in one fixed order — read from the
-//  Sales area itself (lib/areas.php, ops_area_def('sales')): the same permission,
-//  feature-switch and badge rules as the Sales menu page, never a second list.
-function sxw_area_tiles() {
-    static $t = null;
-    if ($t !== null) return $t;
-    $t = [];
-    $def = function_exists('ops_area_def') ? ops_area_def('sales') : null;
-    //  Test-book findings F-01 / F-02 (21 Nov 2026): a tile whose screen would refuse this person
-    //  at the door is left out — the dispatcher's own first question, the route's module gate
-    //  (ops_route_module_map). Without it the Sales bar and Sales home offered, e.g., "Leads"
-    //  to someone who holds Enquiries but not the Leads module, and the click was refused.
-    $modOk = function ($route) {
-        $base = ltrim((string) strtok((string) $route, '?'), '/');
-        $mod = function_exists('ops_route_module_map') ? (ops_route_module_map()[$base] ?? null) : null;
-        if ($mod === null && function_exists('ops_module_family')) $mod = ops_module_family($base);
-        return !$mod || can("mod.$mod.view");
-    };
-    foreach (($def['sections'] ?? []) as $s) foreach ($s['tiles'] as $tile) if ($modOk($tile['route'])) $t[$tile['route']] = $tile + ['section' => $s['label']];
-    return $t;
+//  The screens of an area this person may open — lib/areas.php, area_screen_tiles():
+//  read from the area itself (ops_area_def / the Operations nav index), the same
+//  permission, feature-switch and module-gate rules as its menu page, never a second list.
+//  Generalised 22 Nov 2026 (Operations Batch 1): $area defaults to Sales, as before.
+function sxw_area_tiles($area = 'sales') {
+    return function_exists('area_screen_tiles') ? area_screen_tiles($area) : [];
 }
 
-//  The Sales section navigation (laptop and tablet): the only dark-teal element.
-function sxw_nav($current) {
-    $tiles = sxw_area_tiles();
-    $order = [['/sales-home', 'Sales home'], ['/sales-today', 'Today'], ['/sales-board', 'Pipeline board'], ['/sales-dashboard', 'Sales dashboard'],
-              ['/leads', 'Leads'], ['/opportunities', TP('opportunity')], ['/quotes', THP('quote')], ['/inquiries', THP('inquiry')],
-              ['/sales-orders', 'Orders & payments'], ['/sales-renewals', 'Renewals'], ['/sales-targets', 'Targets'],
-              ['/clients?view=sales', T_REG('client')], ['/sales-settings', 'Sales settings']];
-    echo '<nav class="sxw-nav" aria-label="Sales screens">';
-    foreach ($order as [$r, $lab]) {
+//  The area's section navigation (laptop and tablet): the one dark bar, in the theme's
+//  colour (app.css --area-bar). Owner, 22 Nov 2026: "use the same, make it universal".
+function sxw_nav($current, $area = 'sales') {
+    $tiles = sxw_area_tiles($area);
+    $label = $area === 'operations' ? 'Operations screens' : 'Sales screens';
+    echo '<nav class="sxw-nav" aria-label="' . e($label) . '">';
+    foreach (area_bar_order($area) as [$r, $lab]) {
         if (!isset($tiles[$r])) continue;
         $c = $tiles[$r]['count'] ?? null;
         echo '<a href="' . e($r) . '"' . ($r === $current ? ' class="on" aria-current="page"' : '') . '>' . e($lab)
            . ($c ? '<em>' . (int) $c . '</em>' : '') . '</a>';
     }
-    echo '<a class="all" href="/sales">All Sales screens</a></nav>';
+    $all = area_bar_all($area, $current);
+    echo '<a class="all" href="' . e($all['href']) . '">' . e($all['label']) . '</a></nav>';
 }
 
-//  Phone bottom bar (Sales screens only): Home · Leads · Pipeline · Actions (= Today) · Reports (= Sales dashboard).
-//  An item shows only when the person may open it and its feature is on — the same tiles as above.
+//  Phone bottom bar. Its items are a company setting (Settings → Display & terms →
+//  "Phone bottom bar"; owner, 22 Nov 2026: "make it configurable, admin can set that"),
+//  starting from today's set. An item shows only when the person may open it.
+//  Punch in / out is added for anyone who may punch today (existing rules, lib/trust.php).
 //  Drawn OUTSIDE the page's container so position:fixed is the screen's, not the container's.
-function sxw_bottom($current, $due = null) {
-    $tiles = sxw_area_tiles();
-    $items = [['/sales-home', 'home', 'Home'], ['/leads', 'users', 'Leads'], ['/sales-board', 'flow', 'Pipeline'], ['/sales-today', 'task', 'Actions'], ['/sales-dashboard', 'chart', 'Reports']];
-    $items = array_values(array_filter($items, fn($i) => isset($tiles[$i[0]])));
-    if (!$items) return;
-    echo '<nav class="sxw-bn" aria-label="Sales — quick switch" style="--n:' . count($items) . '">';
+function sxw_bottom($current, $due = null, $area = 'sales') {
+    $items = function_exists('area_bn_items') ? area_bn_items($area, 'office') : [];
+    $punch = function_exists('area_bn_punch') ? area_bn_punch() : null;
+    if (!$items && !$punch) return;
+    $n = count($items) + ($punch ? 1 : 0);
+    echo '<nav class="sxw-bn" aria-label="' . e($area === 'operations' ? 'Operations' : 'Sales') . ' — quick switch" style="--n:' . $n . '">';
     foreach ($items as [$r, $ic, $lab]) {
         $b = ($r === '/sales-today' && $due) ? '<b>' . (int) $due . '</b>' : '';
         echo '<a href="' . e($r) . '"' . ($r === $current ? ' class="on" aria-current="page"' : '') . '>' . rec_icon($ic) . e($lab) . $b . '</a>';
     }
+    if ($punch) echo '<a href="' . e($punch['href']) . '" data-punch="' . e($punch['next']) . '">' . rec_icon('pin') . e($punch['label']) . '</a>';
     echo '</nav>';
 }
 
