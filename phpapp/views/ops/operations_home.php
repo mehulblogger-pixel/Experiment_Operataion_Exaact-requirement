@@ -64,12 +64,12 @@ sxw_kpi('warn', 'note',   'Report pending',     'Report pending',     (string) (
 
 <div class="ox-2">
   <div class="ox-col">
-  <?php // B9-2 — ranked next actions and the pending tasks, from the same
-        //  dashboard_glance()/action_centre engine the area homes already use. ?>
-  <?php rec_card_open('Your work', 'task', '<a class="sxw-fix" href="/my-work">All in My Work ›</a>'); ?>
-    <?php $glanceWantMgmt = false; include __DIR__ . '/_glance_strip.php'; ?>
-    <?= function_exists('ops_render_pending_tasks') ? ops_render_pending_tasks() : '' ?>
-  <?php rec_card_close(); ?>
+  <?php // Owner, 22 Nov 2026: "Your work and your pending tasks are the same thing … delete Your work".
+        //  The ranked "Your next actions" list (action_centre, B9-2) repeated the pending-task cards
+        //  below it, so Operations home now shows the pending-task cards alone. Nothing is lost:
+        //  every item of both lists is on /my-work, linked from the card ("See all in My Work").
+        //  The Dashboard and the area homes keep the ranked strip. ?>
+  <?= function_exists('ops_render_pending_tasks') ? ops_render_pending_tasks() : '' ?>
 
   <?php // ---- Pending scheduling — the cumulative list ---------------------------
         //  Every call this branch still has to put an engineer on, same-office and

@@ -52,9 +52,13 @@ t_ok(strpos($small, 'Show the remaining') === false, 'B9-1 · a short register g
 
 // ---- B9-2 · next-action placement, one engine only ---------------------------
 t_ok(is_file($root . '/views/ops/_glance_strip.php'), 'B9-2 · the strip is ONE shared partial');
-foreach (['views/dashboard.php' => $dash, 'views/ops/operations_home.php' => $opsHome, 'views/ops/area_home.php' => $areaV] as $f => $src) {
+foreach (['views/dashboard.php' => $dash, 'views/ops/area_home.php' => $areaV] as $f => $src) {
     t_ok(strpos($src, '_glance_strip.php') !== false, "B9-2 · $f renders the shared strip");
 }
+//  Owner, 22 Nov 2026: Operations home shows the pending-task cards only (the ranked strip
+//  repeated them); everything stays one tap away on /my-work.
+t_ok(strpos($opsHome, '_glance_strip.php') === false && strpos($opsHome, 'ops_render_pending_tasks') !== false && strpos($opsHome, "'Your work'") === false,
+    'Operations home · pending-task cards only, no duplicate "Your work" / next-actions list');
 t_ok(strpos($strip, 'action_centre') !== false || strpos($strip, 'dashboard_glance') !== false,
     'B9-2 · the strip takes its items from the canonical engine');
 // It must never re-rank: no sorting of its own anywhere in the partial.
