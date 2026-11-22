@@ -88,6 +88,13 @@ $stageLink = $stageEditorOn && $__s6open('pipelines', (!function_exists('pipe_ca
         <p class="rec-note">Used by Renewals, Today and Sales home. Only open contracts are listed.<?= !empty($renewExample) ? ' <b>60 is an example</b> — change it to suit you.' : '' ?></p>
       <?php rec_card_close(); endif; ?>
 
+      <?php //  Owner, 22 Nov 2026 (8a): the heading printed on a quotation PDF. Blank = the industry's.
+            if (function_exists('quote_print_title')): $qpt = trim((string) setting_get('quote_print_title', '')); rec_card_open('Printed ' . Tl('quote') . ' title', 'file'); ?>
+        <label class="sxs6-lab" for="sx6_qpt">Heading at the top of the PDF</label>
+        <input id="sx6_qpt" class="form-control" type="text" maxlength="60" name="quote_print_title" value="<?= e($qpt) ?>" placeholder="<?= e(quote_print_title()) ?>">
+        <p class="rec-note">Leave it empty to use your industry's word (now: <b><?= e($qpt !== '' ? (function () { $s = setting_get('industry_template', ''); return (string) (INDUSTRY_TEMPLATES[$s]['quote_title'] ?? 'Quotation'); })() : quote_print_title()) ?></b>). Printed in capitals on new PDFs; <?= e(Tlp('quote')) ?> already sent are not re-printed.</p>
+      <?php rec_card_close(); endif; ?>
+
       <?php rec_card_open('New leads go to', 'building'); ?>
         <p class="rec-note" style="margin:0 0 8px">A quick lead for an office goes to its salesperson. Empty = whoever types it. Each list shows only people who work for that office.</p>
         <div class="tbl"><table class="rec-tbl"><thead><tr><th scope="col">Branch</th><th scope="col">Person</th></tr></thead><tbody><?php foreach ($offices as $o): ?>

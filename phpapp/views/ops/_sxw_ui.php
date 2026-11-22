@@ -101,6 +101,9 @@ function sxw_contact($phone, $label) {
     $wa = sx_wa($phone); $tel = sx_tel($phone); $o = '';
     if ($tel !== '') $o .= '<a class="sxw-ib" href="' . e($tel) . '" aria-label="Call ' . e($label) . '">' . rec_icon('phone') . '<span>Call</span></a>';
     if ($wa !== '') $o .= '<a class="sxw-ib" href="' . e($wa) . '" target="_blank" rel="noopener" aria-label="WhatsApp ' . e($label) . '">' . rec_icon('wa') . '<span>WhatsApp</span></a>';
+    //  Owner, 22 Nov 2026 (findings LR-05, 7e): a laptop cannot dial, so the number can be
+    //  copied (to a desk phone or a softphone). Shown on wider screens; the phone keeps Call.
+    if ($tel !== '') $o .= '<button type="button" class="sxw-ib sxw-copy" data-copy="' . e(trim((string) $phone)) . '" aria-label="Copy the number of ' . e($label) . '" title="Copy ' . e(trim((string) $phone)) . '">' . rec_icon('copy') . '<span>Copy</span></button>';
     return $o !== '' ? $o : '<span class="muted" style="font-size:12px">no number</span>';
 }
 

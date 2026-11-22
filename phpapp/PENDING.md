@@ -2,6 +2,22 @@
 
 Living list of things explicitly deferred, so nothing is forgotten. Newest on top.
 
+## 🗳️ Owner's answers, 22 Nov 2026 (Operations test book + Sales pending list) — built / parked
+- **Built:** F-OP-01 site check-in only by the assigned engineer (docs/02 19y6); F-OP-02 a delay needs reason +
+  responsibility; F-OP-03 / Q-OP-01..03 call received date not after today, required date not before received, unit rate
+  0 … the "Highest unit rate on a call" setting (owner's value ₹2,50,000); F-OP-04 calls protected from their first edit;
+  F-OP-05 allocation wording; F-OP-06 docs/03 corrected; Q-OP-04 invoice / payment on a job is Finance's (docs/02 19y5);
+  a second Mark IN the same day is refused (first time kept); Sales 7(a)–(g): one breadcrumb + "Sales home" button,
+  Print-a-quotation mode with a PDF per row, clickable Orders & payments cards, "My branch (<name>)", Copy beside a
+  number on a laptop, Payments-to-collect tab only for receivables people, one "Save anyway" button; 8a the printed
+  quotation title (Sales settings; default from the industry template); answer 9 the switch
+  "Add a customer from a won deal that had no lead" (docs/02 19y4).
+- **Approved, to be designed first (answer 8 "Fix all of them") — PENDING:** extending a deployment (technical manpower,
+  template gap P4) and overtime / extra-shift pricing (G6). Both are new workflows, not wording: a short proposal with
+  examples goes to the owner before any code (CLAUDE.md: audit → plan → OK → code).
+- **Answer 6 — punching for anyone in the app, with clear options (deputed to site / regular office person / office person
+  who may be deputed / any other case) — PENDING:** being written up as a separate proposal; not in this build.
+
 ## 🛠️ Operations Batch 1 — Operations home in the Sales look (22 Nov 2026) — built / parked
 - **Built:** Operations home redesigned on the Sales kit; one theme-based area-bar colour for every area (--area-bar);
   the phone bottom bar per area is a setting (Settings → Display & terms → Phone bottom bar); Punch in / out on the phone
@@ -42,8 +58,8 @@ Living list of things explicitly deferred, so nothing is forgotten. Newest on to
   (SH-03); every Orders & payments card opens its list (IP-01); branch name instead of "— mine —"
   (LF-03); hide "Payments to collect" when it cannot show anything (TD-04); one "Save anyway" button
   on both lead forms (J2-04); number with Copy on a laptop (LR-05).
-- **Industry template gaps (V2.1 §8 + mapping) — PENDING, recorded not built:** P1 quotation PDF title
-  fixed as "QUOTATION" (`lib/pdf.php`); P2 the "Quotes" tab name on lead / deal / enquiry pages is also
+- **Industry template gaps (V2.1 §8 + mapping) — PENDING, recorded not built:** ~~P1 quotation PDF title
+  fixed as "QUOTATION"~~ (built 22 Nov, 8a); P2 the "Quotes" tab name on lead / deal / enquiry pages is also
   its address; P3 "CRM — Quotations" on the quotation form; P4 no action to extend a deployment;
   G1 "Principal Employer" on statutory papers only; G2 contract name per industry; G3 lost-reason
   categories; G4 recruitment replacement guarantee; G5 client-audit findings / nonconformities;

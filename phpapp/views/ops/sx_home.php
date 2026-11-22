@@ -63,7 +63,7 @@ $fixN = count(array_filter($health, fn($h) => (int) $h[1] > 0));
     <a href="/opportunity-new"><?= rec_icon('brief') ?>New deal</a>
     <?php if ($qtQuote): ?><a href="/quote-new"><?= rec_icon('file') ?>New <?= e(function_exists('Tl') ? Tl('quote') : 'quote') ?></a><?php endif; ?>
     <a href="/sales-orders"><?= rec_icon('trophy') ?>Orders won</a>
-    <a href="/quotes"><?= rec_icon('copy') ?>Print a <?= e(function_exists('Tl') ? Tl('quote') : 'quote') ?></a>
+    <a href="/quotes?print=1"><?= rec_icon('copy') ?>Print a <?= e(function_exists('Tl') ? Tl('quote') : 'quote') ?></a>
   </div>
 
   <div class="sxw-hd" style="align-items:center;margin-bottom:8px">

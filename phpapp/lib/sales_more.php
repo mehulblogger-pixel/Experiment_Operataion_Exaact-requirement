@@ -753,6 +753,9 @@ function ops_sales_more($route, $method) {
                 setting_set('sales_outcomes', json_encode($rows, JSON_UNESCAPED_UNICODE));
                 setting_set('sales_weekly_off', implode(',', array_map('intval', array_filter((array) ($_POST['off'] ?? []), fn($d) => (int) $d >= 0 && (int) $d <= 6))));
                 setting_set('sales_stale_days', (string) max(1, min(365, (int) ($_POST['stale'] ?? 15))));
+                //  8a — the printed quotation title; blank = the industry's (quote_print_title()).
+                if (isset($_POST['quote_print_title']))
+                    setting_set('quote_print_title', mb_substr(trim(strip_tags((string) $_POST['quote_print_title'])), 0, 60));
                 //  DEF-10 (owner, 21 Nov 2026): the one renewal look-ahead window, in days
                 //  (Renewals, Today and Sales home). Saved only when the form sends it, so a
                 //  settings form without the field leaves the window as it is.

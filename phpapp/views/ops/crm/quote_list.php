@@ -41,7 +41,11 @@ $dt['columns']['status']['render'] = function ($r) use ($stPill, $stL) {
     if ($r['status'] === 'SENT') { $rv = quote_validity($r); if ($rv['expired']) $h .= ' <span class="pill p-mut" title="Past its ' . (int)$r['validity_days'] . '-day validity — expires on the next sweep">past validity</span>'; }
     return $h;
 };
-$dt['columns']['actions']['render'] = fn($r) => '<span class="sxw-acts"><a class="sxw-ib" href="/quote?id=' . (int)$r['id'] . '">' . rec_icon('eye', 's') . '<span>Open</span></a></span>';
+//  Owner, 22 Nov 2026 (design request 7b, "Print a quote"): every row also carries its PDF,
+//  the same document the quotation page prints (/quote-pdf), so printing is one click here.
+$dt['columns']['actions']['render'] = fn($r) => '<span class="sxw-acts"><a class="sxw-ib" href="/quote?id=' . (int)$r['id'] . '">' . rec_icon('eye', 's') . '<span>Open</span></a>'
+    . '<a class="sxw-ib" href="/quote-pdf?id=' . (int)$r['id'] . '" title="Download the PDF to print">' . rec_icon('file', 's') . '<span>PDF</span></a></span>';
+$printMode = !empty($_GET['print']);
 
 $canNew = can('crm.quote.create') || can('mod.quotes.edit');
 $canExt = can('crm.quote.create') || is_master();     // DEF-18 — the server's own rule for /quote-external
@@ -96,6 +100,11 @@ $sbuL = lk_options_or('sbu', OPS_SBUS);
   </div>
   <?php endif; ?>
 
+  <?php if ($printMode): ?>
+  <div class="sxl-ban" role="status"><span class="ic"><?= rec_icon('file') ?></span>
+    <div class="tx"><b class="t">Print a <?= e(Tl('quote')) ?></b>
+      Find the <?= e(Tl('quote')) ?> below (search, or pick Open / Won), then press <b>PDF</b> on its row — the same document its own page prints.</div></div>
+  <?php endif; ?>
   <div class="sxl-ctl sxqt-tabs">
     <nav class="sxw-seg" aria-label="Which <?= e(Tlp('quote')) ?>">
       <?php foreach ($tabs as $k=>$lbl): $on = !$mineApprove && !$mineContract && $view===$k; ?>

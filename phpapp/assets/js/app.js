@@ -2307,3 +2307,21 @@
     if (btn && !btn.disabled) btn.click();
   });
 })();
+
+// Owner, 22 Nov 2026 (findings LR-05, 7e): "Copy" beside a phone number — a laptop cannot
+// dial a tel: link, so the number is copied instead. Works without the clipboard API too.
+(function () {
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest ? ev.target.closest('[data-copy]') : null;
+    if (!b) return;
+    ev.preventDefault();
+    var txt = b.getAttribute('data-copy') || '', lab = b.querySelector('span');
+    var done = function () { if (lab) { var was = lab.textContent; lab.textContent = 'Copied'; setTimeout(function () { lab.textContent = was; }, 1500); } };
+    var fallback = function () {
+      var ta = document.createElement('textarea'); ta.value = txt; ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch (e) {} document.body.removeChild(ta);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, fallback); else fallback();
+  });
+})();

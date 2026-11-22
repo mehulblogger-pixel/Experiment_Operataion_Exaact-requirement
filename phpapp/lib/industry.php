@@ -67,6 +67,7 @@ const INDUSTRY_TEMPLATES = [
         'label' => 'Third-party inspection (TPIA) & testing',
         'blurb' => 'Third-party inspection agencies, vendor inspection, expediting, NDT and testing services.',
         'version' => 2,
+        'quote_title' => 'Technical & Commercial Quotation',   // owner, 22 Nov 2026 (8a): the printed quotation's heading
         //  Funnels created before V2.1 carry the old name; D3 still recognises them.
         'old_labels' => ['Inspection, testing & certification'],
         'funnel' => [
@@ -101,6 +102,7 @@ const INDUSTRY_TEMPLATES = [
         'label' => 'Technical manpower & deputation',
         'blurb' => 'Deputation and supply of engineers, technicians and skilled staff, billed per month, day, hour or shift.',
         'version' => 1,
+        'quote_title' => 'Quotation',   // owner, 22 Nov 2026 (8a): the printed quotation's heading
         'funnel' => [
             ['Manpower requirement received',  'OPEN',  10, 3],
             ['Requirement & scope qualified',  'OPEN',  25, 5],
@@ -132,6 +134,7 @@ const INDUSTRY_TEMPLATES = [
         'label' => 'Recruitment & placement agency',
         'blurb' => 'Permanent placement, executive search and technical recruitment, for a placement fee.',
         'version' => 1,
+        'quote_title' => 'Fee Proposal',   // owner, 22 Nov 2026 (8a): the printed quotation's heading
         'funnel' => [
             ['Job requisition received',  'OPEN', 10, 3],
             ['Mandate / fee terms agreed','OPEN', 25, 7],
@@ -168,6 +171,7 @@ const INDUSTRY_TEMPLATES = [
         'label' => 'Audit & assurance',
         'blurb' => 'ISO / management-system, supplier, vendor, process, internal and compliance audits.',
         'version' => 1,
+        'quote_title' => 'Proposal',   // owner, 22 Nov 2026 (8a): the printed quotation's heading
         'funnel' => [
             ['Audit enquiry / RFP received',          'OPEN', 10, 3],
             ['Scope & requirements reviewed',         'OPEN', 25, 5],
@@ -610,6 +614,16 @@ function industry_current() { return (string)setting_get('industry_template', ''
 // is applied ("inspection@2"), so a later reader knows which edition of the
 // stages and words a company started from. Company changes are never touched
 // on an upgrade: applying creates, it never edits.
+// Owner, 22 Nov 2026 (8a): the heading printed on a quotation PDF. A company setting
+// (Sales settings → "Printed quotation title") wins; otherwise the company's industry
+// template gives it (TPIA "Technical & Commercial Quotation", recruitment "Fee Proposal",
+// audit "Proposal"); otherwise "Quotation" — what every PDF printed before.
+function quote_print_title() {
+    $s = trim((string) (function_exists('setting_get') ? setting_get('quote_print_title', '') : ''));
+    if ($s !== '') return $s;
+    $k = (string) (function_exists('setting_get') ? setting_get('industry_template', '') : '');
+    return (string) (INDUSTRY_TEMPLATES[$k]['quote_title'] ?? 'Quotation');
+}
 function industry_version($key) { return (int) (INDUSTRY_TEMPLATES[$key]['version'] ?? 1); }
 function industry_stamp($key) { return $key . '@' . industry_version($key); }
 

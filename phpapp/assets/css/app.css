@@ -1627,6 +1627,9 @@ a.sxw-kpi:focus-visible{outline:3px solid var(--focus,#2563eb);outline-offset:2p
 .sxw-typ.d{background:color-mix(in srgb,var(--brand) 10%,var(--card));color:var(--brand-ink)}.sxw-typ.l{background:var(--info-bg);color:var(--info)}
 .sxw-acts{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
 .sxw-ib{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:34px;min-width:34px;padding:0 9px;border:1px solid var(--line);border-radius:7px;color:var(--brand-ink);font-size:12.5px;font-weight:600;background:var(--card);white-space:nowrap}
+button.sxw-ib{cursor:pointer;font-family:inherit}
+/* 7e (owner, 22 Nov 2026): Copy is for a laptop; a phone dials with Call */
+@media (max-width:760px){.sxw-copy{display:none}}
 .sxw-ib:hover{text-decoration:none;border-color:var(--field-line)}
 .sxw-ib svg.rec-i{width:16px;height:16px}
 .sxw-due{display:inline-flex;align-items:center;min-height:22px;padding:0 8px;border-radius:5px;font-size:11.5px;font-weight:700;white-space:nowrap}

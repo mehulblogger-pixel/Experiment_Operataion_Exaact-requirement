@@ -617,6 +617,15 @@
 ?>      <a class="crumb-back" href="<?= e($__back['url']) ?>"
          title="Back to <?= e($__back['label']) ?>">&larr; <?= e($__back['label']) ?></a>
 <?php endif;
+      //  Owner, 22 Nov 2026 (design request 7a): on every Sales screen a "Sales home"
+      //  button sits beside Back, in the same place, for anyone who may open Sales home.
+      $__isSales = $cur !== 'sales-home' && $cur !== ''
+          && ((function_exists('nav_sales_place') && nav_sales_place($cur) !== null)
+              || (function_exists('nav_route_area') && nav_route_area($cur) === 'Sales'));
+      if ($__isSales && ($nav_crumbs ?? true) && function_exists('sx_can') && sx_can()
+          && !($__back && trim((string) $__back['url'], '/') === 'sales-home')): ?>
+      <a class="crumb-back crumb-sales-home" href="/sales-home" title="Sales home">&#8962; Sales home</a>
+<?php endif;
       if (count($__trail) > 1): ?>
       <nav class="crumbs" aria-label="Breadcrumb"><?php
         foreach ($__trail as $__i => $__c):

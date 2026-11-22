@@ -424,6 +424,16 @@ function nav_trail($route, $leaf = null) {
         return $trail;
     }
 
+    //  Owner, 22 Nov 2026 (findings SH-03, design request 7a): every Sales screen reads
+    //  the same way — Home › Sales › <register> [› record]. A record or form sat under a
+    //  permission group ("Leads & pipeline", "CRM — Quotations") instead of its register.
+    if (($sp = nav_sales_place($route)) !== null) {
+        $base = nav_trail('sales-today');                 // Home › Sales › Today — the Sales step, if this person may open it
+        array_pop($base);
+        if ($sp['parent'] !== null) $base[] = ['label' => $sp['parent_label'], 'url' => '/' . $sp['parent']];
+        $base[] = ['label' => ($leaf !== null && trim((string) $leaf) !== '') ? (string) $leaf : $sp['label'], 'url' => null];
+        return $base;
+    }
     $mod  = nav_module_of($route);
     //  THE MENU DECIDES WHERE A SCREEN LIVES. The permission grouping only
     //  answers for screens the menu does not list.
@@ -569,6 +579,49 @@ function nav_trail($route, $leaf = null) {
 //  So: the first linked step from the end of the trail, which is the parent.
 //  The trail is drawn immediately below this control, so the two now always
 //  agree by construction — the control is literally the trail's own last link.
+//  Where a Sales screen sits (7a): its register ('parent', or null = straight under
+//  Sales) and its own name. Words follow the company's terminology.
+function nav_sales_place($route) {
+    $T = fn($k, $d) => function_exists('Tl') ? Tl($k) : $d;
+    $TP = fn($k, $d) => function_exists('TP') ? TP($k) : $d;
+    $reg = [
+        'leads'         => [null, 'Leads'],
+        'opportunities' => [null, $TP('opportunity', 'Deals')],
+        'quotes'        => [null, $TP('quote', 'Quotes')],
+        'inquiries'     => [null, $TP('inquiry', 'Inquiries')],
+    ];
+    $map = [
+        'leads'            => $reg['leads'],
+        'lead'             => ['leads', 'Lead'],
+        'lead-new'         => ['leads', 'New lead'],
+        'lead-edit'        => ['leads', 'Edit lead'],
+        'lead-convert'     => ['leads', 'Make a customer'],
+        'sales-lead'       => ['leads', 'Quick lead'],
+        'opportunities'    => $reg['opportunities'],
+        'opportunity'      => ['opportunities', ucfirst($T('opportunity', 'deal'))],
+        'opportunity-new'  => ['opportunities', 'New ' . $T('opportunity', 'deal')],
+        'opportunity-edit' => ['opportunities', 'Edit ' . $T('opportunity', 'deal')],
+        'quotes'           => $reg['quotes'],
+        'quote'            => ['quotes', ucfirst($T('quote', 'quote'))],
+        'quote-new'        => ['quotes', 'New ' . $T('quote', 'quote')],
+        'quote-edit'       => ['quotes', 'Edit ' . $T('quote', 'quote')],
+        'quote-revise'     => ['quotes', 'Revise ' . $T('quote', 'quote')],
+        'quote-external'   => ['quotes', 'External ' . $T('quote', 'quote')],
+        'inquiries'        => $reg['inquiries'],
+        'inquiry'          => ['inquiries', ucfirst($T('inquiry', 'inquiry'))],
+        'inquiry-new'      => ['inquiries', 'New ' . $T('inquiry', 'inquiry')],
+        'inquiry-edit'     => ['inquiries', 'Edit ' . $T('inquiry', 'inquiry')],
+        'crm-reports'      => [null, 'Quotation report'],          // the page's own heading
+        'sales-setup'      => [null, 'Set up Sales'],
+        'stage-gates'      => [null, 'Stage gates'],
+        'pipelines'        => [null, 'Pipelines & funnels'],
+        'ads-roi'          => [null, 'Advertising return'],
+    ];
+    $route = trim((string) $route, '/');
+    if (!isset($map[$route])) return null;
+    [$parent, $label] = $map[$route];
+    return ['parent' => $parent, 'parent_label' => $parent !== null ? $reg[$parent][1] : null, 'label' => $label];
+}
 function nav_back_info($route) {
     $route = trim((string)$route, '/');
     $trail = nav_trail($route);

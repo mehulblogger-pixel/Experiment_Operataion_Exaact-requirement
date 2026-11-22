@@ -84,8 +84,10 @@ $right = '<div class="sxw-ctl"><a class="sxw-bt" href="/sales-lead">' . rec_icon
     <span class="ic"><?= rec_icon('alert') ?></span>
     <div class="tx"><b class="t">This looks like one we already have</b>
       <ul class="sxl-dl"><?php foreach ($dupes as $dp): ?><li><?= $dp['url'] !== '' ? '<a href="' . e($dp['url']) . '" target="_blank" rel="noopener">' . e($dp['text']) . '</a>' : e($dp['text']) ?></li><?php endforeach; ?></ul>
-      <label class="sxl-ok"><input type="checkbox" name="confirm" value="1"<?= form_old('confirm', '') === '1' ? ' checked' : '' ?>> It is a different requirement — save it anyway</label>
-      <span class="sxl-hint">Open one of them instead, or tick the box and press <b>Create it</b>.</span></div>
+      <?php // Owner, 22 Nov 2026 (findings J2-04, 7g): the same "Save anyway" button as the quick
+            // lead, in place of a tick box + Create it. It sends the same confirm=1 the box did. ?>
+      <span class="sxl-hint">Open one of them instead — or, if this really is new, press <b>Save anyway</b>.</span>
+      <div style="margin-top:8px"><button class="btn secondary" type="submit" name="confirm" value="1">Save anyway</button></div></div>
   </div>
   <?php $stepEnd(); ?>
 
@@ -148,7 +150,12 @@ $right = '<div class="sxw-ctl"><a class="sxw-bt" href="/sales-lead">' . rec_icon
       <div class="ff-help">Defaults to you. Change it if somebody else will chase this one.</div></div>
 
     <div class="ff"><label for="lf-off">Branch</label>
-      <select class="form-control" id="lf-off" name="office_id"><option value="">— mine —</option>
+      <?php // Owner, 22 Nov 2026 (findings LF-03, 7d): "— mine —" said nothing. Blank means
+            // the person's home branch (leads_create), so the option names it. ?>
+      <?php $myOff = (int)(($me ?? (function_exists('current_user') ? current_user() : []))['home_office_id'] ?? 0); $myOffName = '';
+            foreach ($offices as $o) if ((int)$o['id'] === $myOff) { $myOffName = (string)$o['name']; break; }
+            if ($myOffName === '' && $myOff) $myOffName = (string)(ops_val("SELECT name FROM offices WHERE id=?", [$myOff]) ?: ''); ?>
+      <select class="form-control" id="lf-off" name="office_id"><option value=""><?= e($myOffName !== '' ? 'My branch (' . $myOffName . ')' : 'My home branch') ?></option>
         <?php foreach ($offices as $o): ?>
           <option value="<?= (int)$o['id'] ?>" <?= $val('office_id') === (string)$o['id'] ? 'selected' : '' ?>><?= e($o['name']) ?></option>
         <?php endforeach; ?>

@@ -54,7 +54,9 @@ $canWork = fn($r) => !function_exists('sales_record_can_work') || sales_record_c
       <div class="sxw-tabs" data-sxw-tabs>
         <button type="button" data-for="deals" class="on">Follow-ups <em><?= count($fu) ?></em></button>
         <button type="button" data-for="stale">Stale deals <em><?= count($d['stale']) ?></em></button>
-        <button type="button" data-for="pay">Payments to collect <em><?= $d['ar'] ? count($d['pay']) : '—' ?></em></button>
+        <?php // Owner, 22 Nov 2026 (findings TD-04, 7f): the tab is offered only to people who
+              // may see receivables — for anyone else it could only ever say "not for you". ?>
+        <?php if ($d['ar']): ?><button type="button" data-for="pay">Payments to collect <em><?= count($d['pay']) ?></em></button><?php endif; ?>
         <button type="button" data-for="renew">Renewals due <em><?= count($d['renewals']) ?></em></button>
       </div>
     </div>
@@ -106,6 +108,7 @@ $canWork = fn($r) => !function_exists('sales_record_can_work') || sales_record_c
       <?php endif; ?>
     </div>
 
+    <?php if ($d['ar']): ?>
     <div id="pay" data-sxw-panel>
       <div class="rec-ch" style="margin:4px 0 8px"><span class="ico"><?= rec_icon('rupee') ?></span><h3>Payments to collect · overdue and due in 7 days</h3></div>
       <?php if (!$d['ar']): ?><p class="sxw-empty">Payments are shown to people who may see receivables.</p>
@@ -117,6 +120,7 @@ $canWork = fn($r) => !function_exists('sales_record_can_work') || sales_record_c
         <p class="rec-note">Accounts' invoices (not Sales values) — the first 15.</p>
       <?php endif; ?>
     </div>
+    <?php endif; /* ar — Payments to collect */ ?>
 
     <div id="renew" data-sxw-panel>
       <div class="rec-ch" style="margin:4px 0 8px"><span class="ico"><?= rec_icon('swap') ?></span><h3>Renewals due</h3></div>

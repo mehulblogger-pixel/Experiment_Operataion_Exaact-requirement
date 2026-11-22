@@ -332,7 +332,7 @@ function quote_pdf_build($q, $lines, $tpl, $sig = [], $lh = []) {
     if ($docRev) { $p->y = $top + 22; $p->text($ml, $docRev, 8, false, [110, 110, 110], $right, 'R'); }
     $p->y = max($ly, $top + 44); $p->hr();
     // ---- title + meta ----
-    $p->line('QUOTATION', 14, true, 20);
+    $p->line(function_exists('quote_print_title') ? mb_strtoupper(quote_print_title()) : 'QUOTATION', 14, true, 20);   // 8a — the company's / industry's title
     $meta = quote_label($q) . '     Date: ' . date('d M Y', strtotime($q['created_at'] ?: 'now')) . '     Validity: ' . (int)$q['validity_days'] . ' days';
     $p->line($meta, 9, false, 16, [90, 90, 90]);
     $p->gap(4);
