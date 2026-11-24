@@ -29,6 +29,8 @@ ok($row['status'] === 'OPEN', 'the legacy status column is left exactly as it wa
 head('2. Status lifecycle + history (never overwrites, always logs)');
 ok(tosrm_call_status($row) === 'RECEIVED', 'an OPEN call derives lifecycle status RECEIVED before any op_status set');
 ok(tosrm_set_status($cid, 'UNDER_REVIEW', 'triage') === true, 'set to UNDER_REVIEW succeeds');
+// Stage 1 B3: Ready for scheduling now needs the readiness check — this fixture is incomplete, so record the existing override first.
+tosrm_override_validation($cid, 'test fixture: lifecycle check only');
 ok(tosrm_set_status($cid, 'READY_TO_SCHEDULE') === true, 'advance to READY_TO_SCHEDULE succeeds');
 ok(tosrm_set_status($cid, 'BOGUS_STATUS') === false, 'an unknown status is rejected');
 $row = ops_one("SELECT * FROM calls WHERE id=?", [$cid]);

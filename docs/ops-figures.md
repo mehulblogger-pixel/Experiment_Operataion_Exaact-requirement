@@ -98,3 +98,20 @@ unit). The inspector's tiles count only that inspector's own jobs.
   - the contract summary;
   - the client portal, where the order now reads *Cancelled*.
 - **Backlog reason:** "No engineer yet" when nobody is on a job. A declined or released assignment counts as nobody. Statuses show by their label, not their code.
+
+## No false "ready" (B3)
+
+- **Ready for scheduling.**
+  - A work order moves to Ready for scheduling only when its details are complete, or when the existing validation override was recorded with a reason (`tosrm_call_ready`).
+  - The page says what is missing.
+  - The card note now reads "marked ready for scheduling". Older forwarded orders also count here, so the card no longer says "all inputs complete".
+- **Client portal.** A job's words follow its dates, compared with today:
+  - an end date still ahead is "Inspection under way", not "finished";
+  - a start date still ahead is "Scheduled".
+- **Card notes say what they count.** Examples:
+  - "Reports awaiting sign-off" means closed jobs whose report is not yet signed off;
+  - the one-line summary uses the card names.
+- **Data health.**
+  - The Backlog tab and the Ops desk list open jobs whose report frequency is blank or not on the list (e.g. the demo's "SINGLE"). A person corrects them.
+  - Nothing is changed automatically.
+  - Until corrected, "Reports to write" leaves those jobs out.

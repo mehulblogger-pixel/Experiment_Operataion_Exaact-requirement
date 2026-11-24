@@ -48,7 +48,14 @@ REJECTED only in intake — and the picker lists only those. The terminal states
 (CLOSED / REJECTED / CANCELLED) have **no exit**. A manager (`is_admin_level`) may
 **override with a reason**, recorded as `[override]` in history. Every change writes an
 audit row (`tosrm.php`). When blank it is *derived* from the legacy status + jobs
-(`tosrm_derive_status()`).
+(`tosrm_derive_status()`). A legacy open order with somebody on a live job derives
+ASSIGNED. A declined, released or cancelled assignment does not count (Stage 1 B2).
+
+**Entering READY_TO_SCHEDULE (Stage 1 B3, owner 24 Nov 2026):** the move is allowed
+only when `tosrm_call_ready()` is true. That means the mandatory details are
+complete, or the existing validation override was recorded with a reason. A
+transition override does not skip this check. The status list itself is
+unchanged.
 
 > States (by rank): RECEIVED/DRAFT (1) → UNDER_REVIEW/CLARIFICATION (2) → ACCEPTED (3)
 > → READY_TO_SCHEDULE (4) → SCHEDULED (5) → ASSIGNED (6) → IN_PROGRESS (7) →

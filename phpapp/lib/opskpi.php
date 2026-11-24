@@ -85,9 +85,9 @@ function opk_call_defs() {
                             "$live AND $st IN ('RECEIVED','DRAFT','UNDER_REVIEW') AND NOT " . opk_has_person_sql('c')],
         'no_engineer'   => ['No engineer yet', 'work orders with nobody on a job',
                             "$live AND NOT $done AND NOT " . opk_has_person_sql('c')],
-        'clarification' => ['Clarification open', 'waiting on client / vendor',
+        'clarification' => ['Clarification open', 'asked, not yet answered',
                             "$live AND EXISTS (SELECT 1 FROM call_clarifications cc WHERE cc.call_id=c.id AND cc.status='OPEN')"],
-        'ready'         => ['Ready to schedule', 'all inputs complete',
+        'ready'         => ['Ready to schedule', 'marked ready for scheduling',
                             "$live AND $st='READY_TO_SCHEDULE'"],
         'wo_overdue'    => ['Work orders overdue', "client's required date passed",
                             "$live AND NOT $done AND COALESCE(c.inspection_required_date,'')<>'' AND c.inspection_required_date<'" . $today . "'"],
@@ -160,6 +160,32 @@ function opk_count_jobs($key) {
 function opk_count_my_jobs($key, $inspectorId) {
     $p = opk_job_pred($key); if ($p === null || (int) $inspectorId <= 0) return 0;
     try { return (int) ops_val("SELECT COUNT(*) FROM jobs j WHERE j.inspector_id=? AND $p", [(int) $inspectorId]); } catch (Throwable $e) { return 0; }
+}
+
+// Data health (Stage 1 B3): open jobs whose report frequency is blank or not one of the
+// listed values — shown for a person to correct; nothing is changed automatically and no
+// new value is added. Under the jobs register's scope. Returns ['n'=>int, 'jobs'=>[...]].
+function opk_freq_health($limit = 8) {
+    $keys = array_keys(defined('REPORT_FREQ') ? REPORT_FREQ : []);
+    if (!$keys) return ['n' => 0, 'jobs' => []];
+    $in = implode(',', array_map(function ($k) { return db()->quote((string) $k); }, $keys));
+    [$w, $a] = opk_jobs_scope();
+    $cond = opk_job_live_sql('j') . " AND COALESCE(j.closed_flag,0)=0 AND COALESCE(j.reporting_frequency,'') NOT IN ($in)";
+    try {
+        $n = (int) ops_val("SELECT COUNT(*) FROM jobs j WHERE $w AND $cond", $a);
+        $jobs = $n ? (ops_all("SELECT j.id, j.job_code, j.reporting_frequency FROM jobs j WHERE $w AND $cond ORDER BY j.id DESC LIMIT " . max(1, (int) $limit), $a) ?: []) : [];
+        return ['n' => $n, 'jobs' => $jobs];
+    } catch (Throwable $e) { return ['n' => 0, 'jobs' => []]; }
+}
+function opk_freq_health_html() {
+    $h = opk_freq_health();
+    if (!$h['n']) return '';
+    $links = [];
+    foreach ($h['jobs'] as $j) $links[] = '<a href="/job?id=' . (int) $j['id'] . '">' . e($j['job_code']) . '</a>'
+        . ' <span class="muted">(' . e(($j['reporting_frequency'] ?? '') !== '' ? $j['reporting_frequency'] : 'blank') . ')</span>';
+    return '<p class="msg msg-warning" style="margin:0 0 12px;font-size:13px"><b>Data health:</b> ' . (int) $h['n']
+         . ' open job' . ($h['n'] === 1 ? '' : 's') . ' with a report frequency that is not on the list — open each and pick one'
+         . ' (until then "Reports to write" leaves them out): ' . implode(', ', $links) . ($h['n'] > count($h['jobs']) ? ' …' : '') . '</p>';
 }
 
 // Where each card opens: the register, filtered by the same predicate.

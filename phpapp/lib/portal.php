@@ -522,9 +522,13 @@ function portal_call_state($c) {
 function portal_job_state($j) {
     if (!empty($j['closed_flag']))          return 'Completed';
     if (strtoupper((string)($j['stage'] ?? '')) === 'CANCELLED') return 'Cancelled';   // Stage 1 B2 (Cancel assignment)
-    if (!empty($j['inspection_end_date']))  return 'Inspection finished — report being prepared';
-    if (!empty($j['inspection_start_date']))return 'Inspection under way';
-    if (!empty($j['scheduled_date']))       return 'Scheduled';
+    //  Stage 1 B3 — the words follow the dates, compared with today: an end date still
+    //  ahead is not "finished", a start date still ahead is not "under way".
+    $today = date('Y-m-d');
+    $end = trim((string)($j['inspection_end_date'] ?? '')); $start = trim((string)($j['inspection_start_date'] ?? ''));
+    if ($end !== '' && $end < $today)       return 'Inspection finished — report being prepared';
+    if ($start !== '' && $start <= $today)  return 'Inspection under way';
+    if ($start !== '' || !empty($j['scheduled_date'])) return 'Scheduled';
     return 'Being arranged';
 }
 

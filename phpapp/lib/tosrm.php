@@ -221,6 +221,11 @@ function tosrm_set_status($callId, $to, $reason = '', $actor = '', $force = fals
     if (!$call) return false;
     $from = tosrm_call_status($call);
     if (!$force && !tosrm_can_transition($from, $to)) return false;   // R6 — not a legal step
+    //  Stage 1 B3 (owner, 24 Nov 2026; Stage 0 S1-08): "Ready for scheduling" means the
+    //  details are complete, or the existing override-with-reason was recorded — the
+    //  readiness check the call page already shows (tosrm_call_ready). Not even a
+    //  transition override skips it: the readiness override is its own, recorded step.
+    if ($to === 'READY_TO_SCHEDULE' && $from !== $to && !tosrm_call_ready($call)['ok']) return false;
     db()->prepare("UPDATE calls SET op_status=? WHERE id=?")->execute([$to, (int)$callId]);
     $note = ($force && !tosrm_can_transition($from, $to)) ? trim('[override] ' . $reason) : (string)$reason;
     db()->prepare("INSERT INTO call_status_events (call_id, old_status, new_status, reason, actor, at) VALUES (?,?,?,?,?,?)")
@@ -631,6 +636,12 @@ function ops_tosrm_action($route, $method) {
             // R6 — a manager may force a non-standard transition, but only with a reason.
             $force  = !empty($_POST['override']) && function_exists('is_admin_level') && is_admin_level();
             if ($force && trim($reason) === '') { flash('An override needs a reason.', 'error'); break; }
+            //  Stage 1 B3 — say exactly why "Ready for scheduling" is refused, and how to proceed.
+            if (strtoupper(trim($to)) === 'READY_TO_SCHEDULE' && !($rd = tosrm_call_ready($call))['ok']) {
+                flash('Not ready for scheduling yet — missing: ' . implode(', ', $rd['missing'])
+                    . '. Complete these details, or record a validation override with a reason, then try again.', 'error');
+                break;
+            }
             if (tosrm_set_status($callId, $to, $reason, '', $force)) {
                 flash('Status updated.');
             } elseif ($to !== '' && array_key_exists(strtoupper(trim($to)), tosrm_status_options())) {
@@ -2082,7 +2093,7 @@ function tosrm_issue_from_event($jobId, $title, $description = '', $severity = '
 // ---- Rule-based data-quality flags (advisory; no AI needed) -----------------
 function tosrm_ops_dataquality($offices = 'ALL', $limit = 60) {
     $w = tosrm_call_office_sql($offices, 'c');
-    $rows = ops_all("SELECT c.* FROM calls c WHERE c.status<>'CLOSED' AND $w ORDER BY c.id DESC LIMIT " . (int)$limit) ?: [];
+    $rows = ops_all("SELECT c.* FROM calls c WHERE " . (function_exists('opk_call_live_sql') ? opk_call_live_sql('c') : "c.status<>'CLOSED'") . " AND $w ORDER BY c.id DESC LIMIT " . (int)$limit) ?: [];
     $out = [];
     foreach ($rows as $c) {
         $missing = tosrm_validate_call($c);
@@ -2094,8 +2105,9 @@ function tosrm_ops_dataquality($offices = 'ALL', $limit = 60) {
 
 // ---- Operations summary (deterministic; AI-wrapped only when enabled) -------
 function tosrm_ops_summary($metrics) {
-    $base = sprintf('Backlog: %d unscheduled, %d awaiting clarification, %d ready to schedule. %d overdue, %d critical, %d report(s) pending. %d service(s) today.',
-        $metrics['unscheduled'], $metrics['clarification'], $metrics['ready'], $metrics['overdue'], $metrics['critical'], $metrics['report_pending'], $metrics['today']);
+    //  Stage 1 B3 — the same names as the cards (lib/opskpi.php), so the sentence says what is counted.
+    $base = sprintf('Backlog: %d with no engineer yet, %d awaiting clarification, %d ready to schedule. %d work order(s) overdue, %d job(s) overdue, %d critical, %d report(s) awaiting sign-off. %d service(s) today.',
+        $metrics['unscheduled'], $metrics['clarification'], $metrics['ready'], $metrics['overdue'], (int)($metrics['jobs_overdue'] ?? 0), $metrics['critical'], $metrics['report_pending'], $metrics['today']);
     // AI may PHRASE it more helpfully, but never invents numbers and never acts.
     if (function_exists('ai_enabled') && ai_enabled() && function_exists('ai_chat')) {
         try {

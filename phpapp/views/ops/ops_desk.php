@@ -33,6 +33,7 @@
   </div>
 </section>
 
+<?= function_exists('opk_freq_health_html') ? opk_freq_health_html() : '' ?>
 <?php if ($dataquality): ?>
 <section class="card" style="margin-bottom:14px">
   <h2 style="margin:0 0 8px">Data-quality flags <span class="muted" style="font-size:13px">(advisory — complete or override on the call)</span></h2>
