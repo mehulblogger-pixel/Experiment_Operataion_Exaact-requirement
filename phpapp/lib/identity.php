@@ -498,7 +498,8 @@ function ops_identity($route, $method) {
         $onlyGap = ($_GET['gap'] ?? '') === '1';
         // Freelancers and sub-contractors — the people engaged through an agency.
         $sql = "SELECT id, name, emp_code, staff_kind, agency_id, agency_name, trade_id
-                FROM inspectors WHERE status='ACTIVE' AND COALESCE(staff_kind,'ASSET') IN ('FREELANCER','SUBCON')";
+                FROM inspectors WHERE status='ACTIVE' AND (COALESCE(staff_kind,'ASSET') IN ('FREELANCER','SUBCON')
+                      OR COALESCE(roll_type,'OWN')='AGENCY')";   // Stage 1 B4 — agency payroll is engaged through an agency too
         $args = [];
         if ($fAgency) { $sql .= " AND agency_id=?"; $args[] = $fAgency; }
         $sql .= " ORDER BY COALESCE(agency_name,''), name";

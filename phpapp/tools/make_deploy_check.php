@@ -38,7 +38,10 @@ foreach ($it as $f) {
 ksort($files);
 
 $rev = trim((string) @shell_exec('git -C ' . escapeshellarg($root) . ' rev-parse --short HEAD 2>/dev/null')) ?: 'local';
-$release = $rev . ' · ' . gmdate('Y-m-d H:i') . ' UTC · ' . count($files) . ' files';
+//  S1-B0 (owner, 24 Nov 2026): the deploy check names the release version too, read from
+//  lib/preflight.php (APP_VERSION), so a support call can quote it.
+$ver = preg_match("/const APP_VERSION = '([^']+)'/", (string) @file_get_contents($root . '/lib/preflight.php'), $vm) ? $vm[1] : '';
+$release = ($ver !== '' ? 'v' . $ver . ' · ' : '') . $rev . ' · ' . gmdate('Y-m-d H:i') . ' UTC · ' . count($files) . ' files';
 
 $map = "[\n";
 foreach ($files as $rel => $m) $map .= "    " . var_export($rel, true) . " => ['s'=>{$m['s']},'h'=>'{$m['h']}'],\n";

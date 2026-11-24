@@ -296,7 +296,7 @@
     <tr><td><b><?= e($j['job_code']) ?></b><?= !empty($j['closed_flag']) ? ' <span class="pill p-ok">closed</span>' : '' ?></td>
       <td class="muted"><?= e($j['call_code'] ?: '—') ?></td>
       <td><?= e($j['inspector_name'] ?: 'Unassigned') ?></td>
-      <td><?= e(lk_options_or('job_stage', JOB_STAGES)[$j['stage'] ?? 'ALLOCATED'] ?? ($j['stage'] ?: '—')) ?></td>
+      <td><?= e(function_exists('job_stage_label') ? job_stage_label($j) : '—') ?></td>
       <td class="num"><?= (int)$j['report_count'] ?></td>
       <td class="num"><a class="btn small secondary" href="/job?id=<?= (int)$j['id'] ?>">Open →</a></td></tr>
   <?php endforeach; ?>

@@ -45,7 +45,7 @@ function engagement($contractNumber, $partnerId = 0) {
     foreach ($invoices as $v) $members[] = ['kind'=>'INVOICE', 'id'=>(int)$v['id'], 'ref'=>(string)($v['invoice_no'] ?? ''), 'status'=>strtoupper((string)($v['status'] ?? '')), 'url'=>'/invoice?id=' . (int)$v['id']];
 
     // Rollup — what is still live, and the billed total.
-    $openCalls = 0; foreach ($calls as $c) { $s = strtoupper((string)(($c['op_status'] ?? '') ?: ($c['status'] ?? ''))); if (!in_array($s, ['CLOSED','CANCELLED','COMPLETED'], true)) $openCalls++; }
+    $openCalls = 0; foreach ($calls as $c) { $s = strtoupper((string)(($c['op_status'] ?? '') ?: ($c['status'] ?? ''))); if (!in_array($s, ['CLOSED','CANCELLED','COMPLETED','REJECTED'], true)) $openCalls++; }
     $openJobs = 0;  foreach ($jobs as $j) if (empty($j['closed_flag'])) $openJobs++;
     $billed = 0.0;  foreach ($invoices as $v) if (strtoupper((string)($v['status'] ?? '')) !== 'CANCELLED') $billed += (float)($v['total'] ?? 0);
     $rollup = [

@@ -125,11 +125,21 @@ function tosrm_derive_status($call) {
     if ($legacy === 'CANCELLED') return 'CANCELLED';
     if ($legacy === 'ALLOCATED') return 'ASSIGNED';
     if ($legacy === 'FORWARDED') return 'READY_TO_SCHEDULE';
+    //  Stage 1 B2 — a legacy open order that already has somebody on a job is not
+    //  "awaiting triage" (Stage 0: 47 of 54 "new requests" had an engineer and a date).
+    //  Same rule as opk_status_sql(), so the pill and the counts agree.
+    if (!empty($call['id']) && function_exists('opk_has_person_sql')) {
+        try { if ((int) ops_val("SELECT COUNT(*) FROM calls c WHERE c.id=? AND " . opk_has_person_sql('c'), [(int) $call['id']]) > 0) return 'ASSIGNED'; } catch (Throwable $e) {}
+    }
     return 'RECEIVED';
 }
 function tosrm_call_status($call) {
     $op = trim((string)($call['op_status'] ?? ''));
-    return $op !== '' ? $op : tosrm_derive_status($call);
+    if ($op !== '') return $op;
+    // A register row already carries the same reading computed in SQL (opk_status_sql)
+    // — use it rather than one more query per row.
+    if (!empty($call['opk_status'])) return (string) $call['opk_status'];
+    return tosrm_derive_status($call);
 }
 
 // Phase 2 §46 — "do not allow two statuses to silently disagree." A call carries a
@@ -211,6 +221,11 @@ function tosrm_set_status($callId, $to, $reason = '', $actor = '', $force = fals
     if (!$call) return false;
     $from = tosrm_call_status($call);
     if (!$force && !tosrm_can_transition($from, $to)) return false;   // R6 — not a legal step
+    //  Stage 1 B3 (owner, 24 Nov 2026; Stage 0 S1-08): "Ready for scheduling" means the
+    //  details are complete, or the existing override-with-reason was recorded — the
+    //  readiness check the call page already shows (tosrm_call_ready). Not even a
+    //  transition override skips it: the readiness override is its own, recorded step.
+    if ($to === 'READY_TO_SCHEDULE' && $from !== $to && !tosrm_call_ready($call)['ok']) return false;
     db()->prepare("UPDATE calls SET op_status=? WHERE id=?")->execute([$to, (int)$callId]);
     $note = ($force && !tosrm_can_transition($from, $to)) ? trim('[override] ' . $reason) : (string)$reason;
     db()->prepare("INSERT INTO call_status_events (call_id, old_status, new_status, reason, actor, at) VALUES (?,?,?,?,?,?)")
@@ -621,6 +636,12 @@ function ops_tosrm_action($route, $method) {
             // R6 — a manager may force a non-standard transition, but only with a reason.
             $force  = !empty($_POST['override']) && function_exists('is_admin_level') && is_admin_level();
             if ($force && trim($reason) === '') { flash('An override needs a reason.', 'error'); break; }
+            //  Stage 1 B3 — say exactly why "Ready for scheduling" is refused, and how to proceed.
+            if (strtoupper(trim($to)) === 'READY_TO_SCHEDULE' && !($rd = tosrm_call_ready($call))['ok']) {
+                flash('Not ready for scheduling yet — missing: ' . implode(', ', $rd['missing'])
+                    . '. Complete these details, or record a validation override with a reason, then try again.', 'error');
+                break;
+            }
             if (tosrm_set_status($callId, $to, $reason, '', $force)) {
                 flash('Status updated.');
             } elseif ($to !== '' && array_key_exists(strtoupper(trim($to)), tosrm_status_options())) {
@@ -678,6 +699,17 @@ function ops_tosrm_action($route, $method) {
 
 const TOSRM_ASSIGN_STATES = ['TENTATIVE'=>'Tentative (held)','CONFIRMED'=>'Confirmed','RELEASED'=>'Released'];
 const TOSRM_ACCEPT_STATES = ['PENDING'=>'Awaiting acceptance','ACCEPTED'=>'Accepted','DECLINED'=>'Declined','CLARIFY'=>'Clarification requested','REPLACE'=>'Replacement requested'];
+// Stage 1 B4 — who is on a register row, in words: the person, else the sub-contractor
+// firm, tagged External when the company does not control their diary.
+function tosrm_resource_label($r) {
+    $name = trim((string) ($r['inspector_name'] ?? ''));
+    $ext  = in_array(strtoupper((string) ($r['staff_kind'] ?? '')), ['FREELANCER', 'SUBCON'], true);
+    if ($name === '' && trim((string) ($r['subcon_agency'] ?? '')) !== '') { $name = trim((string) $r['subcon_agency']); $ext = true; }
+    if ($name === '') return 'Unassigned';
+    return $name . ($ext ? ' · External' : '');
+}
+function tosrm_assign_label($code) { $c = strtoupper((string) $code); return $c === '' ? '—' : (TOSRM_ASSIGN_STATES[$c] ?? $c); }
+function tosrm_accept_label($code) { $c = strtoupper((string) $code); return $c === '' ? '—' : (TOSRM_ACCEPT_STATES[$c] ?? $c); }
 const TOSRM_NOSHOW_PARTIES = ['CLIENT'=>'Client','VENDOR'=>'Vendor','RESOURCE'=>'Resource','OTHER'=>'Other'];
 // Who called a cancellation off — so client-driven and office-driven cancellations
 // can be told apart on the disruptions scoreboard.
@@ -1963,20 +1995,26 @@ function tosrm_ops_metrics($offices = 'ALL') {
     $w = tosrm_call_office_sql($offices, 'c');
     $today = date('Y-m-d');
     $one = fn($sql, $a = []) => (int)(ops_one($sql, $a)['n'] ?? 0);
+    //  Stage 1 B1 (owner, 24 Nov 2026) — every figure comes from lib/opskpi.php, the one
+    //  definition the register it opens is filtered by (card = rows). Work orders are
+    //  counted on the executing desk $offices (the home passes tosrm_office_scope(), as
+    //  the filtered register does) within the register's own visibility; jobs under the
+    //  jobs register's scope.
     $m = [];
-    $m['unscheduled'] = count(function_exists('sched_unallocated_calls') ? sched_unallocated_calls($offices, 999) : []);
-    $m['clarification'] = $one("SELECT COUNT(DISTINCT c.id) n FROM calls c JOIN call_clarifications cc ON cc.call_id=c.id AND cc.status='OPEN' WHERE $w");
-    $m['ready'] = $one("SELECT COUNT(*) n FROM calls c WHERE c.op_status='READY_TO_SCHEDULE' AND $w");
-    $m['new'] = $one("SELECT COUNT(*) n FROM calls c WHERE (c.op_status IN ('RECEIVED','DRAFT','UNDER_REVIEW') OR (COALESCE(c.op_status,'')='' AND c.status='OPEN')) AND $w");
-    $m['today'] = $one("SELECT COUNT(*) n FROM jobs j JOIN calls c ON c.id=j.call_id WHERE j.scheduled_date=? AND $w", [$today]);
-    $m['overdue'] = $one("SELECT COUNT(*) n FROM calls c WHERE c.status<>'CLOSED' AND COALESCE(c.op_status,'')<>'CLOSED' AND c.inspection_required_date<>'' AND c.inspection_required_date<? AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.call_id=c.id AND j.closed_flag=1) AND $w", [$today]);
-    // R10 (fixed, Revamp P5): jobs.stage is vestigial — never advanced past the
-    // default/CANCELLED — so counting j.stage='REPORT_PENDING' was always 0. The
-    // real "report pending" signal is a CLOSED job whose report is still awaiting
-    // the reporting manager's sign-off (report_approval='PENDING'), which is the
-    // live lifecycle field.
-    $m['report_pending'] = $one("SELECT COUNT(*) n FROM jobs j JOIN calls c ON c.id=j.call_id WHERE j.closed_flag=1 AND j.report_approval='PENDING' AND $w");
-    $m['critical'] = $one("SELECT COUNT(*) n FROM calls c WHERE c.priority='CRITICAL' AND c.status<>'CLOSED' AND $w");
+    $m['unscheduled']   = opk_count_calls('no_engineer', $offices);      // "No engineer yet"
+    $m['no_engineer']   = $m['unscheduled'];
+    $m['clarification'] = opk_count_calls('clarification', $offices);
+    $m['ready']         = opk_count_calls('ready', $offices);
+    $m['new']           = opk_count_calls('new', $offices);
+    $m['today']         = opk_count_jobs('today');
+    $m['overdue']       = opk_count_calls('wo_overdue', $offices);       // "Work orders overdue"
+    $m['wo_overdue']    = $m['overdue'];
+    $m['jobs_overdue']  = opk_count_jobs('jobs_overdue');
+    //  (R10, kept: jobs.stage is vestigial — never advanced — so "report pending" is read
+    //  from the closed job's report_approval, never from j.stage.)
+    $m['report_pending'] = opk_count_jobs('signoff');                    // "Reports awaiting sign-off"
+    $m['signoff']       = $m['report_pending'];
+    $m['critical']      = opk_count_calls('critical', $offices);
     return $m;
 }
 
@@ -1985,20 +2023,29 @@ function tosrm_ops_backlog($offices = 'ALL', $limit = 100) {
     tosrm_migrate_d();
     $w = tosrm_call_office_sql($offices, 'c');
     $today = date('Y-m-d');
+    //  Stage 1 B2 (owner, 24 Nov 2026): the backlog reads the one status and the one
+    //  "somebody on it" rule (lib/opskpi.php) — a legacy-cancelled order is not backlog,
+    //  and a declined / released / cancelled assignment is not "a resource assigned".
+    $liveSql = function_exists('opk_call_live_sql') ? opk_call_live_sql('c')
+             : "c.status<>'CLOSED' AND COALESCE(c.op_status,'')<>'CLOSED' AND COALESCE(c.op_status,'')<>'CANCELLED'";
+    $hasRes  = function_exists('opk_job_staffed_sql')
+             ? "(SELECT COUNT(*) FROM jobs j WHERE j.call_id=c.id AND " . opk_job_staffed_sql('j') . ")"
+             : "(SELECT COUNT(*) FROM jobs j WHERE j.call_id=c.id AND j.inspector_id IS NOT NULL)";
+    $stSql   = function_exists('opk_status_sql') ? opk_status_sql('c') : "c.op_status";
     $rows = ops_all("SELECT c.id, c.call_code, c.op_status, c.status, c.priority, c.inspection_type,
                             c.call_received_date, c.inspection_required_date,
                             bp.display_name client_name,
                             (SELECT COUNT(*) FROM call_clarifications cc WHERE cc.call_id=c.id AND cc.status='OPEN') open_clar,
-                            (SELECT COUNT(*) FROM jobs j WHERE j.call_id=c.id AND j.inspector_id IS NOT NULL) has_res
+                            " . $hasRes . " has_res, " . $stSql . " opk_status
                      FROM calls c LEFT JOIN business_partners bp ON bp.id=c.client_id
-                     WHERE c.status<>'CLOSED' AND COALESCE(c.op_status,'')<>'CLOSED' AND COALESCE(c.op_status,'')<>'CANCELLED'
+                     WHERE " . $liveSql . "
                        -- Field-finding #25 — a call already allocated AND scheduled for a FUTURE date is in
                        -- hand (it shows under the Schedule / Assignment registers), not backlog. The backlog
                        -- is work needing attention: unscheduled, unassigned, awaiting clarification, or
                        -- overdue. Overdue (scheduled in the past) and today's stay; only future-scheduled,
                        -- assigned work is excluded here.
                        AND NOT EXISTS (SELECT 1 FROM jobs j2 WHERE j2.call_id=c.id
-                                       AND j2.inspector_id IS NOT NULL AND COALESCE(j2.closed_flag,0)=0
+                                       AND " . (function_exists('opk_job_staffed_sql') ? opk_job_staffed_sql('j2') : "j2.inspector_id IS NOT NULL") . " AND COALESCE(j2.closed_flag,0)=0
                                        AND COALESCE(j2.scheduled_date,'')<>'' AND j2.scheduled_date > '$today')
                        AND $w
                      ORDER BY CASE WHEN c.inspection_required_date='' THEN 1 ELSE 0 END, c.inspection_required_date, c.id
@@ -2006,8 +2053,11 @@ function tosrm_ops_backlog($offices = 'ALL', $limit = 100) {
     foreach ($rows as &$r) {
         $r['age_days'] = ($r['call_received_date'] ?? '') !== '' && function_exists('days_between') ? days_between($r['call_received_date'], $today) : null;
         $r['overdue'] = ($r['inspection_required_date'] ?? '') !== '' && $r['inspection_required_date'] < $today;
+        //  The reason reads the canonical status by its LABEL (never a raw code).
+        $stKey = (string)($r['op_status'] ?: ($r['opk_status'] ?? 'RECEIVED'));
+        $stLab = (tosrm_status_options()[$stKey] ?? (CALL_STATUSES[$stKey] ?? $stKey));
         $r['pending_reason'] = (int)$r['open_clar'] > 0 ? 'Clarification open'
-            : ((int)$r['has_res'] === 0 ? 'No resource assigned' : (($r['op_status'] ?: 'RECEIVED')));
+            : ((int)$r['has_res'] === 0 ? (function_exists('opk_label') ? opk_label('no_engineer') : 'No resource assigned') : $stLab);
     }
     return $rows;
 }
@@ -2018,11 +2068,13 @@ function tosrm_schedule_register($offices = 'ALL', $from = null, $to = null) {
     $from = $from ?: date('Y-m-d'); $to = $to ?: date('Y-m-d', strtotime($from . ' +13 days'));
     $w = tosrm_call_office_sql($offices, 'c');
     return ops_all("SELECT j.id job_id, j.job_code, j.scheduled_date, j.stage, j.assign_state, j.accept_state,
+                           j.closed_flag, j.inspector_id, j.subcon_id,
                            c.id call_id, c.call_code, c.inspection_type, bp.display_name client_name,
-                           i.name inspector_name
+                           i.name inspector_name, i.staff_kind, s.agency subcon_agency
                     FROM jobs j JOIN calls c ON c.id=j.call_id
                     LEFT JOIN business_partners bp ON bp.id=c.client_id
                     LEFT JOIN inspectors i ON i.id=j.inspector_id
+                    LEFT JOIN subcons s ON s.id=j.subcon_id
                     WHERE j.scheduled_date>=? AND j.scheduled_date<=? AND $w
                     ORDER BY j.scheduled_date, j.id", [$from, $to]) ?: [];
 }
@@ -2030,11 +2082,14 @@ function tosrm_assignment_register($offices = 'ALL', $limit = 200) {
     tosrm_migrate_d();
     $w = tosrm_call_office_sql($offices, 'c');
     return ops_all("SELECT j.id job_id, j.job_code, j.scheduled_date, j.assign_state, j.accept_state, j.accept_reason,
-                           c.call_code, c.inspection_type, bp.display_name client_name, i.name inspector_name
+                           j.inspector_id, j.subcon_id,
+                           c.call_code, c.inspection_type, bp.display_name client_name, i.name inspector_name, i.staff_kind,
+                           s.agency subcon_agency
                     FROM jobs j JOIN calls c ON c.id=j.call_id
                     LEFT JOIN business_partners bp ON bp.id=c.client_id
                     LEFT JOIN inspectors i ON i.id=j.inspector_id
-                    WHERE j.inspector_id IS NOT NULL AND $w
+                    LEFT JOIN subcons s ON s.id=j.subcon_id
+                    WHERE (j.inspector_id IS NOT NULL OR j.subcon_id IS NOT NULL) AND $w
                     ORDER BY j.id DESC LIMIT " . (int)$limit) ?: [];
 }
 
@@ -2056,7 +2111,7 @@ function tosrm_issue_from_event($jobId, $title, $description = '', $severity = '
 // ---- Rule-based data-quality flags (advisory; no AI needed) -----------------
 function tosrm_ops_dataquality($offices = 'ALL', $limit = 60) {
     $w = tosrm_call_office_sql($offices, 'c');
-    $rows = ops_all("SELECT c.* FROM calls c WHERE c.status<>'CLOSED' AND $w ORDER BY c.id DESC LIMIT " . (int)$limit) ?: [];
+    $rows = ops_all("SELECT c.* FROM calls c WHERE " . (function_exists('opk_call_live_sql') ? opk_call_live_sql('c') : "c.status<>'CLOSED'") . " AND $w ORDER BY c.id DESC LIMIT " . (int)$limit) ?: [];
     $out = [];
     foreach ($rows as $c) {
         $missing = tosrm_validate_call($c);
@@ -2068,8 +2123,9 @@ function tosrm_ops_dataquality($offices = 'ALL', $limit = 60) {
 
 // ---- Operations summary (deterministic; AI-wrapped only when enabled) -------
 function tosrm_ops_summary($metrics) {
-    $base = sprintf('Backlog: %d unscheduled, %d awaiting clarification, %d ready to schedule. %d overdue, %d critical, %d report(s) pending. %d service(s) today.',
-        $metrics['unscheduled'], $metrics['clarification'], $metrics['ready'], $metrics['overdue'], $metrics['critical'], $metrics['report_pending'], $metrics['today']);
+    //  Stage 1 B3 — the same names as the cards (lib/opskpi.php), so the sentence says what is counted.
+    $base = sprintf('Backlog: %d with no engineer yet, %d awaiting clarification, %d ready to schedule. %d work order(s) overdue, %d job(s) overdue, %d critical, %d report(s) awaiting sign-off. %d service(s) today.',
+        $metrics['unscheduled'], $metrics['clarification'], $metrics['ready'], $metrics['overdue'], (int)($metrics['jobs_overdue'] ?? 0), $metrics['critical'], $metrics['report_pending'], $metrics['today']);
     // AI may PHRASE it more helpfully, but never invents numbers and never acts.
     if (function_exists('ai_enabled') && ai_enabled() && function_exists('ai_chat')) {
         try {
@@ -2373,13 +2429,20 @@ function tosrm_xo_calls($offices, $limit = 120) {
 // scheduling". A call is pending when it is open and no job carries a date yet.
 // Scope: calls this branch executes (or raised with no executing branch set yet).
 function tosrm_pending_scheduling($offices, $limit = 200) {
-    $w = ["c.status<>'CLOSED'",
-          "COALESCE(c.op_status,'') NOT IN ('CLOSED','CANCELLED')",
-          "NOT EXISTS (SELECT 1 FROM jobs j WHERE j.call_id=c.id AND COALESCE(j.scheduled_date,'')<>'')"];
-    if (is_array($offices)) {
-        if (!$offices) return [];
-        $in = implode(',', array_map('intval', $offices));
-        $w[] = "(c.executing_office_id IN ($in) OR (COALESCE(c.executing_office_id,0)=0 AND c.ibo_office_id IN ($in)))";
+    if (is_array($offices) && !$offices) return [];
+    //  Stage 1 B1 (owner, 24 Nov 2026): "Waiting for a person" is the SAME list the
+    //  "No engineer yet" card counts (lib/opskpi.php) — nobody on a job yet, a
+    //  declined / released assignment counting as nobody — under the card's scope.
+    if (function_exists('opk_call_pred')) {
+        $w = [opk_call_pred('no_engineer'), opk_calls_visible_scope($offices)];
+    } else {
+        $w = ["c.status<>'CLOSED'",
+              "COALESCE(c.op_status,'') NOT IN ('CLOSED','CANCELLED')",
+              "NOT EXISTS (SELECT 1 FROM jobs j WHERE j.call_id=c.id AND COALESCE(j.scheduled_date,'')<>'')"];
+        if (is_array($offices)) {
+            $in = implode(',', array_map('intval', $offices));
+            $w[] = "(c.executing_office_id IN ($in) OR (COALESCE(c.executing_office_id,0)=0 AND c.ibo_office_id IN ($in)))";
+        }
     }
     try {
         return ops_all("SELECT c.id, c.call_code, c.client_id, c.inspection_type, c.sbu,
@@ -2606,7 +2669,7 @@ function ops_operations_home($method) {
     // then simply shows no number).
     $safe = function ($sql, $args = []) { try { return (int)(ops_one($sql, $args)['n'] ?? 0); } catch (Throwable $e) { return null; } };
     $counts = [
-        'calls_open'  => $safe("SELECT COUNT(*) n FROM calls c WHERE c.status<>'CLOSED' AND COALESCE(c.op_status,'')<>'CLOSED' AND $w"),
+        'calls_open'  => $safe("SELECT COUNT(*) n FROM calls c WHERE " . (function_exists('opk_call_live_sql') ? opk_call_live_sql('c') : "c.status<>'CLOSED' AND COALESCE(c.op_status,'')<>'CLOSED'") . " AND $w"),
         'jobs_active' => $safe("SELECT COUNT(*) n FROM jobs j JOIN calls c ON c.id=j.call_id WHERE COALESCE(j.closed_flag,0)=0 AND $w"),
         'recurring'   => $safe("SELECT COUNT(*) n FROM calls c WHERE COALESCE(c.is_recurring,0)=1 AND c.status<>'CLOSED' AND $w"),
         'overrides'   => $safe("SELECT COUNT(*) n FROM contract_overrides WHERE status IN ('PENDING','ENDORSED')"),

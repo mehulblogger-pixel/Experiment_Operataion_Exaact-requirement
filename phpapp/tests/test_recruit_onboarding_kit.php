@@ -55,7 +55,7 @@ setting_set('role_access', '');   // clear the test's role override
 // ...and put the marketplace switch back exactly as it was found.
 if ($okSnapConnect === null) {
     try { db()->prepare("DELETE FROM settings WHERE skey='connect_enabled'")->execute(); } catch (Throwable $e) {}
-    $okCache = &settings_cache(); unset($okCache['connect_enabled']);
+    $okCache = &settings_cache(); unset($okCache['connect_enabled']); unset($okCache);
 } else {
     setting_set('connect_enabled', $okSnapConnect);
 }

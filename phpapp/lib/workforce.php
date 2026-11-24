@@ -459,12 +459,55 @@ function ops_work_norms($method) {
 }
 
 // -------------------------------------------------------------------------
+//  ONE RESOURCE CLASSIFICATION (Stage 1 B4, owner 24 Nov 2026; Stage 0 S1-09/S4-01)
+//
+//  Built on the three existing fields — nothing new is stored:
+//    staff_kind  ASSET (our person) · FREELANCER · SUBCON
+//    roll_type   OWN · AGENCY (agency payroll — still a company-controlled person)
+//    team_role   FIELD · COORD · OFFICE
+//  A RESOURCE for availability, the board, suggestions and capacity is the field team
+//  plus coordinators. In-house (own roll) and agency-payroll staff are company-
+//  controlled. Freelancers and sub-contractors are EXTERNAL: shown in their own group
+//  ("External — confirm with agency") and never counted as free capacity, because
+//  the company does not control their diary. The allocate picker is unchanged —
+//  everyone stays deputable there (owner rule).
+// -------------------------------------------------------------------------
+function res_class($p) {
+    $kind = strtoupper((string) ($p['staff_kind'] ?? 'ASSET')) ?: 'ASSET';
+    $roll = strtoupper((string) ($p['roll_type'] ?? 'OWN')) ?: 'OWN';
+    $role = strtoupper((string) ($p['team_role'] ?? 'FIELD')) ?: 'FIELD';
+    if (in_array($kind, ['FREELANCER', 'SUBCON'], true)) $grp = ['EXTERNAL', $kind === 'SUBCON' ? 'Sub-contractor' : 'Freelancer (external)'];
+    elseif ($roll === 'AGENCY') $grp = ['AGENCY_PAYROLL', 'Agency payroll'];
+    else $grp = ['INHOUSE', 'In-house'];
+    return ['group' => $grp[0], 'label' => $grp[1], 'company' => $grp[0] !== 'EXTERNAL',
+            'resource' => in_array($role, ['FIELD', 'COORD'], true)];
+}
+// SQL twins (alias '' or 'i.'): company-controlled, and field team + coordinators.
+function res_company_sql($a = '')  { return "COALESCE({$a}staff_kind,'ASSET') NOT IN ('FREELANCER','SUBCON')"; }
+function res_resource_sql($a = '') { return "COALESCE(NULLIF({$a}team_role,''),'FIELD') IN ('FIELD','COORD')"; }
+// A job that really occupies its person: not cancelled, hold not released, not declined
+// (Stage 0 S1-10 — a declined / released engineer still showed ON JOB).
+function res_job_holds_sql($j = '') {
+    return "COALESCE({$j}stage,'')<>'CANCELLED' AND COALESCE({$j}assign_state,'')<>'RELEASED' AND COALESCE({$j}accept_state,'')<>'DECLINED'";
+}
+// External people for the availability page's own group (never counted as free).
+function availability_external($offices) {
+    $where = "status='ACTIVE' AND COALESCE(staff_kind,'ASSET') IN ('FREELANCER','SUBCON')";
+    if (is_array($offices)) {
+        if (!$offices) return [];
+        $where .= " AND (home_office_id IN (" . implode(',', array_map('intval', $offices)) . ") OR COALESCE(home_office_id,0)=0)";
+    }
+    try { return ops_all("SELECT id, name, emp_code, staff_kind, roll_type, agency_name FROM inspectors WHERE $where ORDER BY name") ?: []; }
+    catch (Throwable $e) { return []; }
+}
+
+// -------------------------------------------------------------------------
 //  Availability board
 // -------------------------------------------------------------------------
 // Inspector ids that are occupied by an active (open) job on $day.
 function inspectors_on_job($day) {
     $rows = ops_all("SELECT DISTINCT inspector_id FROM jobs
-        WHERE inspector_id IS NOT NULL AND closed_flag=0 AND (
+        WHERE inspector_id IS NOT NULL AND closed_flag=0 AND " . res_job_holds_sql() . " AND (
             scheduled_date = ?
             OR (inspection_start_date <> '' AND inspection_start_date <= ? AND (inspection_end_date='' OR inspection_end_date >= ?))
             OR (scheduled_date <> '' AND scheduled_date <= ? AND inspection_end_date <> '' AND inspection_end_date >= ?)
@@ -485,7 +528,8 @@ function inspector_day_overrides($day) {
 // job today, else AVAILABLE) + note + today's job code(s).
 function inspector_availability($offices, $day = null) {
     $day = $day ?: date('Y-m-d');
-    $where = "status='ACTIVE' AND COALESCE(staff_kind,'ASSET')<>'SUBCON'";
+    //  Stage 1 B4 — resources only (field team + coordinators), company-controlled only.
+    $where = "status='ACTIVE' AND " . res_company_sql() . " AND " . res_resource_sql();
     $args = [];
     if (is_array($offices)) {
         if (!$offices) return [];
@@ -501,7 +545,7 @@ function inspector_availability($offices, $day = null) {
     // today's job code(s) per inspector (for the "on job" detail)
     $jobs = [];
     foreach (ops_all("SELECT inspector_id, job_code, scheduled_date FROM jobs
-        WHERE inspector_id IS NOT NULL AND closed_flag=0 AND (
+        WHERE inspector_id IS NOT NULL AND closed_flag=0 AND " . res_job_holds_sql() . " AND (
             scheduled_date=? OR (inspection_start_date<>'' AND inspection_start_date<=? AND (inspection_end_date='' OR inspection_end_date>=?))
         )", [$day, $day, $day]) as $j) $jobs[(int)$j['inspector_id']][] = $j['job_code'];
     $out = [];
@@ -559,7 +603,7 @@ function availability_matrix($offices, $from, $to) {
     // period, or any of the visit dates now held on the deputation.
     $busy = []; $busyId = [];   // busyId: inspector_id => day => job id, for a direct link to the job
     foreach (ops_all("SELECT id, inspector_id, job_code, scheduled_date, inspection_start_date, inspection_end_date, inspection_dates
-                      FROM jobs WHERE inspector_id IS NOT NULL AND closed_flag=0 AND inspector_id IN ($inIds)") as $j) {
+                      FROM jobs WHERE inspector_id IS NOT NULL AND closed_flag=0 AND " . res_job_holds_sql() . " AND inspector_id IN ($inIds)") as $j) {
         $iid = (int)$j['inspector_id'];
         $mark = function ($d) use (&$busy, &$busyId, $iid, $j, $first, $last) {
             if ($d === '' || $d < $first || $d > $last) return;
@@ -747,6 +791,7 @@ function ops_inspector_availability($method) {
         'tradeOpts' => function_exists('trade_options') ? trade_options() : [],
         'fOffice' => $fOffice, 'fSbu' => $fSbu, 'fStatus' => $fStatus, 'fTrade' => $fTrade, 'fq' => $fq,
         'chkFrom' => $chkFrom, 'chkDays' => $chkDays,
+        'external' => function_exists('availability_external') ? availability_external($offices) : [],   // Stage 1 B4
     ]);
     return true;
 }
@@ -786,10 +831,17 @@ function ops_run_mis_digest($period = 'weekly') {
     $today = date('Y-m-d');
     $since = $period === 'monthly' ? date('Y-m-d', strtotime('-1 month')) : date('Y-m-d', strtotime('-7 days'));
     $v = fn($sql, $a = []) => (float)ops_val($sql, $a);
-    $openJobs   = (int)$v("SELECT COUNT(*) FROM jobs WHERE closed_flag=0");
-    $overdue    = (int)$v("SELECT COUNT(*) FROM jobs WHERE closed_flag=0 AND ((inspection_end_date<>'' AND inspection_end_date<?) OR (inspection_end_date='' AND scheduled_date<>'' AND scheduled_date<?))", [$today, $today]);
+    //  Stage 1 B1/B2: the digest reads the same definitions as the Operations home
+    //  (lib/opskpi.php): a cancelled job is not open; overdue = "Jobs overdue";
+    //  reports = "Reports awaiting sign-off" (closed jobs, sign-off pending).
+    $openJobs   = (int)$v("SELECT COUNT(*) FROM jobs j WHERE j.closed_flag=0 AND COALESCE(j.stage,'')<>'CANCELLED'");
+    $overdue    = function_exists('opk_job_pred')
+        ? (int)$v("SELECT COUNT(*) FROM jobs j WHERE " . opk_job_pred('jobs_overdue'))
+        : (int)$v("SELECT COUNT(*) FROM jobs WHERE closed_flag=0 AND ((inspection_end_date<>'' AND inspection_end_date<?) OR (inspection_end_date='' AND scheduled_date<>'' AND scheduled_date<?))", [$today, $today]);
     $closed     = (int)$v("SELECT COUNT(*) FROM jobs WHERE closed_flag=1 AND closed_at>=?", [$since]);
-    $repPending = (int)$v("SELECT COUNT(*) FROM jobs WHERE report_approval='PENDING'");
+    $repPending = function_exists('opk_job_pred')
+        ? (int)$v("SELECT COUNT(*) FROM jobs j WHERE " . opk_job_pred('signoff'))
+        : (int)$v("SELECT COUNT(*) FROM jobs WHERE report_approval='PENDING'");
     $newCalls   = (int)$v("SELECT COUNT(*) FROM calls WHERE call_received_date>=?", [$since]);
     // sales (guard if CRM not present)
     $hasQuotes  = (int)$v("SELECT COUNT(*) FROM quotations");
@@ -804,10 +856,10 @@ function ops_run_mis_digest($period = 'weekly') {
     $label = $period === 'monthly' ? 'Monthly' : 'Weekly';
     $body = "$label management summary — " . app_name() . "\nPeriod: since $since\n\n"
         . "OPERATIONS\n"
-        . "  Open jobs: $openJobs  (overdue: $overdue)\n"
+        . "  Open jobs: $openJobs  (jobs overdue: $overdue)\n"
         . "  Jobs closed in period: $closed\n"
         . "  New calls in period: $newCalls\n"
-        . "  Reports awaiting approval: $repPending\n\n"
+        . "  Reports awaiting sign-off: $repPending\n\n"
         . "SALES / CRM\n"
         . "  Open quotations: $qOpen\n"
         . "  Won in period: $qWon  (₹" . nf($wonVal, 0) . ")\n"

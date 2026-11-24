@@ -30,7 +30,7 @@ t_nothrow('the policy is ENFORCED by default — the owner\'s decision', functio
     // read path and is returned by reference, so unsetting the key there is
     // exactly the state a fresh workspace is in.
     db()->prepare("DELETE FROM settings WHERE skey=?")->execute(['requisition_requires_request']);
-    $c = &settings_cache(); unset($c['requisition_requires_request']);
+    $c = &settings_cache(); unset($c['requisition_requires_request']); unset($c);
     t_ok(!hreq_direct_path_allowed(), 'with nothing configured, the direct route is refused');
     t_ok(hreq_direct_path_block_reason() !== '', 'and it says why');
 });

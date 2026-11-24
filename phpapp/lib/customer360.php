@@ -119,9 +119,10 @@ function c360_work($pid) {
                        LEFT JOIN calls c ON c.id = j.call_id
                        LEFT JOIN inspectors i ON i.id = j.inspector_id
                        WHERE c.client_id=? ORDER BY j.id DESC LIMIT 8", [(int)$pid]);
-    $openCalls = (int)c360_try(fn() => ops_val("SELECT COUNT(*) FROM calls WHERE client_id=? AND status <> 'CLOSED'", [(int)$pid]), 0);
+    //  Stage 1 B2 — open = live (not closed, cancelled or rejected on either status field).
+    $openCalls = (int)c360_try(fn() => ops_val("SELECT COUNT(*) FROM calls c WHERE c.client_id=? AND " . (function_exists('opk_call_live_sql') ? opk_call_live_sql('c') : "c.status <> 'CLOSED'"), [(int)$pid]), 0);
     $openJobs  = (int)c360_try(fn() => ops_val(
-        "SELECT COUNT(*) FROM jobs j LEFT JOIN calls c ON c.id=j.call_id WHERE c.client_id=? AND j.closed_flag=0", [(int)$pid]), 0);
+        "SELECT COUNT(*) FROM jobs j LEFT JOIN calls c ON c.id=j.call_id WHERE c.client_id=? AND j.closed_flag=0 AND COALESCE(j.stage,'')<>'CANCELLED'", [(int)$pid]), 0);
     // Work finished and never billed, for this customer. The single most useful
     // number on the screen for anybody in accounts.
     $unbilled = (int)c360_try(fn() => ops_val(

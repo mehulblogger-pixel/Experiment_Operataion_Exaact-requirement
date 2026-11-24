@@ -51,5 +51,6 @@ foreach ($keys as $k) {
     if ($snap[$k] === null) { try { db()->prepare("DELETE FROM settings WHERE skey=?")->execute([$k]); } catch (Throwable $e) {} unset($cache[$k]); }
     else setting_set($k, $snap[$k]);
 }
+unset($cache);   // S1-B0: release the reference to the settings cache
 licence_disabled(true);
 t_ok(true, 'global module settings restored');

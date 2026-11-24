@@ -225,6 +225,7 @@ try {
     require __DIR__ . '/lib/ncdca.php';
     require __DIR__ . '/lib/schedboard.php';
     require __DIR__ . '/lib/tosrm.php';
+    require __DIR__ . '/lib/opskpi.php';   // Stage 1 B1 — one definition per Operations figure
     require __DIR__ . '/lib/attend.php';
     require __DIR__ . '/lib/cvp.php';
     require __DIR__ . '/lib/tapi.php';

@@ -2571,12 +2571,60 @@ function job_glance($job) {
 // already exist (the nowband narrates the next step; this names the stage, the owner
 // and every blocker in one place). Blockers tagged money=true are hidden from a field
 // inspector by the caller. Every probe is guarded so a missing helper never breaks it.
+//  Stage 1 B2 (owner, 24 Nov 2026; Stage 0 S1-06) — THE JOB'S STAGE, DERIVED.
+//  jobs.stage is a field the application never advances (13 open demo jobs read
+//  "Report pending" while the Operations home counted 0), so every screen that shows
+//  a job's stage now derives it from the facts it already has: the closed flag, the
+//  dates and the report documents. Only the two states a person sets on purpose are
+//  read from the field — Cancelled (Cancel assignment) and On hold. The words are the
+//  existing job-stage list (Settings → lists) — no new stage.
+//  $facts (optional): ['any'=>n, 'review'=>n, 'issued'=>n] report-document counts the
+//  caller already has; otherwise they are read here.
+function job_stage_key($job, $facts = null) {
+    $job = (array) $job;
+    $jid = (int) ($job['id'] ?? ($job['job_id'] ?? 0));
+    // A list row may not carry every column; fill the missing ones once.
+    if ($jid && (!array_key_exists('closed_flag', $job) || !array_key_exists('reporting_frequency', $job) || !array_key_exists('inspection_end_date', $job))) {
+        try { $job += (ops_one("SELECT * FROM jobs WHERE id=?", [$jid]) ?: []); } catch (Throwable $e) {}
+    }
+    if (!empty($job['closed_flag'])) return 'CLOSED';
+    $raw = strtoupper((string) ($job['stage'] ?? ''));
+    if ($raw === 'CANCELLED') return 'CANCELLED';
+    if ($raw === 'ON_HOLD')   return 'ON_HOLD';
+    if (!is_array($facts)) {
+        $facts = ['any' => 0, 'review' => 0, 'issued' => 0];
+        if ($jid) try {
+            $r = ops_one("SELECT COUNT(*) a, SUM(CASE WHEN status IN ('VETTING','UNDER_REVIEW') THEN 1 ELSE 0 END) r,
+                                 SUM(CASE WHEN COALESCE(finalized,0)=1 THEN 1 ELSE 0 END) i
+                          FROM report_docs WHERE job_id=? AND COALESCE(deleted,0)=0", [$jid]) ?: [];
+            $facts = ['any' => (int) ($r['a'] ?? 0), 'review' => (int) ($r['r'] ?? 0), 'issued' => (int) ($r['i'] ?? 0)];
+        } catch (Throwable $e) {}
+    }
+    $today = date('Y-m-d');
+    $start = trim((string) ($job['inspection_start_date'] ?? ''));
+    $end   = trim((string) ($job['inspection_end_date'] ?? ''));
+    $sd    = trim((string) ($job['scheduled_date'] ?? ''));
+    $needsRp  = strtoupper(trim((string) ($job['reporting_frequency'] ?? ''))) !== 'NOREPORT';
+    $uploaded = trim((string) ($job['report_upload_date'] ?? '')) !== '';
+    if ($needsRp && ($facts['issued'] || $facts['review'] || $uploaded)) return 'SUBMITTED';
+    if ($needsRp && ($facts['any'] || ($end !== '' && $end < $today)))  return 'REPORT_PENDING';
+    if (($start !== '' && $start <= $today) || ($sd !== '' && $sd <= $today)) return 'IN_PROGRESS';
+    return 'ALLOCATED';
+}
+function job_stage_label($job, $facts = null) {
+    $job = (array) $job;
+    $k = job_stage_key($job, $facts);
+    $map = function_exists('lk_options_or') ? lk_options_or('job_stage', JOB_STAGES) : JOB_STAGES;
+    if ($k === 'ALLOCATED' && empty($job['inspector_id']) && empty($job['subcon_id']) && function_exists('opk_label')
+        && (array_key_exists('inspector_id', $job) || array_key_exists('subcon_id', $job)))
+        return opk_label('no_engineer');
+    return $map[$k] ?? (JOB_STAGES[$k] ?? $k);
+}
 function job_now($job) {
     $job = (array)$job;
     $jid = (int)($job['id'] ?? 0);
     $stageMap = (function_exists('lk_options_or') ? lk_options_or('job_stage', JOB_STAGES) : JOB_STAGES);
     $closed = !empty($job['closed_flag']);
-    $stage = $closed ? 'Closed' : ($stageMap[$job['stage'] ?? 'ALLOCATED'] ?? ($job['stage'] ?: 'Allocated'));
 
     // Report state, to decide the owner and reflect Module 07.
     $cnt = function ($sql, $a = []) { try { return (int) ops_val($sql, $a); } catch (Throwable $e) { return 0; } };
@@ -2585,6 +2633,8 @@ function job_now($job) {
     $issued    = $cnt("SELECT COUNT(*) FROM report_docs WHERE job_id=? AND COALESCE(deleted,0)=0 AND COALESCE(finalized,0)=1", [$jid]);
     $sched = trim((string)($job['scheduled_date'] ?? '')) !== '';
     $ins = trim((string)($job['inspector_name'] ?? '')) ?: 'the inspector';
+
+    $stage = job_stage_label($job, ['any' => $anyReport, 'review' => $inReview, 'issued' => $issued]);
 
     if ($closed)          $owner = '—';
     elseif ($inReview)    $owner = 'Reviewer / approver';
@@ -3708,7 +3758,7 @@ function ops_route_module_map() {
         'impartiality'=>'impartiality','imp-type'=>'impartiality','imp-declare'=>'impartiality',
         'imp-threat-add'=>'impartiality','imp-threat-decide'=>'impartiality',
         'competence'=>'competence','auth-add'=>'competence','auth-status'=>'competence',
-        'auth-enforce'=>'competence','witness-add'=>'competence',
+        'auth-enforce'=>'competence','auth-window'=>'competence','witness-add'=>'competence',
         'cert-verify'=>'competence','credential-req-init'=>'competence',
         'equipment'=>'equipment','equip-new'=>'equipment','equip-edit'=>'equipment',
         'equip-cal-add'=>'equipment','equip-cal-del'=>'equipment','equip-cert'=>'equipment',
@@ -5663,6 +5713,20 @@ function ops_calls($route, $method) {
         $fQuote    = (int)($_GET['quote'] ?? 0);
         if ($fContract !== '') { $where .= " AND c.contract_number = ?"; $args[] = $fContract; }
         if ($fQuote)           { $where .= " AND c.quotation_id = ?";   $args[] = $fQuote; }
+        //  Stage 1 B1 (owner, 24 Nov 2026) — opened from an Operations-home card: the SAME
+        //  definition (lib/opskpi.php) under the SAME branch scope the card counted with,
+        //  so the card's number is the number of rows here.
+        $fKpi = trim((string)($_GET['f'] ?? ''));
+        if ($fKpi !== '' && function_exists('opk_call_pred') && opk_call_pred($fKpi) !== null) {
+            $where .= ' AND ' . opk_call_pred($fKpi) . ' AND ' . opk_calls_scope();
+        } else $fKpi = '';
+        //  The row flags the register's chips count — the same definitions again.
+        $opkCols = function_exists('opk_call_pred')
+            ? "(CASE WHEN " . opk_call_pred('no_engineer') . " THEN 1 ELSE 0 END) opk_no_engineer, "
+            . "(CASE WHEN " . opk_call_pred('wo_overdue') . " THEN 1 ELSE 0 END) opk_wo_overdue, "
+            . "(CASE WHEN " . opk_call_done_sql('c') . " THEN 1 ELSE 0 END) opk_done, "
+            . opk_status_sql('c') . " opk_status, "
+            : '';
         $costExpr = "((SELECT COALESCE(SUM(ve.row_total),0) FROM voucher_entries ve JOIN jobs jv ON jv.id=ve.job_id WHERE jv.call_id=c.id)"
                   . " + (SELECT COALESCE(SUM(ex.travel+ex.local+ex.food+ex.lodging+ex.misc),0) FROM expenses ex JOIN jobs je ON je.id=ex.job_id WHERE je.call_id=c.id))";
         // §a.ix — the register has to answer "where is this call stuck?" without
@@ -5694,6 +5758,7 @@ function ops_calls($route, $method) {
             cu.first_name coord_fname, cu.last_name coord_lname, cu.username coord_uname,
             (SELECT COUNT(*) FROM jobs j WHERE j.call_id=c.id) job_count,
             (SELECT COUNT(*) FROM jobs j WHERE j.call_id=c.id AND COALESCE(j.closed_flag,0)=1) closed_count,
+            $opkCols
             $costExpr AS cost_incurred,
             (SELECT MIN(j2.scheduled_date) FROM jobs j2 WHERE j2.call_id=c.id AND j2.scheduled_date<>'') sched_date,
             (SELECT i.name FROM jobs j3 LEFT JOIN inspectors i ON i.id=j3.inspector_id
@@ -5734,7 +5799,7 @@ function ops_calls($route, $method) {
             $head[] = 'Status';
             $csv = [$head];
             foreach ($rows as $c) {
-                $st = ($c['status'] ?? '') === 'CLOSED' ? 'Closed' : ((int)$c['job_count'] === 0 ? 'To schedule' : 'In progress');
+                $st = function_exists('opk_progress_label') ? opk_progress_label($c) : (($c['status'] ?? '') === 'CLOSED' ? 'Closed' : ((int)$c['job_count'] === 0 ? 'To schedule' : 'In progress'));
                 $L = $c['lead'];
                 $row = [$c['call_code'], $c['client_disp'] ?: $c['client_name'], $c['vendor_name'],
                     lk_options_or('sbu', OPS_SBUS)[$c['sbu']] ?? $c['sbu'],
@@ -5754,7 +5819,7 @@ function ops_calls($route, $method) {
             csv_download('calls-' . date('Y-m-d') . '.csv', $csv);
         }
         view('ops/calls', ['rows' => $rows, 'q' => $q, 'minCost' => $_GET['mincost'] ?? '',
-            'fContract' => $fContract, 'fQuote' => $fQuote]); return;
+            'fContract' => $fContract, 'fQuote' => $fQuote, 'fKpi' => $fKpi]); return;
     }
     if ($route === 'call-new' || $route === 'call-edit') {
         ops_require(can('ops.call.create') || is_master(), 'Only operations / coordinators can create ' . Tlp('call') . '.');
@@ -8831,24 +8896,37 @@ function ops_jobs($route, $method) {
         if ($fOffice) { $where .= " AND j.executing_office_id=?"; $args[] = $fOffice; }
         $fUnalloc = ($_GET['unallocated'] ?? '') === '1';
         if ($fUnalloc) $where .= " AND (j.inspector_id IS NULL AND (j.subcon_id IS NULL))";
-        $rows = ops_all("SELECT j.*, c.call_code, bp.legal_name client_name, bp.display_name client_disp,
-            i.name inspector_name FROM jobs j LEFT JOIN calls c ON c.id=j.call_id
+        //  Stage 1 B1 (owner, 24 Nov 2026) — opened from an Operations-home card: the
+        //  SAME definition (lib/opskpi.php) the card counted, under the register's own
+        //  scope (which is the card's scope), so the card's number is the rows here.
+        $fKpi = trim((string)($_GET['f'] ?? ''));
+        if ($fKpi !== '' && function_exists('opk_job_pred') && opk_job_pred($fKpi) !== null) {
+            $where .= ' AND ' . opk_job_pred($fKpi);
+        } else $fKpi = '';
+        $opkJ = function_exists('opk_job_pred')
+            ? "(CASE WHEN " . opk_job_pred('jobs_overdue') . " THEN 1 ELSE 0 END) opk_jobs_overdue, "
+            . "(CASE WHEN " . opk_job_live_sql('j') . " THEN 0 ELSE 1 END) opk_cancelled, "
+            : '';
+        $rows = ops_all("SELECT j.*, $opkJ c.call_code, bp.legal_name client_name, bp.display_name client_disp,
+            i.name inspector_name, i.staff_kind, sc.agency subcon_agency FROM jobs j LEFT JOIN calls c ON c.id=j.call_id
             LEFT JOIN business_partners bp ON bp.id=c.client_id LEFT JOIN inspectors i ON i.id=j.inspector_id
+            LEFT JOIN subcons sc ON sc.id=j.subcon_id
             WHERE $where ORDER BY j.id DESC", $args);
         if (wants_csv()) {
             $seeCredit = can('data.credit'); $today = date('Y-m-d');
             $csv = [array_merge(['Job','Client','Inspector','Scheduled','Reporting'], $seeCredit ? ['Expected credit'] : [], ['TAT days','Status','Money'])];
             foreach ($rows as $j) {
                 $money = $j['closed_flag'] ? (empty($j['invoice_raised']) ? 'Unbilled' : (empty($j['payment_received']) ? 'Awaiting payment' : 'Paid')) : '';
+                $jst = !empty($j['opk_cancelled']) ? 'Cancelled' : ($j['closed_flag'] ? 'Closed' : (!empty($j['opk_jobs_overdue']) ? 'Overdue' : 'Open'));
                 $csv[] = array_merge([$j['job_code'], $j['client_disp'] ?: $j['client_name'], $j['inspector_name'], $j['scheduled_date'], REPORT_FREQ[$j['reporting_frequency']] ?? ''],
-                    $seeCredit ? [(float)$j['expected_credit']] : [], [$j['tat_days'], $j['closed_flag'] ? 'Closed' : 'Open', $money]);
+                    $seeCredit ? [(float)$j['expected_credit']] : [], [$j['tat_days'], $jst, $money]);
             }
             csv_download('jobs-' . date('Y-m-d') . '.csv', $csv);
         }
         view('ops/jobs', ['rows' => $rows, 'q' => $q, 'filter' => $filter,
             'inspectors' => inspectors_list(), 'offices' => offices_list(),
             'fInsp' => $fInsp, 'fMonth' => $fMonth, 'fFrom' => $fFrom, 'fTo' => $fTo,
-            'fOffice' => $fOffice, 'fUnalloc' => $fUnalloc]); return;
+            'fOffice' => $fOffice, 'fUnalloc' => $fUnalloc, 'fKpi' => $fKpi]); return;
     }
     if ($route === 'job-new' || $route === 'job-edit') {
         //  B10-CL-1 — the button is now gated where it is drawn, but a bookmark or
@@ -9725,12 +9803,17 @@ function ops_my_jobs() {
         }
         flash(inspector_link_msg(), 'error'); redirect('/');
     }
+    //  Stage 1 B1: each job carries the flags the dashboard tiles count (lib/opskpi.php),
+    //  so "Jobs overdue" / "Reports to write" open exactly the jobs the tile counted.
+    $opkJ = function_exists('opk_job_pred')
+        ? "(CASE WHEN " . opk_job_pred('jobs_overdue') . " THEN 1 ELSE 0 END) opk_jobs_overdue, (CASE WHEN " . opk_job_pred('to_write') . " THEN 1 ELSE 0 END) opk_to_write, (CASE WHEN " . opk_job_live_sql('j') . " THEN 0 ELSE 1 END) opk_cancelled,"
+        : '';
     if ($insId) {
-        $rows = ops_all("SELECT j.*, c.call_code, bp.legal_name client_name, bp.display_name client_disp
+        $rows = ops_all("SELECT j.*, $opkJ c.call_code, bp.legal_name client_name, bp.display_name client_disp
             FROM jobs j LEFT JOIN calls c ON c.id=j.call_id LEFT JOIN business_partners bp ON bp.id=c.client_id
             WHERE j.inspector_id=? ORDER BY j.closed_flag, j.scheduled_date DESC", [$insId]);
     } else {
-        $rows = ops_all("SELECT j.*, c.call_code, bp.legal_name client_name, bp.display_name client_disp
+        $rows = ops_all("SELECT j.*, $opkJ c.call_code, bp.legal_name client_name, bp.display_name client_disp
             FROM jobs j LEFT JOIN calls c ON c.id=j.call_id LEFT JOIN business_partners bp ON bp.id=c.client_id
             WHERE j.closed_flag=0 ORDER BY j.scheduled_date DESC");
     }
@@ -10308,7 +10391,7 @@ function ops_pending_tasks() {
     // To issue — approved reports waiting to be finalised (only if I may finalise).
     if (is_master() || can('idems.finalize'))
         $add($cnt("SELECT COUNT(*) $base AND d.status='APPROVED' AND COALESCE(d.finalized,0)=0", $scopeArgs),
-            '📄', 'to issue', 'approved reports to finalise', '/documents?status=APPROVED', 'ok');
+            '📄', 'reports awaiting issue', 'approved reports to finalise', '/documents?status=APPROVED', 'ok');
     // To release — issued reports marked for a Release Note that have none yet.
     if (can('mod.idems.edit') || is_master_of('idems'))
         $add($cnt("SELECT COUNT(*) $base AND COALESCE(d.finalized,0)=1 AND COALESCE(d.rn_to_issue,0)=1 AND d.type_code NOT IN ('RN','IRN')
@@ -10875,13 +10958,22 @@ function ops_reports() {
     [$fyFrom, $fyTo] = fy_range($F['fy']);
     // ---- scoped data ----
     [$scopeW, $scopeArgs] = scope_clause('j.executing_office_id', 'j.sbu');
-    $jobs = ops_all("SELECT j.*, i.salary_ctc, i.name inspector_name, i.id ins_id, i.trade_id, bp.legal_name client_name, bp.display_name client_disp,
+    //  Stage 1 B1/B2: the MIS reads the same definitions as the Operations home
+    //  (lib/opskpi.php) — a cancelled job is not open or overdue; "No engineer yet"
+    //  is the same rule as the card. The MIS keeps its own FY / month / office filters.
+    $opkJ = function_exists('opk_job_pred')
+        ? "(CASE WHEN " . opk_job_pred('jobs_overdue') . " THEN 1 ELSE 0 END) opk_jobs_overdue, (CASE WHEN " . opk_job_live_sql('j') . " THEN 0 ELSE 1 END) opk_cancelled,"
+        : "0 opk_jobs_overdue, 0 opk_cancelled,";
+    $opkC = function_exists('opk_call_pred')
+        ? ", (CASE WHEN " . opk_call_pred('no_engineer') . " THEN 1 ELSE 0 END) opk_no_engineer"
+        : ", NULL opk_no_engineer";
+    $jobs = ops_all("SELECT j.*, $opkJ i.salary_ctc, i.name inspector_name, i.id ins_id, i.trade_id, bp.legal_name client_name, bp.display_name client_disp,
         c.client_id, c.region, o.name office_name, bn.boss_number FROM jobs j LEFT JOIN inspectors i ON i.id=j.inspector_id
         LEFT JOIN calls c ON c.id=j.call_id LEFT JOIN business_partners bp ON bp.id=c.client_id
         LEFT JOIN boss_numbers bn ON bn.id=j.boss_id
         LEFT JOIN offices o ON o.id=j.executing_office_id WHERE $scopeW", $scopeArgs);
     [$cScopeW, $cScopeArgs] = scope_clause('c.executing_office_id', 'c.sbu');
-    $calls = ops_all("SELECT c.*, (SELECT COUNT(*) FROM jobs j WHERE j.call_id=c.id AND j.scheduled_date<>'') sched_jobs
+    $calls = ops_all("SELECT c.*, (SELECT COUNT(*) FROM jobs j WHERE j.call_id=c.id AND j.scheduled_date<>'') sched_jobs $opkC
         FROM calls c WHERE $cScopeW", $cScopeArgs);
     // ---- apply filters in PHP (FY/month/office/sbu/inspector/activity/type) ----
     $filt = function($rows) use ($F, $fyFrom, $fyTo) {
@@ -10902,11 +10994,15 @@ function ops_reports() {
 
     // ---- OPERATIONS ----
     $op = ['calls'=>count($calls), 'pending'=>0, 'open'=>0, 'closed'=>0, 'overdue'=>0, 'tatOn'=>0, 'tatLate'=>0, 'tatTotal'=>0, 'tatSum'=>0];
-    foreach ($calls as $c) if ((int)$c['sched_jobs'] === 0 && ($c['status'] ?? '') !== 'CLOSED') $op['pending']++;
+    foreach ($calls as $c) {
+        if ($c['opk_no_engineer'] !== null) { if ((int)$c['opk_no_engineer'] === 1) $op['pending']++; }
+        elseif ((int)$c['sched_jobs'] === 0 && ($c['status'] ?? '') !== 'CLOSED') $op['pending']++;
+    }
     $today = date('Y-m-d');
     foreach ($jobs as $j) {
+        if (!empty($j['opk_cancelled'])) continue;   // a cancelled job is neither open, closed nor overdue
         if ($j['closed_flag']) { $op['closed']++; if ($j['tat_days']!==null){ $op['tatTotal']++; $op['tatSum']+=(int)$j['tat_days']; if ((int)$j['tat_days']<=$tatThresh) $op['tatOn']++; else $op['tatLate']++; } }
-        else { $op['open']++; $end=$j['inspection_end_date']?:$j['scheduled_date']; if ($end && $end<$today) $op['overdue']++; }
+        else { $op['open']++; if ((int)$j['opk_jobs_overdue'] === 1) $op['overdue']++; }
     }
 
     // ---- FINANCIAL ----

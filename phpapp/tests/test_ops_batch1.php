@@ -29,12 +29,15 @@ try {
     $css = (string) file_get_contents(dirname(__DIR__) . '/assets/css/app.css');
     t_ok(strpos($css, ':root{--area-bar:color-mix(in srgb,var(--brand) 78%,#000)}') !== false && strpos($css, '.sxw{--sxw-teal:var(--area-bar)') !== false,
          'one theme-based bar colour (--area-bar) on :root, used by every area bar');
-    foreach (['New requests', 'Unscheduled', 'Clarification open', 'Ready to schedule', 'Overdue', 'Critical', 'Report pending'] as $k)
-        t_ok(strpos($h, 'data-k="' . $k . '"') !== false, 'figure card kept: ' . $k);
+    //  Stage 1 B1 (owner, 24 Nov 2026): the approved names — "Unscheduled" became "No engineer yet",
+    //  "Overdue" split into "Work orders overdue" + "Jobs overdue", "Report pending" became
+    //  "Reports awaiting sign-off". Every card now opens its filtered register.
+    foreach (['New requests', 'No engineer yet', 'Clarification open', 'Ready to schedule', "Today's services", 'Work orders overdue', 'Jobs overdue', 'Critical', 'Reports awaiting sign-off'] as $k)
+        t_ok(strpos($h, 'data-k="' . e($k) . '"') !== false, 'figure card kept: ' . $k);
     t_ok(strpos($h, 'class="kpi sxw-kpi') !== false, 'the figures use the app-wide KPI card');
     foreach (['Backlog &amp; registers', 'Work intake &amp; delivery', 'TPIA service lines', 'Controls, time &amp; people'] as $tab)
         t_ok(strpos($h, 'data-tab="' . $tab . '"') !== false, 'tab kept: ' . html_entity_decode($tab));
-    foreach (['/call-new', '/schedule', '/my-work', '/operations?dr=fy', '/operations#backlog', '/operations#schedule'] as $href)
+    foreach (['/call-new', '/schedule', '/my-work', '/operations?dr=fy', '/calls?f=no_engineer', '/calls?f=wo_overdue', '/jobs?f=jobs_overdue', '/jobs?f=today', '/jobs?f=signoff'] as $href)
         t_ok(strpos($h, 'href="' . $href . '"') !== false, 'Director · link kept: ' . $href);
 
     // ---- 4: the note is gone -----------------------------------------------------------------

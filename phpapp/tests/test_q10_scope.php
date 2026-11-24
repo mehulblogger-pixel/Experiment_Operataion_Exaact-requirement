@@ -248,7 +248,7 @@ try {
     $fields['records_mode'] = 'team';
     $rightsBefore = role_perms('MARKETING_MANAGER'); sort($rightsBefore);
     q10_route('access', 'POST', $master, [], $fields);
-    $fresh(); $rc = &settings_cache(); $rc['role_access'] = (string) ops_val("SELECT svalue FROM settings WHERE skey='role_access'", [], '');
+    $fresh(); $rc = &settings_cache(); $rc['role_access'] = (string) ops_val("SELECT svalue FROM settings WHERE skey='role_access'", [], ''); unset($rc);   // S1-B0: release the reference (a later file's $rc would write into the cache)
     $rightsAfter = role_perms('MARKETING_MANAGER'); sort($rightsAfter);
     t_eq(sales_rec_role_mode('MARKETING_MANAGER'), 'team', 'save · the role page saves Team for the Marketing Manager');
     t_eq(array_values(array_diff($rightsAfter, ['@split1', '@verbs2'])), array_values(array_diff($rightsBefore, ['@split1', '@verbs2'])), 'save · the role\'s switches are unchanged by saving the records choice');

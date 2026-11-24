@@ -127,10 +127,10 @@ function inspector_eligibility($inspectorId, $ctx = []) {
         }
     } catch (Throwable $e) {}
 
-    // 3. Certificate expiring soon (valid, but within 45 days of the work date) → EXPIRING
-    //    (advisory). Computed inline so it never depends on an un-loaded helper.
+    // 3. Certificate expiring soon (valid, but within the company's window — Stage 1 B5,
+    //    default 45 days — of the work date) → EXPIRING (advisory).
     try {
-        $soonBy = date('Y-m-d', strtotime($onDate . ' +45 days'));
+        $soonBy = date('Y-m-d', strtotime($onDate . ' +' . credential_window_days() . ' days'));
         foreach (ops_all("SELECT name, valid_to FROM inspector_certs WHERE inspector_id=? AND COALESCE(valid_to,'')<>''", [$inspectorId]) as $c) {
             $vt = substr((string)$c['valid_to'], 0, 10);
             if ($vt >= $onDate && $vt <= $soonBy) { $bump('EXPIRING'); $add('warn', 'Certificate expiring soon: ' . $c['name'] . ' (' . $vt . ')'); }
@@ -403,7 +403,8 @@ function competence_matrix() {
 // across every active inspector, in one worklist. Read-only over inspector_certs;
 // it changes nothing (certs already remind on their own expiry — this is the "who +
 // what" a manager works from).
-function competence_training_watch($withinDays = 45, $today = null) {
+function competence_training_watch($withinDays = null, $today = null) {
+    if ($withinDays === null) $withinDays = credential_window_days();   // Stage 1 B5 — the one window
     $today = $today ?: date('Y-m-d');
     $soon = date('Y-m-d', strtotime($today . ' +' . max(0, (int)$withinDays) . ' days'));
     $out = [];
@@ -422,7 +423,7 @@ function competence_training_watch($withinDays = 45, $today = null) {
     usort($out, fn($a, $b) => [$a['state'] !== 'lapsed', $a['days']] <=> [$b['state'] !== 'lapsed', $b['days']]);
     return $out;
 }
-function competence_training_watch_counts($withinDays = 45) {
+function competence_training_watch_counts($withinDays = null) {
     $l = 0; $e = 0;
     foreach (competence_training_watch($withinDays) as $x) { if ($x['state'] === 'lapsed') $l++; else $e++; }
     return ['lapsed' => $l, 'expiring' => $e, 'total' => $l + $e];
@@ -516,6 +517,16 @@ function ops_competence($route, $method) {
         redirect('/competence');
     }
 
+    if ($route === 'auth-window' && $method === 'POST') {
+        ops_require(competence_can_authorise(), 'Only a manager can change the certificate warning window.');
+        $d = (int) ($_POST['days'] ?? 0);
+        if ($d < 1 || $d > 365) { flash('Pick a number of days between 1 and 365.', 'error'); redirect('/competence'); }
+        $old = credential_window_days();
+        setting_set('credential_window_days', (string) $d);
+        if (function_exists('idems_log')) { try { idems_log('setting', 0, 'CREDENTIAL_WINDOW', ['field' => 'credential_window_days', 'old' => $old, 'new' => $d]); } catch (Throwable $e) {} }
+        flash('Certificates now show "expiring soon" ' . $d . ' days before they lapse.');
+        redirect('/competence');
+    }
     if ($route === 'auth-enforce' && $method === 'POST') {
         $on = !empty($_POST['on']) ? '1' : '0';
         // Refuse to switch it on while nobody is authorised — that would stop
@@ -777,8 +788,13 @@ const CREDENTIAL_VERIFY_STATES = [
     'SUPERSEDED'         => 'Superseded',
 ];
 
-// The "expiring soon" window, shared with the training watch so the two agree.
-function credential_window_days() { return 45; }
+// The "expiring soon" window, shared with the training watch and the eligibility pill so
+// they all agree. Stage 1 B5 (owner, 24 Nov 2026): a company setting, default 45 days —
+// the value every company had — kept between 1 and 365.
+function credential_window_days() {
+    $d = function_exists('setting_get') ? (int) setting_get('credential_window_days', '45') : 45;
+    return ($d >= 1 && $d <= 365) ? $d : 45;
+}
 
 // Derive one credential's status from its stored fields. Pure/read-only.
 // A REJECTED/SUPERSEDED verdict stands whatever the dates say; otherwise the

@@ -36,6 +36,14 @@
         <?php endif; ?>
       </p>
     </div>
+    <?php if (!empty($canEdit) && function_exists('credential_window_days')): ?>
+    <form method="post" action="/auth-window" style="margin:0 0 6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+      <label for="cw-days" class="muted" style="font-size:12.5px">Warn before a certificate lapses</label>
+      <input id="cw-days" class="form-control" type="number" name="days" min="1" max="365" value="<?= (int)credential_window_days() ?>" style="max-width:90px">
+      <span class="muted" style="font-size:12.5px">days</span>
+      <button class="btn secondary small" type="submit">Save</button>
+    </form>
+    <?php endif; ?>
     <form method="post" action="/auth-enforce" style="margin:0">
       <input type="hidden" name="on" value="<?= $ready['enforced'] ? '0' : '1' ?>">
       <button class="btn<?= $ready['enforced'] ? ' secondary' : '' ?>" type="submit">

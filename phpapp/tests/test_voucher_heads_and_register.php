@@ -27,6 +27,6 @@ t_ok(in_array('OTHER', $codes2, true) && in_array('FOOD', $codes2, true), 'an un
 
 // --- (b) register status source -----------------------------------------------
 $src = file_get_contents(__DIR__ . '/../views/ops/calls.php');
-t_ok(strpos($src, "closed_count") !== false, 'the register uses the closed-job count for status');
+t_ok(strpos($src, "closed_count") !== false || strpos($src, 'opk_progress_label') !== false, 'the register uses the closed-job count for status (Stage 1: via the one progress rule)');
 t_ok(strpos($src, 'report_inspector') !== false, 'the register falls back to the report inspector for the team column');
 t_ok(strpos($src, 'issued_reports') !== false, 'the register shows when reports have actually been issued');

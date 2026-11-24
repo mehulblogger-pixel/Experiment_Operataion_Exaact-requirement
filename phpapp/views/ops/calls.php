@@ -2,15 +2,18 @@
   $today = date('Y-m-d');
   $nSched = 0; $nOverdue = 0; $nClosed = 0;
   foreach ($rows as $c) {
-    // A call is DONE when its status is CLOSED, or every job under it has closed —
-    // the same rule the call detail uses, so the register agrees with it.
-    $cDone = ($c['status'] ?? '') === 'CLOSED' || ((int)$c['job_count'] > 0 && (int)($c['closed_count'] ?? 0) === (int)$c['job_count']);
-    $needs = !$cDone && (int)$c['job_count'] === 0;
-    if ($cDone) $nClosed++;
-    elseif ($needs) { $nSched++; if (($c['inspection_required_date'] ?? '') && $c['inspection_required_date'] < $today) $nOverdue++; }
+    // Stage 1 B1: the chips read the SAME flags the Operations-home cards count
+    // (lib/opskpi.php) — "No engineer yet" and "Work orders overdue" — so a chip,
+    // a card and the filtered register can never disagree. A cancelled or rejected
+    // work order is neither closed nor waiting (B2).
+    $pl = function_exists('opk_progress_label') ? opk_progress_label($c) : '';
+    if ($pl === 'Closed') $nClosed++;
+    if (isset($c['opk_no_engineer']) ? (int)$c['opk_no_engineer'] === 1 : $pl === 'No engineer yet') $nSched++;
+    if ((int)($c['opk_wo_overdue'] ?? 0) === 1) $nOverdue++;
   }
+  $fKpi = $fKpi ?? '';
 ?>
-<?php $fContract = $fContract ?? ''; $fQuote = $fQuote ?? 0; $filtered = ($fContract !== '' || $fQuote); ?>
+<?php $fContract = $fContract ?? ''; $fQuote = $fQuote ?? 0; $filtered = ($fContract !== '' || $fQuote || $fKpi !== ''); ?>
 <?php // Commercial columns are permission-gated: credit follows data.credit, the
       //  cost figure follows the profitability/salary permission. Operational staff
       //  without them (e.g. an assistant manager) see the register without these.
@@ -18,7 +21,10 @@
       $seeCost   = can('data.profitability') || (function_exists('can_see_salary') && can_see_salary()) || is_master(); ?>
 <div class="master-head">
   <div><h1><?= e(T_REG('call')) ?></h1>
-  <?php if ($filtered): ?>
+  <?php if ($fKpi !== ''): ?>
+    <p class="sub" style="margin:2px 0 0">Showing: <b><?= e(opk_label($fKpi)) ?></b> — <?= e(opk_hint($fKpi)) ?>.
+      <a href="/calls" style="margin-left:6px">Clear filter →</a></p>
+  <?php elseif ($filtered): ?>
     <p class="sub" style="margin:2px 0 0">Showing every <?= e(Tl('call')) ?> under
       <?= $fContract !== '' ? 'contract <b>' . e($fContract) . '</b>' : (e(Tl('quote')) . ' #' . (int)$fQuote) ?>.
       <a href="/calls" style="margin-left:6px">Clear filter →</a></p>
@@ -33,8 +39,8 @@
 
 <div class="chip-row">
   <span class="ct">Showing <b><?= count($rows) ?></b></span>
-  <span class="ct"><span class="dot dot-warn"></span><?= $nSched ?> to schedule</span>
-  <?php if ($nOverdue): ?><span class="ct"><span class="dot dot-bad"></span><?= $nOverdue ?> overdue</span><?php endif; ?>
+  <span class="ct"><span class="dot dot-warn"></span><?= $nSched ?> no engineer yet</span>
+  <?php if ($nOverdue): ?><span class="ct"><span class="dot dot-bad"></span><?= $nOverdue ?> work orders overdue</span><?php endif; ?>
   <span class="ct"><span class="dot dot-ok"></span><?= $nClosed ?> closed</span>
 </div>
 
@@ -64,8 +70,9 @@
     </tr></thead>
     <tbody>
     <?php foreach ($rows as $c):
-      $closed = ($c['status'] ?? '') === 'CLOSED' || ((int)$c['job_count'] > 0 && (int)($c['closed_count'] ?? 0) === (int)$c['job_count']);
-      $needs = !$closed && (int)$c['job_count'] === 0;
+      $prog = function_exists('opk_progress_label') ? opk_progress_label($c) : '';
+      $closed = $prog === 'Closed';
+      $needs = $prog === 'No engineer yet';
       $req = $c['inspection_required_date'] ?? '';
       $reqOverdue = $needs && $req && $req < $today;
       $L = $c['lead'] ?? [];
@@ -146,12 +153,15 @@
         <?php if ($seeCost): ?><td class="num"><?= ((float)($c['cost_incurred'] ?? 0))>0 ? fmoney($c['cost_incurred']) : $dash ?></td><?php endif; ?>
         <td>
           <?php // Module 04 — the unified lifecycle status (over both status systems). ?>
-          <?php if (function_exists('call_status_label')): $cLc = call_status_label($c); ?>
+          <?php unset($cLc); if (function_exists('call_status_label')): $cLc = call_status_label($c); ?>
             <span class="pill <?= e($cLc['tone']) ?>"><?= e($cLc['label']) ?></span><br>
           <?php endif; ?>
-          <?php if ($closed): ?><span class="pill p-ok">Closed</span>
-          <?php elseif ($needs): ?><span class="pill p-warn">To schedule</span>
-          <?php else: ?><span class="pill p-info">In progress</span><?php endif; ?>
+          <?php $lcKey = isset($cLc) ? $cLc['key'] : ''; ?>
+          <?php if (!isset($cLc)): ?><span class="pill p-info"><?= e($prog) ?></span>
+          <?php elseif (in_array($lcKey, ['CLOSED', 'CANCELLED', 'REJECTED'], true) || $prog === 'Cancelled' || $prog === 'Rejected'): ?>
+          <?php elseif ($closed): ?><small style="color:var(--ok)">Closed · every job closed</small>
+          <?php elseif ($needs): ?><small style="color:var(--warn,#b45309);font-weight:600">No engineer yet</small>
+          <?php else: ?><small class="muted">In progress</small><?php endif; ?>
         </td>
         <td style="white-space:nowrap">
           <a class="btn small secondary" href="/call?id=<?= (int)$c['id'] ?>">Open</a>

@@ -936,7 +936,7 @@ if (function_exists('hwp_for_job')):
     <?php if (!empty($job['adv_required'])): ?><div><span class="k">Advance</span><?= rtrim(rtrim(nf((float)$job['adv_pct'],2),'0'),'.') ?>% · <?= !empty($job['adv_received'])?'<span style="color:var(--ok)">received</span>':'<span style="color:var(--bad)">pending</span>' ?></div><?php endif; ?>
     <div><span class="k">Call</span><?= e($job['call_code'] ?: '—') ?></div>
     <div><span class="k">Job type</span><?= e(lk_options_or('job_type', JOB_TYPES)[$job['job_type'] ?? 'INSPECTION'] ?? '—') ?></div>
-    <div><span class="k">Stage</span><?= e(lk_options_or('job_stage', JOB_STAGES)[$job['stage'] ?? 'ALLOCATED'] ?? '—') ?></div>
+    <div><span class="k">Stage</span><?= e(isset($jn['stage']) ? $jn['stage'] : (function_exists('job_stage_label') ? job_stage_label($job) : '—')) ?></div>
     <div><span class="k">Executing office</span><?= e($job['office_name'] ?: '—') ?></div>
     <div><span class="k">Inspector</span><?= e($job['inspector_name'] ?: '—') ?></div>
     <div><span class="k">Sub-con</span><?= e($job['subcon_agency'] ?: '—') ?></div>

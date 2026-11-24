@@ -114,9 +114,10 @@
 <?php if (function_exists('is_field_inspector') ? is_field_inspector() : is_inspector()): ?>
   <?php $myId = $u['inspector_id'] ?? 0;
     $mc = fn($sql, $extra = []) => $myId ? (int)ops_val("SELECT COUNT(*) FROM jobs WHERE inspector_id=? AND $sql", array_merge([$myId], $extra)) : 0;
-    $myOpen    = $mc("closed_flag=0");
-    $myOverdue = $mc("closed_flag=0 AND ((inspection_end_date<>'' AND inspection_end_date<?) OR (inspection_end_date='' AND scheduled_date<>'' AND scheduled_date<?))", [$today, $today]);
-    $myReports = $mc("closed_flag=0 AND reporting_frequency<>'NOREPORT' AND (report_upload_date IS NULL OR report_upload_date='')");
+    $myOpen    = $mc("closed_flag=0 AND COALESCE(stage,'')<>'CANCELLED'");
+    // Stage 1 B1 — the one definition (lib/opskpi.php), as on the KPI board above.
+    $myOverdue = function_exists('opk_count_my_jobs') ? opk_count_my_jobs('jobs_overdue', $myId) : $mc("closed_flag=0 AND ((inspection_end_date<>'' AND inspection_end_date<?) OR (inspection_end_date='' AND scheduled_date<>'' AND scheduled_date<?))", [$today, $today]);
+    $myReports = function_exists('opk_count_my_jobs') ? opk_count_my_jobs('to_write', $myId) : $mc("closed_flag=0 AND reporting_frequency<>'NOREPORT' AND (report_upload_date IS NULL OR report_upload_date='')");
     $myDone    = $mc("closed_flag=1");
   ?>
   <?php // My cockpit — the SAME universal KPI board that powers the client and
@@ -127,8 +128,8 @@
   <?php else: ?>
     <div class="qcards" style="margin-top:18px">
       <a class="qcard tone-info" href="/my-jobs?f=open"><div class="qic">🗂</div><div class="qn"><?= $myOpen ?></div><div class="ql">Open jobs to do</div></a>
-      <a class="qcard tone-warn" href="/my-jobs?f=reports"><div class="qic">📄</div><div class="qn"><?= $myReports ?></div><div class="ql">Reports pending</div></a>
-      <a class="qcard tone-bad" href="/my-jobs?f=overdue"><div class="qic">⏰</div><div class="qn"><?= $myOverdue ?></div><div class="ql">Overdue</div></a>
+      <a class="qcard tone-warn" href="/my-jobs?f=reports"><div class="qic">📄</div><div class="qn"><?= $myReports ?></div><div class="ql">Reports to write</div></a>
+      <a class="qcard tone-bad" href="/my-jobs?f=overdue"><div class="qic">⏰</div><div class="qn"><?= $myOverdue ?></div><div class="ql">Jobs overdue</div></a>
       <a class="qcard tone-ok" href="/vouchers"><div class="qic">🧾</div><div class="qn"><?= e(cur_sym()) ?></div><div class="ql">This month's voucher</div></a>
     </div>
   <?php endif; ?>
@@ -182,10 +183,14 @@
         $cw .= ' AND c.sbu IN (' . implode(',', array_fill(0, count($cSbu), '?')) . ')';
         foreach ($cSbu as $s0) $ca[] = $s0;
     }
-    $openCalls  = (int)ops_val("SELECT COUNT(*) FROM calls c WHERE c.status<>'CLOSED' AND $cw", $ca);
-    $openJobs   = (int)ops_val("SELECT COUNT(*) FROM jobs j WHERE j.closed_flag=0 AND $jw", $ja);
+    //  Stage 1 B2 — the one status reading (lib/opskpi.php): a cancelled / rejected work
+    //  order is not open; a cancelled job is neither open nor overdue.
+    $openCalls  = (int)ops_val("SELECT COUNT(*) FROM calls c WHERE " . (function_exists('opk_call_live_sql') ? opk_call_live_sql('c') : "c.status<>'CLOSED'") . " AND $cw", $ca);
+    $openJobs   = (int)ops_val("SELECT COUNT(*) FROM jobs j WHERE j.closed_flag=0 AND COALESCE(j.stage,'')<>'CANCELLED' AND $jw", $ja);
     $closedJobs = (int)ops_val("SELECT COUNT(*) FROM jobs j WHERE j.closed_flag=1 AND $jw", $ja);
-    $overdue    = (int)ops_val("SELECT COUNT(*) FROM jobs j WHERE j.closed_flag=0 AND ((j.inspection_end_date<>'' AND j.inspection_end_date<?) OR (j.inspection_end_date='' AND j.scheduled_date<>'' AND j.scheduled_date<?)) AND $jw", array_merge([$today,$today], $ja));
+    $overdue    = function_exists('opk_job_pred')
+        ? (int)ops_val("SELECT COUNT(*) FROM jobs j WHERE " . opk_job_pred('jobs_overdue') . " AND $jw", $ja)
+        : (int)ops_val("SELECT COUNT(*) FROM jobs j WHERE j.closed_flag=0 AND ((j.inspection_end_date<>'' AND j.inspection_end_date<?) OR (j.inspection_end_date='' AND j.scheduled_date<>'' AND j.scheduled_date<?)) AND $jw", array_merge([$today,$today], $ja));
     $status = ['Open'=>max(0,$openJobs-$overdue), 'Overdue'=>$overdue, 'Closed'=>$closedJobs];
 
     // M6 — neither permission is a module permission, and this dashboard renders

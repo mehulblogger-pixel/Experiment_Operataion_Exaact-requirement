@@ -52,7 +52,7 @@ try {
         t_ok(in_array($k, $keys, true), "the board has the $k tile");
     // Actions surface report-pending and open-concern.
     $alabels = array_map(fn($a) => $a['label'], $b['actions']);
-    t_ok(in_array('Reports pending', $alabels, true), 'an action calls out reports pending');
+    t_ok(in_array('Reports awaiting issue', $alabels, true), 'an action calls out reports awaiting issue (Stage 1 B1 name)');
     t_ok(in_array('Open concerns', $alabels, true), 'an action calls out open concerns');
 
     // --- scoping: the other client sees only its own numbers ------------------
@@ -154,7 +154,7 @@ try {
     // No money key is ever exposed to the inspector.
     t_ok(!isset($ins['raw']['billed']) && !isset($ins['raw']['booked_value']), 'the inspector board carries no money figure');
     ob_start(); connect_kpi_render($ins); $ihtml = ob_get_clean();
-    t_ok(strpos($ihtml, 'Overdue') !== false, 'the rendered inspector board shows the Overdue tile');
+    t_ok(strpos($ihtml, 'Jobs overdue') !== false, 'the rendered inspector board shows the Jobs overdue tile (Stage 1 B1 name)');
 } finally {
     if ($own && db()->inTransaction()) db()->rollBack();
 }

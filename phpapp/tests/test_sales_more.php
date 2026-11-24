@@ -179,7 +179,7 @@ try {
     $pidO = (int) ops_val("SELECT id FROM pipelines WHERE entity_kind='OPPORTUNITY' LIMIT 1");
     db()->prepare("INSERT INTO pipeline_stages (pipeline_id,seq,name,kind,probability,sla_days,active) VALUES (?,99,'Enquiry received','OPEN',10,7,1)")->execute([$pidO]);
     $stg = (int) db()->lastInsertId();
-    db()->prepare("DELETE FROM settings WHERE skey='opp_stage_rename_v1'")->execute(); $sc = &settings_cache(); unset($sc['opp_stage_rename_v1']);
+    db()->prepare("DELETE FROM settings WHERE skey='opp_stage_rename_v1'")->execute(); $sc = &settings_cache(); unset($sc['opp_stage_rename_v1']); unset($sc);
     opp_rename_first_stage();
     t_eq((string) ops_val("SELECT name FROM pipeline_stages WHERE id=?", [$stg]), 'New deal', 'stage · a deal stage still called "Enquiry received" becomes "New deal"');
     t_eq((int) ops_val("SELECT COUNT(*) FROM pipelines WHERE entity_kind='OPPORTUNITY' AND name='Opportunity pipeline'"), 0, 'stage · a deal pipeline still called "Opportunity pipeline" becomes "Deal pipeline"');

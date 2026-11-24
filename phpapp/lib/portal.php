@@ -338,7 +338,7 @@ function portal_calls($limit = 200) {
     $pid = portal_partner_id();
     if (!$pid) return [];
     return portal_try(fn() => ops_all(
-        "SELECT c.id, c.call_code, c.call_received_date, c.inspection_required_date, c.status,
+        "SELECT c.id, c.call_code, c.call_received_date, c.inspection_required_date, c.status, c.op_status,
                 c.inspection_type, c.inspection_type_other, c.product_category, c.contract_number,
                 c.allocated_at
          FROM calls c WHERE c.client_id = ? AND " . portal_site_sql('c') . "
@@ -356,7 +356,7 @@ function portal_call($id) {
     // user cannot open a same-company record at a site they were not scoped to
     // (Module 10 — the list hid it; the single fetch must not reveal it).
     return portal_try(fn() => ops_one(
-        "SELECT c.id, c.call_code, c.call_received_date, c.inspection_required_date, c.status,
+        "SELECT c.id, c.call_code, c.call_received_date, c.inspection_required_date, c.status, c.op_status,
                 c.inspection_type, c.inspection_type_other, c.product_category, c.contract_number,
                 c.inspection_dates, c.allocated_at, c.client_id
          FROM calls c WHERE c.id = ? AND c.client_id = ? AND " . portal_site_sql('c'), [(int)$id, $pid]), null) ?: null;
@@ -512,15 +512,23 @@ function portal_invoices() {
 // wants to know one thing: has somebody been sent, and is it finished. So the
 // portal says that in words, and never shows the code.
 function portal_call_state($c) {
-    if (strtoupper((string)($c['status'] ?? '')) === 'CLOSED') return 'Completed';
+    //  Stage 1 B2 — the one status reading: either status field can say it is over.
+    $op = strtoupper((string)($c['op_status'] ?? '')); $lg = strtoupper((string)($c['status'] ?? ''));
+    if ($op === 'CLOSED' || $lg === 'CLOSED') return 'Completed';
+    if (in_array($op, ['CANCELLED', 'REJECTED'], true) || $lg === 'CANCELLED') return 'Cancelled';
     if (empty($c['allocated_at'])) return 'With our coordinators';
     return 'Engineer assigned';
 }
 function portal_job_state($j) {
     if (!empty($j['closed_flag']))          return 'Completed';
-    if (!empty($j['inspection_end_date']))  return 'Inspection finished — report being prepared';
-    if (!empty($j['inspection_start_date']))return 'Inspection under way';
-    if (!empty($j['scheduled_date']))       return 'Scheduled';
+    if (strtoupper((string)($j['stage'] ?? '')) === 'CANCELLED') return 'Cancelled';   // Stage 1 B2 (Cancel assignment)
+    //  Stage 1 B3 — the words follow the dates, compared with today: an end date still
+    //  ahead is not "finished", a start date still ahead is not "under way".
+    $today = date('Y-m-d');
+    $end = trim((string)($j['inspection_end_date'] ?? '')); $start = trim((string)($j['inspection_start_date'] ?? ''));
+    if ($end !== '' && $end < $today)       return 'Inspection finished — report being prepared';
+    if ($start !== '' && $start <= $today)  return 'Inspection under way';
+    if ($start !== '' || !empty($j['scheduled_date'])) return 'Scheduled';
     return 'Being arranged';
 }
 
@@ -549,7 +557,7 @@ function portal_invoice_overdue($i, $today = null) {
 function portal_dashboard() {
     $calls = portal_calls(500);
     $open = 0;
-    foreach ($calls as $c) if (strtoupper((string)$c['status']) !== 'CLOSED') $open++;
+    foreach ($calls as $c) if (!in_array(portal_call_state($c), ['Completed', 'Cancelled'], true)) $open++;   // Stage 1 B2
     $reports = portal_reports(500);
     $inv = portal_invoices();
     $outstanding = 0.0; $overdue = 0;

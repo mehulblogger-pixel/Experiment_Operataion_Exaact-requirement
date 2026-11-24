@@ -2506,7 +2506,9 @@ function &settings_cache() {
     // company's workspace would be the CONTROL database's — a cross-company
     // leak of modules, seat limits and every other setting.
     $epoch = function_exists('db_epoch') ? db_epoch() : 0;
-    if ($cache === null || $atEpoch !== $epoch) {
+    //  S1-B0 — the cache is handed out BY REFERENCE; if a caller ever wrote a non-array
+    //  into it (a test re-using a variable name did, and crashed the full suite), reload.
+    if (!is_array($cache) || $atEpoch !== $epoch) {
         $cache = [];
         $atEpoch = $epoch;
         //  M3 FINAL STABILISATION — approval condition records live in `settings`
