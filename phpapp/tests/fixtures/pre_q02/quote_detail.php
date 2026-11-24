@@ -1,0 +1,1213 @@
+<?php
+// Kept for the Q-02 test (test_quote_page_v2): the quotation page as it was before the clean
+// layout of 24 Nov 2026 (commit e09a62fa), with its includes pointed back at views/ops/.
+  $stPill = ['DRAFT'=>'p-mut','PENDING_APPROVAL'=>'p-warn','APPROVED'=>'p-info','SENT'=>'p-info',
+             'ACCEPTED'=>'p-ok','LOST'=>'p-bad','REJECTED'=>'p-bad','EXPIRED'=>'p-mut'];
+  $st = $q['status'];
+  $act = function($to, $label, $cls='btn small') use ($q) {
+    return '<form method="post" action="/quote-status?id='.(int)$q['id'].'" style="display:inline"><input type="hidden" name="to" value="'.e($to).'"><button class="'.$cls.'" type="submit">'.e($label).'</button></form>';
+  };
+  $locT = lk_options_or('quote_location_type', QUOTE_LOCATION_TYPES);
+?>
+<?php
+// Stage 4 of the Sales redesign (owner, 21 Nov 2026, approved design s4-quote): the
+// quotation page on the record kit — the Sales bar, the chain, the header card with
+// its status and versions, and the three figures (DEF-06: before GST first). Every
+// panel, tab, form and button below is the same as before (the old page is kept in
+// tests/fixtures/pre_stage4/quote_detail.php); DEF-18: the buttons follow the server's
+// own rules; backend item 9: the preparer may withdraw it from its approvers.
+require_once dirname(__DIR__, 3) . '/views/ops/_sxw_ui.php';
+$qBg = crm_quote_before_gst($q); $qTot = (float)$q['total_amount'];
+$qVal = quote_validity($q);
+?>
+<div class="rec sxw has-bn sxq sxqd">
+<?php sxw_nav('/quotes'); ?>
+<?= function_exists('chain_strip') ? chain_strip('QUOTE', (int)$q['id'], 'QUOTE', (int)$q['id']) : '' ?>
+<div class="sxqd-top">
+<section class="rec-card sxqd-hd">
+  <div class="sxqd-t">
+    <span class="tile"><?= rec_icon('file') ?></span>
+    <div class="sxqd-tt">
+      <h1><?= e(quote_label($q)) ?> <span class="pill <?= $stPill[$st] ?? 'p-mut' ?>" style="font-size:13px;vertical-align:middle"><?= e(lk_options_or('quote_status', QUOTE_STATUS)[$st] ?? $st) ?></span>
+        <?php $verN = count($revs); ?><a href="#revisions" class="pill p-info" style="font-size:12px;vertical-align:middle;text-decoration:none" title="See the revision list and the full change history">🕑 Rev <?= str_pad((string)(int)$q['rev'],2,'0',STR_PAD_LEFT) ?> · <?= $verN ?> version<?= $verN === 1 ? '' : 's' ?></a></h1>
+      <p class="sub"><?= e(($q['client_name'] ?? '') ?: (($clientReg['legal_name'] ?? '') ?: '—')) ?> · <?= e($q['subject'] ?: '—') ?></p>
+    </div>
+  </div>
+  <div class="sxqd-acts">
+    <?php // Sales hands over to operations here. Acceptance is given to the quote;
+          // the contract number is registered off that acceptance; then inspection
+          // calls are raised FROM the contract — so the handover button points at
+          // the contract, not straight at a call. If the contract is not registered
+          // yet, it nudges you to register it first. ?>
+    <?php // Only someone who raises calls (operations/coordinators) sees this — and
+          // only once the contract is OPEN (endorsed + branch-manager approved). ?>
+    <?php $cOpen = $contractRow && strtoupper((string)($contractRow['open_status'] ?? 'OPEN')) === 'OPEN';
+          if ($st === 'ACCEPTED' && $cOpen && (can('ops.call.create') || is_master())): ?>
+        <a class="btn" href="/call-new?contract_id=<?= (int)($contractRow['id'] ?? 0) ?>&contract=<?= e(urlencode((string)$q['contract_number'])) ?>">▶ Raise <?= e(Tl('call')) ?></a>
+    <?php endif; ?>
+    <?php //  Q-05 (owner, 24 Nov 2026) — before approval the PDF is a marked draft, and the
+          //  editable Word copy waits for approval and is for those who send quotations. ?>
+    <?php $qdCleared = crm_quote_doc_cleared($q); $qdWord = crm_quote_word_allowed($q); ?>
+    <?php if ($qdCleared): ?>
+      <a class="btn<?= $st === 'ACCEPTED' ? ' secondary' : '' ?>" href="/quote-pdf?id=<?= (int)$q['id'] ?>">⬇ PDF (for client)</a>
+    <?php else: ?>
+      <a class="btn secondary" href="/quote-pdf?id=<?= (int)$q['id'] ?>" title="Every page is marked “<?= e(QUOTE_DRAFT_MARK) ?>” until it is approved">⬇ PDF (draft)</a>
+    <?php endif; ?>
+    <?php if ($qdWord): ?><a class="btn secondary" href="/quote-doc?id=<?= (int)$q['id'] ?>">Word (editable)</a><?php endif; ?>
+    <?php //  A re-edit the Super Admin granted on a closed quotation shows its own Edit button (SALB-061).
+          //  DEF-18 — the edit screen also takes an APPROVED one (a commercial change cancels the
+          //  approval, D-07), so Edit is offered there too.
+          $reEdit = in_array($st, ['ACCEPTED','LOST'], true) && trim((string)($q['unlocked_until'] ?? '')) !== '' && strtotime((string)$q['unlocked_until']) > time() && !quote_is_locked($q); ?>
+    <?php if ($canEdit && (in_array($st, ['DRAFT','PENDING_APPROVAL','REJECTED','APPROVED'], true) || $reEdit)): ?><a class="btn secondary" href="/quote-edit?id=<?= (int)$q['id'] ?>"><?= $reEdit ? 'Edit (re-opened until ' . e(fdate(substr((string)$q['unlocked_until'], 0, 10))) . ')' : 'Edit' ?></a><?php endif; ?>
+  </div>
+  <?php if (function_exists('crm_quote_pdf_unprintable') && crm_quote_pdf_unprintable($q, $lines ?? [])): ?>
+    <p class="sxl-note" style="margin:8px 0 0"><span class="pill p-warn" style="white-space:normal" title="The PDF's font has only English letters">This <?= e(Tl('quote')) ?> has Gujarati / Hindi letters or symbols that the PDF cannot print (they show as “?”). Send the <b>Word</b> document, or save it as PDF from Word.</span></p>
+  <?php endif; ?>
+  <?php //  "📎 Documents" and "← back" were drawn twice — here and in the row below / the back pill
+        //  above the page (owner, 14 Nov 2026: "There are two document tabs"). Once each now. ?>
+</section>
+<div class="sxw-kp sxqd-kp" style="--n:3">
+  <?php sxw_kpi('teal', 'rupee', 'Before GST', 'Before GST', $qBg > 0 ? cur_sym() . nf($qBg, fmod($qBg, 1) ? 2 : 0) : '—', 'the figure approvals and contracts use');
+        sxw_kpi('grey', 'rupee', 'With GST', 'With GST' . ((float)($q['gst_pct'] ?? 0) > 0 ? ' ' . nf((float)$q['gst_pct'], fmod((float)$q['gst_pct'], 1) ? 2 : 0) . '%' : ''), $qTot > 0 ? cur_sym() . nf($qTot, fmod($qTot, 1) ? 2 : 0) : '—', 'what the ' . Tl('client') . ' pays');
+        sxw_kpi(!empty($qVal['expired']) ? 'bad' : 'info', 'cal', 'Validity', 'Validity', (int)($q['validity_days'] ?? 0) > 0 ? (int)$q['validity_days'] . ' days' : 'Open',
+                !empty($qVal['expires_on']) ? (!empty($qVal['expired']) ? 'lapsed ' : 'to ') . fdate($qVal['expires_on']) : 'counted from when it is sent'); ?>
+</div>
+</div>
+
+<?php // Jump-nav: every section of this quote in one place, so nothing has to be
+      // hunted for down the page. Links only to sections that actually exist for
+      // this quote; #-links into a tabbed section activate that tab automatically. ?>
+<style>
+  /* A jump from "On this quote" lands with the section's top in view, below the sticky top bar
+     (owner, 14 Nov 2026: "When clicked on costing it takes one step down below the costing box"). */
+  .panel[id], [id="revisions"]{scroll-margin-top:96px}
+  @media (max-width:760px){ .panel[id], [id="revisions"]{scroll-margin-top:176px} }   /* the phone's top bar is taller (~159px) */
+  /* DEF-SAL-027 — once the page has measured its own top bar, use that height, so a jump never hides a heading. */
+  :root[data-topbar-h] .panel[id], :root[data-topbar-h] [id="revisions"]{scroll-margin-top:calc(var(--topbar-h) + 16px)}
+</style>
+<nav class="quote-jump" aria-label="On this quote" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:12px 0 4px;font-size:13px">
+  <span class="muted" style="font-size:12px">On this quote:</span>
+  <a class="btn small secondary" href="#actions">Actions</a>
+  <?php if (!empty($approvals)): ?><a class="btn small secondary" href="#approval">Approval chain</a><?php endif; ?>
+  <?php if (!empty($preorderOn) && !empty($preorderItems)): ?><a class="btn small secondary" href="#preorder">Pre-order checklist</a><?php endif; ?>
+  <?php if ($st === 'ACCEPTED' || !empty($q['contract_number'])): ?><a class="btn small secondary" href="#contract">Contract</a><?php endif; ?>
+  <?php if (!empty($costingCan)): ?><a class="btn small secondary" href="#costing">Costing</a><?php endif; ?>
+  <a class="btn small secondary" href="#quote-docs">📎 Documents</a>
+</nav>
+
+<?php
+  // Where this quotation is in its journey, said in one line with the one next
+  // step — so a person knows what to do without reading the whole page. The
+  // detailed panels below still carry the specifics (who is approving, the
+  // contract, and so on).
+  $nbTitle = lk_options_or('quote_status', QUOTE_STATUS)[$st] ?? $st; $nbNext = '';
+  switch ($st) {
+    case 'DRAFT': $nbTitle = 'Still a draft.';
+      if (!empty($canSubmit)) $nbNext = (($needsApproval ?? true) ? 'Next: submit it for approval when it is ready.' : 'Next: send it to the ' . Tl('client') . ' when it is ready.');
+      else { $nbWho = trim((string)($assignedName ?? '')) !== '' ? (string)$assignedName : (function_exists('crm_people_who_can') ? crm_people_who_can('crm.quote.create', $q) : '');
+             $nbNext = ($nbWho !== '' ? $nbWho . ' prepares it and submits it' : 'The sales colleague preparing it submits it') . ' for approval — that is not yours to do. You will see it here when it comes to you.'; }
+      break;
+    case '__never': break;
+    case 'PENDING_APPROVAL': $nbTitle = 'Waiting for approval' . (!empty($pendingWith) ? ' — with ' . $pendingWith : '') . '.'; $nbNext = 'They approve it, or send it back with a comment.'; break;
+    case 'APPROVED': $nbTitle = 'Approved and ready to go out.';
+      //  Someone who may not send must not be told "send it" with no button (bounce list 1.1).
+      if (!empty($canSend)) $nbNext = 'Next: send it to the ' . Tl('client') . '.';
+      else { $nbWho = function_exists('crm_people_who_can') ? crm_people_who_can('crm.quote.send', $q) : '';
+             $nbNext = ($nbWho !== '' ? $nbWho . ' sends' : 'A senior sales colleague sends') . ' it to the ' . Tl('client') . ' — sending is not yours to do. Tell them it is ready.'; }
+      break;
+    case 'SENT': $nbTitle = 'Sent to the ' . Tl('client') . (trim((string)($q['sent_at'] ?? '')) !== '' ? ' on ' . fdate(substr((string)$q['sent_at'], 0, 10)) : '') . '.'; $nbNext = 'Waiting for their answer — mark it accepted, or lost.'; break;
+    case 'ACCEPTED': $nbTitle = 'Accepted 🎉 — they said yes.';
+      //  A registered contract is not an open one: until its signatures are in, say
+      //  who it waits for instead of "raise calls from it" (owner, 13 Nov 2026).
+      $nbOs = !empty($contractRow) ? strtoupper((string)($contractRow['open_status'] ?? '') ?: 'OPEN') : '';
+      if (trim((string)($q['contract_number'] ?? '')) === '') {
+        if (!empty($canContract)) $nbNext = 'Next: register the contract number. Inspection ' . Tlp('call') . ' are then raised from the contract.';
+        else { $nbWho = function_exists('crm_people_who_can') ? crm_people_who_can('crm.contract.register', $q) : '';
+               $nbNext = 'With Accounts' . ($nbWho !== '' ? ' (' . $nbWho . ')' : '') . ' to register the contract number. Nothing more for you to do here.'; }
+      }
+      elseif ($nbOs === 'PENDING') { $nbTitle = 'Accepted 🎉 — contract ' . $q['contract_number'] . ' is waiting for approval.'; $nbNext = contract_waiting_words($contractRow); }
+      elseif ($nbOs === 'REJECTED') { $nbTitle = 'Accepted — but opening contract ' . $q['contract_number'] . ' was rejected.'; $nbNext = 'See the reason under Contract below; register it again when it is put right.'; }
+      else $nbNext = 'Contract ' . ($nbOs === 'CLOSED' ? 'closed' : 'open') . ' — ' . ($nbOs === 'CLOSED' ? 'no new ' . Tlp('call') . ' can be raised from it.' : 'raise inspection ' . Tlp('call') . ' from it whenever the work comes in, as many as needed.');
+      break;
+    case 'REJECTED': $nbTitle = 'Sent back by ' . ($q['rejected_by'] ?: 'the approver') . '.'; $nbNext = 'Correct it and submit again, or raise a revision.'; break;
+    case 'LOST': $nbTitle = 'Closed — not accepted.'; break;
+    case 'EXPIRED': $nbTitle = 'Expired — its validity has passed.'; $nbNext = 'Raise a revision to re-issue it.'; break;
+  }
+  //  Assigned to someone else (owner, 14 Nov 2026, option C): say who works on it, not what to press.
+  if (!empty($assigneeWords) && in_array($st, ['DRAFT', 'REJECTED', 'APPROVED', 'SENT', 'EXPIRED'], true)) $nbNext = $assigneeWords;
+?>
+<div class="nowband">
+  <div class="step"><?= e($nbTitle) ?></div>
+  <?php if ($nbNext !== ''): ?><p class="next"><?= e($nbNext) ?></p><?php endif; ?>
+</div>
+<?php //  Stage 4 (backend item 9, owner 21 Nov 2026): the person who prepared it may take it
+      //  back from its approvers to draft, with a note (docs/03). Only them, only now. ?>
+<?php if (function_exists('crm_quote_withdraw_problem') && crm_quote_withdraw_problem($q) === ''): ?>
+<details class="rec-card sxqd-wd" id="withdraw">
+  <summary><?= rec_icon('left', 's') ?> <b>Withdraw to draft</b> <span class="muted">— take it back from its approvers to change it</span></summary>
+  <form method="post" action="/quote-withdraw?id=<?= (int)$q['id'] ?>" class="sxqd-wdf">
+    <label for="wd-note">Why are you taking it back? <span class="muted">— the approvers it was waiting on are told</span></label>
+    <input class="form-control" id="wd-note" name="note" required maxlength="500" placeholder="e.g. the client changed the scope — two more sites">
+    <button class="btn small secondary" type="submit" onclick="return confirm('Take this <?= e(Tl('quote')) ?> back to draft? Its approval in progress ends; you submit it again when it is ready.')">Withdraw to draft</button>
+  </form>
+</details>
+<?php endif; ?>
+
+<?php // C1 — the Sales → Finance → Operations wall, said plainly to a SALES viewer.
+      // Sales own the thread only up to "won"; the accepted quote is then LOCKED
+      // (quote_is_locked — edits go through a revision) and the contract is Accounts'
+      // to register. A person who owns quotations but can neither register the
+      // contract nor raise calls is on the sales side, so the handoff is made explicit
+      // rather than leaving them hunting for a next action that is not theirs.
+      $isSalesViewer = (can('crm.quote.create') || can('crm.quote.send') || can('crm.followup.manage'))
+          && !$canContract && !can('ops.call.create') && !is_master();
+      if ($st === 'ACCEPTED' && $isSalesViewer): ?>
+<div class="panel" style="border:1px solid var(--ok);background:color-mix(in srgb,var(--ok) 6%,transparent)">
+  <b style="color:var(--ok)">✓ Won — handed to Accounts for contract registration</b>
+  <div class="muted" style="margin-top:4px">
+    Sales' part is complete. The thread stops here: <b>Accounts</b> register the contract number, then
+    <b>Operations</b> raise inspection <?= e(Tlp('call')) ?> from it. There is nothing more to do on this
+    <?= e(Tl('quote')) ?> — and because the accepted version is what the <?= e(Tl('client')) ?> is holding, the
+    only way to change it now is to raise a <b>revision</b> (a new revision number that re-enters approval).
+  </div>
+</div>
+<?php endif; ?>
+
+<?php //  HOW TO SEND (owner, 14 Nov 2026: "Send to customer button not found why? and when send from my
+      //  mail box it downloaded .eml file why? what is use of it"). Shown only to someone who may send —
+      //  the matrix gives sending to crm.quote.send — and in plain words, with the three real ways. ?>
+<?php if (in_array($st, ['APPROVED','SENT'], true) && !empty($q['contact_email']) && !empty($canSend)): ?>
+<div class="panel" id="how-to-send" style="background:var(--soft)">
+  <b><?= $st === 'SENT' ? 'Send it again, or chase it' : 'Three ways to send this' ?></b>
+  <div class="muted" style="margin-top:4px;line-height:1.55">
+    <?php if ($st === 'APPROVED'): ?><b>1. ✉ Send to <?= e(Tl('client')) ?></b> — the system e-mails it to <?= e($q['contact_email']) ?> from the company mailbox, with the PDF attached, and marks it sent. Nothing else to do.<br><?php endif; ?>
+    <b><?= $st === 'APPROVED' ? '2. ' : '' ?>Open in Gmail</b> — opens a new Gmail message in a new tab, already addressed and written, and downloads the PDF at the same time: attach the downloaded PDF (📎), press Send. The <?= e(Tl('client')) ?>'s reply comes to you.<br>
+    <b><?= $st === 'APPROVED' ? '3. ' : '' ?>Outlook (.eml file)</b> — downloads one ready e-mail file (it ends in <b>.eml</b>) with the PDF already inside. Double-click it: it opens in Outlook or Windows Mail as a draft from <?= e(compose_can_personalise() ? (current_user()['email'] ?? '') : 'your address') ?> — press Send. It is for desktop Outlook; Gmail in a browser cannot open it, so use “Open in Gmail” there.
+    <?php if ($st === 'APPROVED'): ?><br>After sending it yourself (2 or 3), press <b>“✓ I have sent it — mark sent”</b> so the follow-ups start. The system then does not e-mail the <?= e(Tl('client')) ?> again.<?php endif; ?>
+    <?php if (!compose_can_personalise()): ?>
+      <br><span style="color:var(--warn)">Add your e-mail address to your profile first, or the Outlook draft will open from the company address.</span>
+    <?php endif; ?>
+  </div>
+</div>
+<?php endif; ?>
+
+<?php // Won, but nobody has raised the contract number yet. The registration panel
+      // is far down a long page, so the state is called out at the top — worded for
+      // whoever is looking, because Accounts have a job to do and everyone else
+      // needs to know the order can still be scheduled. ?>
+<?php if ($st === 'ACCEPTED' && trim((string)($q['contract_number'] ?? '')) === ''):
+        $waited = function_exists('contract_wait_days') ? contract_wait_days($q) : null; ?>
+<div class="panel" style="border:1px solid var(--warn);background:color-mix(in srgb,var(--warn) 7%,transparent)">
+  <b style="color:var(--warn)">⚠ Contract number is yet to be created</b>
+  <?php if ($waited !== null): ?><span class="pill <?= $waited > 7 ? 'p-bad' : 'p-warn' ?>" style="margin-left:6px">waiting <?= (int)$waited ?> day<?= $waited == 1 ? '' : 's' ?></span><?php endif; ?>
+  <div class="muted" style="margin-top:4px">
+    <?php if ($canContract): ?>
+      This is yours to do — register the <?= e(Tl('client')) ?> and enter the contract number below, and the order floats
+      to operations automatically.
+    <?php else: ?>
+      Accounts have it. <?= e(THP('call')) ?> can be raised against this order in the meantime — they will simply keep
+      showing the contract number as outstanding until it is registered.
+    <?php endif; ?>
+  </div>
+  <?php // Owner, 13 Nov 2026 (bounce list 1.2): Accounts were prompted three times and the
+        // real button sat on another tab. When there is nothing to check first (this
+        // client has no other contract), ONE press here registers it — the same one-click
+        // registration the Contract panel offers. Otherwise the panel, which shows the
+        // client's other contracts, is the right place to decide.
+        if ($canContract && empty($clientContracts)): ?>
+    <form method="post" action="/quote-contract?id=<?= (int)$q['id'] ?>" style="margin-top:8px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <input type="hidden" name="auto_contract" value="1">
+      <?php if (!empty($contractPrefill['po_id'])): ?><input type="hidden" name="po_id" value="<?= (int)$contractPrefill['po_id'] ?>"><?php endif; ?>
+      <button class="btn small" type="submit">✓ Register the contract — next number</button>
+      <a href="#contract" style="font-size:12.5px">Check the details, or type the <?= e(Tl('client')) ?>'s own number →</a>
+    </form>
+  <?php else: ?>
+  <div style="margin-top:8px"><a class="btn small<?= $canContract ? '' : ' secondary' ?>" href="#contract">
+    <?= $canContract ? 'Register it now' : 'See the registration panel' ?></a></div>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
+<?php if ($st === 'REJECTED'): ?>
+<div class="panel" style="border:1px solid var(--bad);background:color-mix(in srgb,var(--bad) 6%,transparent)">
+  <b style="color:var(--bad)">Rejected by <?= e($q['rejected_by'] ?: 'the approver') ?></b>
+  <span class="muted"><?= $q['rejected_at'] ? ' on ' . e(fdate(substr((string)$q['rejected_at'],0,10))) : '' ?></span>
+  <?php if (!empty($q['reject_remarks'])): ?><div style="margin-top:4px"><b>Comment:</b> <?= e($q['reject_remarks']) ?></div><?php endif; ?>
+  <div class="muted" style="margin-top:4px">Correct it, then use <b>Submit for approval again</b> below — the chain is rebuilt from scratch and this rejection is cleared. For a change the client asked for, raise a new revision instead so both versions stay on the record.</div>
+</div>
+<?php endif; ?>
+
+<?php if (!empty($locked)): ?>
+<div class="panel" style="border:1px solid var(--warn)">
+  <b>🔒 Locked.</b> <span class="muted"><?= e($lockReason ?? '') ?></span>
+  <?php if (($st === 'SENT' || trim((string)($q['sent_at'] ?? '')) !== '') && $st !== 'ACCEPTED' && (int)($q['is_current'] ?? 1) === 1): ?>
+    <div style="margin-top:8px">
+      <button class="btn small" type="button" onclick="document.getElementById('revbox').style.display='block';document.getElementById('revbox').scrollIntoView({behavior:'smooth'})">Raise a revision</button>
+      <span class="muted" style="margin-left:6px">A revision keeps the same <?= e(Tl('quote')) ?> number, takes the next revision number,
+        carries every line and site across, and goes through approval again before it can be sent.</span>
+    </div>
+  <?php elseif ($editReq): ?>
+    <div style="margin-top:8px"><span class="pill p-warn">Request pending</span>
+      <span class="muted">raised by <?= e($editReq['requested_by']) ?> — “<?= e($editReq['reason']) ?>”</span></div>
+  <?php else: ?>
+    <form method="post" action="/quote-unlock?id=<?= (int)$q['id'] ?>" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:end">
+      <input type="hidden" name="do" value="request">
+      <div class="ff" style="margin:0;flex:1;min-width:240px"><label>Why does it need re-opening?</label>
+        <input class="form-control" name="reason" required placeholder="e.g. client asked to correct the rate on line 2"></div>
+      <button class="btn small secondary" type="submit">Request re-edit</button>
+    </form>
+  <?php endif; ?>
+</div>
+<?php elseif ($editReq && is_master()): ?>
+<div class="panel" style="border:1px solid var(--warn)">
+  <b>Re-edit requested</b> <span class="muted">by <?= e($editReq['requested_by']) ?> — “<?= e($editReq['reason']) ?>”</span>
+  <form method="post" action="/quote-unlock?id=<?= (int)$q['id'] ?>" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:end">
+    <input type="hidden" name="req" value="<?= (int)$editReq['id'] ?>">
+    <div class="ff" style="margin:0"><label>Unlock for (hours)</label>
+      <input class="form-control" type="number" name="hours" value="24" min="1" max="168" style="width:110px"></div>
+    <div class="ff" style="margin:0;flex:1;min-width:200px"><label>Note</label><input class="form-control" name="note"></div>
+    <button class="btn small" name="do" value="grant" type="submit">Grant</button>
+    <button class="btn small danger" name="do" value="refuse" type="submit">Refuse</button>
+  </form>
+</div>
+<?php elseif (!empty($q['unlocked_until']) && strtotime($q['unlocked_until']) > time()): ?>
+<div class="panel" style="border:1px solid var(--ok)">
+  <b style="color:var(--ok)">Unlocked</b> <span class="muted">until <?= e(date('d M Y H:i', strtotime($q['unlocked_until']))) ?> — it re-locks itself afterwards.</span>
+</div>
+<?php endif; ?>
+
+<?php // Module 03 — validity/expiry heads-up. A SENT quote past its validity, before
+      // the daily sweep stamps it EXPIRED; or a near-expiry nudge. Read-only, never blocks. ?>
+<?php $qv = quote_validity($q); ?>
+<?php if ($st === 'SENT' && $qv['expired']): ?>
+<div class="panel" style="border:1px solid var(--warn)">
+  <b>⏳ Past validity.</b> <span class="muted">This <?= e(Tl('quote')) ?>'s <?= (int)$q['validity_days'] ?>-day validity lapsed on <?= e(fdate($qv['expires_on'])) ?>.
+  Raise a revision to re-issue it with a fresh validity, or record the <?= e(Tl('client')) ?>'s acceptance (it is noted as accepted after expiry). Nothing is blocked.</span>
+</div>
+<?php elseif ($st === 'SENT' && $qv['days_left'] !== null && $qv['days_left'] >= 0 && $qv['days_left'] <= 7): ?>
+<div class="panel" style="border:1px solid var(--line)">
+  <span class="muted">⏳ Validity ends in <?= (int)$qv['days_left'] ?> day(s) — on <?= e(fdate($qv['expires_on'])) ?>.</span>
+</div>
+<?php endif; ?>
+
+<?php $needsApproval = $needsApproval ?? true; $canDecide = $canDecide ?? false; $assignedName = (string)($assignedName ?? ''); ?>
+<?php if (empty($q['is_current'])): ?>
+<div class="panel" role="status" style="border-left:4px solid var(--warn,#b7791f)">
+  <b>This is an earlier revision.</b> A later revision replaced it, so it is kept as a record and nothing on it can move.
+  <?php foreach (($revs ?? []) as $rv) if (!empty($rv['is_current'])): ?><a class="btn small" href="/quote?id=<?= (int)$rv['id'] ?>">Open the current revision →</a><?php endif; ?>
+</div>
+<?php else: ?>
+<!-- Status action bar. Drawn only when it holds something to press: an empty
+     "Actions — move this quote:" box told Accounts and readers there was a step
+     they could not find (bounce list 1.4, 13 Nov 2026). -->
+<?php ob_start(); ?>
+  <?php // A rejected quote is not an ending — it goes back round. It must offer
+        // the same submit button a draft does, or the only way forward is to
+        // raise a whole new revision for what may be a one-word correction. ?>
+  <?php $canSubmit = $canSubmit ?? true; $submitProblem = (string)($submitProblem ?? ''); $sendProblem = (string)($sendProblem ?? ''); ?>
+  <?php if (($st==='DRAFT' || $st==='REJECTED') && !$needsApproval): ?>
+    <?php if ($canSend && $sendProblem === ''): ?><?= $act('SENT','✉ Send to ' . Tl('client')) ?><?php elseif ($canSend): ?><span class="q-why" style="font-size:12.5px;color:var(--warn,#9a5b00);background:var(--warn-soft,#fdf1e3);border-radius:8px;padding:4px 10px">⚠ <?= e($sendProblem) ?></span><?php endif; ?>
+    <span class="muted" style="font-size:12.5px">No approval needed — <?= e(crm_quote_no_approval_reason($q)) ?>.</span>
+  <?php elseif (($st==='DRAFT' || $st==='REJECTED') && $canSubmit): ?>
+    <?php if ($submitProblem === ''): ?>
+      <?= $act('PENDING_APPROVAL', $st==='REJECTED' ? '↻ Submit for approval again' : 'Submit for approval') ?>
+    <?php else: //  a button that would only be refused is not drawn — the reason is, in its place ?>
+      <span class="q-why" style="font-size:12.5px;color:var(--warn,#9a5b00);background:var(--warn-soft,#fdf1e3);border-radius:8px;padding:4px 10px">⚠ Not ready to submit: <?= e($submitProblem) ?></span>
+    <?php endif; ?>
+    <?php if ($st==='REJECTED' && !empty($canEdit)): ?>
+      <a class="btn small secondary" href="/quote-edit?id=<?= (int)$q['id'] ?>">Edit first</a>
+    <?php endif; ?>
+  <?php elseif ($st==='APPROVED'): ?>
+    <?php if ($canSend && $sendProblem === ''): ?><?= $act('SENT','✉ Send to ' . Tl('client')) ?><?php elseif ($canSend): ?><span class="q-why" style="font-size:12.5px;color:var(--warn,#9a5b00);background:var(--warn-soft,#fdf1e3);border-radius:8px;padding:4px 10px">⚠ <?= e($sendProblem) ?></span><?php endif; ?>
+  <?php elseif ($st==='SENT' || $st==='EXPIRED'): ?>
+    <?php $pc = $possibleCustomer ?? null; if ($canDecide && $pc): ?>
+      <div role="group" aria-label="Same company?" style="flex-basis:100%;padding:10px 12px;border-left:4px solid var(--warn,#b7791f);background:var(--warn-bg,#fffbea);border-radius:8px">
+        <div style="margin-bottom:6px"><b>Before recording the acceptance:</b> is “<?= e($q['client_name']) ?>” the same company as <b><?= e($pc['legal_name'] ?? '') ?></b> (<?= e($pc['code'] ?? '') ?>), already on file?</div>
+        <form method="post" action="/quote-status?id=<?= (int)$q['id'] ?>" style="display:inline"><input type="hidden" name="to" value="ACCEPTED"><input type="hidden" name="same_as" value="<?= (int)$pc['id'] ?>"><button class="btn small" type="submit">Yes — same company, mark accepted</button></form>
+        <details style="display:inline-block;vertical-align:top"><summary class="btn small secondary" style="display:inline-flex">No — a different company, mark accepted</summary>
+          <form method="post" action="/quote-status?id=<?= (int)$q['id'] ?>" style="margin-top:8px;max-width:760px"><input type="hidden" name="to" value="ACCEPTED"><input type="hidden" name="new_company" value="1">
+            <?php $cidVals = []; $cidId = 'qa-cid2'; $cidNote = 'The new ' . Tl('client') . '\'s GSTIN and PAN — required when a ' . Tl('quote') . ' is won.'; include dirname(__DIR__, 3) . '/views/ops/_custid_fields.php'; ?>
+            <button class="btn small" type="submit">No — a different company, mark accepted</button></form>
+        </details>
+      </div>
+    <?php elseif ($canDecide && empty($q['client_id']) && trim((string) ($q['client_name'] ?? '')) !== '' && !ops_val("SELECT id FROM business_partners WHERE is_client=1 AND (legal_name=? OR display_name=?) LIMIT 1", [trim((string) $q['client_name']), trim((string) $q['client_name'])])): ?>
+      <?php // Won for a name not on the client master: its GSTIN and PAN are asked here (owner, 21 Nov 2026: D1–D4). ?>
+      <form method="post" action="/quote-status?id=<?= (int)$q['id'] ?>" style="flex-basis:100%;max-width:760px"><input type="hidden" name="to" value="ACCEPTED">
+        <?php $cidVals = []; $cidId = 'qa-cid'; $cidNote = '“' . (string) $q['client_name'] . '” is not on the ' . Tl('client') . ' list yet. Winning the ' . Tl('quote') . ' puts it there — with its GSTIN and PAN.'; include dirname(__DIR__, 3) . '/views/ops/_custid_fields.php'; ?>
+        <?php if ((int) ($_GET['loc'] ?? 0) > 0 && ($locRow = ops_one("SELECT id, code, legal_name FROM business_partners WHERE id=?", [(int) $_GET['loc']]))): ?>
+          <label style="display:flex;gap:8px;align-items:flex-start;margin:0 0 8px;font-weight:600"><input type="checkbox" name="add_location_to" value="<?= (int) $locRow['id'] ?>" style="margin-top:3px"> Yes — it is <?= e($locRow['code'] . ' — ' . $locRow['legal_name']) ?> (same PAN): add this GSTIN as its billing location</label>
+        <?php endif; ?>
+        <button class="btn small" type="submit"><?= e($st==='EXPIRED' ? 'Mark accepted (after expiry)' : 'Mark accepted (won)') ?></button>
+      </form>
+    <?php elseif ($canDecide): ?><?= $act('ACCEPTED', $st==='EXPIRED' ? 'Mark accepted (after expiry)' : 'Mark accepted (won)') ?>
+    <?php else: ?><span class="muted" style="font-size:12.5px"><?= e($assignedName !== '' ? $assignedName . ', who is assigned to this ' . Tl('quote') . ',' : 'The person assigned to this ' . Tl('quote')) ?> records the <?= e(Tl('client')) ?>'s answer.</span><?php endif; ?>
+    <?php if (crm_quote_word_allowed($q)): ?><a class="btn small secondary" href="/quote-doc?id=<?= (int)$q['id'] ?>">Re-download Word</a><?php endif; ?>
+  <?php endif; ?>
+  <?php if (in_array($st, ['APPROVED','SENT'], true) && !empty($q['contact_email']) && !empty($canSend)): ?>
+    <span style="width:1px;height:22px;background:var(--line)"></span>
+    <a class="btn small secondary" href="/quote-compose?id=<?= (int)$q['id'] ?>&amp;mode=gmail" target="_blank" rel="noopener"
+       onclick="var d=document.createElement('a');d.href='/quote-pdf?id=<?= (int)$q['id'] ?>';d.download='';document.body.appendChild(d);d.click();d.remove();"
+       title="Opens a new Gmail message in a new tab, addressed and written, and downloads the PDF to attach">✉️ Open in Gmail</a>
+    <a class="btn small secondary" href="/quote-compose?id=<?= (int)$q['id'] ?>"
+       title="Downloads a .eml e-mail file with the PDF inside — double-click it to open it in Outlook as a draft, then press Send">📨 Outlook (.eml)</a>
+    <?php if ($st === 'APPROVED' && ($sendProblem ?? '') === ''): ?>
+      <form method="post" action="/quote-status?id=<?= (int)$q['id'] ?>" style="display:inline" onsubmit="return confirm('Did you send it to the <?= e(Tl('client')) ?> from your own mailbox? It is marked sent and follow-ups start; no e-mail is sent from here.')">
+        <input type="hidden" name="to" value="SENT"><input type="hidden" name="by_hand" value="1">
+        <button class="btn small secondary" type="submit" title="You sent it yourself — mark it sent without e-mailing the client again">✓ I have sent it — mark sent</button></form>
+    <?php endif; ?>
+  <?php endif; ?>
+  <?php if ($canDecide && in_array($st, ['DRAFT','SENT'], true)):   // docs/03: only Draft → Lost and Sent → Lost ?>
+    <button class="btn small danger" type="button" onclick="document.getElementById('lostbox').style.display='block'">Mark lost</button>
+  <?php endif; ?>
+  <?php // Revising is how a sent quotation is changed, so this is deliberately NOT
+        // gated on the edit lock — otherwise the only correct action would be the
+        // one greyed out. ?>
+  <?php //  An accepted quotation is final (docs/03): the won order stays with Accounts. Only the
+        //  latest revision can be revised (test book SALB-053 / SALB-055). ?>
+  <?php if (!empty($canRevise) && in_array($st, ['SENT','APPROVED','LOST','REJECTED','EXPIRED'], true) && (int)($q['is_current'] ?? 1) === 1): ?>
+    <button class="btn small secondary" type="button" onclick="document.getElementById('revbox').style.display='block'" style="margin-left:auto">Revise (new rev)</button>
+  <?php endif; ?>
+<?php $qActs = trim((string)ob_get_clean());
+      if (strpos($qActs, '<button') !== false || strpos($qActs, '<a ') !== false || strpos($qActs, '<form') !== false): ?>
+<div class="panel" id="actions" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+  <span class="muted"><b>Actions</b> — move this <?= e(Tl('quote')) ?>:</span>
+  <?= $qActs ?>
+</div>
+<?php elseif ($qActs !== ''): ?>
+<div class="panel" id="actions"><?= $qActs ?></div>
+<?php else: // nothing to press — so the "Actions" shortcut above has nowhere to go ?>
+<script>[].forEach.call(document.querySelectorAll('.quote-jump a[href="#actions"]'),function(a){a.hidden=true;});</script>
+<?php endif; ?>
+<?php endif; // current revision ?>
+
+<?php // ---- The six tabs of the approved design (owner, 21 Nov 2026: Stage 4 / Stage 5 C2) ----
+      //  Overview (next step, decision, approval chain, pre-order checklist, costing,
+      //  commercials) · Lines & milestones · Approvals (the full approval record) ·
+      //  Documents · Contract & order · History & follow-ups. Every panel is the one
+      //  that was here; only the tab it sits under changed. Without script every
+      //  panel shows, one below the other. ?>
+<div data-tabs data-tabs-key="quote" data-tabs-order="Overview,Lines &amp; milestones,Approvals,Documents,Contract &amp; order,History &amp; follow-ups">
+<?php // Quotation playbook — the guided sales path, first thing on Overview so
+      // Quote -> Order -> Job all read the same.
+      if (function_exists('crm_render_quote_playbook')): ?>
+  <div data-tab="Overview"><?php crm_render_quote_playbook($q); ?></div>
+<?php endif; ?>
+<?php // ---- Project costing linked to this quotation --------------------------
+  if (!empty($costingCan)): $pcRow = $costing ?? null; $back = '/quote?id=' . (int)$q['id']; ?>
+<div class="panel" id="costing" data-tab="Overview" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+  <span class="muted">🧮 Project costing:</span>
+  <?php if ($pcRow): ?>
+    <a class="btn small secondary" href="/project-costing?id=<?= (int)$pcRow['id'] ?>"><b><?= e($pcRow['code']) ?></b> — <?= e($pcRow['title']) ?></a>
+    <span class="muted" style="font-size:12.5px">revenue <?= fmoney_short($pcRow['exp_revenue']) ?> · margin <?= (float)$pcRow['exp_revenue']>0 ? nf((float)$pcRow['exp_profit']/(float)$pcRow['exp_revenue']*100,1) : '0' ?>%</span>
+    <?php // Locked once this quotation is sent, won or has a contract (owner, 13 Nov 2026).
+          $pcLock = function_exists('pc_quote_lock_reason') ? pc_quote_lock_reason($pcRow) : '';
+          //  A revision being prepared whose costing is locked: one press for an editable copy (14 Nov 2026).
+          $pcRevise = function_exists('pc_revise_problem') && function_exists('pc_can_edit') && pc_can_edit() && pc_revise_problem((int)$q['id']) === '';
+          if ($pcRevise): ?>
+      <form method="post" action="/project-costing-revise" style="display:inline"><input type="hidden" name="quote_id" value="<?= (int)$q['id'] ?>">
+        <button class="btn small" title="Makes an editable copy of <?= e($pcRow['code']) ?> for this revision; the original stays as the record of the earlier price">✎ Change the costing for this revision</button></form>
+    <?php endif;
+          if ($pcLock !== ''): ?>
+      <span class="muted" style="margin-left:auto;font-size:12.5px" title="<?= e($pcLock) ?>"><?php
+        //  Whose step locked it: this revision, or an earlier one (14 Nov 2026 — a fresh revision read
+        //  "this quote has gone to the client" when only the earlier revision had).
+        $lockSelf = (int)$q['rev'] > 0 ? strpos($pcLock, '(revision ' . (int)$q['rev'] . ')') !== false : strpos($pcLock, '(revision ') === false;
+        $lockWhat = strpos($pcLock, ' has a contract') !== false ? 'has a contract' : (strpos($pcLock, ' has been won') !== false ? 'has been won'
+                  : (strpos($pcLock, ' has gone to the ') !== false ? 'has gone to the ' . Tl('client') : (strpos($pcLock, ' has been approved') !== false ? 'has been approved' : 'has gone for approval'))); ?>🔒 Locked — <?= $lockSelf ? 'this ' . e(Tl('quote')) : 'an earlier revision' ?> <?= e($lockWhat) ?></span>
+    <?php else: ?>
+    <form method="post" action="/project-costing-attach" style="display:inline;margin-left:auto" onsubmit="return confirm('Unlink this costing from the quotation? It is not deleted — you can attach it again from here.')">
+      <input type="hidden" name="costing_id" value="<?= (int)$pcRow['id'] ?>"><input type="hidden" name="quote_id" value="0"><input type="hidden" name="back" value="<?= e($back) ?>">
+      <button class="btn small btn-ghost">Unlink</button>
+    </form>
+    <?php endif; ?>
+  <?php else: ?>
+    <form method="post" action="/project-costing-new" style="display:inline">
+      <input type="hidden" name="quote_id" value="<?= (int)$q['id'] ?>"><input type="hidden" name="client_id" value="<?= (int)($q['client_id'] ?? 0) ?>">
+      <input type="hidden" name="office_id" value="<?= (int)($q['office_id'] ?? 0) ?>"><input type="hidden" name="title" value="<?= e($q['subject'] ?: quote_label($q)) ?>">
+      <input type="hidden" name="site" value="<?= e($q['site_location'] ?? '') ?>">
+      <button class="btn small primary">＋ Create costing for this quotation</button>
+    </form>
+    <?php if (!empty($costingUnlinked)): ?>
+    <form method="post" action="/project-costing-attach" style="display:inline-flex;gap:6px;align-items:center">
+      <input type="hidden" name="quote_id" value="<?= (int)$q['id'] ?>"><input type="hidden" name="back" value="<?= e($back) ?>">
+      <select name="costing_id" class="form-control" style="padding:5px 8px;font-size:13px"><option value="">attach existing…</option>
+        <?php foreach ($costingUnlinked as $u): ?><option value="<?= (int)$u['id'] ?>"><?= e($u['code'].' — '.$u['title'] . (!empty($u['client_name']) ? ' · ' . $u['client_name'] : '') . ' · ' . strtolower(PC_STATUS[$u['status']] ?? $u['status'])) ?></option><?php endforeach; ?>
+      </select><button class="btn small secondary">Attach</button>
+    </form>
+    <?php endif; ?>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
+<?php
+  // ---- Pre-order review checklist (configurable, on/off) ----
+  $preorderOn = $preorderOn ?? false; $preorderItems = $preorderItems ?? [];
+  $preorderState = $preorderState ?? []; $preorderRequireAll = $preorderRequireAll ?? false;
+  $preorderCanWaive = $preorderCanWaive ?? false;
+  if ($preorderOn && $preorderItems):
+    $pcDone = 0; foreach ($preorderItems as $it) if (!empty($preorderState[preorder_item_key($it)])) $pcDone++;
+    $pcAll = $pcDone >= count($preorderItems);
+    $pcWaived = trim((string)($q['preorder_waiver'] ?? '')) !== '';
+    $pcOpen = !empty($q['is_current']) && !in_array((string)$q['status'], ['ACCEPTED', 'LOST', 'EXPIRED'], true);
+?>
+<div class="panel" id="preorder" data-tab="Overview" style="border:1px solid <?= ($pcAll || $pcWaived) ? 'var(--ok)' : 'var(--warn,#c90)' ?>">
+  <div class="ctitle" style="margin-top:0"><h3>Pre-order review</h3>
+    <span class="pill <?= ($pcAll || $pcWaived) ? 'p-ok' : 'p-warn' ?>"><?= $pcWaived && !$pcAll ? 'Waived' : (int)$pcDone . '/' . count($preorderItems) . ' done' ?></span></div>
+  <p class="muted" style="margin:0 0 8px;font-size:12px">Enquiry / tender / contract review for this <?= e(Tl('quote')) ?>.<?= $preorderRequireAll ? ' <b>Every point must be ticked — or the checklist waived — before it is approved, sent, or accepted.</b>' : '' ?></p>
+  <?php if ($pcWaived): ?>
+    <p style="margin:0 0 8px;font-size:13px">⚠ <b>Waived</b> by <?= e($q['preorder_waived_by']) ?> on <?= e(fdate($q['preorder_waived_at'])) ?> — <?= e($q['preorder_waiver']) ?></p>
+  <?php endif; ?>
+  <form method="post" action="/quote-preorder-save">
+    <input type="hidden" name="id" value="<?= (int)$q['id'] ?>">
+    <?php foreach ($preorderItems as $it): $k = preorder_item_key($it); $tk = $preorderState[$k] ?? null; ?>
+      <label class="chk" style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;font-size:13px">
+        <input type="checkbox" name="pc[<?= e($k) ?>]" value="1" <?= !empty($tk) ? 'checked' : '' ?> <?= $pcOpen ? '' : 'disabled' ?> style="margin-top:2px">
+        <span><?= e($it) ?><?php if (is_array($tk)): ?> <span class="muted" style="font-size:11.5px">— <?= e($tk['by'] ?? '') ?>, <?= e(fdate($tk['at'] ?? '')) ?></span><?php endif; ?></span>
+      </label>
+    <?php endforeach; ?>
+    <?php if ($pcOpen): ?>
+    <div style="margin-top:8px"><button class="btn small" type="submit">Save checklist</button>
+      <?php if (is_master() || can('settings.manage')): ?><a class="muted" style="font-size:11.5px;margin-left:8px" href="/preorder-checklist">Edit the checklist →</a><?php endif; ?></div>
+    <?php endif; ?>
+  </form>
+  <?php if ($preorderRequireAll && !$pcAll && !$pcWaived && $pcOpen && $preorderCanWaive): ?>
+  <details style="margin-top:10px"><summary class="muted" style="font-size:12.5px;cursor:pointer">A point cannot be confirmed? Waive the checklist</summary>
+    <form method="post" action="/quote-preorder-save" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:6px">
+      <input type="hidden" name="id" value="<?= (int)$q['id'] ?>"><input type="hidden" name="do" value="waive">
+      <input class="form-control" name="waiver_reason" required maxlength="400" placeholder="Why — shown on the <?= e(Tl('quote')) ?> with your name" style="flex:1;min-width:220px">
+      <button class="btn small secondary" type="submit">Waive</button>
+    </form>
+  </details>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
+<?php if ($approvals): ?>
+<div class="panel" id="approval" data-tab="Overview">
+  <h3 class="tab-sub" style="margin-top:0">Approval chain</h3>
+  <?php if ($st==='PENDING_APPROVAL' && $pendingWith): ?>
+    <div class="panel" style="margin:0 0 10px;background:var(--soft)">
+      <b>⏳ Waiting with <?= e($pendingWith) ?></b>
+      <?php if ($pendingStep): ?><span class="muted"> — level <?= (int)$pendingStep['level'] ?> of <?= count($approvals) ?></span><?php endif; ?>
+      <?php // Owner, 12 Nov 2026 — say who comes next, so a chain that starts with
+            // the Branch Manager does not look as if the unit head was skipped.
+        if ($pendingStep && crm_approval_mode() === 'order'):
+          $nextNames = [];
+          //  in the order they will sign: the other levels by number, top management last (14 Nov 2026)
+          $lastLv = function_exists('appr_last_levels') ? appr_last_levels($approvals, 'crm_step_approvers_direct') : [];
+          $seq = array_keys($approvals);
+          usort($seq, fn($x, $y) => [in_array((int)$approvals[$x]['level'], $lastLv, true) ? 1 : 0, (int)$approvals[$x]['level']] <=> [in_array((int)$approvals[$y]['level'], $lastLv, true) ? 1 : 0, (int)$approvals[$y]['level']]);
+          $passed = false;
+          foreach ($seq as $ni) { $na = $approvals[$ni];
+            if ((int)$na['id'] === (int)$pendingStep['id']) { $passed = true; continue; }
+            if ($na['status'] !== 'PENDING' || !$passed || (int)$na['level'] === (int)$pendingStep['level']) continue;
+            $np = $stepPeople[$ni] ?? [];
+            $nextNames[] = 'level ' . (int)$na['level'] . ' — ' . ($np ? implode(', ', array_map('crm_person_label', array_slice($np, 0, 2))) : (!empty($na['approver_role']) ? (ORG_ROLES[$na['approver_role']] ?? $na['approver_role']) : 'any approver'));
+          }
+          if ($nextNames): ?><div class="muted" style="font-size:12.5px;margin-top:3px">Then: <?= e(implode(' → ', $nextNames)) ?></div><?php endif; endif; ?>
+    </div>
+  <?php endif; ?>
+  <table class="dt">
+    <thead><tr><th class="num">Level</th><th>With whom</th><th>Status</th><th>Acted</th><th>Comment</th><th></th></tr></thead>
+    <tbody>
+    <?php foreach ($approvals as $ai => $a):
+      $people = $stepPeople[$ai] ?? [];
+      if ($people) { $names = array_map('crm_person_label', array_slice($people, 0, 4)); $more = count($people) - count($names); $who = implode(', ', $names) . ($more > 0 ? " and $more other(s)" : ''); }
+      else $who = ucfirst(crm_step_who($a));
+    ?>
+    <tr>
+      <td class="num"><b><?= (int)$a['level'] ?></b></td>
+      <td><?= e($who) ?></td>
+      <td><span class="pill <?= $a['status']==='APPROVED'?'p-ok':($a['status']==='REJECTED'?'p-bad':'p-warn') ?>">
+          <?= e($a['status']==='PENDING' ? 'Pending' : ucfirst(strtolower($a['status']))) ?></span></td>
+      <td class="muted"><?= $a['acted_by'] ? e($a['acted_by']).'<br><span style="font-size:11px">'.e(fdate(substr((string)$a['acted_at'],0,10))).'</span>' : '—' ?></td>
+      <td class="muted"><?= $a['remarks'] ? e($a['remarks']) : '—' ?></td>
+      <td class="num" style="white-space:nowrap">
+        <?php if (crm_can_act_approval($a)): $aOpen = in_array((int)$a['level'], $openLevels ?? [(int)$a['level']], true); ?>
+        <form method="post" action="/quote-approve?id=<?= (int)$q['id'] ?>" style="display:flex;gap:4px;align-items:center;justify-content:flex-end;flex-wrap:wrap">
+          <input type="hidden" name="step" value="<?= (int)$a['id'] ?>">
+          <input class="form-control" name="remarks" placeholder="comment (required to reject)" style="width:190px">
+          <?php if ($aOpen): ?><button class="btn small" name="decision" value="approve" type="submit">Approve</button>
+          <?php else: //  not this level's turn yet — no Approve button that would only be refused (owner, 14 Nov 2026) ?>
+            <span class="muted" style="font-size:11.5px;white-space:normal;max-width:180px;text-align:right">Approve opens when the levels before yours have signed</span>
+          <?php endif; ?>
+          <button class="btn small danger" name="decision" value="reject" type="submit">Reject</button>
+        </form>
+        <?php endif; ?>
+      </td>
+    </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+  <?php // Everybody approves the wrong thing once. While it is still inside the
+        // building that is a mistake, not an event. ?>
+  <?php if (!empty($canRetract)): ?>
+  <form method="post" action="/quote-unapprove?id=<?= (int)$q['id'] ?>"
+        style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;border-top:1px solid var(--line);padding-top:10px">
+    <div class="ff" style="margin:0;flex:1;min-width:260px"><label>Approved it by mistake? Take it back</label>
+      <input class="form-control" name="reason" placeholder="why you are taking it back (optional)"></div>
+    <button class="btn small secondary" type="submit"
+      onclick="return confirm('Take your approval back? The quotation goes to waiting-for-approval again, and any level approved after yours is reset with it.')">Take my approval back</button>
+  </form>
+  <p class="muted" style="margin-top:6px">Possible only while the <?= e(Tl('quote')) ?> is still inside the company.
+    Once it has gone to the <?= e(Tl('client')) ?> it cannot be taken back — raise a revision instead.</p>
+  <?php endif; ?>
+  <p class="muted" style="margin-top:6px">It becomes <strong>Approved</strong> once every level has approved. A rejection needs a comment and marks the whole <?= e(Tl('quote')) ?> as rejected. Configure the chain under <a href="/approval-rules?module=quote">Approval rules</a>.</p>
+</div>
+<?php endif; ?>
+
+<div id="lostbox" class="panel" style="display:none;border:1px solid var(--bad)">
+  <form method="post" action="/quote-status?id=<?= (int)$q['id'] ?>">
+    <input type="hidden" name="to" value="LOST">
+    <h3 class="tab-sub" style="margin-top:0">Mark as lost / regretted</h3>
+    <div class="form-grid">
+      <div class="ff"><label>Reason *</label>
+        <select class="form-control" name="lost_reason" id="lost_reason" required onchange="document.getElementById('lo_other').style.display=this.value==='OTHER'?'block':'none'">
+          <option value="">— pick a reason —</option>
+          <?php foreach ($lostReasons as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?>
+        </select></div>
+      <div class="ff" id="lo_other" style="display:none"><label>Other — please specify</label><input class="form-control" name="lost_reason_other"></div>
+    </div>
+    <div style="margin-top:10px"><button class="btn danger" type="submit">Confirm lost</button>
+      <button class="btn secondary" type="button" onclick="document.getElementById('lostbox').style.display='none'">Cancel</button></div>
+  </form>
+</div>
+
+<div id="revbox" class="panel" style="display:none;border:1px solid var(--line)">
+  <form method="post" action="/quote-revise?id=<?= (int)$q['id'] ?>">
+    <h3 class="tab-sub" style="margin-top:0">Create a new revision</h3>
+    <p class="sub">This bumps the revision number (Rev <?= str_pad((string)((int)$q['rev']+1),2,'0',STR_PAD_LEFT) ?>) and copies everything into a fresh draft you can edit. The current version is kept in history.</p>
+    <div class="ff ff-wide"><label>What changed? (logged in history)</label><input class="form-control" name="summary" placeholder="e.g. Revised rates after negotiation"></div>
+    <div style="margin-top:10px"><button class="btn" type="submit">Create revision</button>
+      <button class="btn secondary" type="button" onclick="document.getElementById('revbox').style.display='none'">Cancel</button></div>
+  </form>
+</div>
+
+<div class="panel-split" data-tab="Overview">
+  <div class="panel">
+    <h3 class="tab-sub" style="margin-top:0"><?= e(T('client')) ?></h3>
+    <table class="kv">
+      <tr><td class="muted">Client</td><td><?= e($q['client_name'] ?: '—') ?></td></tr>
+      <tr><td class="muted">Contact</td><td><?= e($q['contact_name'] ?: '—') ?><?= $q['contact_email']?' · '.e($q['contact_email']):'' ?><?= $q['contact_mobile']?' · '.e($q['contact_mobile']):'' ?></td></tr>
+      <tr><td class="muted"><?= e(T("sbu")) ?></td><td><?= e(lk_options_or('sbu', OPS_SBUS)[$q['sbu']] ?? $q['sbu'] ?: '—') ?></td></tr>
+      <tr><td class="muted">Location</td><td><?= e($q['site_location'] ?: '—') ?> <span class="pill p-mut"><?= e($locT[$q['location_type']] ?? $q['location_type']) ?></span></td></tr>
+    </table>
+  </div>
+  <div class="panel">
+    <h3 class="tab-sub" style="margin-top:0">Commercials</h3>
+    <table class="kv">
+      <tr><td class="muted">Validity</td><td><?= (int)$q['validity_days'] ?> days</td></tr>
+      <tr><td class="muted">Payment terms</td><td><?= e($q['payment_terms'] ?: '—') ?></td></tr>
+      <tr><td class="muted">Advance</td><td><?= (float)$q['advance_pct'] ?>% <?= $q['advance_required']?'<span class="pill p-warn">required before scheduling</span>':'' ?></td></tr>
+      <tr><td class="muted">Deliverable</td><td><?= $q['report_vs_payment']?'<span class="pill p-warn">Report only against payment</span>':'Standard' ?></td></tr>
+      <?php // Closing check (21 Nov 2026): the approved design's "Commercials and totals" shows the
+            // GST beside the before-GST figure on Overview, as the Lines tab does — display only.
+            $ovM = fn($v) => e(cur_sym()) . nf((float) $v, fmod((float) $v, 1) ? 2 : 0);
+            $ovSplit = function_exists('sx_quote_gst_split') ? sx_quote_gst_split($q) : null; ?>
+      <tr><td class="muted">Before GST</td><td><b><?= $ovM($q['subtotal']) ?></b></td></tr>
+      <tr><td class="muted">GST (<?= (float) $q['gst_pct'] ?>%)</td><td><?= $ovM($q['gst_amount']) ?><?php if ($ovSplit && ($ovSplit['mode'] ?? '') !== 'UNKNOWN' && !empty($ovSplit['rows'])): ?> <span class="muted" style="font-size:12px">— <?= e(implode(' + ', array_map(fn($r) => $r[0] . ' ' . cur_sym() . nf((float) $r[1], fmod((float) $r[1], 1) ? 2 : 0), $ovSplit['rows']))) ?></span><?php endif; ?></td></tr>
+      <tr><td class="muted">Total with GST</td><td><b><?= $ovM($q['total_amount']) ?></b></td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="panel" style="padding:0;overflow:hidden" data-tab="Lines &amp; milestones">
+  <div class="tbl-scroll" style="overflow-x:auto">
+  <table class="dt">
+    <thead><tr><th>#</th><th><?= e(T('sbu')) ?></th><th>Service</th><th>Description</th><th>Location</th><th>Order</th><th class="num">Qty</th><th>Unit</th><th class="num">Rate</th><th class="num">Amount</th></tr></thead>
+    <tbody>
+      <?php foreach ($lines as $i=>$l): ?>
+      <tr>
+        <td class="muted"><?= $i+1 ?></td>
+        <td><?= e(lk_options_or('sbu', OPS_SBUS)[$l['sbu']] ?? $l['sbu'] ?: '—') ?></td>
+        <td><?= e(lk_options_or('inspection_type', INSPECTION_TYPES)[$l['service_type']] ?? $l['service_type'] ?: '—') ?><?= $l['subtypes']?'<div class="muted" style="font-size:11px">'.e($l['subtypes']).'</div>':'' ?></td>
+        <td><?= e($l['description'] ?: '—') ?></td>
+        <td><?= e($l['location'] ?: '—') ?></td>
+        <td><span class="pill <?= $l['order_type']==='OPEN'?'p-info':'p-mut' ?>"><?= e(lk_options_or('order_type', ORDER_TYPES)[$l['order_type']] ?? $l['order_type']) ?></span></td>
+        <td class="num"><?= rtrim(rtrim(nf((float)$l['qty'],2),'0'),'.') ?></td>
+        <td><?= e(lk_options_or('charge_unit', CHARGE_UNITS)[$l['unit']] ?? $l['unit']) ?></td>
+        <td class="num"><?= e(cur_sym()) ?><?= nf((float)$l['rate'], 2) ?></td>
+        <td class="num"><?= e(cur_sym()) ?><?= nf((float)$l['amount'], 2) ?></td>
+      </tr>
+      <?php endforeach; ?>
+      <?php if (!$lines): ?><tr><td colspan="10" class="muted" style="text-align:center;padding:16px">No line items.</td></tr><?php endif; ?>
+    </tbody>
+    <tfoot>
+      <tr><td colspan="9" class="num muted">Subtotal</td><td class="num"><b><?= e(cur_sym()) ?><?= nf((float)$q['subtotal'], 2) ?></b></td></tr>
+      <tr><td colspan="9" class="num muted">GST (<?= (float)$q['gst_pct'] ?>%)</td><td class="num"><?= e(cur_sym()) ?><?= nf((float)$q['gst_amount'], 2) ?></td></tr>
+      <?php // How that GST splits on the invoice — the invoice's own rule (books_is_igst).
+            // Display only: the quotation's figures are not changed.
+            $gsp = function_exists('sx_quote_gst_split') ? sx_quote_gst_split($q) : null;
+            if ($gsp && $gsp['mode'] === 'UNKNOWN'): ?>
+        <tr><td colspan="9" class="num muted" style="font-size:12px"><?php if (($gsp['missing'] ?? '') === 'ours'): ?>CGST + SGST or IGST is decided once your own state is set (Settings → Tally / accounts → “Our state” — the same setting the invoice uses).<?php else: ?>CGST + SGST or IGST is decided once the <?= e(Tl('client')) ?>'s state (or GSTIN) is on their record.<?php endif; ?></td><td></td></tr>
+      <?php elseif ($gsp): foreach ($gsp['rows'] as [$gl, $ga]): ?>
+        <tr><td colspan="9" class="num muted" style="font-size:12px">of which <?= e($gl) ?></td><td class="num muted" style="font-size:12px"><?= e(cur_sym()) ?><?= nf((float)$ga, 2) ?></td></tr>
+      <?php endforeach; endif; ?>
+      <tr><td colspan="9" class="num"><b>Total</b></td><td class="num"><b><?= e(cur_sym()) ?><?= nf((float)$q['total_amount'], 2) ?></b></td></tr>
+    </tfoot>
+  </table>
+  </div>
+</div>
+
+<?php // Billing by milestones (owner, 12 Nov 2026) — the schedule the contract takes when this is won.
+      if (function_exists('ms_rows_quote')):
+        $msMode = 'quote'; $msBase = ms_quote_base($q); $msRows = ms_with_amounts(ms_rows_quote((int)$q['id']), $msBase);
+        $msRet = (float)($q['ms_retention_pct'] ?? 0); $msCanEdit = ms_can_edit_quote($q);
+        $msAction = '/quote-milestones'; $msHidden = ['quote_id' => (int)$q['id']]; $msShowMoney = true;
+        //  Drawn in its OWN scope: the piece has working names of its own ($st, $r, $i …)
+        //  and, included bare, its "$st" replaced this page's status — which hid the
+        //  whole "Won — contract registration" panel on any quotation with a schedule.
+        if ($msRows || $msCanEdit) (static function (array $__page) { extract($__page); include dirname(__DIR__, 3) . '/views/ops/_milestones.php'; })(get_defined_vars());
+      endif; ?>
+
+<?php if (!empty($orderCalls)):
+  $cInv=0;$cRec=0; foreach($orderCalls as $oc){ $cInv+=(float)$oc['invoiced']; $cRec+=(float)$oc['received']; } ?>
+<div class="panel" data-tab="Contract &amp; order">
+  <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+    <h3 class="tab-sub" style="margin:0">Inspection <?= e(Tlp('call')) ?> under this order</h3>
+    <a style="margin-left:auto;font-size:12.5px" href="/calls?<?= $q['contract_number'] ? 'contract=' . e(urlencode((string)$q['contract_number'])) : 'quote=' . (int)$q['id'] ?>">Open in the register →</a>
+  </div>
+  <div class="chip-row" style="margin:8px 0">
+    <span class="ct"><b><?= count($orderCalls) ?></b> <?= e(Tlp('call')) ?></span>
+    <span class="ct">Invoiced <b><?= e(cur_sym()) ?><?= nf($cInv,0) ?></b></span>
+    <span class="ct">Received <b><?= e(cur_sym()) ?><?= nf($cRec,0) ?></b></span>
+  </div>
+  <table class="grid"><tr><th><?= e(T('call')) ?></th><th>Raised</th><th>Status</th><th class="num"><?= e(Tlp('job')) ?></th><th class="num">Invoiced</th><th class="num">Received</th></tr>
+    <?php foreach ($orderCalls as $oc):
+      $cst = ($oc['status'] ?? '') === 'CLOSED' ? 'Closed' : ((int)$oc['job_count'] === 0 ? 'To schedule' : 'In progress'); ?>
+    <tr>
+      <td><a href="/call?id=<?= (int)$oc['id'] ?>"><?= e($oc['call_code'] ?: ('#' . (int)$oc['id'])) ?></a></td>
+      <td class="muted"><?= e(fdate(substr((string)$oc['created_at'],0,10))) ?></td>
+      <td><?= e($cst) ?></td>
+      <td class="num"><?= (int)$oc['job_count'] ?></td>
+      <td class="num"><?= (float)$oc['invoiced']>0?cur_sym().nf((float)$oc['invoiced'],0):'—' ?></td>
+      <td class="num"><?= (float)$oc['received']>0?cur_sym().nf((float)$oc['received'],0):'—' ?></td>
+    </tr>
+    <?php endforeach; ?>
+  </table>
+  <p class="muted" style="margin-top:6px">Each <?= e(Tl('call')) ?> opens to its <?= e(Tlp('job')) ?>, deputations and invoicing. Raise more from the contract panel above.</p>
+</div>
+<?php endif; ?>
+
+<?php if (!empty($orderJobs)):
+  $oInv=0;$oPaid=0; foreach($orderJobs as $oj){ $oInv+=(float)($oj['_invoiced'] ?? $oj['invoice_amount']); $oPaid+= !empty($oj['payment_received'])?(float)$oj['payment_amount']:0; } ?>
+<div class="panel" data-tab="Contract &amp; order">
+  <h3 class="tab-sub" style="margin-top:0">Jobs &amp; revenue against this order</h3>
+  <div class="chip-row" style="margin-bottom:8px">
+    <span class="ct">Ordered <b><?= e(cur_sym()) ?><?= nf((float)$q['total_amount'], 2) ?></b></span>
+    <span class="ct">Invoiced <b><?= e(cur_sym()) ?><?= nf($oInv,0) ?></b></span>
+    <span class="ct">Received <b><?= e(cur_sym()) ?><?= nf($oPaid,0) ?></b></span>
+    <span class="ct"><?= count($orderJobs) ?> job<?= count($orderJobs)==1?'':'s' ?></span>
+  </div>
+  <table class="grid"><tr><th>Job</th><th>Inspector</th><th>Stage</th><th class="num">Invoiced</th><th class="num">Received</th></tr>
+    <?php foreach ($orderJobs as $oj): ?>
+    <tr><td><a href="/job?id=<?= (int)$oj['id'] ?>"><?= e($oj['job_code']) ?></a></td>
+      <td><?= e($oj['inspector_name'] ?: '—') ?></td>
+      <td><?= $oj['closed_flag']?'Closed':'Open' ?></td>
+      <td class="num"><?php $ojInv=(float)($oj['_invoiced'] ?? $oj['invoice_amount']); ?><?= $ojInv>0?cur_sym().nf($ojInv,0):'—' ?></td>
+      <td class="num"><?= !empty($oj['payment_received'])?cur_sym().nf((float)$oj['payment_amount'],0):'—' ?></td></tr>
+    <?php endforeach; ?>
+  </table>
+  <p class="muted" style="margin-top:6px">Revenue booked against quote <?= e($q['quote_no']) ?><?= $q['contract_number']?' / contract '.e($q['contract_number']):'' ?>. Link more jobs from the job form ("Against <?= e(Tl('quote')) ?> / contract").</p>
+</div>
+<?php endif; ?>
+
+<?php if ($st==='ACCEPTED'): ?>
+<div class="panel" id="contract" style="border:1px solid var(--ok)" data-tab="Contract &amp; order">
+  <h3 class="tab-sub" style="margin-top:0">Won — client &amp; contract registration (Accounts)</h3>
+  <?php
+    $cr = $contractRow ?? null;
+    $os = $cr ? ($cr['open_status'] ?: 'OPEN') : '';
+    $osColors = ['PENDING'=>'#b45309','OPEN'=>'#15803d','REJECTED'=>'#b91c1c','CLOSED'=>'#64748b'];
+    $osLabel  = defined('CONTRACT_OPEN_STATES') ? (CONTRACT_OPEN_STATES[$os] ?? $os) : $os;
+  ?>
+  <?php if ($q['contract_number']): ?>
+    <table class="kv">
+      <tr><td class="muted">Registered client</td><td><?= $clientReg ? e($clientReg['legal_name']).' <span class="muted">('.e($clientReg['code']).')</span>' : e($q['client_name']) ?></td></tr>
+      <tr><td class="muted">Contract number</td><td><b><?= e($q['contract_number']) ?></b>
+        <?php if ($cr): ?> <span class="pill" style="background:<?= $osColors[$os] ?? '#64748b' ?>;color:#fff"><?= e($osLabel) ?></span><?php endif; ?></td></tr>
+      <?php if ($cr && trim((string)$cr['requested_by'])!==''): ?><tr><td class="muted">Requested</td><td><?= e($cr['requested_by']) ?><?= $cr['requested_at']?' · '.e(substr($cr['requested_at'],0,10)):'' ?></td></tr><?php endif; ?>
+      <?php if ($cr && trim((string)$cr['mgr_endorsed_at'])!==''): ?><tr><td class="muted">First signature</td><td><?= e($cr['mgr_endorsed_by']) ?> · <?= e(substr($cr['mgr_endorsed_at'],0,10)) ?></td></tr><?php endif; ?>
+      <?php if ($cr && trim((string)$cr['bm_approved_at'])!==''): ?><tr><td class="muted">Final approval</td><td><?= e($cr['bm_approved_by']) ?> · <?= e(substr($cr['bm_approved_at'],0,10)) ?></td></tr><?php endif; ?>
+      <?php if ($cr && trim((string)$cr['close_reason'])!==''): ?><tr><td class="muted">Note</td><td><?= e($cr['close_reason']) ?></td></tr><?php endif; ?>
+    </table>
+
+    <?php // Inspection / deputation calls are raised FROM the contract — the client,
+          // the contract number, the business unit and the office all carry across.
+          // Repeatable: as many calls as the work needs, on any later day.
+          if ((can('ops.call.create') || is_master()) && $os === 'OPEN'): ?>
+      <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;border-top:1px dashed var(--line);padding-top:10px">
+        <a class="btn small" href="/call-new?contract_id=<?= (int)($cr['id'] ?? 0) ?>&contract=<?= e(urlencode((string)$q['contract_number'])) ?>">▶ Raise <?= e(Tl('call')) ?></a>
+        <span class="sub" style="margin:0">Raise as many <?= e(Tlp('call')) ?> as the work needs against this contract — today or any later day.</span>
+      </div>
+    <?php endif; ?>
+
+    <?php if ($os === 'PENDING'): ?>
+      <div class="panel" style="margin-top:8px;border-left:3px solid #b45309">
+        <b>Contract waiting for approval.</b> Each step is written into the history below with who and when.
+        <?php $sg = contract_open_stage($cr); $sgId = (int)$cr['id']; $sgKind = 'open'; include dirname(__DIR__, 3) . '/views/ops/_contract_sign.php'; ?>
+        <p class="sub" style="margin:8px 0 0">The order is <strong>held from operations</strong> until the contract is open.</p>
+      </div>
+    <?php elseif ($os === 'OPEN'): ?>
+      <p class="sub" style="margin:8px 0 0">The <strong>handover to operations</strong> — <?= e(Tl('client')) ?>, <?= e(Tl('quote')) ?> and contract number, contacts, what was sold, the order lines and the commercial conditions — has gone to the delivery team, so they can raise <?= e(Tlp('call')) ?> against it without asking Sales for anything. It is saved in the system either way; it is also e-mailed once SMTP is set up in Settings.</p>
+      <form method="post" action="/quote-float?id=<?= (int)$q['id'] ?>" style="margin-top:8px"><button class="btn small secondary" type="submit">Re-send to operations</button></form>
+    <?php elseif ($os === 'CLOSED' || $os === 'REJECTED'): ?>
+      <p class="sub" style="margin:8px 0 0">This contract is <?= $os==='CLOSED' ? ('closed'.($cr['auto_closed']?' automatically after being idle':'')) : 'not opened (opening was rejected)' ?>. <?= e($cr['close_reason']) ?></p>
+      <?php if ($canContract): ?>
+        <form method="post" action="/contract-open" style="margin-top:8px" onsubmit="return confirm('Request re-opening this contract? It goes through your company\'s contract approval again.')">
+          <input type="hidden" name="id" value="<?= (int)$cr['id'] ?>"><input type="hidden" name="do" value="reopen">
+          <button class="btn small secondary" type="submit"><?= $os==='CLOSED'?'Request re-opening':'Request opening again' ?></button>
+        </form>
+      <?php endif; ?>
+    <?php endif; ?>
+
+    <?php // One rate quotation → contracts for several GROUP companies. Beyond the main
+          //  contract above, a related company (a subsidiary billing on its own number)
+          //  can hold its own contract at the SAME rates, raised from here. ?>
+    <?php $extraContracts = array_values(array_filter($quoteContracts ?? [], fn($c) => (int)$c['id'] !== (int)($cr['id'] ?? 0))); ?>
+    <?php if ($extraContracts || (($canContract ?? false) && !empty($groupCandidates))): ?>
+      <div style="margin-top:12px;border-top:1px dashed var(--line);padding-top:10px">
+        <div style="font-weight:600;margin-bottom:6px">Group-company contracts <span class="muted" style="font-weight:400">— same rates, different contract numbers</span></div>
+        <?php if ($extraContracts): ?>
+          <table class="kv" style="margin-bottom:8px">
+            <?php foreach ($extraContracts as $ec): $eos = $ec['open_status'] ?: 'OPEN'; ?>
+              <tr><td class="muted"><?= e($ec['partner_disp'] ?: $ec['partner_legal'] ?: '—') ?></td>
+                  <td><b><?= e($ec['contract_number']) ?></b>
+                    <span class="pill" style="background:<?= $osColors[$eos] ?? '#64748b' ?>;color:#fff"><?= e(defined('CONTRACT_OPEN_STATES') ? (CONTRACT_OPEN_STATES[$eos] ?? $eos) : $eos) ?></span>
+                    <?php if ($eos === 'OPEN' && (can('ops.call.create') || is_master())): ?> <a href="/call-new?contract_id=<?= (int)$ec['id'] ?>" class="btn small secondary">▶ Raise <?= e(Tl('call')) ?></a><?php endif; ?>
+                  </td></tr>
+            <?php endforeach; ?>
+          </table>
+        <?php endif; ?>
+        <?php if (($canContract ?? false) && !empty($groupCandidates)): ?>
+          <details class="fold"><summary>Register a contract for another group company</summary>
+            <div class="fold-body">
+            <form method="post" action="/quote-add-contract?id=<?= (int)$q['id'] ?>">
+              <div class="form-grid">
+                <div class="ff"><label>Group company</label>
+                  <select class="form-control searchable" name="partner_id" required>
+                    <option value="">— pick a related company —</option>
+                    <?php foreach ($groupCandidates as $g): ?><option value="<?= (int)$g['id'] ?>"><?= e($g['display_name'] ?: $g['legal_name']) ?></option><?php endforeach; ?>
+                  </select>
+                  <small class="muted">Only companies linked to <?= e($q['client_name'] ?: 'this client') ?> as parent / subsidiary appear here.</small></div>
+                <div class="ff"><label>Contract number</label><input class="form-control" name="contract_number" placeholder="their number, or auto">
+                  <label class="chk" style="margin-top:6px"><input type="checkbox" name="auto_contract" value="1"> Generate automatically</label></div>
+                <div class="ff"><label>Value before GST (<?= e(cur_sym()) ?>)</label><input class="form-control" type="number" step="0.01" name="value" placeholder="their PO value, before GST (optional)"></div>
+                <div class="ff"><label>Start</label><input class="form-control" type="date" name="start_date"></div>
+                <div class="ff"><label>End</label><input class="form-control" type="date" name="end_date"></div>
+              </div>
+              <div style="margin-top:10px"><button class="btn small" type="submit">Register group contract</button></div>
+            </form>
+            </div>
+          </details>
+        <?php endif; ?>
+      </div>
+    <?php endif; ?>
+
+  <?php elseif ($canContract): ?>
+    <?php
+      // Point 1 / Point 2 — registering a contract is ONE button. Everything the
+      // contract needs is already on the purchase order and the quotation, so it is
+      // read from there and shown as a summary; the fields are still here, folded
+      // away, for the occasion when something genuinely has to be different.
+      // The two signatures are untouched: this makes the DATA one click, not the
+      // approval. A duplicate about to be created is named before the button is
+      // pressed, not discovered afterwards.
+      $pf       = $contractPrefill ?? [];
+      $pfNote   = function_exists('contract_prefill_note') ? contract_prefill_note($pf) : '';
+      $pfBranch = (int)($pf['branch_id'] ?? 0) ?: (int)($q['office_id'] ?? 0);
+      $pfBranchName = $pfBranch ? (string)ops_val("SELECT name FROM offices WHERE id=?", [$pfBranch]) : '';
+      $pfValue  = ($pf['value'] ?? null) !== null ? (float)$pf['value'] : crm_quote_value_before_gst($q);   // before GST (owner, 20 Nov 2026)
+      $existing = $clientContracts ?? [];
+    ?>
+    <p class="sub">One click registers it. The number is generated, and the value, dates and branch come across from
+      <?= !empty($pf['po_number']) ? 'the ' . e(Tl('client')) . '&rsquo;s purchase order' : 'this ' . e(Tl('quote')) ?> —
+      nothing is re-typed. Your company's rule for opening it: <b><?= e(contract_rule_sentence()) ?></b>. The order floats to operations once it is open.</p>
+
+    <?php if ($existing): ?>
+      <?php // The duplicate warning, up front. Most double-registrations happen
+            // because nobody could see what this client already had. ?>
+      <div class="panel" style="margin:0 0 10px;background:var(--soft)">
+        <b>This <?= e(Tl('client')) ?> already has <?= count($existing) ?> contract<?= count($existing) === 1 ? '' : 's' ?>.</b>
+        <span class="muted">Check this is not one of them under a second number.</span>
+        <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+          <?php foreach ($existing as $ex0): $eos0 = $ex0['open_status'] ?: 'OPEN'; ?>
+            <a class="btn small secondary" href="/contract?id=<?= (int)$ex0['id'] ?>" target="_blank"><?= e($ex0['contract_number']) ?>
+              <span class="muted">· <?= e(strtolower(defined('CONTRACT_OPEN_STATES') ? (CONTRACT_OPEN_STATES[$eos0] ?? $eos0) : $eos0)) ?></span></a>
+          <?php endforeach; ?>
+        </div>
+      </div>
+    <?php endif; ?>
+
+    <?php // The one-click path. It posts nothing but auto_contract and the PO it
+          // read from; the server fills the rest from the same two documents. ?>
+    <form method="post" action="/quote-contract?id=<?= (int)$q['id'] ?>" style="margin-bottom:10px">
+      <input type="hidden" name="auto_contract" value="1">
+      <?php if (!empty($pf['po_id'])): ?><input type="hidden" name="po_id" value="<?= (int)$pf['po_id'] ?>"><?php endif; ?>
+      <div class="panel" style="margin:0;border:1px solid var(--ok)">
+        <table class="grid" style="margin:0">
+          <tr><th style="width:38%">Contract number</th><td><b>generated</b> <span class="muted">— BRANCH/C/FY/00001</span></td></tr>
+          <tr><th>Billing branch</th><td><b><?= e($pfBranchName ?: '—') ?></b> <span class="muted">— owns this contract &amp; its invoices</span></td></tr>
+          <tr><th>Value</th><td><b><?= e(fmoney($pfValue)) ?></b><?= !empty($pf['from']['value']) ? ' <span class="muted">— from ' . e($pf['from']['value']) . '</span>' : '' ?></td></tr>
+          <tr><th>Runs from</th><td><b><?= e(($pf['start_date'] ?? '') !== '' ? fdate($pf['start_date']) : '—') ?></b>
+            <?= ($pf['end_date'] ?? '') !== '' ? ' to <b>' . e(fdate($pf['end_date'])) . '</b>' : ' <span class="muted">— no end date on the order, so none is invented</span>' ?></td></tr>
+          <?php if (!empty($pf['po_number'])): ?>
+            <tr><th>Against purchase order</th><td><b><?= e($pf['po_number']) ?></b> <span class="muted">— linked to the contract automatically</span></td></tr>
+          <?php endif; ?>
+        </table>
+        <?php if ($pfNote !== ''): ?><p class="muted" style="margin:8px 2px 0"><?= e($pfNote) ?></p><?php endif; ?>
+        <?php if (empty($q['client_id']) && $q['client_name']): ?><p class="muted" style="margin:6px 2px 0">&ldquo;<?= e($q['client_name']) ?>&rdquo; will be registered as a <?= e(Tl('client')) ?> automatically.</p><?php endif; ?>
+        <div style="margin-top:10px"><button class="btn" type="submit">✓ Register the contract &amp; request opening</button></div>
+      </div>
+    </form>
+
+    <?php if (!empty($pf['choices'])): ?>
+      <p class="muted" style="margin:0 2px 10px">This <?= e(Tl('client')) ?> has <?= count($pf['choices']) ?> purchase orders not yet on a contract, so none was assumed.
+        Pick the right one below if the contract is against one of them.</p>
+    <?php endif; ?>
+
+    <details class="fold">
+      <summary>Enter it differently &mdash; type the <?= e(Tl('client')) ?>&rsquo;s own number, or change the dates</summary>
+      <div class="fold-body">
+    <form method="post" action="/quote-contract?id=<?= (int)$q['id'] ?>">
+      <div class="form-grid">
+        <div class="ff"><label>Contract number</label>
+          <input class="form-control" name="contract_number" id="contract_number" placeholder="e.g. CON/2026/0142"
+                 maxlength="<?= defined('CONTRACT_NO_MAX') ? (int)CONTRACT_NO_MAX : 40 ?>"
+                 data-client="<?= (int)($q['client_id'] ?? 0) ?>">
+          <label class="chk" style="margin-top:6px"><input type="checkbox" name="auto_contract" value="1" id="auto_contract"> Generate automatically <span class="muted">(BRANCH/C/FY/00001)</span></label>
+          <?php // Point 1 — the duplicate is named while it is being typed. ?>
+          <small id="cno_warn" style="display:none;margin-top:6px"></small></div>
+        <?php // The branch is set ONCE here and carries to every call, job and the
+              //  invoice (its numbering series). Defaults to what the order / quote /
+              //  client record already says; change it only if another branch owns and
+              //  bills this contract. ?>
+        <div class="ff"><label>Billing branch <span class="muted">— owns this contract &amp; its invoices</span></label>
+          <select class="form-control searchable" name="branch_id">
+            <?php foreach (offices_list() as $o): ?>
+              <option value="<?= (int)$o['id'] ?>" <?= $pfBranch === (int)$o['id'] ? 'selected' : '' ?>><?= e($o['name']) ?></option>
+            <?php endforeach; ?>
+          </select>
+          <small class="muted">Set once; the calls, jobs and invoice all inherit it.</small></div>
+        <div class="ff"><label>Value before GST (<?= e(cur_sym()) ?>)</label>
+          <input class="form-control" type="number" step="0.01" name="value" value="<?= e(number_format($pfValue, 2, '.', '')) ?>">
+          <small class="muted"><?= !empty($pf['from']['value']) ? 'From ' . e($pf['from']['value']) . '.' : 'From this ' . e(Tl('quote')) . '.' ?></small></div>
+        <?php if (!empty($pf['choices'])): ?>
+        <div class="ff"><label>Against which purchase order?</label>
+          <select class="form-control searchable" name="po_id"><option value="">— none / decide later —</option>
+            <?php foreach ($pf['choices'] as $poc): ?>
+              <option value="<?= (int)$poc['id'] ?>"><?= e(($poc['po_number'] ?: 'unnumbered') . ' — ' . fmoney((float)($poc['value'] ?? 0))) ?></option>
+            <?php endforeach; ?>
+          </select>
+          <small class="muted">Its value and dates are used for anything left blank here.</small></div>
+        <?php endif; ?>
+        <div class="ff"><label>Contract start</label><input class="form-control" type="date" name="start_date" id="c_start" value="<?= e($pf['start_date'] ?? '') ?>"></div>
+        <div class="ff"><label>Contract end</label><input class="form-control" type="date" name="end_date" id="c_end" value="<?= e($pf['end_date'] ?? '') ?>"></div>
+      </div>
+      <div style="margin-top:10px"><button class="btn secondary" type="submit">Register &amp; request opening</button></div>
+    </form>
+      </div>
+    </details>
+    <script>(function(){
+      var a=document.getElementById('auto_contract'),n=document.getElementById('contract_number');
+      if(a&&n)a.addEventListener('change',function(){n.disabled=a.checked;n.style.background=a.checked?'var(--soft)':'';if(a.checked)n.value='';});
+      // Point 1 — ask the server whether this number is a duplicate while it is
+      // still being typed. A warning here costs nothing; the same warning after a
+      // submit costs a contract nobody can delete.
+      var box=document.getElementById('cno_warn'),t=null;
+      if(!n||!box)return;
+      // The warning text names the party that already holds the number, and that
+      // name comes from the client master — so it is escaped before it reaches
+      // innerHTML. A company called <img onerror=...> must read as a company name,
+      // not run as script.
+      function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){
+        return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+      function show(parts,bad){
+        if(!parts||!parts.length){box.style.display='none';box.textContent='';return;}
+        box.style.display='block';
+        box.innerHTML=parts.map(function(p){return '\u26a0 '+esc(p);}).join('<br>');
+        box.style.color=bad?'var(--bad)':'var(--warn)';
+      }
+      n.addEventListener('input',function(){
+        clearTimeout(t);var v=n.value.trim();if(v.length<3){show(null);return;}
+        t=setTimeout(function(){
+          var s=(document.getElementById('c_start')||{}).value||'',en=(document.getElementById('c_end')||{}).value||'';
+          fetch('/contract-no-check?client_id='+encodeURIComponent(n.dataset.client||'0')+'&no='+encodeURIComponent(v)+'&start='+encodeURIComponent(s)+'&end='+encodeURIComponent(en))
+            .then(function(r){return r.json();}).then(function(d){
+              if(!d||!d.ok){show(null);return;}
+              if(d.block){show([d.block],true);return;}
+              show(d.warn||null,false);
+            }).catch(function(){show(null);});
+        },350);
+      });
+    })();</script>
+  <?php else: ?>
+    <p class="sub">Awaiting Accounts to register the client &amp; contract number.</p>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
+<?php if ($st==='LOST' && $q['lost_reason']): ?>
+<div class="panel" style="border:1px solid var(--bad)" data-tab="Overview"><b>Lost reason:</b> <?= e(lk_options_or('quote_lost_reason', QUOTE_LOST_REASONS)[$q['lost_reason']] ?? $q['lost_reason']) ?><?= $q['lost_reason_other']?' — '.e($q['lost_reason_other']):'' ?></div>
+<?php endif; ?>
+
+<?php // Open by default once there is more than one version or any recorded change,
+      // so the revision trail is visible without a click — a quotation's history is
+      // part of the record, not a detail to hunt for. ?>
+<details class="fold" id="revisions" data-tab="History &amp; follow-ups"<?= (count($revs) > 1 || !empty($hist)) ? ' open' : '' ?>>
+  <summary>Revisions &amp; change history <span class="sub"><?= count($revs) ?> version<?= count($revs) === 1 ? '' : 's' ?><?= $hist ? ' · ' . count($hist) . ' logged change' . (count($hist) === 1 ? '' : 's') : '' ?><?= $followups ? ' · ' . count($followups) . ' follow-up' . (count($followups) === 1 ? '' : 's') : '' ?></span></summary>
+  <div class="fold-body">
+<div class="panel-split">
+  <div class="panel">
+    <h3 class="tab-sub" style="margin-top:0">Revision history</h3>
+    <table class="grid"><tr><th>Rev</th><th>Status</th><th class="num">Total</th><th>Created by</th><th>When</th><th></th></tr>
+      <?php foreach ($revs as $rv): ?>
+      <tr>
+        <td><b><?= $rv['rev']>0?'Rev '.str_pad((string)$rv['rev'],2,'0',STR_PAD_LEFT):'Original' ?></b> <?= $rv['is_current']?'<span class="pill p-ok">current</span>':'' ?></td>
+        <td><?= e(lk_options_or('quote_status', QUOTE_STATUS)[$rv['status']] ?? $rv['status']) ?></td>
+        <td class="num"><?= e(cur_sym()) ?><?= nf((float)$rv['total_amount'],0) ?></td>
+        <td><?= e(trim((string)($rv['created_by'] ?? '')) !== '' ? (string)$rv['created_by'] : '—') ?></td>
+        <td class="muted"><?= e(substr((string)$rv['created_at'],0,10)) ?></td>
+        <td><?= $rv['is_current']?'':'<a class="btn small secondary" href="/quote?id='.(int)$rv['id'].'">view</a>' ?></td>
+      </tr>
+      <?php endforeach; ?>
+    </table>
+    <?php if ($st === 'ACCEPTED'): ?>
+      <div class="panel" style="margin:10px 0 0;background:var(--soft)">
+        <b>Final copy</b> <span class="muted">— the accepted version, as sent.</span>
+        <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+          <a class="btn small" href="/quote-pdf?id=<?= (int)$q['id'] ?>">⬇ PDF</a>
+          <?php if (crm_quote_word_allowed($q)): ?><a class="btn small secondary" href="/quote-doc?id=<?= (int)$q['id'] ?>">⬇ Word</a><?php endif; ?>
+        </div>
+      </div>
+    <?php endif; ?>
+    <?php if ($hist): ?>
+      <h4 class="tab-sub" style="font-size:13px;margin:14px 0 6px">What changed</h4>
+      <table class="dt">
+        <thead><tr><th>Rev</th><th>Change</th><th>By</th><th>When</th></tr></thead>
+        <tbody>
+        <?php foreach ($hist as $hi => $h):
+          // Compare each entry with the one before it, so the list reads as a
+          // running record of what actually changed rather than just "edited".
+          $prev = $hist[$hi + 1] ?? null;
+          $diff = $prev ? crm_diff_snapshots(json_decode((string)$prev['snapshot'], true), json_decode((string)$h['snapshot'], true)) : [];
+        ?>
+          <tr>
+            <td><?= str_pad((string)$h['rev'],2,'0',STR_PAD_LEFT) ?></td>
+            <td><?= e($h['summary']) ?>
+              <?php if ($diff): ?>
+                <details style="margin-top:4px"><summary class="muted" style="cursor:pointer;font-size:12px"><?= count($diff) ?> field(s)</summary>
+                  <div style="font-size:12px;margin-top:4px">
+                  <?php foreach (array_slice($diff, 0, 12) as $d): ?>
+                    <div><b><?= e(str_replace('_', ' ', $d['field'])) ?>:</b>
+                      <span class="muted"><?= e($d['from'] === '' ? '(blank)' : mb_substr($d['from'], 0, 60)) ?></span>
+                      → <?= e($d['to'] === '' ? '(blank)' : mb_substr($d['to'], 0, 60)) ?></div>
+                  <?php endforeach; ?>
+                  </div>
+                </details>
+              <?php endif; ?>
+            </td>
+            <td class="muted"><?= e($h['changed_by']) ?></td>
+            <td class="muted"><?= e(fdate(substr((string)$h['changed_at'],0,10))) ?></td>
+          </tr>
+        <?php endforeach; ?>
+        </tbody>
+      </table>
+    <?php endif; ?>
+  </div>
+  <div class="panel">
+    <h3 class="tab-sub" style="margin-top:0">Follow-ups</h3>
+    <?php $canFU = can('crm.quote.send') || can('crm.quote.create') || is_master();   // view-only people see them, without buttons (SALB-047) ?>
+    <?php if ($followups): ?>
+    <?php // Row cards, not a table. This panel is half the page wide and six
+          // editable columns could not fit in it — the table ran outside the
+          // panel and had to be zoomed out to read. These wrap instead. ?>
+    <form method="post" action="/quote-followup?id=<?= (int)$q['id'] ?>">
+      <input type="hidden" name="do" value="save">
+      <div class="fu-list">
+        <?php foreach ($followups as $f):
+              $tone = ['DONE'=>'p-ok','SENT'=>'p-info','SKIPPED'=>'p-mut','PENDING'=>'p-warn'][$f['status']] ?? 'p-mut';
+              $overdue = ($f['status'] === 'PENDING' && ($f['due_date'] ?? '') !== '' && $f['due_date'] < date('Y-m-d')); ?>
+        <div class="fu<?= $overdue ? ' fu-late' : '' ?>">
+          <input type="hidden" name="f_id[]" value="<?= (int)$f['id'] ?>">
+          <div class="fu-head">
+            <b><?= e(lk_options_or('followup_kind', FOLLOWUP_KINDS)[$f['kind']] ?? $f['kind']) ?></b>
+            <span class="pill <?= e($tone) ?>"><?= e(['PENDING'=>'Pending','DONE'=>'Done','SENT'=>'Sent','SKIPPED'=>'Skipped'][$f['status']] ?? $f['status']) ?></span>
+            <?php if ($overdue): ?><span class="pill p-bad">overdue</span><?php endif; ?>
+            <?php if (!empty($q['contact_email'])): ?>
+              <a class="btn small secondary fu-mail" href="/followup-compose?id=<?= (int)$f['id'] ?>"
+                 title="Opens the chase in your own mailbox">✉️ Chase</a><?php endif; ?>
+          </div>
+          <div class="fu-grid">
+            <label>Due<input class="form-control" type="date" name="f_due[]" value="<?= e($f['due_date']) ?>"></label>
+            <label>Status<select class="form-control" name="f_status[]">
+                <?php foreach (['PENDING'=>'Pending','DONE'=>'Done','SENT'=>'Sent','SKIPPED'=>'Skipped'] as $sk=>$sv): ?>
+                  <option value="<?= e($sk) ?>" <?= ($f['status']===$sk)?'selected':'' ?>><?= e($sv) ?></option><?php endforeach; ?>
+              </select></label>
+            <label>Done on<input class="form-control" type="date" name="f_done[]" value="<?= e($f['done_date'] ?? '') ?>"></label>
+          </div>
+          <label class="fu-note">What was said
+            <input class="form-control" name="f_note[]" value="<?= e($f['note'] ?? '') ?>" placeholder="e.g. purchase head reviewing, call back Tuesday"></label>
+        </div>
+        <?php endforeach; ?>
+      </div>
+      <?php if ($canFU): ?><div style="margin-top:10px"><button class="btn small" type="submit">Save follow-ups</button></div><?php endif; ?>
+    </form>
+    <style>
+      .fu-list{display:flex;flex-direction:column;gap:10px}
+      .fu{border:1px solid var(--line);border-radius:var(--radius-sm,10px);padding:10px 12px;background:var(--soft)}
+      .fu-late{border-color:var(--bad)}
+      .fu-head{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+      .fu-head b{font-size:13.5px}
+      .fu-mail{margin-left:auto}
+      /* auto-fit means one column in a narrow panel and three in a wide one,
+         with no fixed min-width to push the card past its container */
+      .fu-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:8px}
+      .fu label,.fu-note{display:flex;flex-direction:column;gap:3px;font-size:11.5px;font-weight:700;
+        color:var(--muted);text-transform:uppercase;letter-spacing:.3px}
+      .fu-note{margin-top:8px}
+      .fu .form-control{width:100%;min-width:0;font-size:13.5px;text-transform:none;letter-spacing:0}
+    </style>
+    <p class="muted" style="margin-top:6px">Scheduled automatically when the <?= e(Tl('quote')) ?> is marked sent — day 3, 6, 9, fortnight and month. Edit any date, mark one done with a note, or add your own below.</p>
+    <?php else: ?>
+      <p class="muted">Follow-ups are scheduled automatically once the <?= e(Tl('quote')) ?> is marked <b>sent</b> — day 3, 6, 9, fortnight and month. You can also add one by hand.</p>
+    <?php endif; ?>
+    <?php if ($canFU): ?>
+    <form method="post" action="/quote-followup?id=<?= (int)$q['id'] ?>" style="display:flex;gap:6px;flex-wrap:wrap;align-items:end;margin-top:8px;border-top:1px solid var(--line);padding-top:10px">
+      <input type="hidden" name="do" value="add">
+      <div class="ff" style="margin:0"><label>Add a follow-up on</label><input class="form-control" type="date" name="due_date" value="<?= e(date('Y-m-d')) ?>"></div>
+      <div class="ff" style="margin:0;flex:1;min-width:160px"><label>Note</label><input class="form-control" name="note" required placeholder="e.g. call the purchase head"></div>
+      <button class="btn small secondary" type="submit">+ Add</button>
+    </form>
+    <?php endif; ?>
+  </div>
+</div>
+  </div>
+</details>
+
+<div class="panel" data-tab="Documents">
+  <h3 class="tab-sub" style="margin-top:0">Sites <span class="muted">— every location this <?= e(Tl('quote')) ?> covers</span></h3>
+  <?php if ($locs): ?>
+  <table class="dt">
+    <thead><tr><th>Site</th><th>Type</th><th>Address</th><th>Contact</th><th>Nearest <?= e(T('office')) ?></th></tr></thead>
+    <tbody>
+    <?php $offById = []; foreach ($offAll as $o) $offById[(int)$o['id']] = $o['name'];
+          foreach ($locs as $L): ?>
+      <tr>
+        <td><b><?= e($L['label'] ?: '—') ?></b></td>
+        <td><?= e(lk_options_or('site_location_type', SITE_LOCATION_TYPES)[$L['location_type']] ?? $L['location_type']) ?></td>
+        <td><?= e(quote_location_line($L)) ?: '<span class="muted">—</span>' ?></td>
+        <td><?= e(trim(($L['contact_name'] ?? '') . ' ' . ($L['contact_mobile'] ?? ''))) ?: '<span class="muted">—</span>' ?></td>
+        <td><?= e($offById[(int)($L['office_id'] ?? 0)] ?? '—') ?></td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+  <?php else: ?><p class="muted">No sites recorded. Add them on the edit screen.</p><?php endif; ?>
+</div>
+
+<div class="panel" data-tab="Documents" id="quote-docs">
+  <h3 class="tab-sub" style="margin-top:0">Documents <span class="muted">— the enquiry e-mail, the <?= e(Tl('client')) ?>'s PO, QAP / scope of inspection, our format and anything the <?= e(Tl('engineer')) ?> will need</span></h3>
+  <?php if ($files): ?>
+  <table class="dt">
+    <thead><tr><th>File</th><th>Kind</th><th>Note</th><th>Shared with <?= e(Tl('engineer')) ?></th><th>Added</th><th></th></tr></thead>
+    <tbody>
+    <?php foreach ($files as $f): ?>
+      <tr>
+        <td><a href="/quote-file?id=<?= (int)$f['id'] ?>">⬇ <?= e($f['file_name']) ?></a>
+            <span class="muted" style="font-size:11px">(<?= e(nf(((int)$f['b64len']) * 3 / 4 / 1024, 0)) ?> KB)</span></td>
+        <td><?= e($fileKinds[$f['kind']] ?? $f['kind']) ?></td>
+        <td class="muted"><?= e($f['note'] ?: '—') ?></td>
+        <td><?= $f['share_with_inspector'] ? '<span class="pill p-ok">yes</span>' : '<span class="pill p-mut">no</span>' ?></td>
+        <td class="muted"><?= e($f['uploaded_by']) ?><br><span style="font-size:11px"><?= e(fdate(substr((string)$f['uploaded_at'],0,10))) ?></span></td>
+        <td class="num">
+          <?php // DEF-18 — the server removes a file for "create quotations" or a master, never on a sent one. ?>
+          <?php if ((can('crm.quote.create') || is_master()) && !quote_is_locked($q)): ?>
+          <form method="post" action="/quote-file-delete?id=<?= (int)$f['id'] ?>" onsubmit="return confirm('Remove this file?')" style="display:inline">
+            <button class="btn small danger" type="submit">✕</button></form>
+          <?php endif; ?>
+        </td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+  <?php else: ?><p class="muted">Nothing attached to this revision yet.</p><?php endif; ?>
+
+  <?php //  DEF-05 (owner, 21 Nov 2026, option A): the earlier revisions' files, linked — not copied. ?>
+  <?php if (!empty($prevFiles)): ?>
+  <h4 class="tab-sub" style="margin:14px 0 6px">From earlier revisions <span class="muted">— attached there, shown here so nothing has to be uploaded again</span></h4>
+  <table class="dt">
+    <thead><tr><th>File</th><th>Kind</th><th>Note</th><th>From</th><th>Added</th></tr></thead>
+    <tbody>
+    <?php foreach ($prevFiles as $f): ?>
+      <tr>
+        <td><a href="/quote-file?id=<?= (int)$f['id'] ?>">⬇ <?= e($f['file_name']) ?></a>
+            <span class="muted" style="font-size:11px">(<?= e(nf(((int)$f['b64len']) * 3 / 4 / 1024, 0)) ?> KB)</span></td>
+        <td><?= e($fileKinds[$f['kind']] ?? $f['kind']) ?></td>
+        <td class="muted"><?= e($f['note'] ?: '—') ?></td>
+        <td><span class="pill p-mut">from Rev <?= str_pad((string)(int)$f['from_rev'], 2, '0', STR_PAD_LEFT) ?></span></td>
+        <td class="muted"><?= e($f['uploaded_by']) ?><br><span style="font-size:11px"><?= e(fdate(substr((string)$f['uploaded_at'],0,10))) ?></span></td>
+      </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+  <?php endif; ?>
+
+  <?php // DEF-18 — the server takes a file from "create quotations", Quotes edit or a master of
+        // quotations; on a sent (locked) one only a master. The form follows exactly that. ?>
+  <?php if ((can('crm.quote.create') || can('mod.quotes.edit') || is_master_of('quotes')) && (!quote_is_locked($q) || is_master())): ?>
+  <form method="post" action="/quote-files?id=<?= (int)$q['id'] ?>" enctype="multipart/form-data" style="margin-top:10px;border-top:1px solid var(--line);padding-top:10px">
+    <div class="form-grid">
+      <div class="ff"><label>Kind</label>
+        <select class="form-control" name="kind" id="fkind">
+          <?php foreach ($fileKinds as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?>
+        </select></div>
+      <div class="ff"><label>Files <span class="muted">— several at once, 8 MB each</span></label>
+        <input class="form-control" type="file" name="files[]" multiple data-max-bytes="<?= (int) QUOTE_FILE_MAX ?>"></div>
+      <div class="ff"><label>Note</label><input class="form-control" name="note" placeholder="e.g. approved QAP rev 2"></div>
+      <div class="ff po-only" style="display:none"><label>PO number</label><input class="form-control" name="po_number" value="<?= e($q['po_number'] ?? '') ?>"></div>
+      <div class="ff po-only" style="display:none"><label>PO date</label><input class="form-control" type="date" name="po_date" value="<?= e($q['po_date'] ?? '') ?>"></div>
+      <div class="ff" style="align-self:end">
+        <label class="chk"><input type="checkbox" name="share_with_inspector" value="1" checked> Share with the <?= e(Tl('engineer')) ?> on every <?= e(Tl('call')) ?> from this <?= e(Tl('quote')) ?></label></div>
+    </div>
+    <div style="margin-top:10px"><button class="btn small" type="submit">Attach</button></div>
+  </form>
+  <script>
+  (function(){
+    var k = document.getElementById('fkind');
+    function sync(){ document.querySelectorAll('.po-only').forEach(function(el){ el.style.display = k.value === 'PO' ? '' : 'none'; }); }
+    k.addEventListener('change', sync); sync();
+  })();
+  </script>
+  <?php endif; ?>
+</div>
+<?php // ---- Approvals tab: the whole approval record, every revision (read only) ----
+      //  The live chain with its Approve / Reject buttons stays on Overview, where
+      //  the decision is taken; this tab is the record — who signed what, when, with
+      //  what comment, on this revision and the earlier ones. Read from crm_approvals(). ?>
+<div class="panel" id="approval-record" data-tab="Approvals">
+  <h3 class="tab-sub" style="margin-top:0">Approval record</h3>
+  <?php $arRows = [];
+        foreach (($revs ?? []) as $rv) foreach ((function_exists('crm_approvals') ? crm_approvals((int) $rv['id']) : []) as $ar) $arRows[] = ['rev' => $rv, 'a' => $ar];
+        if (!$arRows): ?>
+    <p class="muted" style="margin:0">This <?= e(Tl('quote')) ?> has not been sent for approval yet. When it is, every level, who signed it, when and with what comment is listed here.</p>
+  <?php else: ?>
+  <div class="rec-scroll"><table class="dt">
+    <thead><tr><th>Revision</th><th class="num">Level</th><th>With whom</th><th>Status</th><th>Acted</th><th>Comment</th></tr></thead>
+    <tbody>
+    <?php foreach ($arRows as $x): $rv = $x['rev']; $a = $x['a']; ?>
+      <tr><td><?= (int) $rv['rev'] > 0 ? 'Rev ' . str_pad((string) $rv['rev'], 2, '0', STR_PAD_LEFT) : 'Original' ?><?= !empty($rv['is_current']) ? ' <span class="pill p-ok">current</span>' : '' ?></td>
+        <td class="num"><?= (int) $a['level'] ?></td>
+        <td><?= e(function_exists('crm_step_who') ? ucfirst(crm_step_who($a)) : (string) ($a['approver_role'] ?? '')) ?></td>
+        <td><span class="pill <?= $a['status'] === 'APPROVED' ? 'p-ok' : ($a['status'] === 'REJECTED' ? 'p-bad' : 'p-warn') ?>"><?= e($a['status'] === 'PENDING' ? 'Pending' : ucfirst(strtolower((string) $a['status']))) ?></span></td>
+        <td class="muted"><?= !empty($a['acted_by']) ? e($a['acted_by']) . ' · ' . e(fdate(substr((string) $a['acted_at'], 0, 10))) : '—' ?></td>
+        <td class="muted"><?= !empty($a['remarks']) ? e($a['remarks']) : '—' ?></td></tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table></div>
+  <?php endif; ?>
+  <p class="muted" style="font-size:12px;margin:8px 0 0">The decision itself — Approve or Reject — is on <b>Overview</b>, under <b>Approval chain</b>.</p>
+</div>
+</div><!-- /data-tabs (quote) -->
+</div><!-- /rec sxqd -->
+<?php sxw_bottom('/quotes'); ?>

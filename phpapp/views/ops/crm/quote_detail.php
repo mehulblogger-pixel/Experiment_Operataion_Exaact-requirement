@@ -18,81 +18,116 @@ require_once __DIR__ . '/../_sxw_ui.php';
 $qBg = crm_quote_before_gst($q); $qTot = (float)$q['total_amount'];
 $qVal = quote_validity($q);
 ?>
-<div class="rec sxw has-bn sxq sxqd">
-<?php sxw_nav('/quotes'); ?>
-<?= function_exists('chain_strip') ? chain_strip('QUOTE', (int)$q['id'], 'QUOTE', (int)$q['id']) : '' ?>
-<div class="sxqd-top">
-<section class="rec-card sxqd-hd">
-  <div class="sxqd-t">
-    <span class="tile"><?= rec_icon('file') ?></span>
-    <div class="sxqd-tt">
-      <h1><?= e(quote_label($q)) ?> <span class="pill <?= $stPill[$st] ?? 'p-mut' ?>" style="font-size:13px;vertical-align:middle"><?= e(lk_options_or('quote_status', QUOTE_STATUS)[$st] ?? $st) ?></span>
-        <?php $verN = count($revs); ?><a href="#revisions" class="pill p-info" style="font-size:12px;vertical-align:middle;text-decoration:none" title="See the revision list and the full change history">🕑 Rev <?= str_pad((string)(int)$q['rev'],2,'0',STR_PAD_LEFT) ?> · <?= $verN ?> version<?= $verN === 1 ? '' : 's' ?></a></h1>
-      <p class="sub"><?= e(($q['client_name'] ?? '') ?: (($clientReg['legal_name'] ?? '') ?: '—')) ?> · <?= e($q['subject'] ?: '—') ?></p>
-    </div>
-  </div>
-  <div class="sxqd-acts">
-    <?php // Sales hands over to operations here. Acceptance is given to the quote;
-          // the contract number is registered off that acceptance; then inspection
-          // calls are raised FROM the contract — so the handover button points at
-          // the contract, not straight at a call. If the contract is not registered
-          // yet, it nudges you to register it first. ?>
-    <?php // Only someone who raises calls (operations/coordinators) sees this — and
-          // only once the contract is OPEN (endorsed + branch-manager approved). ?>
-    <?php $cOpen = $contractRow && strtoupper((string)($contractRow['open_status'] ?? 'OPEN')) === 'OPEN';
-          if ($st === 'ACCEPTED' && $cOpen && (can('ops.call.create') || is_master())): ?>
-        <a class="btn" href="/call-new?contract_id=<?= (int)($contractRow['id'] ?? 0) ?>&contract=<?= e(urlencode((string)$q['contract_number'])) ?>">▶ Raise <?= e(Tl('call')) ?></a>
-    <?php endif; ?>
-    <?php //  Q-05 (owner, 24 Nov 2026) — before approval the PDF is a marked draft, and the
-          //  editable Word copy waits for approval and is for those who send quotations. ?>
-    <?php $qdCleared = crm_quote_doc_cleared($q); $qdWord = crm_quote_word_allowed($q); ?>
-    <?php if ($qdCleared): ?>
-      <a class="btn<?= $st === 'ACCEPTED' ? ' secondary' : '' ?>" href="/quote-pdf?id=<?= (int)$q['id'] ?>">⬇ PDF (for client)</a>
-    <?php else: ?>
-      <a class="btn secondary" href="/quote-pdf?id=<?= (int)$q['id'] ?>" title="Every page is marked “<?= e(QUOTE_DRAFT_MARK) ?>” until it is approved">⬇ PDF (draft)</a>
-    <?php endif; ?>
-    <?php if ($qdWord): ?><a class="btn secondary" href="/quote-doc?id=<?= (int)$q['id'] ?>">Word (editable)</a><?php endif; ?>
-    <?php //  A re-edit the Super Admin granted on a closed quotation shows its own Edit button (SALB-061).
-          //  DEF-18 — the edit screen also takes an APPROVED one (a commercial change cancels the
-          //  approval, D-07), so Edit is offered there too.
-          $reEdit = in_array($st, ['ACCEPTED','LOST'], true) && trim((string)($q['unlocked_until'] ?? '')) !== '' && strtotime((string)$q['unlocked_until']) > time() && !quote_is_locked($q); ?>
-    <?php if ($canEdit && (in_array($st, ['DRAFT','PENDING_APPROVAL','REJECTED','APPROVED'], true) || $reEdit)): ?><a class="btn secondary" href="/quote-edit?id=<?= (int)$q['id'] ?>"><?= $reEdit ? 'Edit (re-opened until ' . e(fdate(substr((string)$q['unlocked_until'], 0, 10))) . ')' : 'Edit' ?></a><?php endif; ?>
-  </div>
-  <?php if (function_exists('crm_quote_pdf_unprintable') && crm_quote_pdf_unprintable($q, $lines ?? [])): ?>
-    <p class="sxl-note" style="margin:8px 0 0"><span class="pill p-warn" style="white-space:normal" title="The PDF's font has only English letters">This <?= e(Tl('quote')) ?> has Gujarati / Hindi letters or symbols that the PDF cannot print (they show as “?”). Send the <b>Word</b> document, or save it as PDF from Word.</span></p>
-  <?php endif; ?>
-  <?php //  "📎 Documents" and "← back" were drawn twice — here and in the row below / the back pill
-        //  above the page (owner, 14 Nov 2026: "There are two document tabs"). Once each now. ?>
-</section>
-<div class="sxw-kp sxqd-kp" style="--n:3">
-  <?php sxw_kpi('teal', 'rupee', 'Before GST', 'Before GST', $qBg > 0 ? cur_sym() . nf($qBg, fmod($qBg, 1) ? 2 : 0) : '—', 'the figure approvals and contracts use');
-        sxw_kpi('grey', 'rupee', 'With GST', 'With GST' . ((float)($q['gst_pct'] ?? 0) > 0 ? ' ' . nf((float)$q['gst_pct'], fmod((float)$q['gst_pct'], 1) ? 2 : 0) . '%' : ''), $qTot > 0 ? cur_sym() . nf($qTot, fmod($qTot, 1) ? 2 : 0) : '—', 'what the ' . Tl('client') . ' pays');
-        sxw_kpi(!empty($qVal['expired']) ? 'bad' : 'info', 'cal', 'Validity', 'Validity', (int)($q['validity_days'] ?? 0) > 0 ? (int)$q['validity_days'] . ' days' : 'Open',
-                !empty($qVal['expires_on']) ? (!empty($qVal['expired']) ? 'lapsed ' : 'to ') . fdate($qVal['expires_on']) : 'counted from when it is sent'); ?>
-</div>
-</div>
-
-<?php // Jump-nav: every section of this quote in one place, so nothing has to be
-      // hunted for down the page. Links only to sections that actually exist for
-      // this quote; #-links into a tabbed section activate that tab automatically. ?>
+<?php
+// ============================================================================
+//  Q-02 (owner, 24 Nov 2026) — the quotation page, clean layout. Same handler, same variables,
+//  same permission checks and the same forms as before: every piece below is the old piece,
+//  moved (the page before this change is kept in tests/fixtures/pre_q02/quote_detail.php).
+//    header (number · client · status · total) → step bar → the Sales KPI cards (before GST ·
+//    GST with its CGST + SGST / IGST split · total with GST · validity — the app-wide card) →
+//    chips (Checklist · Costing · PDF · Edit · More) → "Next step" card with the one right
+//    button, and Approve / Reject for the person it waits on → the same six tabs, with the
+//    six-step playbook folded at the end of Overview.
+// ============================================================================
+$verN = count($revs);
+//  ---- step bar: where this quotation is (display only; read from the status) ----
+$sbSteps = ['Draft', 'Submitted', 'Approved', 'Sent', 'Won'];
+$sbAt = ['DRAFT' => 0, 'REJECTED' => 0, 'PENDING_APPROVAL' => 1, 'APPROVED' => 2, 'SENT' => 3, 'EXPIRED' => 3, 'ACCEPTED' => 5, 'LOST' => 4][$st] ?? 0;
+if ($st === 'REJECTED') $sbSteps[1] = 'Sent back';
+if ($st === 'EXPIRED')  $sbSteps[3] = 'Expired';
+if ($st === 'LOST')     $sbSteps[4] = 'Lost';
+//  ---- checklist count for its chip (the same count the Pre-order review box shows) ----
+$ckN = 0; $ckDone = 0;
+if (!empty($preorderOn) && !empty($preorderItems)) { $ckN = count($preorderItems); foreach ($preorderItems as $it) if (!empty(($preorderState ?? [])[preorder_item_key($it)])) $ckDone++; }
+$ckWaived = trim((string)($q['preorder_waiver'] ?? '')) !== '';
+$cOpen = $contractRow && strtoupper((string)($contractRow['open_status'] ?? 'OPEN')) === 'OPEN';
+$reEdit = in_array($st, ['ACCEPTED','LOST'], true) && trim((string)($q['unlocked_until'] ?? '')) !== '' && strtotime((string)$q['unlocked_until']) > time() && !quote_is_locked($q);
+$mny = fn($v) => cur_sym() . nf((float)$v, fmod((float)$v, 1) ? 2 : 0);
+//  ---- the GST card's split — the invoice's own rule (sx_quote_gst_split, display only) ----
+$qGst = (float)($q['gst_amount'] ?? 0); $qGstPct = (float)($q['gst_pct'] ?? 0);
+$qSplit = function_exists('sx_quote_gst_split') ? sx_quote_gst_split($q) : null;
+$qSplitWords = '';
+if ($qSplit && ($qSplit['mode'] ?? '') === 'IGST') $qSplitWords = 'all IGST · ' . Tl('client') . ' in another state';
+elseif ($qSplit && ($qSplit['mode'] ?? '') === 'CGST_SGST') $qSplitWords = implode(' + ', array_map(fn($r) => strtok((string)$r[0], '·') . $mny($r[1]), $qSplit['rows']));
+elseif ($qSplit && ($qSplit['mode'] ?? '') === 'UNKNOWN') $qSplitWords = 'CGST + SGST or IGST — set once the states are known';
+?>
 <style>
-  /* A jump from "On this quote" lands with the section's top in view, below the sticky top bar
-     (owner, 14 Nov 2026: "When clicked on costing it takes one step down below the costing box"). */
-  .panel[id], [id="revisions"]{scroll-margin-top:96px}
-  @media (max-width:760px){ .panel[id], [id="revisions"]{scroll-margin-top:176px} }   /* the phone's top bar is taller (~159px) */
-  /* DEF-SAL-027 — once the page has measured its own top bar, use that height, so a jump never hides a heading. */
+  .panel[id], [id="revisions"], [id="next-step"]{scroll-margin-top:96px}
+  @media (max-width:760px){ .panel[id], [id="revisions"], [id="next-step"]{scroll-margin-top:176px} }
   :root[data-topbar-h] .panel[id], :root[data-topbar-h] [id="revisions"]{scroll-margin-top:calc(var(--topbar-h) + 16px)}
+  .q2-hd{margin:0 0 12px;padding:16px 18px;display:flex;flex-direction:column;gap:14px}
+  .q2-row{display:flex;gap:18px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+  .q2-id{display:flex;gap:12px;min-width:0;flex:1 1 360px}
+  .q2-id .tile{flex:none;display:grid;place-items:center;width:44px;height:44px;border-radius:10px;background:var(--soft);color:var(--brand-ink)}
+  .q2-id h1{margin:0;font-size:22px;line-height:1.3;overflow-wrap:anywhere}
+  .q2-id .sub{margin:4px 0 0;color:var(--muted);font-size:13.5px}
+  .q2-money{text-align:right;flex:0 1 auto;min-width:220px}
+  .q2-money .big{font-size:28px;font-weight:700;line-height:1.1;letter-spacing:-.01em}
+  .q2-money .lbl{font-size:12.5px;color:var(--muted);margin-top:2px}
+  .q2-steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;counter-reset:q2}
+  .q2-steps li{position:relative;padding:8px 10px 8px 34px;border-radius:10px;background:var(--soft);border:1px solid var(--line);font-size:13px;font-weight:600;color:var(--muted);min-height:36px;display:flex;align-items:center}
+  .q2-steps li::before{counter-increment:q2;content:counter(q2);position:absolute;left:9px;top:50%;transform:translateY(-50%);width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-size:11px;background:var(--card);border:1px solid var(--line);color:var(--muted)}
+  .q2-steps li.done{color:var(--brand-ink);background:color-mix(in srgb,var(--brand) 7%,var(--card));border-color:color-mix(in srgb,var(--brand) 25%,var(--line))}
+  .q2-steps li.done::before{content:"✓";background:var(--brand);border-color:var(--brand);color:#fff}
+  .q2-steps li.now{color:var(--ink);background:var(--card);border:2px solid var(--brand);box-shadow:0 2px 8px color-mix(in srgb,var(--brand) 18%,transparent)}
+  .q2-steps li.now::before{background:var(--brand);border-color:var(--brand);color:#fff}
+  .q2-steps li.stop{color:var(--red);border-color:color-mix(in srgb,var(--red) 40%,var(--line));background:color-mix(in srgb,var(--red) 6%,var(--card))}
+  .q2-steps li.stop::before{content:"✕";background:var(--red);border-color:var(--red);color:#fff}
+  .q2-chips{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 12px}
+  .sxqd .sxw-kp.q2-kp{grid-template-columns:repeat(4,minmax(0,1fr));margin:0 0 12px}
+  .q2-chips>.lead{font-size:12px;color:var(--muted)}
+  .q2-chip{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);font-size:13px;font-weight:600;color:var(--brand-ink);text-decoration:none;white-space:nowrap}
+  .q2-chip:hover{border-color:var(--brand-ink);text-decoration:none}
+  .q2-chip .n{font-weight:700;border-radius:999px;padding:1px 7px;font-size:11.5px;background:color-mix(in srgb,var(--amber) 16%,var(--card));color:#8a4b00}
+  .q2-chip .n.ok{background:color-mix(in srgb,var(--green) 14%,var(--card));color:#166534}
+  .q2-chip.pri{background:var(--brand);color:var(--on-brand);border-color:var(--brand)}
+  .q2-more{position:relative}
+  .q2-more>summary{list-style:none;cursor:pointer}
+  .q2-more>summary::-webkit-details-marker{display:none}
+  .q2-more .menu{position:absolute;z-index:30;top:calc(100% + 6px);left:0;min-width:230px;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(15,23,42,.14);padding:6px;display:flex;flex-direction:column}
+  .q2-more .menu a{padding:9px 12px;border-radius:8px;font-size:13.5px;color:var(--ink)}
+  .q2-more .menu a:hover{background:var(--soft);text-decoration:none}
+  .q2-next{margin:0 0 14px;padding:16px 18px;border:1px solid var(--line);border-left:4px solid var(--brand)}
+  .q2-next .eyebrow{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--brand-ink);margin-bottom:4px}
+  .q2-next .nowband{border:0;padding:0;margin:0;background:none;box-shadow:none}
+  .q2-next .q2-acts{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}
+  .q2-next .q2-acts>.muted:first-child{flex-basis:100%;font-size:12px}
+  .q2-next .q2-acts form:first-of-type .btn{min-height:40px;padding-left:18px;padding-right:18px;font-size:14px}
+  .q2-next .q2-acts .btn.danger{background:var(--card);color:var(--red);border-color:color-mix(in srgb,var(--red) 45%,var(--line));box-shadow:none}
+  .q2-next .panel{margin:12px 0 0;padding:12px 14px;box-shadow:none}
+  .q2-next .q2-dec{margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .q2-next .q2-dec .form-control{flex:1;min-width:220px;min-height:40px}
+  .q2-next .q2-dec .btn{min-height:40px}
+  .q2-next .q2-dec .lv{flex-basis:100%;font-size:12px;color:var(--muted)}
+  .q2-next .sxqd-wd{margin:12px 0 0;border:1px dashed var(--line);border-radius:10px}
+  .q2-next details.sxqd-how>summary{cursor:pointer}
+  .q2-next details.q2-lock>summary{cursor:pointer;list-style:none}
+  .q2-next details.q2-lock>summary::-webkit-details-marker{display:none}
+  .q2-next .q2-open{font-size:12px;font-weight:600;color:var(--brand-ink);white-space:nowrap;margin-left:4px}
+  .q2-fold{margin:0;padding:0 !important}
+  .q2-fold>summary{cursor:pointer;padding:14px 18px;font-weight:600}
+  .q2-fold>.card{margin:0 !important;border:0;box-shadow:none}
+  .q2-next .q2-ck{margin:10px 0 0;font-size:13px;padding:8px 12px;border-radius:8px;background:color-mix(in srgb,var(--amber) 9%,var(--card));color:#7a4300}
+  @media (max-width:760px){
+    .sxqd .chain{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;margin:8px 0;padding-bottom:4px}
+    .sxqd .chain-step{flex:0 0 112px;min-width:112px}
+    .q2-hd{padding:14px}
+    .q2-money{text-align:left;min-width:0;flex-basis:100%}
+    .q2-money .big{font-size:24px}
+    .q2-steps{grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}
+    .q2-steps li{padding:26px 2px 6px;justify-content:center;text-align:center;font-size:10.5px;min-height:0}
+    .q2-steps li::before{left:50%;top:6px;transform:translateX(-50%)}
+    .q2-chips{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch}
+    .sxqd .sxw-kp.q2-kp{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .sxqd .sxw-kp.q2-kp>.kpi .v{font-size:20px}
+    .q2-chips>.lead{display:none}
+    .q2-more .menu{position:fixed;left:16px;right:16px;top:auto;bottom:84px}
+    .q2-next .q2-acts .btn, .q2-next .q2-dec .btn{flex:1 1 auto}
+  }
 </style>
-<nav class="quote-jump" aria-label="On this quote" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:12px 0 4px;font-size:13px">
-  <span class="muted" style="font-size:12px">On this quote:</span>
-  <a class="btn small secondary" href="#actions">Actions</a>
-  <?php if (!empty($approvals)): ?><a class="btn small secondary" href="#approval">Approval chain</a><?php endif; ?>
-  <?php if (!empty($preorderOn) && !empty($preorderItems)): ?><a class="btn small secondary" href="#preorder">Pre-order checklist</a><?php endif; ?>
-  <?php if ($st === 'ACCEPTED' || !empty($q['contract_number'])): ?><a class="btn small secondary" href="#contract">Contract</a><?php endif; ?>
-  <?php if (!empty($costingCan)): ?><a class="btn small secondary" href="#costing">Costing</a><?php endif; ?>
-  <a class="btn small secondary" href="#quote-docs">📎 Documents</a>
-</nav>
-
+<?php
+//  ---- the pieces of the old top, captured as they were (same conditions, same forms) ----
+?>
 <?php
   // Where this quotation is in its journey, said in one line with the one next
   // step — so a person knows what to do without reading the whole page. The
@@ -119,13 +154,13 @@ $qVal = quote_validity($q);
       //  who it waits for instead of "raise calls from it" (owner, 13 Nov 2026).
       $nbOs = !empty($contractRow) ? strtoupper((string)($contractRow['open_status'] ?? '') ?: 'OPEN') : '';
       if (trim((string)($q['contract_number'] ?? '')) === '') {
-        if (!empty($canContract)) $nbNext = 'Next: register the contract number. Inspection ' . Tlp('call') . ' are then raised from the contract.';
+        if (!empty($canContract)) $nbNext = 'Next: register the contract number. ' . ucfirst(Tlp('call')) . ' are then raised from the contract.';
         else { $nbWho = function_exists('crm_people_who_can') ? crm_people_who_can('crm.contract.register', $q) : '';
                $nbNext = 'With Accounts' . ($nbWho !== '' ? ' (' . $nbWho . ')' : '') . ' to register the contract number. Nothing more for you to do here.'; }
       }
       elseif ($nbOs === 'PENDING') { $nbTitle = 'Accepted 🎉 — contract ' . $q['contract_number'] . ' is waiting for approval.'; $nbNext = contract_waiting_words($contractRow); }
       elseif ($nbOs === 'REJECTED') { $nbTitle = 'Accepted — but opening contract ' . $q['contract_number'] . ' was rejected.'; $nbNext = 'See the reason under Contract below; register it again when it is put right.'; }
-      else $nbNext = 'Contract ' . ($nbOs === 'CLOSED' ? 'closed' : 'open') . ' — ' . ($nbOs === 'CLOSED' ? 'no new ' . Tlp('call') . ' can be raised from it.' : 'raise inspection ' . Tlp('call') . ' from it whenever the work comes in, as many as needed.');
+      else $nbNext = 'Contract ' . ($nbOs === 'CLOSED' ? 'closed' : 'open') . ' — ' . ($nbOs === 'CLOSED' ? 'no new ' . Tlp('call') . ' can be raised from it.' : 'raise ' . Tlp('call') . ' from it whenever the work comes in, as many as needed.');
       break;
     case 'REJECTED': $nbTitle = 'Sent back by ' . ($q['rejected_by'] ?: 'the approver') . '.'; $nbNext = 'Correct it and submit again, or raise a revision.'; break;
     case 'LOST': $nbTitle = 'Closed — not accepted.'; break;
@@ -134,10 +169,8 @@ $qVal = quote_validity($q);
   //  Assigned to someone else (owner, 14 Nov 2026, option C): say who works on it, not what to press.
   if (!empty($assigneeWords) && in_array($st, ['DRAFT', 'REJECTED', 'APPROVED', 'SENT', 'EXPIRED'], true)) $nbNext = $assigneeWords;
 ?>
-<div class="nowband">
-  <div class="step"><?= e($nbTitle) ?></div>
-  <?php if ($nbNext !== ''): ?><p class="next"><?= e($nbNext) ?></p><?php endif; ?>
-</div>
+
+<?php ob_start(); ?>
 <?php //  Stage 4 (backend item 9, owner 21 Nov 2026): the person who prepared it may take it
       //  back from its approvers to draft, with a note (docs/03). Only them, only now. ?>
 <?php if (function_exists('crm_quote_withdraw_problem') && crm_quote_withdraw_problem($q) === ''): ?>
@@ -151,6 +184,8 @@ $qVal = quote_validity($q);
 </details>
 <?php endif; ?>
 
+<?php $wdHtml = trim((string)ob_get_clean()); ?>
+<?php ob_start(); ?>
 <?php // C1 — the Sales → Finance → Operations wall, said plainly to a SALES viewer.
       // Sales own the thread only up to "won"; the accepted quote is then LOCKED
       // (quote_is_locked — edits go through a revision) and the contract is Accounts'
@@ -175,8 +210,8 @@ $qVal = quote_validity($q);
       //  mail box it downloaded .eml file why? what is use of it"). Shown only to someone who may send —
       //  the matrix gives sending to crm.quote.send — and in plain words, with the three real ways. ?>
 <?php if (in_array($st, ['APPROVED','SENT'], true) && !empty($q['contact_email']) && !empty($canSend)): ?>
-<div class="panel" id="how-to-send" style="background:var(--soft)">
-  <b><?= $st === 'SENT' ? 'Send it again, or chase it' : 'Three ways to send this' ?></b>
+<details class="panel sxqd-how" id="how-to-send" style="background:var(--soft)">
+  <summary><b><?= $st === 'SENT' ? 'Send it again, or chase it' : 'Three ways to send this' ?></b> <span class="muted">— tap to read</span></summary>
   <div class="muted" style="margin-top:4px;line-height:1.55">
     <?php if ($st === 'APPROVED'): ?><b>1. ✉ Send to <?= e(Tl('client')) ?></b> — the system e-mails it to <?= e($q['contact_email']) ?> from the company mailbox, with the PDF attached, and marks it sent. Nothing else to do.<br><?php endif; ?>
     <b><?= $st === 'APPROVED' ? '2. ' : '' ?>Open in Gmail</b> — opens a new Gmail message in a new tab, already addressed and written, and downloads the PDF at the same time: attach the downloaded PDF (📎), press Send. The <?= e(Tl('client')) ?>'s reply comes to you.<br>
@@ -186,7 +221,7 @@ $qVal = quote_validity($q);
       <br><span style="color:var(--warn)">Add your e-mail address to your profile first, or the Outlook draft will open from the company address.</span>
     <?php endif; ?>
   </div>
-</div>
+</details>
 <?php endif; ?>
 
 <?php // Won, but nobody has raised the contract number yet. The registration panel
@@ -236,8 +271,8 @@ $qVal = quote_validity($q);
 <?php endif; ?>
 
 <?php if (!empty($locked)): ?>
-<div class="panel" style="border:1px solid var(--warn)">
-  <b>🔒 Locked.</b> <span class="muted"><?= e($lockReason ?? '') ?></span>
+<details class="panel q2-lock" style="border:1px solid var(--warn)">
+  <summary><b>🔒 Locked.</b> <span class="muted"><?= e($lockReason ?? '') ?></span> <span class="q2-open">Options ▾</span></summary>
   <?php if (($st === 'SENT' || trim((string)($q['sent_at'] ?? '')) !== '') && $st !== 'ACCEPTED' && (int)($q['is_current'] ?? 1) === 1): ?>
     <div style="margin-top:8px">
       <button class="btn small" type="button" onclick="document.getElementById('revbox').style.display='block';document.getElementById('revbox').scrollIntoView({behavior:'smooth'})">Raise a revision</button>
@@ -255,7 +290,7 @@ $qVal = quote_validity($q);
       <button class="btn small secondary" type="submit">Request re-edit</button>
     </form>
   <?php endif; ?>
-</div>
+</details>
 <?php elseif ($editReq && is_master()): ?>
 <div class="panel" style="border:1px solid var(--warn)">
   <b>Re-edit requested</b> <span class="muted">by <?= e($editReq['requested_by']) ?> — “<?= e($editReq['reason']) ?>”</span>
@@ -288,6 +323,9 @@ $qVal = quote_validity($q);
 </div>
 <?php endif; ?>
 
+
+<?php $notesHtml = trim((string)ob_get_clean()); ?>
+<?php ob_start(); ?>
 <?php $needsApproval = $needsApproval ?? true; $canDecide = $canDecide ?? false; $assignedName = (string)($assignedName ?? ''); ?>
 <?php if (empty($q['is_current'])): ?>
 <div class="panel" role="status" style="border-left:4px solid var(--warn,#b7791f)">
@@ -367,16 +405,113 @@ $qVal = quote_validity($q);
   <?php endif; ?>
 <?php $qActs = trim((string)ob_get_clean());
       if (strpos($qActs, '<button') !== false || strpos($qActs, '<a ') !== false || strpos($qActs, '<form') !== false): ?>
-<div class="panel" id="actions" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+<div class="q2-acts" id="actions">
   <span class="muted"><b>Actions</b> — move this <?= e(Tl('quote')) ?>:</span>
   <?= $qActs ?>
 </div>
 <?php elseif ($qActs !== ''): ?>
-<div class="panel" id="actions"><?= $qActs ?></div>
+<div class="q2-acts" id="actions"><?= $qActs ?></div>
 <?php else: // nothing to press — so the "Actions" shortcut above has nowhere to go ?>
 <script>[].forEach.call(document.querySelectorAll('.quote-jump a[href="#actions"]'),function(a){a.hidden=true;});</script>
 <?php endif; ?>
 <?php endif; // current revision ?>
+
+<?php $actsHtml = trim((string)ob_get_clean()); ?>
+<?php //  The approve / reject decision — the same form that sat in the Approval chain table, moved up
+      //  here so the approver does not scroll past the playbook and the checklist to find it.
+  ob_start();
+  foreach (($approvals ?? []) as $a): if (!crm_can_act_approval($a)) continue; $aOpen = in_array((int)$a['level'], $openLevels ?? [(int)$a['level']], true); ?>
+        <form method="post" action="/quote-approve?id=<?= (int)$q['id'] ?>" class="q2-dec">
+          <span class="lv">Your decision — level <?= (int)$a['level'] ?> of <?= count($approvals) ?></span>
+          <input type="hidden" name="step" value="<?= (int)$a['id'] ?>">
+          <input class="form-control" name="remarks" placeholder="comment (required to reject)">
+          <?php if ($aOpen): ?><button class="btn small" name="decision" value="approve" type="submit">Approve</button>
+          <?php else: ?>
+            <span class="muted" style="font-size:11.5px">Approve opens when the levels before yours have signed</span>
+          <?php endif; ?>
+          <button class="btn small danger" name="decision" value="reject" type="submit">Reject</button>
+        </form>
+<?php endforeach; $apprForms = trim((string)ob_get_clean()); ?>
+
+<div class="rec sxw has-bn sxq sxqd">
+<?php sxw_nav('/quotes'); ?>
+<?= function_exists('chain_strip') ? chain_strip('QUOTE', (int)$q['id'], 'QUOTE', (int)$q['id']) : '' ?>
+
+<script>(function(){var c=document.querySelector('.sxqd .chain'),h=c&&c.querySelector('.chain-here');if(h&&c.scrollWidth>c.clientWidth)c.scrollLeft=Math.max(0,h.offsetLeft-c.offsetLeft-24);})();</script>
+<section class="rec-card q2-hd">
+  <div class="q2-row">
+    <div class="q2-id">
+      <span class="tile"><?= rec_icon('file') ?></span>
+      <div style="min-width:0">
+        <h1><?= e(quote_label($q)) ?> <span class="pill <?= $stPill[$st] ?? 'p-mut' ?>" style="font-size:13px;vertical-align:middle"><?= e(lk_options_or('quote_status', QUOTE_STATUS)[$st] ?? $st) ?></span>
+          <a href="#revisions" class="pill p-info" style="font-size:12px;vertical-align:middle;text-decoration:none" title="See the revision list and the full change history">🕑 Rev <?= str_pad((string)(int)$q['rev'],2,'0',STR_PAD_LEFT) ?> · <?= $verN ?> version<?= $verN === 1 ? '' : 's' ?></a></h1>
+        <p class="sub"><?= e(($q['client_name'] ?? '') ?: (($clientReg['legal_name'] ?? '') ?: '—')) ?> · <?= e($q['subject'] ?: '—') ?></p>
+      </div>
+    </div>
+    <div class="q2-money">
+      <div class="big"><?= $qTot > 0 ? e($mny($qTot)) : '—' ?></div>
+      <div class="lbl">Total with GST</div>
+    </div>
+  </div>
+  <ol class="q2-steps" aria-label="Where this <?= e(Tl('quote')) ?> is">
+    <?php foreach ($sbSteps as $i => $lab):
+      $cls = $i < $sbAt ? 'done' : ($i === $sbAt ? 'now' : '');
+      if ($st === 'LOST' && $i === 4) $cls = 'stop';
+      if ($st === 'REJECTED' && $i === 1) $cls = 'stop'; ?>
+      <li class="<?= $cls ?>"<?= $cls === 'now' ? ' aria-current="step"' : '' ?>><?= e($lab) ?></li>
+    <?php endforeach; ?>
+  </ol>
+  <?php if (function_exists('crm_quote_pdf_unprintable') && crm_quote_pdf_unprintable($q, $lines ?? [])): ?>
+    <p class="sxl-note" style="margin:0"><span class="pill p-warn" style="white-space:normal" title="The PDF's font has only English letters">This <?= e(Tl('quote')) ?> has Gujarati / Hindi letters or symbols that the PDF cannot print (they show as “?”). Send the <b>Word</b> document, or save it as PDF from Word.</span></p>
+  <?php endif; ?>
+</section>
+
+<div class="sxw-kp sxqd-kp q2-kp" style="--n:4">
+  <?php sxw_kpi('teal', 'rupee', 'Before GST', 'Before GST', $qBg > 0 ? $mny($qBg) : '—', 'the figure approvals and contracts use');
+        sxw_kpi('grey', 'rupee', 'GST', 'GST amount', $qGst > 0 ? $mny($qGst) : '—', $qSplitWords);
+        sxw_kpi('ok', 'rupee', 'With GST', 'With GST' . ($qGstPct > 0 ? ' ' . nf($qGstPct, fmod($qGstPct, 1) ? 2 : 0) . '%' : ''), $qTot > 0 ? $mny($qTot) : '—', 'what the ' . Tl('client') . ' pays');
+        sxw_kpi(!empty($qVal['expired']) ? 'bad' : 'info', 'cal', 'Validity', 'Validity', (int)($q['validity_days'] ?? 0) > 0 ? (int)$q['validity_days'] . ' days' : 'Open',
+                !empty($qVal['expires_on']) ? (!empty($qVal['expired']) ? 'lapsed ' : 'to ') . fdate($qVal['expires_on']) : 'counted from when it is sent'); ?>
+</div>
+
+  <nav class="q2-chips quote-jump" aria-label="On this quote">
+    <span class="lead">On this quote:</span>
+    <?php if (!empty($preorderOn) && !empty($preorderItems)): ?><a class="q2-chip" href="#preorder">☑ Pre-order checklist <span class="n<?= ($ckDone >= $ckN || $ckWaived) ? ' ok' : '' ?>"><?= $ckWaived && $ckDone < $ckN ? 'waived' : $ckDone . '/' . $ckN ?></span></a><?php endif; ?>
+    <?php if (!empty($costingCan)): ?><a class="q2-chip" href="#costing">🧮 Costing<?= !empty($costing) ? ' <span class="n ok">' . e($costing['code'] ?? '') . '</span>' : '' ?></a><?php endif; ?>
+    <?php //  Q-05 (owner, 24 Nov 2026) — before approval the PDF is a marked draft, and the editable
+          //  Word copy waits for approval and is for those who send quotations. ?>
+    <?php if (crm_quote_doc_cleared($q)): ?><a class="q2-chip" href="/quote-pdf?id=<?= (int)$q['id'] ?>">⬇ PDF (for client)</a>
+    <?php else: ?><a class="q2-chip" href="/quote-pdf?id=<?= (int)$q['id'] ?>" title="Every page is marked “<?= e(QUOTE_DRAFT_MARK) ?>” until it is approved">⬇ PDF (draft)</a><?php endif; ?>
+    <?php if ($canEdit && (in_array($st, ['DRAFT','PENDING_APPROVAL','REJECTED','APPROVED'], true) || $reEdit)): ?><a class="q2-chip" href="/quote-edit?id=<?= (int)$q['id'] ?>">✎ <?= $reEdit ? 'Edit (re-opened until ' . e(fdate(substr((string)$q['unlocked_until'], 0, 10))) . ')' : 'Edit' ?></a><?php endif; ?>
+    <details class="q2-more">
+      <summary class="q2-chip">More ▾</summary>
+      <div class="menu">
+        <?php if (crm_quote_word_allowed($q)): ?><a href="/quote-doc?id=<?= (int)$q['id'] ?>">Word (editable)</a><?php endif; ?>
+        <a href="#actions">Actions</a>
+        <?php if (!empty($approvals)): ?><a href="#approval">Approval chain</a><?php endif; ?>
+        <?php if ($st === 'ACCEPTED' || !empty($q['contract_number'])): ?><a href="#contract">Contract</a><?php endif; ?>
+        <a href="#quote-docs">📎 Documents</a>
+      </div>
+    </details>
+  </nav>
+
+<section class="rec-card q2-next" id="next-step">
+  <div class="eyebrow">Next step</div>
+  <div class="nowband">
+    <div class="step"><?= e($nbTitle) ?></div>
+    <?php if ($nbNext !== ''): ?><p class="next"><?= e($nbNext) ?></p><?php endif; ?>
+  </div>
+  <?php if ($st === 'ACCEPTED' && $cOpen && (can('ops.call.create') || is_master())): ?>
+    <div class="q2-acts"><a class="btn" href="/call-new?contract_id=<?= (int)($contractRow['id'] ?? 0) ?>&contract=<?= e(urlencode((string)$q['contract_number'])) ?>">▶ Raise <?= e(Tl('call')) ?></a></div>
+  <?php endif; ?>
+  <?php if (!empty($preorderRequireAll) && $ckN && $ckDone < $ckN && !$ckWaived && !empty($q['is_current']) && in_array($st, ['DRAFT','PENDING_APPROVAL','APPROVED','SENT'], true)): ?>
+    <p class="q2-ck">☑ Pre-order checklist <b><?= $ckDone ?>/<?= $ckN ?></b> — every point must be ticked (or the checklist waived) before it is approved, sent or accepted. <a href="#preorder">Open the checklist ↓</a></p>
+  <?php endif; ?>
+  <?= $apprForms ?>
+  <?= $actsHtml ?>
+  <?= $wdHtml ?>
+  <?= $notesHtml ?>
+</section>
 
 <?php // ---- The six tabs of the approved design (owner, 21 Nov 2026: Stage 4 / Stage 5 C2) ----
       //  Overview (next step, decision, approval chain, pre-order checklist, costing,
@@ -385,55 +520,67 @@ $qVal = quote_validity($q);
       //  that was here; only the tab it sits under changed. Without script every
       //  panel shows, one below the other. ?>
 <div data-tabs data-tabs-key="quote" data-tabs-order="Overview,Lines &amp; milestones,Approvals,Documents,Contract &amp; order,History &amp; follow-ups">
-<?php // Quotation playbook — the guided sales path, first thing on Overview so
-      // Quote -> Order -> Job all read the same.
-      if (function_exists('crm_render_quote_playbook')): ?>
-  <div data-tab="Overview"><?php crm_render_quote_playbook($q); ?></div>
-<?php endif; ?>
-<?php // ---- Project costing linked to this quotation --------------------------
-  if (!empty($costingCan)): $pcRow = $costing ?? null; $back = '/quote?id=' . (int)$q['id']; ?>
-<div class="panel" id="costing" data-tab="Overview" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-  <span class="muted">🧮 Project costing:</span>
-  <?php if ($pcRow): ?>
-    <a class="btn small secondary" href="/project-costing?id=<?= (int)$pcRow['id'] ?>"><b><?= e($pcRow['code']) ?></b> — <?= e($pcRow['title']) ?></a>
-    <span class="muted" style="font-size:12.5px">revenue <?= fmoney_short($pcRow['exp_revenue']) ?> · margin <?= (float)$pcRow['exp_revenue']>0 ? nf((float)$pcRow['exp_profit']/(float)$pcRow['exp_revenue']*100,1) : '0' ?>%</span>
-    <?php // Locked once this quotation is sent, won or has a contract (owner, 13 Nov 2026).
-          $pcLock = function_exists('pc_quote_lock_reason') ? pc_quote_lock_reason($pcRow) : '';
-          //  A revision being prepared whose costing is locked: one press for an editable copy (14 Nov 2026).
-          $pcRevise = function_exists('pc_revise_problem') && function_exists('pc_can_edit') && pc_can_edit() && pc_revise_problem((int)$q['id']) === '';
-          if ($pcRevise): ?>
-      <form method="post" action="/project-costing-revise" style="display:inline"><input type="hidden" name="quote_id" value="<?= (int)$q['id'] ?>">
-        <button class="btn small" title="Makes an editable copy of <?= e($pcRow['code']) ?> for this revision; the original stays as the record of the earlier price">✎ Change the costing for this revision</button></form>
-    <?php endif;
-          if ($pcLock !== ''): ?>
-      <span class="muted" style="margin-left:auto;font-size:12.5px" title="<?= e($pcLock) ?>"><?php
-        //  Whose step locked it: this revision, or an earlier one (14 Nov 2026 — a fresh revision read
-        //  "this quote has gone to the client" when only the earlier revision had).
-        $lockSelf = (int)$q['rev'] > 0 ? strpos($pcLock, '(revision ' . (int)$q['rev'] . ')') !== false : strpos($pcLock, '(revision ') === false;
-        $lockWhat = strpos($pcLock, ' has a contract') !== false ? 'has a contract' : (strpos($pcLock, ' has been won') !== false ? 'has been won'
-                  : (strpos($pcLock, ' has gone to the ') !== false ? 'has gone to the ' . Tl('client') : (strpos($pcLock, ' has been approved') !== false ? 'has been approved' : 'has gone for approval'))); ?>🔒 Locked — <?= $lockSelf ? 'this ' . e(Tl('quote')) : 'an earlier revision' ?> <?= e($lockWhat) ?></span>
-    <?php else: ?>
-    <form method="post" action="/project-costing-attach" style="display:inline;margin-left:auto" onsubmit="return confirm('Unlink this costing from the quotation? It is not deleted — you can attach it again from here.')">
-      <input type="hidden" name="costing_id" value="<?= (int)$pcRow['id'] ?>"><input type="hidden" name="quote_id" value="0"><input type="hidden" name="back" value="<?= e($back) ?>">
-      <button class="btn small btn-ghost">Unlink</button>
-    </form>
-    <?php endif; ?>
-  <?php else: ?>
-    <form method="post" action="/project-costing-new" style="display:inline">
-      <input type="hidden" name="quote_id" value="<?= (int)$q['id'] ?>"><input type="hidden" name="client_id" value="<?= (int)($q['client_id'] ?? 0) ?>">
-      <input type="hidden" name="office_id" value="<?= (int)($q['office_id'] ?? 0) ?>"><input type="hidden" name="title" value="<?= e($q['subject'] ?: quote_label($q)) ?>">
-      <input type="hidden" name="site" value="<?= e($q['site_location'] ?? '') ?>">
-      <button class="btn small primary">＋ Create costing for this quotation</button>
-    </form>
-    <?php if (!empty($costingUnlinked)): ?>
-    <form method="post" action="/project-costing-attach" style="display:inline-flex;gap:6px;align-items:center">
-      <input type="hidden" name="quote_id" value="<?= (int)$q['id'] ?>"><input type="hidden" name="back" value="<?= e($back) ?>">
-      <select name="costing_id" class="form-control" style="padding:5px 8px;font-size:13px"><option value="">attach existing…</option>
-        <?php foreach ($costingUnlinked as $u): ?><option value="<?= (int)$u['id'] ?>"><?= e($u['code'].' — '.$u['title'] . (!empty($u['client_name']) ? ' · ' . $u['client_name'] : '') . ' · ' . strtolower(PC_STATUS[$u['status']] ?? $u['status'])) ?></option><?php endforeach; ?>
-      </select><button class="btn small secondary">Attach</button>
-    </form>
-    <?php endif; ?>
+<?php if ($approvals): ?>
+<div class="panel" id="approval" data-tab="Overview">
+  <h3 class="tab-sub" style="margin-top:0">Approval chain</h3>
+  <?php if ($st==='PENDING_APPROVAL' && $pendingWith): ?>
+    <div class="panel" style="margin:0 0 10px;background:var(--soft)">
+      <b>⏳ Waiting with <?= e($pendingWith) ?></b>
+      <?php if ($pendingStep): ?><span class="muted"> — level <?= (int)$pendingStep['level'] ?> of <?= count($approvals) ?></span><?php endif; ?>
+      <?php // Owner, 12 Nov 2026 — say who comes next, so a chain that starts with
+            // the Branch Manager does not look as if the unit head was skipped.
+        if ($pendingStep && crm_approval_mode() === 'order'):
+          $nextNames = [];
+          //  in the order they will sign: the other levels by number, top management last (14 Nov 2026)
+          $lastLv = function_exists('appr_last_levels') ? appr_last_levels($approvals, 'crm_step_approvers_direct') : [];
+          $seq = array_keys($approvals);
+          usort($seq, fn($x, $y) => [in_array((int)$approvals[$x]['level'], $lastLv, true) ? 1 : 0, (int)$approvals[$x]['level']] <=> [in_array((int)$approvals[$y]['level'], $lastLv, true) ? 1 : 0, (int)$approvals[$y]['level']]);
+          $passed = false;
+          foreach ($seq as $ni) { $na = $approvals[$ni];
+            if ((int)$na['id'] === (int)$pendingStep['id']) { $passed = true; continue; }
+            if ($na['status'] !== 'PENDING' || !$passed || (int)$na['level'] === (int)$pendingStep['level']) continue;
+            $np = $stepPeople[$ni] ?? [];
+            $nextNames[] = 'level ' . (int)$na['level'] . ' — ' . ($np ? implode(', ', array_map('crm_person_label', array_slice($np, 0, 2))) : (!empty($na['approver_role']) ? (ORG_ROLES[$na['approver_role']] ?? $na['approver_role']) : 'any approver'));
+          }
+          if ($nextNames): ?><div class="muted" style="font-size:12.5px;margin-top:3px">Then: <?= e(implode(' → ', $nextNames)) ?></div><?php endif; endif; ?>
+    </div>
   <?php endif; ?>
+  <table class="dt">
+    <thead><tr><th class="num">Level</th><th>With whom</th><th>Status</th><th>Acted</th><th>Comment</th><th></th></tr></thead>
+    <tbody>
+    <?php foreach ($approvals as $ai => $a):
+      $people = $stepPeople[$ai] ?? [];
+      if ($people) { $names = array_map('crm_person_label', array_slice($people, 0, 4)); $more = count($people) - count($names); $who = implode(', ', $names) . ($more > 0 ? " and $more other(s)" : ''); }
+      else $who = ucfirst(crm_step_who($a));
+    ?>
+    <tr>
+      <td class="num"><b><?= (int)$a['level'] ?></b></td>
+      <td><?= e($who) ?></td>
+      <td><span class="pill <?= $a['status']==='APPROVED'?'p-ok':($a['status']==='REJECTED'?'p-bad':'p-warn') ?>">
+          <?= e($a['status']==='PENDING' ? 'Pending' : ucfirst(strtolower($a['status']))) ?></span></td>
+      <td class="muted"><?= $a['acted_by'] ? e($a['acted_by']).'<br><span style="font-size:11px">'.e(fdate(substr((string)$a['acted_at'],0,10))).'</span>' : '—' ?></td>
+      <td class="muted"><?= $a['remarks'] ? e($a['remarks']) : '—' ?></td>
+      <td class="num" style="white-space:nowrap">
+        <?php if (crm_can_act_approval($a)): ?><a href="#next-step" style="font-size:12px">Decide in “Next step” at the top ↑</a><?php endif; ?>
+      </td>
+    </tr>
+    <?php endforeach; ?>
+    </tbody>
+  </table>
+  <?php // Everybody approves the wrong thing once. While it is still inside the
+        // building that is a mistake, not an event. ?>
+  <?php if (!empty($canRetract)): ?>
+  <form method="post" action="/quote-unapprove?id=<?= (int)$q['id'] ?>"
+        style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;border-top:1px solid var(--line);padding-top:10px">
+    <div class="ff" style="margin:0;flex:1;min-width:260px"><label>Approved it by mistake? Take it back</label>
+      <input class="form-control" name="reason" placeholder="why you are taking it back (optional)"></div>
+    <button class="btn small secondary" type="submit"
+      onclick="return confirm('Take your approval back? The quotation goes to waiting-for-approval again, and any level approved after yours is reset with it.')">Take my approval back</button>
+  </form>
+  <p class="muted" style="margin-top:6px">Possible only while the <?= e(Tl('quote')) ?> is still inside the company.
+    Once it has gone to the <?= e(Tl('client')) ?> it cannot be taken back — raise a revision instead.</p>
+  <?php endif; ?>
+  <p class="muted" style="margin-top:6px">It becomes <strong>Approved</strong> once every level has approved. A rejection needs a comment and marks the whole <?= e(Tl('quote')) ?> as rejected. Configure the chain under <a href="/approval-rules?module=quote">Approval rules</a>.</p>
 </div>
 <?php endif; ?>
 
@@ -480,77 +627,50 @@ $qVal = quote_validity($q);
 </div>
 <?php endif; ?>
 
-<?php if ($approvals): ?>
-<div class="panel" id="approval" data-tab="Overview">
-  <h3 class="tab-sub" style="margin-top:0">Approval chain</h3>
-  <?php if ($st==='PENDING_APPROVAL' && $pendingWith): ?>
-    <div class="panel" style="margin:0 0 10px;background:var(--soft)">
-      <b>⏳ Waiting with <?= e($pendingWith) ?></b>
-      <?php if ($pendingStep): ?><span class="muted"> — level <?= (int)$pendingStep['level'] ?> of <?= count($approvals) ?></span><?php endif; ?>
-      <?php // Owner, 12 Nov 2026 — say who comes next, so a chain that starts with
-            // the Branch Manager does not look as if the unit head was skipped.
-        if ($pendingStep && crm_approval_mode() === 'order'):
-          $nextNames = [];
-          //  in the order they will sign: the other levels by number, top management last (14 Nov 2026)
-          $lastLv = function_exists('appr_last_levels') ? appr_last_levels($approvals, 'crm_step_approvers_direct') : [];
-          $seq = array_keys($approvals);
-          usort($seq, fn($x, $y) => [in_array((int)$approvals[$x]['level'], $lastLv, true) ? 1 : 0, (int)$approvals[$x]['level']] <=> [in_array((int)$approvals[$y]['level'], $lastLv, true) ? 1 : 0, (int)$approvals[$y]['level']]);
-          $passed = false;
-          foreach ($seq as $ni) { $na = $approvals[$ni];
-            if ((int)$na['id'] === (int)$pendingStep['id']) { $passed = true; continue; }
-            if ($na['status'] !== 'PENDING' || !$passed || (int)$na['level'] === (int)$pendingStep['level']) continue;
-            $np = $stepPeople[$ni] ?? [];
-            $nextNames[] = 'level ' . (int)$na['level'] . ' — ' . ($np ? implode(', ', array_map('crm_person_label', array_slice($np, 0, 2))) : (!empty($na['approver_role']) ? (ORG_ROLES[$na['approver_role']] ?? $na['approver_role']) : 'any approver'));
-          }
-          if ($nextNames): ?><div class="muted" style="font-size:12.5px;margin-top:3px">Then: <?= e(implode(' → ', $nextNames)) ?></div><?php endif; endif; ?>
-    </div>
+<?php // ---- Project costing linked to this quotation --------------------------
+  if (!empty($costingCan)): $pcRow = $costing ?? null; $back = '/quote?id=' . (int)$q['id']; ?>
+<div class="panel" id="costing" data-tab="Overview" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+  <span class="muted">🧮 Project costing:</span>
+  <?php if ($pcRow): ?>
+    <a class="btn small secondary" href="/project-costing?id=<?= (int)$pcRow['id'] ?>"><b><?= e($pcRow['code']) ?></b> — <?= e($pcRow['title']) ?></a>
+    <span class="muted" style="font-size:12.5px">revenue <?= fmoney_short($pcRow['exp_revenue']) ?> · margin <?= (float)$pcRow['exp_revenue']>0 ? nf((float)$pcRow['exp_profit']/(float)$pcRow['exp_revenue']*100,1) : '0' ?>%</span>
+    <?php // Locked once this quotation is sent, won or has a contract (owner, 13 Nov 2026).
+          $pcLock = function_exists('pc_quote_lock_reason') ? pc_quote_lock_reason($pcRow) : '';
+          //  A revision being prepared whose costing is locked: one press for an editable copy (14 Nov 2026).
+          $pcRevise = function_exists('pc_revise_problem') && function_exists('pc_can_edit') && pc_can_edit() && pc_revise_problem((int)$q['id']) === '';
+          if ($pcRevise): ?>
+      <form method="post" action="/project-costing-revise" style="display:inline"><input type="hidden" name="quote_id" value="<?= (int)$q['id'] ?>">
+        <button class="btn small" title="Makes an editable copy of <?= e($pcRow['code']) ?> for this revision; the original stays as the record of the earlier price">✎ Change the costing for this revision</button></form>
+    <?php endif;
+          if ($pcLock !== ''): ?>
+      <span class="muted" style="margin-left:auto;font-size:12.5px" title="<?= e($pcLock) ?>"><?php
+        //  Whose step locked it: this revision, or an earlier one (14 Nov 2026 — a fresh revision read
+        //  "this quote has gone to the client" when only the earlier revision had).
+        $lockSelf = (int)$q['rev'] > 0 ? strpos($pcLock, '(revision ' . (int)$q['rev'] . ')') !== false : strpos($pcLock, '(revision ') === false;
+        $lockWhat = strpos($pcLock, ' has a contract') !== false ? 'has a contract' : (strpos($pcLock, ' has been won') !== false ? 'has been won'
+                  : (strpos($pcLock, ' has gone to the ') !== false ? 'has gone to the ' . Tl('client') : (strpos($pcLock, ' has been approved') !== false ? 'has been approved' : 'has gone for approval'))); ?>🔒 Locked — <?= $lockSelf ? 'this ' . e(Tl('quote')) : 'an earlier revision' ?> <?= e($lockWhat) ?></span>
+    <?php else: ?>
+    <form method="post" action="/project-costing-attach" style="display:inline;margin-left:auto" onsubmit="return confirm('Unlink this costing from the quotation? It is not deleted — you can attach it again from here.')">
+      <input type="hidden" name="costing_id" value="<?= (int)$pcRow['id'] ?>"><input type="hidden" name="quote_id" value="0"><input type="hidden" name="back" value="<?= e($back) ?>">
+      <button class="btn small btn-ghost">Unlink</button>
+    </form>
+    <?php endif; ?>
+  <?php else: ?>
+    <form method="post" action="/project-costing-new" style="display:inline">
+      <input type="hidden" name="quote_id" value="<?= (int)$q['id'] ?>"><input type="hidden" name="client_id" value="<?= (int)($q['client_id'] ?? 0) ?>">
+      <input type="hidden" name="office_id" value="<?= (int)($q['office_id'] ?? 0) ?>"><input type="hidden" name="title" value="<?= e($q['subject'] ?: quote_label($q)) ?>">
+      <input type="hidden" name="site" value="<?= e($q['site_location'] ?? '') ?>">
+      <button class="btn small primary">＋ Create costing for this quotation</button>
+    </form>
+    <?php if (!empty($costingUnlinked)): ?>
+    <form method="post" action="/project-costing-attach" style="display:inline-flex;gap:6px;align-items:center">
+      <input type="hidden" name="quote_id" value="<?= (int)$q['id'] ?>"><input type="hidden" name="back" value="<?= e($back) ?>">
+      <select name="costing_id" class="form-control" style="padding:5px 8px;font-size:13px"><option value="">attach existing…</option>
+        <?php foreach ($costingUnlinked as $u): ?><option value="<?= (int)$u['id'] ?>"><?= e($u['code'].' — '.$u['title'] . (!empty($u['client_name']) ? ' · ' . $u['client_name'] : '') . ' · ' . strtolower(PC_STATUS[$u['status']] ?? $u['status'])) ?></option><?php endforeach; ?>
+      </select><button class="btn small secondary">Attach</button>
+    </form>
+    <?php endif; ?>
   <?php endif; ?>
-  <table class="dt">
-    <thead><tr><th class="num">Level</th><th>With whom</th><th>Status</th><th>Acted</th><th>Comment</th><th></th></tr></thead>
-    <tbody>
-    <?php foreach ($approvals as $ai => $a):
-      $people = $stepPeople[$ai] ?? [];
-      if ($people) { $names = array_map('crm_person_label', array_slice($people, 0, 4)); $more = count($people) - count($names); $who = implode(', ', $names) . ($more > 0 ? " and $more other(s)" : ''); }
-      else $who = ucfirst(crm_step_who($a));
-    ?>
-    <tr>
-      <td class="num"><b><?= (int)$a['level'] ?></b></td>
-      <td><?= e($who) ?></td>
-      <td><span class="pill <?= $a['status']==='APPROVED'?'p-ok':($a['status']==='REJECTED'?'p-bad':'p-warn') ?>">
-          <?= e($a['status']==='PENDING' ? 'Pending' : ucfirst(strtolower($a['status']))) ?></span></td>
-      <td class="muted"><?= $a['acted_by'] ? e($a['acted_by']).'<br><span style="font-size:11px">'.e(fdate(substr((string)$a['acted_at'],0,10))).'</span>' : '—' ?></td>
-      <td class="muted"><?= $a['remarks'] ? e($a['remarks']) : '—' ?></td>
-      <td class="num" style="white-space:nowrap">
-        <?php if (crm_can_act_approval($a)): $aOpen = in_array((int)$a['level'], $openLevels ?? [(int)$a['level']], true); ?>
-        <form method="post" action="/quote-approve?id=<?= (int)$q['id'] ?>" style="display:flex;gap:4px;align-items:center;justify-content:flex-end;flex-wrap:wrap">
-          <input type="hidden" name="step" value="<?= (int)$a['id'] ?>">
-          <input class="form-control" name="remarks" placeholder="comment (required to reject)" style="width:190px">
-          <?php if ($aOpen): ?><button class="btn small" name="decision" value="approve" type="submit">Approve</button>
-          <?php else: //  not this level's turn yet — no Approve button that would only be refused (owner, 14 Nov 2026) ?>
-            <span class="muted" style="font-size:11.5px;white-space:normal;max-width:180px;text-align:right">Approve opens when the levels before yours have signed</span>
-          <?php endif; ?>
-          <button class="btn small danger" name="decision" value="reject" type="submit">Reject</button>
-        </form>
-        <?php endif; ?>
-      </td>
-    </tr>
-    <?php endforeach; ?>
-    </tbody>
-  </table>
-  <?php // Everybody approves the wrong thing once. While it is still inside the
-        // building that is a mistake, not an event. ?>
-  <?php if (!empty($canRetract)): ?>
-  <form method="post" action="/quote-unapprove?id=<?= (int)$q['id'] ?>"
-        style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;border-top:1px solid var(--line);padding-top:10px">
-    <div class="ff" style="margin:0;flex:1;min-width:260px"><label>Approved it by mistake? Take it back</label>
-      <input class="form-control" name="reason" placeholder="why you are taking it back (optional)"></div>
-    <button class="btn small secondary" type="submit"
-      onclick="return confirm('Take your approval back? The quotation goes to waiting-for-approval again, and any level approved after yours is reset with it.')">Take my approval back</button>
-  </form>
-  <p class="muted" style="margin-top:6px">Possible only while the <?= e(Tl('quote')) ?> is still inside the company.
-    Once it has gone to the <?= e(Tl('client')) ?> it cannot be taken back — raise a revision instead.</p>
-  <?php endif; ?>
-  <p class="muted" style="margin-top:6px">It becomes <strong>Approved</strong> once every level has approved. A rejection needs a comment and marks the whole <?= e(Tl('quote')) ?> as rejected. Configure the chain under <a href="/approval-rules?module=quote">Approval rules</a>.</p>
 </div>
 <?php endif; ?>
 
@@ -1206,6 +1326,11 @@ $qVal = quote_validity($q);
   <?php endif; ?>
   <p class="muted" style="font-size:12px;margin:8px 0 0">The decision itself — Approve or Reject — is on <b>Overview</b>, under <b>Approval chain</b>.</p>
 </div>
+<?php // Quotation playbook — the guided sales path, first thing on Overview so
+      // Quote -> Order -> Job all read the same.
+      if (function_exists('crm_render_quote_playbook')): ?>
+  <details class="panel q2-fold" data-tab="Overview"><summary>📘 Quotation playbook — the six steps, explained</summary><?php crm_render_quote_playbook($q); ?></details>
+<?php endif; ?>
 </div><!-- /data-tabs (quote) -->
 </div><!-- /rec sxqd -->
 <?php sxw_bottom('/quotes'); ?>

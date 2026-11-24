@@ -23,6 +23,12 @@ if (getenv('STAGE4_OLD')) {
     $fn = str_replace('$__viewFile = __DIR__ . "/views/$__view.php";',
         '$__viewFile = in_array($__view, ["ops/crm/quote_list","ops/crm/quote_detail","ops/crm/quote_form","ops/crm/quote_external","ops/crm/template_list","ops/crm/template_form","ops/crm/reports","ops/crm/approval_rule_list","ops/crm/approval_rule_form","ops/approval_delegations","ops/approvals","ops/project_costing","ops/project_costings","ops/costing_heads","ops/preorder_checklist"], true) ? __DIR__ . "/tests/fixtures/pre_stage4/" . basename($__view) . ".php" : __DIR__ . "/views/$__view.php";', $fn);
 }
+//  Q-02 (owner, 24 Nov 2026): the quotation page as it was just before the clean layout
+//  (tests/fixtures/pre_q02/), for test_quote_page_v2 (env QPAGE_OLD=1).
+if (getenv('QPAGE_OLD')) {
+    $fn = str_replace('$__viewFile = __DIR__ . "/views/$__view.php";',
+        '$__viewFile = $__view === "ops/crm/quote_detail" ? __DIR__ . "/tests/fixtures/pre_q02/quote_detail.php" : __DIR__ . "/views/$__view.php";', $fn);
+}
 $tmp = $root . '/.viewprobe_s4_' . getmypid() . '.php';
 file_put_contents($tmp, "<?php\n" . $fn);
 require $tmp; @unlink($tmp);
@@ -76,6 +82,7 @@ register_shutdown_function(function () {
         //  Buttons a person can press, by their words (submit buttons and links styled as buttons).
         foreach ($x->query('.//button', $main) as $b) $out['buttons'][] = $clean($b->textContent);
     }
+    if (getenv('WORKER_HTML')) $out['html'] = $html;   // the page itself, for layout checks (test_quote_page_v2)
     $out['done'] = $GLOBALS['__s4_done'] ?? 'redirect';
     echo json_encode($out) . "\n";
 });
