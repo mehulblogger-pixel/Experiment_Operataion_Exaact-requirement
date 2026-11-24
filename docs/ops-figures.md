@@ -143,3 +143,17 @@ everyone stays deputable there.
 **Agency-staff roster** now also lists agency-payroll staff.
 
 **Data health:** an external person also marked "own roll" shows a *check* tag. Nothing is changed automatically.
+
+## One competence warning (B5)
+
+**The warning window is a setting.**
+- The "expiring soon" window is no longer fixed at 45 days. It is a company setting, `credential_window_days`, with a default of 45.
+- A manager changes it on Competence → "Warn before a certificate lapses". Who may change it is the same `competence_can_authorise()` check used for authorisation enforcement.
+- Each change is written to the audit log.
+- The credential pill, the eligibility pill and the training watch all read this one window.
+
+**The same pill everywhere.**
+- The existing eligibility verdict now also shows on the scheduling board's "who's free" suggestions and on the allocate form's "who else could take this date".
+- A person with a lapsed required certificate is no longer offered first.
+
+**Nothing new blocks.** The existing pack block at allocation is unchanged.

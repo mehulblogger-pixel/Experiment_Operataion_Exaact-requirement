@@ -565,7 +565,10 @@ function sched_alternatives($date, $officeId = null, $sbu = '', $limit = 6) {
             if ($his && !in_array($sbu, $his, true)) continue;
         }
         if (inspector_busy_on($r['id'], $date) !== '') continue;
-        $out[] = ['id' => (int)$r['id'], 'name' => $r['name']];
+        //  Stage 1 B5 — the same eligibility warning the allocate picker shows.
+        $el = function_exists('inspector_eligibility') ? inspector_eligibility((int)$r['id'], ['on_date' => $date, 'sbu' => $sbu])['status'] : 'ELIGIBLE';
+        $out[] = ['id' => (int)$r['id'], 'name' => $r['name'], 'elig' => $el,
+                  'elig_label' => $el !== 'ELIGIBLE' && function_exists('inspector_eligibility_pill') ? inspector_eligibility_pill($el)[0] : ''];
         if (count($out) >= $limit) break;
     }
     return $out;

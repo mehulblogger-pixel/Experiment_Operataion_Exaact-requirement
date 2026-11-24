@@ -113,15 +113,19 @@ function sched_suggest($offices, $span, $sbu = '', $limit = 8) {
         $win = free_window($matrix, $id, $from, $days);
         // Jobs they already carry in the view — a tie-breaker toward the least loaded.
         $load = 0; foreach ($days as $d) if (($matrix[$id][$d] ?? '') === 'ON_JOB') $load++;
+        $elig = function_exists('inspector_eligibility') ? inspector_eligibility($id, ['on_date' => $from, 'sbu' => $sbu]) : ['status' => 'ELIGIBLE', 'reasons' => []];
         $out[] = [
             'id' => $id, 'name' => $p['name'], 'emp_code' => $p['emp_code'] ?? '',
             'office_id' => (int)($p['home_office_id'] ?? 0), 'sbu' => $sk['sbu'] ?? ($p['sbu'] ?? ''),
             'skills' => $sk['skills'] ?? '', 'run' => (int)$win['run'], 'until' => $win['until'],
             'next_busy' => $win['next_busy'], 'load' => $load,
+            'elig' => $elig['status'], 'elig_why' => implode('; ', array_column($elig['reasons'], 'text')),
         ];
     }
     // Rank: longest free run first, then least loaded, then name.
-    usort($out, fn($a, $b) => ($b['run'] <=> $a['run']) ?: ($a['load'] <=> $b['load']) ?: strcasecmp($a['name'], $b['name']));
+    //  Stage 1 B5 — a person with a lapsed required certificate is no longer offered first.
+    $er = ['ELIGIBLE' => 0, 'CHECK' => 1, 'EXPIRING' => 1, 'BLOCKED' => 2];
+    usort($out, fn($a, $b) => (($er[$a['elig']] ?? 0) <=> ($er[$b['elig']] ?? 0)) ?: ($b['run'] <=> $a['run']) ?: ($a['load'] <=> $b['load']) ?: strcasecmp($a['name'], $b['name']));
     return array_slice($out, 0, $limit);
 }
 

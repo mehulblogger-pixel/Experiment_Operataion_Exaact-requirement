@@ -116,7 +116,9 @@
         <tbody>
         <?php foreach ($suggest as $s): ?>
           <tr>
-            <td><b><?= e($s['name']) ?></b><?= $s['sbu']?' <span class="muted" style="font-size:11px">'.e($s['sbu']).'</span>':'' ?></td>
+            <td><b><?= e($s['name']) ?></b><?= $s['sbu']?' <span class="muted" style="font-size:11px">'.e($s['sbu']).'</span>':'' ?>
+              <?php if (function_exists('inspector_eligibility_pill') && ($s['elig'] ?? 'ELIGIBLE') !== 'ELIGIBLE'): [$eL, $eC] = inspector_eligibility_pill($s['elig']); ?>
+                <span class="pill <?= e($eC) ?>" style="font-size:10.5px" title="<?= e($s['elig_why'] ?? '') ?>"><?= e($eL) ?></span><?php endif; ?></td>
             <td><span class="pill p-ok"><?= (int)$s['run'] ?> day<?= $s['run']==1?'':'s' ?></span><?= $s['until']?' <span class="muted" style="font-size:11px">to '.e($fmtD($s['until'])).'</span>':'' ?></td>
             <td class="muted" style="font-size:12px"><?= $s['next_busy'] ? 'busy '.e($fmtD($s['next_busy'])) : ($s['load']?'':'clear') ?></td>
             <?php if ($canAllocate): ?>

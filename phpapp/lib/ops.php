@@ -3758,7 +3758,7 @@ function ops_route_module_map() {
         'impartiality'=>'impartiality','imp-type'=>'impartiality','imp-declare'=>'impartiality',
         'imp-threat-add'=>'impartiality','imp-threat-decide'=>'impartiality',
         'competence'=>'competence','auth-add'=>'competence','auth-status'=>'competence',
-        'auth-enforce'=>'competence','witness-add'=>'competence',
+        'auth-enforce'=>'competence','auth-window'=>'competence','witness-add'=>'competence',
         'cert-verify'=>'competence','credential-req-init'=>'competence',
         'equipment'=>'equipment','equip-new'=>'equipment','equip-edit'=>'equipment',
         'equip-cal-add'=>'equipment','equip-cal-del'=>'equipment','equip-cert'=>'equipment',

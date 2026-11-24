@@ -1063,7 +1063,7 @@
         var alts = [];
         (d.days || []).forEach(function (x) {
           if (x.free || !x.alternatives || !x.alternatives.length) return;
-          alts.push(x.pretty + ': ' + x.alternatives.map(function (a) { return a.name; }).join(', '));
+          alts.push(x.pretty + ': ' + x.alternatives.map(function (a) { return a.name + (a.elig_label ? ' (' + a.elig_label + ')' : ''); }).join(', '));
         });
         bits.push(alts.length ? 'Free instead — ' + alts.join('; ') + '.' : 'Nobody else in this branch is free either.');
         bits.push('</div>');
