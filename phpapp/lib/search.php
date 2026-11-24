@@ -253,17 +253,19 @@ function search_sources() {
             [$sw, $sa] = scope_clause('c.executing_office_id', 'c.sbu');
             return array_map(fn($r) => [
                 'title'    => $r['call_code'],
-                'subtitle' => $r['client_name'] ?: '',
+                'subtitle' => trim(($r['client_name'] ?: '') . (($r['client_call_ref'] ?? '') !== '' ? ' · call no. ' . $r['client_call_ref'] : '')
+                              . (($r['supply_po_ref'] ?? '') !== '' ? ' · PO ' . $r['supply_po_ref'] : ''), ' ·'),
                 'meta'     => trim(($r['status'] ?: '') . ' · ' . ($r['call_received_date'] ? fdate($r['call_received_date']) : ''), ' ·'),
                 'url'      => '/call?id=' . (int)$r['id'],
             ], ops_all(
-                "SELECT c.id, c.call_code, c.status, c.call_received_date, c.contract_number,
+                "SELECT c.id, c.call_code, c.status, c.call_received_date, c.contract_number, c.client_call_ref, c.supply_po_ref,
                         COALESCE(bp.display_name, bp.legal_name) client_name
                  FROM calls c LEFT JOIN business_partners bp ON bp.id = c.client_id
                  WHERE $sw AND (c.call_code LIKE ? OR c.notes LIKE ? OR c.contract_number LIKE ?
-                                OR bp.display_name LIKE ? OR bp.legal_name LIKE ?)
+                                OR bp.display_name LIKE ? OR bp.legal_name LIKE ?
+                                OR c.client_call_ref LIKE ? OR c.supply_po_ref LIKE ?)
                  ORDER BY c.id DESC LIMIT $n",
-                array_merge($sa, [$l, $l, $l, $l, $l])));
+                array_merge($sa, [$l, $l, $l, $l, $l, $l, $l])));
         });
 
     // ---- Deputations ---------------------------------------------------------

@@ -307,6 +307,18 @@ function ops_migrate() {
     ensure_column('calls', 'deliverables', "VARCHAR(255) DEFAULT ''");
     ensure_column('calls', 'po_id', 'INT NULL');
     ensure_column('calls', 'po_line_item_id', 'INT NULL');
+    //  TPIA reporting Phase 1 (owner, 25 Nov 2026 — D1/D2/D3). Three plain-text
+    //  references our coordinator types from the client's request, all optional
+    //  and empty on every older work order:
+    //    client_call_ref  the client's own inspection call number (searchable; a
+    //                     repeat only warns — it never blocks or merges calls)
+    //    supply_po_ref    "Client PO no. (placed on the manufacturer)" — the
+    //                     client's purchase order on the manufacturer, NOT our
+    //                     service PO (po_id). Reports copy it as their P.O.
+    //    offered_scope    the lot / stage / quantity offered on this call
+    ensure_column('calls', 'client_call_ref', "VARCHAR(80) DEFAULT ''");
+    ensure_column('calls', 'supply_po_ref', "VARCHAR(80) DEFAULT ''");
+    ensure_column('calls', 'offered_scope', "VARCHAR(255) DEFAULT ''");
     // Contracting-vs-executing credit model
     ensure_column('calls', 'contracting_office_id', 'INT NULL');       // office that owns the client/PO
     ensure_column('calls', 'coordinator_id', 'INT NULL');             // the named coordinator the call is forwarded to
@@ -5706,7 +5718,9 @@ function ops_calls($route, $method) {
             $conds[] = "c.sbu IN ($ph)"; foreach ($sbu as $s) $args[] = $s;
         }
         $where = $conds ? implode(' AND ', $conds) : '1=1';
-        if ($q) { $where .= " AND (c.call_code LIKE ? OR bp.legal_name LIKE ? OR v.legal_name LIKE ?)"; array_push($args, "%$q%","%$q%","%$q%"); }
+        //  TPIA Phase 1 — the client's call number and the client PO on the
+        //  manufacturer are searchable here too (owner, 25 Nov 2026 — D1).
+        if ($q) { $where .= " AND (c.call_code LIKE ? OR bp.legal_name LIKE ? OR v.legal_name LIKE ? OR c.client_call_ref LIKE ? OR c.supply_po_ref LIKE ?)"; array_push($args, "%$q%","%$q%","%$q%","%$q%","%$q%"); }
         // See every call under one contract, or under one quotation — the "all
         // calls under this contract / quote" view asked for from those screens.
         $fContract = trim((string)($_GET['contract'] ?? ''));
@@ -6081,6 +6095,25 @@ function ops_calls($route, $method) {
                 view('ops/call_form', array_merge(call_form_vars($call, $b), ['error' => $entryErr, 'errorFields' => $entryBad]));
                 return;
             }
+            //  TPIA Phase 1 / D1 (owner, 25 Nov 2026) — the client's call number is
+            //  optional and may repeat. A repeat for the same client only WARNS and
+            //  lists the other call(s); the person decides. Nothing is blocked or
+            //  merged; the acknowledged repeat is written to History below.
+            foreach (['client_call_ref', 'supply_po_ref', 'offered_scope'] as $tf) $b[$tf] = trim((string)($b[$tf] ?? ''));
+            $dupAck = '';
+            $refChanged = $b['client_call_ref'] !== '' && (!$call || trim((string)($call['client_call_ref'] ?? '')) !== $b['client_call_ref']);
+            if ($refChanged) {
+                $dupRef = call_client_ref_dups($b['client_call_ref'], (int)($b['client_id'] ?? 0), (int)($call['id'] ?? 0));
+                if ($dupRef['rows'] || $dupRef['hidden']) {
+                    if (empty($b['client_ref_dup_ok'])) {
+                        view('ops/call_form', array_merge(call_form_vars($call, $b), ['dupRef' => $dupRef, 'errorFields' => ['client_call_ref'],
+                            'error' => ucfirst(Tl('client')) . "'s call no. " . $b['client_call_ref'] . ' is already on another ' . Tl('call')
+                                . '. Check the list beside the box, then tick "Save anyway" if this is a separate request. Nothing was saved yet.']));
+                        return;
+                    }
+                    $dupAck = implode(', ', array_column($dupRef['rows'], 'call_code')) . ($dupRef['hidden'] ? ' (+' . (int)$dupRef['hidden'] . ' outside this branch)' : '');
+                }
+            }
             $fields = call_save_fields();
             // Drop any field whose column is missing (partial upload) so the whole
             // save cannot crash on one unknown column — it is added on next boot.
@@ -6154,6 +6187,7 @@ function ops_calls($route, $method) {
                 touch_row_version('calls', $call['id']);
                 if ($forwardNow) $pdo->prepare("UPDATE calls SET forwarded_at=?, status='FORWARDED' WHERE id=?")->execute([date('c'), $call['id']]);
                 custom_save('call', $call['id'], $b);
+                if ($dupAck !== '') call_client_ref_dup_log((int)$call['id'], $b['client_call_ref'], $dupAck);
                 // Notify on the office forward, and also when a coordinator is
                 // newly named (a same-office hand-off, or a re-assignment) so the
                 // person now owning the call actually hears about it.
@@ -6180,6 +6214,7 @@ function ops_calls($route, $method) {
                 $id = $pdo->lastInsertId();
                 touch_row_version('calls', (int)$id);   // F-OP-04 — protected from its first edit
                 custom_save('call', $id, $b);
+                if ($dupAck !== '') call_client_ref_dup_log((int)$id, $b['client_call_ref'], $dupAck);
                 $coordNamed = (int)($b['coordinator_id'] ?? 0) > 0;
                 if ($execOffice || $coordNamed) send_forward_email($id);
                 flash("$code created." . ($execOffice ? ' Forwarded to the branch — email sent.'
@@ -6269,6 +6304,24 @@ function normalise_city($input) {
 // $posted: when a save is refused, re-render with what was typed rather than
 // with what is in the database. Losing twenty fields because one was wrong is
 // the kind of thing that makes people stop using a system.
+//  TPIA Phase 1 / D1 — other work orders of the same client carrying the same
+//  client call number. Returns the ones the signed-in person may open, and only
+//  a count of any outside their branch (their numbers are not shown).
+function call_client_ref_dups($ref, $clientId, $excludeId = 0) {
+    $ref = trim((string)$ref); $out = ['ref' => $ref, 'rows' => [], 'hidden' => 0];
+    if ($ref === '') return $out;
+    $w = "LOWER(TRIM(c.client_call_ref))=LOWER(?) AND c.id<>?"; $a = [$ref, (int)$excludeId];
+    if ((int)$clientId > 0) { $w .= " AND c.client_id=?"; $a[] = (int)$clientId; }
+    try { $rows = ops_all("SELECT c.id, c.call_code, c.executing_office_id, c.ibo_office_id, c.sbu FROM calls c WHERE $w ORDER BY c.id", $a) ?: []; }
+    catch (Throwable $e) { return $out; }
+    foreach ($rows as $r) { if (call_view_scope_allows($r)) $out['rows'][] = $r; else $out['hidden']++; }
+    return $out;
+}
+function call_client_ref_dup_log($callId, $ref, $others) {
+    if (!function_exists('act_log')) return;
+    try { act_log('CALL', (int)$callId, 'SYSTEM', ucfirst(Tl('client')) . "'s call no. " . $ref . ' is also on ' . $others
+        . ' — saved as a separate ' . Tl('call') . ' by ' . user_name(current_user()) . '; nothing was merged.'); } catch (Throwable $e) {}
+}
 function call_form_vars($call, $posted = null) {
     $u = current_user();
     if ($posted !== null) {
@@ -6336,7 +6389,8 @@ function call_save_fields() {
         'inspection_dates','schedule_end_date','schedule_weekdays',
         'engagement_type','days_count','months_count','pattern_kind','pattern_n',
         'force_dates','manmonth_basis','manmonth_min_days',
-        'reporting_frequency','report_custom_days','deliverables','is_outstation','chargeable_heads'];
+        'reporting_frequency','report_custom_days','deliverables','is_outstation','chargeable_heads',
+        'client_call_ref','supply_po_ref','offered_scope'];
 }
 function job_save_fields() {
     return ['executing_office_id','inspector_id','subcon_id','job_type','stage','scheduled_date',

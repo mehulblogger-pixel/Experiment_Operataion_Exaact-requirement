@@ -510,6 +510,22 @@
       <?= $cRow($vendorInfo, Tl('vendor')) ?>
     </div>
   </div>
+  <?php //  TPIA Phase 1 — what the client asked for on this call, and how the
+        //  reports this job owes stand (one line, from the same calculation as
+        //  the "Reports to write" figure). ?>
+  <?php $tpRef = trim((string)($jcall['client_call_ref'] ?? '')); $tpPo = trim((string)($jcall['supply_po_ref'] ?? '')); $tpLot = trim((string)($jcall['offered_scope'] ?? ''));
+        $tpLine = function_exists('ops_report_progress_line') ? ops_report_progress_line($job) : ''; ?>
+  <?php if ($tpRef !== '' || $tpPo !== '' || $tpLot !== '' || $tpLine !== ''): ?>
+  <div class="ct-site" id="tpia-refs">
+    <span class="lab-sm">What was offered</span>
+    <div class="kv-grid">
+      <?php if ($tpRef !== ''): ?><div><span class="k"><?= e(T('client')) ?>'s call no.</span><a href="/call?id=<?= (int)$job['call_id'] ?>&amp;hist=ref#tpia-history"><?= e($tpRef) ?></a></div><?php endif; ?>
+      <?php if ($tpPo !== ''): ?><div><span class="k"><?= e(T('client')) ?> PO (on the <?= e(Tl('manufacturer')) ?>)</span><a href="/call?id=<?= (int)$job['call_id'] ?>&amp;hist=po#tpia-history"><?= e($tpPo) ?></a></div><?php endif; ?>
+      <?php if ($tpLot !== ''): ?><div><span class="k">Lot / stage / qty offered</span><?= e($tpLot) ?></div><?php endif; ?>
+      <?php if ($tpLine !== ''): ?><div><span class="k"><?= e(TH('report')) ?>s</span><?= e($tpLine) ?></div><?php endif; ?>
+    </div>
+  </div>
+  <?php endif; ?>
   <div class="ct-site">
     <span class="lab-sm">Site address</span>
     <?php if ($siteTxt !== ''): ?>

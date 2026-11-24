@@ -9286,6 +9286,16 @@ function idems_context_for($callId, $jobId = 0) {
             $po = ops_one("SELECT po_number, title FROM partner_purchase_orders WHERE id=?", [$call['po_id']]);
             if ($po) { $ctx['po_ref'] = $po['po_number']; $ctx['po_title'] = $po['title']; }
         }
+        //  TPIA Phase 1 (owner, 25 Nov 2026 — D3): the P.O. on an inspection report
+        //  is the CLIENT's purchase order placed on the manufacturer, typed on the
+        //  call. When it is there it is the report's P.O.; our own service PO above
+        //  stays the fallback, so a call without it reads exactly as before.
+        if (trim((string)($call['supply_po_ref'] ?? '')) !== '') {
+            if (!empty($ctx['po_ref'])) $ctx['service_po'] = $ctx['po_ref'];
+            $ctx['po_ref'] = trim((string)$call['supply_po_ref']);
+        }
+        if (trim((string)($call['client_call_ref'] ?? '')) !== '') $ctx['client_call_ref'] = trim((string)$call['client_call_ref']);
+        if (trim((string)($call['offered_scope'] ?? '')) !== '') $ctx['offered_scope'] = trim((string)$call['offered_scope']);
         if (!empty($call['po_line_item_id'])) {
             $li = ops_one("SELECT description, quantity, site FROM po_line_items WHERE id=?", [$call['po_line_item_id']]);
             if ($li) { $ctx['item_desc'] = $li['description']; $ctx['quantity'] = $li['quantity']; if (!empty($li['site'])) $ctx['location'] = $li['site']; }
@@ -9343,6 +9353,9 @@ function idems_field_aliases() {
         'inspection_date'=>['inspection_date','date_of_inspection','insp_date','date','visit_date','inspected_on'],
         'inspector_name'=> ['inspector','inspector_name','inspected_by','surveyor','engineer'],
         'call_code'     => ['call_no','call_number','inspection_call','call_ref','call_code','ic_no'],
+        // TPIA Phase 1 — the client's own call number and the lot / stage offered.
+        'client_call_ref'=>['client_call_no','client_call_ref','client_call_number','client_ic_no','customer_call_no'],
+        'offered_scope' => ['offered_scope','lot','lot_no','lot_stage','lot_offered','stage_offered','lot_stage_qty'],
         'job_code'      => ['job_no','job_code','job_number','work_order'],
         'project_name'  => ['project','project_name','project_title'],
         'project_code'  => ['project_code','project_no','project_number'],

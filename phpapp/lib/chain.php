@@ -469,6 +469,150 @@ function chain_gaps() {
     return $g;
 }
 
+// ---- Inspection history (TPIA Phase 1, owner 25 Nov 2026 — item 2) ----------
+// The thread above walks ONE record's own links. This reads the SIBLINGS: every
+// work order of the same client that carries the same client's call number, the
+// same client PO on the manufacturer, or the same manufacturer — listed side by
+// side and oldest first, never merged. Read-only, like everything in this file;
+// each row links to the real record.
+//
+// Visibility is the viewer's existing reach, nothing more: a work order is listed
+// only when call_view_scope_allows() lets them open it, and a report only when
+// idems_doc_access() lets them read it (so an inspector sees only their own).
+// Work orders and reports hidden by that rule are counted, never named.
+const CHAIN_HIST_KEYS = ['ref' => "client's call no.", 'po' => 'client PO on the manufacturer', 'mfr' => 'manufacturer'];
+
+function chain_history_default_key(array $call) {
+    if (trim((string)($call['client_call_ref'] ?? '')) !== '') return 'ref';
+    if (trim((string)($call['supply_po_ref'] ?? '')) !== '') return 'po';
+    if ((int)($call['vendor_id'] ?? 0) > 0) return 'mfr';
+    return 'self';
+}
+
+function chain_history_for_call($callId, $by = '') {
+    $call = chain_one("SELECT * FROM calls WHERE id=?", [(int)$callId]);
+    $out = ['by' => 'self', 'value' => '', 'calls' => [], 'events' => [], 'hidden_calls' => 0, 'hidden_reports' => 0];
+    if (!$call) return $out;
+    $by = isset(CHAIN_HIST_KEYS[$by]) ? $by : chain_history_default_key($call);
+    $client = (int)($call['client_id'] ?? 0);
+    $w = ''; $a = [];
+    if ($by === 'ref' && ($v = trim((string)($call['client_call_ref'] ?? ''))) !== '') { $w = "LOWER(TRIM(c.client_call_ref))=LOWER(?)"; $a = [$v]; $out['value'] = $v; }
+    elseif ($by === 'po' && ($v = trim((string)($call['supply_po_ref'] ?? ''))) !== '') { $w = "LOWER(TRIM(c.supply_po_ref))=LOWER(?)"; $a = [$v]; $out['value'] = $v; }
+    elseif ($by === 'mfr' && (int)($call['vendor_id'] ?? 0) > 0) {
+        $w = "c.vendor_id=?"; $a = [(int)$call['vendor_id']];
+        $out['value'] = (string)(chain_one("SELECT COALESCE(NULLIF(display_name,''), legal_name) n FROM business_partners WHERE id=?", [(int)$call['vendor_id']])['n'] ?? '');
+    } else $by = 'self';
+    $out['by'] = $by;
+    if ($by === 'self') { $w = "c.id=?"; $a = [(int)$call['id']]; }
+    elseif ($client > 0) { $w .= " AND c.client_id=?"; $a[] = $client; }
+    $rows = chain_all("SELECT c.*, COALESCE(NULLIF(v.display_name,''), v.legal_name) vendor_name FROM calls c
+                       LEFT JOIN business_partners v ON v.id=c.vendor_id WHERE $w ORDER BY c.id LIMIT 60", $a);
+    $calls = [];
+    foreach ($rows as $r) {
+        if ((int)$r['id'] !== (int)$call['id'] && function_exists('call_view_scope_allows') && !call_view_scope_allows($r)) { $out['hidden_calls']++; continue; }
+        $calls[(int)$r['id']] = $r;
+    }
+    $out['calls'] = array_values($calls);
+    if (!$calls) return $out;
+    $ev = [];
+    $add = function ($date, $ord, $icon, $title, $detail, $href, $callCode) use (&$ev) {
+        $d = substr((string)$date, 0, 10);
+        $ev[] = ['date' => $d, 'ord' => $ord, 'icon' => $icon, 'title' => $title, 'detail' => $detail, 'href' => $href, 'call' => $callCode];
+    };
+    $ids = implode(',', array_keys($calls));
+    foreach ($calls as $c) {
+        $bits = array_filter([
+            trim((string)($c['client_call_ref'] ?? '')) !== '' ? "client's call no. " . $c['client_call_ref'] : '',
+            trim((string)($c['supply_po_ref'] ?? '')) !== '' ? 'PO ' . $c['supply_po_ref'] : '',
+            trim((string)($c['offered_scope'] ?? '')) !== '' ? $c['offered_scope'] : '',
+            trim((string)($c['vendor_name'] ?? '')) !== '' ? 'at ' . $c['vendor_name'] : '',
+        ]);
+        $state = function_exists('opk_progress_label') ? opk_progress_label($c) : (string)($c['status'] ?? '');
+        $add(($c['call_received_date'] ?? '') ?: ($c['created_at'] ?? ''), 0, '📞', TH('call') . ' ' . $c['call_code'] . ' received',
+             implode(' · ', $bits) . ($bits ? ' · ' : '') . 'now: ' . $state, '/call?id=' . (int)$c['id'], $c['call_code']);
+    }
+    $jobs = chain_all("SELECT j.*, i.name inspector_name FROM jobs j LEFT JOIN inspectors i ON i.id=j.inspector_id WHERE j.call_id IN ($ids) ORDER BY j.id");
+    $jobCall = [];
+    foreach ($jobs as $j) {
+        $cc = $calls[(int)$j['call_id']]['call_code'] ?? '';
+        $jobCall[(int)$j['id']] = $cc;
+        $when = trim((string)($j['scheduled_date'] ?? '')) ?: substr((string)($j['created_at'] ?? ''), 0, 10);
+        $add(substr((string)($j['created_at'] ?? ''), 0, 10) ?: $when, 1, '🗂', TH('job') . ' ' . $j['job_code'] . ' allocated',
+             ($j['inspector_name'] ? $j['inspector_name'] . ' · ' : '') . 'planned ' . ($when ? fdate($when) : '—')
+             . (trim((string)($j['inspection_end_date'] ?? '')) !== '' && $j['inspection_end_date'] !== $when ? ' to ' . fdate($j['inspection_end_date']) : '')
+             . (($j['stage'] ?? '') === 'CANCELLED' ? ' · cancelled' : (!empty($j['closed_flag']) ? ' · closed' . (!empty($j['closed_at']) ? ' ' . fdate(substr((string)$j['closed_at'], 0, 10)) : '') : ' · open')),
+             '/job?id=' . (int)$j['id'], $cc);
+    }
+    if ($jobCall) {
+        $jids = implode(',', array_keys($jobCall));
+        $vlab = function_exists('visit_status_label') ? 'visit_status_label' : null;
+        foreach (chain_all("SELECT v.*, i.name inspector_name FROM job_visits v LEFT JOIN inspectors i ON i.id=v.inspector_id WHERE v.job_id IN ($jids) ORDER BY v.visit_date, v.id") as $v) {
+            $st = (string)($v['status'] ?? 'PLANNED');
+            $lab = $vlab ? $vlab($v) : $st;
+            $add($v['visit_date'], 2, $st === 'NO_INSPECTION' ? '⛔' : ($st === 'DONE' ? '✅' : '📅'), 'Visit day — ' . $lab,
+                 trim(($v['inspector_name'] ?: '') . (trim((string)($v['moved_from'] ?? '')) !== '' ? ' · moved from ' . fdate($v['moved_from']) : '')
+                      . (trim((string)($v['closed_by'] ?? '')) !== '' ? ' · closed by ' . $v['closed_by'] : ''), ' ·'),
+                 '/job?id=' . (int)$v['job_id'] . '#visit-close', $jobCall[(int)$v['job_id']] ?? '');
+        }
+    }
+    $jidList = $jobCall ? implode(',', array_keys($jobCall)) : '0';
+    foreach (chain_all("SELECT r.*, i.name inspector_name FROM report_docs r LEFT JOIN inspectors i ON i.id=r.inspector_id
+                        WHERE COALESCE(r.deleted,0)=0 AND (r.call_id IN ($ids) OR r.job_id IN ($jidList)) ORDER BY r.id") as $r) {
+        if (function_exists('idems_doc_access') && idems_doc_access($r) === '') { $out['hidden_reports']++; continue; }
+        $tc = strtoupper((string)($r['type_code'] ?? ''));
+        $isRn = in_array($tc, ['RN', 'IRN'], true); $isNcr = $tc === 'NCR';
+        $links = [];
+        if ((int)($r['revises_id'] ?? 0)) $links[] = 'revision ' . (int)($r['rev'] ?? 0);
+        if ((int)($r['prev_stage_doc_id'] ?? 0)) $links[] = 'continues an earlier stage';
+        if ((int)($r['reinspects_id'] ?? 0)) $links[] = 're-inspection';
+        if ((int)($r['revised_by_id'] ?? 0)) $links[] = 'replaced by a later revision';
+        $date = trim((string)($r['inspection_date'] ?? '')) ?: (trim((string)($r['issue_date'] ?? '')) ?: substr((string)($r['created_at'] ?? ''), 0, 10));
+        $st = defined('IDEMS_STATUS') ? (IDEMS_STATUS[$r['status'] ?? ''] ?? ($r['status'] ?? '')) : ($r['status'] ?? '');
+        $cc = $calls[(int)($r['call_id'] ?? 0)]['call_code'] ?? ($jobCall[(int)($r['job_id'] ?? 0)] ?? '');
+        $add($date, 3, $isRn ? '🟢' : ($isNcr ? '⚠️' : '📑'),
+             ($isRn ? 'Release Note ' : ($isNcr ? 'Nonconformity ' : TH('report') . ' ')) . ($r['irn'] ?: '#' . (int)$r['id']),
+             trim(($r['inspector_name'] ? $r['inspector_name'] . ' · ' : '') . $st . ($links ? ' · ' . implode(', ', $links) : '')
+                  . (trim((string)($r['po_ref'] ?? '')) !== '' ? ' · PO ' . $r['po_ref'] : '')),
+             '/document?id=' . (int)$r['id'], $cc);
+    }
+    usort($ev, function ($x, $y) { return [$x['date'] === '' ? '9999' : $x['date'], $x['ord']] <=> [$y['date'] === '' ? '9999' : $y['date'], $y['ord']]; });
+    $out['events'] = $ev;
+    return $out;
+}
+
+// The panel on the work-order page. $by comes from the link that was clicked
+// (the client's call no., the PO or the manufacturer).
+function chain_history_panel($call, $by = '') {
+    $h = chain_history_for_call((int)($call['id'] ?? 0), $by);
+    $base = '/call?id=' . (int)($call['id'] ?? 0) . '&hist=';
+    $o = '<div class="panel" id="tpia-history" data-tab="Inspection history">';
+    $o .= '<div class="ctitle" style="margin-top:0"><h3>Inspection history';
+    if ($h['by'] !== 'self') $o .= ' <span class="muted">— every ' . e(Tl('call')) . ' with the same ' . e(CHAIN_HIST_KEYS[$h['by']]) . ' <b>' . e($h['value']) . '</b>, oldest first, never merged</span>';
+    else $o .= ' <span class="muted">— this ' . e(Tl('call')) . ' only (no client call no., PO or manufacturer to match on)</span>';
+    $o .= '</h3></div>';
+    $sw = [];
+    foreach (CHAIN_HIST_KEYS as $k => $lab) {
+        $has = $k === 'ref' ? trim((string)($call['client_call_ref'] ?? '')) !== '' : ($k === 'po' ? trim((string)($call['supply_po_ref'] ?? '')) !== '' : (int)($call['vendor_id'] ?? 0) > 0);
+        if (!$has) continue;
+        $sw[] = $k === $h['by'] ? '<span class="pill p-ok">' . e(ucfirst($lab)) . '</span>'
+              : '<a class="pill p-mut" href="' . e($base . $k . '#tpia-history') . '">' . e(ucfirst($lab)) . '</a>';
+    }
+    if (count($sw) > 1) $o .= '<p style="margin:0 0 10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span class="muted" style="font-size:12px">Match on:</span>' . implode('', $sw) . '</p>';
+    $o .= '<p class="muted" style="font-size:12px;margin:0 0 10px">' . count($h['calls']) . ' ' . e(count($h['calls']) === 1 ? Tl('call') : Tlp('call'))
+        . ' · ' . count($h['events']) . ' entries'
+        . ($h['hidden_calls'] ? ' · ' . (int)$h['hidden_calls'] . ' more outside your branch (not shown)' : '')
+        . ($h['hidden_reports'] ? ' · ' . (int)$h['hidden_reports'] . ' ' . e(Tlp('report')) . ' you cannot open (not shown)' : '') . '</p>';
+    if (!$h['events']) return $o . '<p class="muted">Nothing recorded yet.</p></div>';
+    $o .= '<div class="table-wrap"><table class="grid"><tr><th style="width:110px">Date</th><th>What</th><th>' . e(TH('call')) . '</th></tr>';
+    foreach ($h['events'] as $x) {
+        $o .= '<tr><td>' . ($x['date'] !== '' ? e(fdate($x['date'])) : '<span class="muted">—</span>') . '</td>'
+            . '<td><a href="' . e($x['href']) . '">' . $x['icon'] . ' ' . e($x['title']) . '</a>'
+            . ($x['detail'] !== '' ? '<br><small class="muted">' . e($x['detail']) . '</small>' : '') . '</td>'
+            . '<td>' . e($x['call']) . '</td></tr>';
+    }
+    return $o . '</table></div></div>';
+}
+
 function chain_can() {
     return can('mod.calls.view') || can('mod.jobs.view') || can('mod.quotes.view') || is_master_of(['calls','jobs','quotes']);
 }

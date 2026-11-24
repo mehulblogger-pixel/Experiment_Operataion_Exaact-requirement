@@ -80,7 +80,10 @@
     ?>
       <tr<?= !empty($L['late']) ? ' style="background:color-mix(in srgb,var(--bad) 5%,transparent)"' : '' ?>>
         <td><a href="/call?id=<?= (int)$c['id'] ?>"><b><?= e($c['call_code']) ?></b></a>
-            <?php if (!empty($c['folder_link'])): ?><a href="<?= e($c['folder_link']) ?>" target="_blank" rel="noopener" title="Shared folder">🔗</a><?php endif; ?></td>
+            <?php if (!empty($c['folder_link'])): ?><a href="<?= e($c['folder_link']) ?>" target="_blank" rel="noopener" title="Shared folder">🔗</a><?php endif; ?>
+            <?php if (trim((string)($c['client_call_ref'] ?? '')) !== '' || trim((string)($c['supply_po_ref'] ?? '')) !== ''): ?>
+              <br><small class="muted"><?= trim((string)($c['client_call_ref'] ?? '')) !== '' ? 'Client no. ' . e($c['client_call_ref']) : '' ?><?= trim((string)($c['client_call_ref'] ?? '')) !== '' && trim((string)($c['supply_po_ref'] ?? '')) !== '' ? ' · ' : '' ?><?= trim((string)($c['supply_po_ref'] ?? '')) !== '' ? 'PO ' . e($c['supply_po_ref']) : '' ?></small>
+            <?php endif; ?></td>
         <td><?= e($c['client_disp'] ?: $c['client_name'] ?: '—') ?>
             <?php //  Read the RESOLVED number, falling back to the row's own copy
                   //  for any caller that has not been updated to select it. A work

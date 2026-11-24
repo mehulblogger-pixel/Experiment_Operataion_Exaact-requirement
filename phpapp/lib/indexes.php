@@ -52,6 +52,10 @@ function indexes_migrate() {
     idx_add('calls', 'ix_calls_activity','(activity_id)');
     idx_add('calls', 'ix_calls_created', '(created_at)');
     idx_add('calls', 'ix_calls_code',    '(call_code)');
+    // TPIA Phase 1 — the client's call number and the client PO on the manufacturer
+    // are searched and drive the inspection-history panel.
+    idx_add('calls', 'ix_calls_clientref', '(client_call_ref)');
+    idx_add('calls', 'ix_calls_supplypo',  '(supply_po_ref)');
 
     idx_add('jobs', 'ix_jobs_call',      '(call_id)');
     idx_add('jobs', 'ix_jobs_inspector', '(inspector_id, closed_flag)');
