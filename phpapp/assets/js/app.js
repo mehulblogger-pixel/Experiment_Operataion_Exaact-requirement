@@ -2325,3 +2325,24 @@
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, fallback); else fallback();
   });
 })();
+
+// ---- GSTIN boxes marked data-gstin-check (owner test Q-15, 23 Nov 2026) ----
+//  A pasted GSTIN can carry a no-break or zero-width space, a dash or lower case; they are
+//  dropped as you type (the server does the same), and the GSTN check character is tested
+//  at once, so a mistyped or made-up number is named before Save, not after.
+(function () {
+  var CS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  function checkChar(f) {
+    var sum = 0;
+    for (var i = 0; i < 14; i++) { var c = CS.indexOf(f.charAt(i)); if (c < 0) return ''; var p = c * (i % 2 ? 2 : 1); sum += Math.floor(p / 36) + p % 36; }
+    return CS.charAt((36 - sum % 36) % 36);
+  }
+  document.addEventListener('input', function (ev) {
+    var g = ev.target; if (!g || !g.hasAttribute || !g.hasAttribute('data-gstin-check')) return;
+    var raw = g.value || '', v = raw.toUpperCase().replace(/[^0-9A-Z]/g, '').substr(0, 15); if (v !== raw) g.value = v;
+    var hint = g.parentNode ? g.parentNode.querySelector('.gstin-hint') : null; if (!hint) return;
+    hint.textContent = !v.length ? '' : (v.length !== 15 ? 'A GSTIN is 15 characters (' + v.length + ' typed).'
+      : (checkChar(v.substr(0, 14)) === v.charAt(14) ? 'Its check character is right.'
+        : 'The last character does not match the rest — a typing mistake, or a made-up number. Copy it again from the GST certificate.'));
+  });
+})();

@@ -271,7 +271,14 @@ const GST_STATES = [
     '29'=>'Karnataka','30'=>'Goa','31'=>'Lakshadweep','32'=>'Kerala','33'=>'Tamil Nadu',
     '34'=>'Puducherry','35'=>'Andaman & Nicobar','36'=>'Telangana','37'=>'Andhra Pradesh','38'=>'Ladakh',
 ];
-function clean_gstin($g) { return strtoupper(preg_replace('/\s+/', '', trim((string)$g))); }
+//  Owner test Q-15 (23 Nov 2026): a GSTIN pasted from a certificate, an e-mail or a phone
+//  can carry a no-break space, a zero-width space or a dash that the old "remove spaces"
+//  missed, so a correct number failed. Everything that is not a letter or a digit is now
+//  dropped — a GSTIN never contains anything else.
+function clean_gstin($g) { return strtoupper(preg_replace('/[^0-9A-Za-z]+/', '', (string)$g)); }
+//  The one example GSTIN shown on screens and in messages. It is made up but passes the
+//  real check (the old examples all failed it, so copying one was refused).
+const GSTIN_EXAMPLE = '24AAACE1234F1ZC';
 function pan_from_gstin($g) {
     $g = clean_gstin($g);
     if (strlen($g) >= 12) {

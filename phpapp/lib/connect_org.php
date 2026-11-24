@@ -294,7 +294,7 @@ function connect_org_register(array $in) {
     // GSTIN when only the GSTIN was typed (invoices and the duplicate check use both).
     $gst = clean_gstin((string)($in['gstin'] ?? ''));
     if ($gst !== '' && function_exists('is_valid_gstin') && !is_valid_gstin($gst))
-        return [false, 'That GSTIN does not look right — it is 15 characters, e.g. 24ABCDE1234F1Z5. Leave it empty if you do not have one.', null];
+        return [false, 'That GSTIN does not look right — it is 15 characters, e.g. ' . GSTIN_EXAMPLE . '. Leave it empty if you do not have one.', null];
     //  Owner, 21 Nov 2026: the GSTIN's check digit is verified, as everywhere a
     //  customer is put on file (a sign-up is not yet a won customer, so the boxes
     //  stay optional here; one without them is asked at its first invoice — D3).

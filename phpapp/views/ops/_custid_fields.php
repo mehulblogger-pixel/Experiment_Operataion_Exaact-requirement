@@ -23,7 +23,7 @@ $g = (string) ($cv['gstin'] ?? '');
   </div>
   <div class="form-grid">
     <div class="ff cid-f" data-for="REGISTERED GOVT_NO_PAN"><label for="<?= e($px) ?>-gstin">GSTIN</label>
-      <input class="form-control" id="<?= e($px) ?>-gstin" name="gstin" value="<?= e($g) ?>" maxlength="15" autocomplete="off" placeholder="e.g. 24AAACT1234F1Z5" style="text-transform:uppercase"></div>
+      <input class="form-control" id="<?= e($px) ?>-gstin" name="gstin" value="<?= e($g) ?>" maxlength="20" autocomplete="off" placeholder="e.g. <?= e(GSTIN_EXAMPLE) ?>" style="text-transform:uppercase"></div>
     <div class="ff cid-f" data-for="REGISTERED UNREGISTERED GOVT_NO_PAN"><label for="<?= e($px) ?>-pan">PAN <span class="muted cid-auto" style="font-weight:400">(filled from the GSTIN)</span></label>
       <input class="form-control" id="<?= e($px) ?>-pan" name="pan" value="<?= e((string) ($cv['pan'] ?? '')) ?>" maxlength="10" autocomplete="off" placeholder="e.g. AAACT1234F" style="text-transform:uppercase"></div>
     <div class="ff cid-f" data-for="REGISTERED UNREGISTERED GOVT_NO_PAN"><label for="<?= e($px) ?>-state">State <span class="muted cid-auto" style="font-weight:400">(from the GSTIN)</span></label>
@@ -51,10 +51,20 @@ $g = (string) ($cv['gstin'] ?? '');
   }
   function fill(){
     if (!g || status() !== 'REGISTERED') { if (hint) hint.textContent = ''; return; }
-    var v = (g.value || '').toUpperCase().replace(/\s+/g, ''); g.value = v;
+    //  Owner test Q-15 (23 Nov 2026): a pasted no-break or zero-width space, a dash or a dot is
+    //  dropped here as it is on the server, and the check character is tested as you type.
+    var raw = g.value || '', v = raw.toUpperCase().replace(/[^0-9A-Z]/g, '').substr(0, 15); if (v !== raw) g.value = v;
     if (v.length >= 12) { var pan = v.substr(2, 10); if (/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan) && p) p.value = pan; }
     if (v.length >= 2 && s && states[v.substr(0, 2)]) s.value = states[v.substr(0, 2)];
-    if (hint) hint.textContent = v.length && v.length !== 15 ? 'A GSTIN is 15 characters (' + v.length + ' typed).' : (v.length === 15 ? 'PAN and state filled from the GSTIN. The check digit is verified when you save.' : '');
+    if (hint) hint.textContent = v.length && v.length !== 15 ? 'A GSTIN is 15 characters (' + v.length + ' typed).'
+      : (v.length === 15 ? (checkChar(v.substr(0, 14)) === v.charAt(14) ? 'PAN and state filled from the GSTIN. Its check character is right.'
+        : 'The last character does not match the rest — a typing mistake, or a made-up number. Copy it again from the GST certificate.') : '');
+  }
+  //  The GSTN check character (the same sum as commercial_gstin_check_char() on the server).
+  function checkChar(f){
+    var cs = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ', sum = 0;
+    for (var i = 0; i < 14; i++) { var c = cs.indexOf(f.charAt(i)); if (c < 0) return ''; var p = c * (i % 2 ? 2 : 1); sum += Math.floor(p / 36) + p % 36; }
+    return cs.charAt((36 - sum % 36) % 36);
   }
   box.querySelectorAll('[name=tax_status]').forEach(function(r){ r.addEventListener('change', sync); });
   if (g) g.addEventListener('input', fill);

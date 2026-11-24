@@ -54,7 +54,7 @@ $mv = !empty($pp['parent_id']) ? custid_move_preview((int) $pp['id']) : null;
     <details style="margin-top:10px"><summary class="btn small">+ Add a billing location (another state)</summary>
       <form method="post" action="/partner-billing-location?id=<?= (int) $pp['id'] ?>" class="inline-add" style="margin-top:8px">
         <input type="hidden" name="do" value="add">
-        <div class="ff"><label for="bl-gstin">GSTIN in that state</label><input class="form-control" id="bl-gstin" name="gstin" maxlength="15" required placeholder="e.g. 27<?= e($pp['pan'] ?: 'AAACT1234F') ?>1ZX" style="text-transform:uppercase"></div>
+        <div class="ff"><label for="bl-gstin">GSTIN in that state</label><input class="form-control" id="bl-gstin" name="gstin" maxlength="20" required data-gstin-check autocomplete="off" placeholder="state code + <?= e($pp['pan'] ?: 'the PAN') ?> + 3 characters" title="Copy it from that state's GST certificate — the last character is a check, so a made-up number is refused" style="text-transform:uppercase"><span class="ff-help gstin-hint" aria-live="polite"></span></div>
         <div class="ff"><label for="bl-label">Name</label><input class="form-control" id="bl-label" name="label" maxlength="150" placeholder="e.g. Mumbai plant"></div>
         <div class="ff"><label for="bl-line1">Billing address</label><input class="form-control" id="bl-line1" name="line1" maxlength="255"></div>
         <div class="ff"><label for="bl-city">City</label><input class="form-control" id="bl-city" name="city" maxlength="120"></div>

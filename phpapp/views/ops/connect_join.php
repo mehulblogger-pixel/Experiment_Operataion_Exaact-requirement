@@ -69,7 +69,7 @@ $modLabel = ['operations'=>'Operations','admin'=>'Admin','sales'=>'Sales/CRM','r
       <label style="margin-top:0">Your organisation's name</label>
       <input name="name" required autofocus placeholder="e.g. Zephyr Inspection Services">
       <label>GSTIN <span style="font-weight:400;color:var(--muted)">— optional</span></label>
-      <input name="gstin" maxlength="15" autocapitalize="characters" placeholder="e.g. 24ABCDE1234F1Z5" value="<?= e($_POST['gstin'] ?? '') ?>">
+      <input name="gstin" maxlength="20" autocapitalize="characters" placeholder="e.g. <?= e(GSTIN_EXAMPLE) ?>" value="<?= e($_POST['gstin'] ?? '') ?>">
       <label>PAN <span style="font-weight:400;color:var(--muted)">— optional, filled from the GSTIN if you give one</span></label>
       <input name="pan" maxlength="10" autocapitalize="characters" placeholder="e.g. ABCDE1234F" value="<?= e($_POST['pan'] ?? '') ?>">
     </div>

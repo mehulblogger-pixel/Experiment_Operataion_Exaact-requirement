@@ -77,7 +77,7 @@ function custid_gstin_problem($g) {
     $g = clean_gstin($g);
     if ($g === '') return 'Enter the GSTIN.';
     if (function_exists('commercial_gstin_problem')) return commercial_gstin_problem($g);
-    return is_valid_gstin($g) ? '' : 'A GSTIN is 15 characters, like 24AAACE1234F1Z5 — please check it.';
+    return is_valid_gstin($g) ? '' : 'A GSTIN is 15 characters, like ' . GSTIN_EXAMPLE . ' — please check it.';
 }
 // A government department's GSTIN can be issued on its TAN rather than a PAN,
 // so only the length, the state code and the check digit are asked of it.

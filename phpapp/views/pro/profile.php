@@ -100,7 +100,7 @@
     </label>
     <div id="gstinBlk" class="<?= $gstReg ? '' : 'hide' ?>">
       <label for="f-gstin">Your GSTIN</label>
-      <input id="f-gstin" name="gstin" value="<?= e($me['gstin'] ?? '') ?>" placeholder="e.g. 24ABCDE1234F1Z5" maxlength="15" style="text-transform:uppercase">
+      <input id="f-gstin" name="gstin" value="<?= e($me['gstin'] ?? '') ?>" placeholder="e.g. <?= e(GSTIN_EXAMPLE) ?>" maxlength="20" style="text-transform:uppercase">
     </div>
     <label for="f-pan">PAN <span class="muted" style="font-weight:400">(optional — used for TDS)</span></label>
     <input id="f-pan" name="pan" value="<?= e($me['pan'] ?? '') ?>" placeholder="e.g. ABCDE1234F" maxlength="10" style="text-transform:uppercase">

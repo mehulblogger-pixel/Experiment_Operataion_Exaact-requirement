@@ -153,7 +153,7 @@ function commercial_tax_split(array $t, $pos) {
 function commercial_gstin_problem($g) {
     $g = function_exists('clean_gstin') ? clean_gstin((string) $g) : strtoupper(trim((string) $g));
     if (!preg_match('/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/', $g))
-        return 'A GSTIN is 15 characters, like 24AAACE1234F1Z5 — please check it.';
+        return 'A GSTIN is 15 characters, like ' . GSTIN_EXAMPLE . ' — please check it.';
     if (defined('GST_STATES') && !isset(GST_STATES[substr($g, 0, 2)]))
         return 'The GSTIN\'s first two digits are not an Indian state code.';
     if (commercial_gstin_check_char(substr($g, 0, 14)) !== $g[14])

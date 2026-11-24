@@ -76,7 +76,7 @@ function connect_pro_migrate() {
  * a typo becoming a wrong number on an invoice. Empty is treated as "not provided".
  */
 function connect_pro_gstin_valid($gstin) {
-    $g = strtoupper(trim((string)$gstin));
+    $g = clean_gstin((string)$gstin);
     return $g !== '' && (bool)preg_match('/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][0-9A-Z]Z[0-9A-Z]$/', $g);
 }
 /** Validate the FORMAT of a PAN (AAAAA9999A). Empty = not provided. */
@@ -95,11 +95,11 @@ function connect_pro_tax_save($id, array $in) {
     connect_pro_migrate();
     $id = (int)$id; if ($id <= 0) return [false, 'Unknown professional.'];
     $status = strtoupper(trim((string)($in['gst_status'] ?? 'UNREGISTERED'))) === 'REGISTERED' ? 'REGISTERED' : 'UNREGISTERED';
-    $gstin = strtoupper(trim((string)($in['gstin'] ?? '')));
+    $gstin = clean_gstin((string)($in['gstin'] ?? ''));
     $pan   = strtoupper(trim((string)($in['pan'] ?? '')));
     if ($pan !== '' && !connect_pro_pan_valid($pan)) return [false, 'That PAN does not look right — it should be like AAAAA9999A.'];
     if ($status === 'REGISTERED') {
-        if (!connect_pro_gstin_valid($gstin)) return [false, 'A registered professional needs a valid 15-character GSTIN (e.g. 24ABCDE1234F1Z5).'];
+        if (!connect_pro_gstin_valid($gstin)) return [false, 'A registered professional needs a valid 15-character GSTIN (e.g. ' . GSTIN_EXAMPLE . ').'];
         // The PAN sits inside the GSTIN (chars 3–12); offer it back if not separately given.
         if ($pan === '') $pan = substr($gstin, 2, 10);
     } else {

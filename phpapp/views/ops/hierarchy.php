@@ -325,7 +325,7 @@
           <div class="ff ff-wide"><label>Address</label><input class="form-control" name="o_address" value="<?= e($o['address'] ?? '') ?>"></div>
           <div class="ff"><label>Phone</label><input class="form-control" name="o_phone" value="<?= e($o['phone'] ?? '') ?>"></div>
           <div class="ff"><label>Branch GSTIN <span class="muted">(optional)</span></label>
-            <input class="form-control" name="o_gstin" maxlength="15" value="<?= e($o['gstin'] ?? '') ?>" placeholder="e.g. 27ABCDE1234F1Z5" style="text-transform:uppercase">
+            <input class="form-control" name="o_gstin" maxlength="20" value="<?= e($o['gstin'] ?? '') ?>" placeholder="e.g. <?= e(GSTIN_EXAMPLE) ?>" style="text-transform:uppercase">
             <small class="muted">Only if this branch has its own GST registration. Empty = it bills under its parent branch's GSTIN, else the company's.</small></div>
           <div class="ff"><label>Order on the chart</label><input class="form-control" name="o_sort" type="number" value="<?= (int)($o['sort_order'] ?? 0) ?>"></div>
           <div class="ff ff-check"><label class="chk"><input type="checkbox" name="o_active" value="1"<?= (int)($o['is_active'] ?? 1) ? ' checked' : '' ?>> Active</label></div>

@@ -41,12 +41,15 @@
   <?php if ($salesView): $owedOn = false; foreach ($salesCols as $sc) if ($sc['owed'] !== null) { $owedOn = true; break; } ?>
   <tr><th>Name</th><th>State</th><th>GSTIN</th><th class="n">Open deals</th><th class="n">Open pipeline</th><th class="n">Won this FY</th><?php if ($owedOn): ?><th class="n">Owed to us</th><?php endif; ?><th>Last contact</th><th>Contact</th><th></th></tr>
   <?php foreach ($rows as $p): $sc = $salesCols[(int) $p['id']] ?? ['deals' => 0, 'pipe' => 0, 'won' => 0, 'owed' => null, 'touch' => '', 'contact' => '', 'phone' => ''];
-        $g = strtoupper(trim((string) ($p['gstin'] ?? ''))); $gOk = $g === '' ? null : (bool) preg_match('/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/', $g);
+        //  Owner test J1-05 (23 Nov 2026): this column showed only "✓ valid", so a GSTIN that was
+        //  saved looked missing. It now shows the number itself, checked with the real check
+        //  character (the shape alone passed mistyped numbers).
+        $g = clean_gstin((string) ($p['gstin'] ?? '')); $gOk = $g === '' ? null : (function_exists('commercial_gstin_problem') ? commercial_gstin_problem($g) === '' : is_valid_gstin($g));
         $idle = $sc['touch'] !== '' ? sx_days_since($sc['touch']) : null; ?>
   <tr>
     <td><a href="/partner?id=<?= (int)$p['id'] ?>"><b><?= e(partner_name($p)) ?></b></a><br><span class="muted" style="font-size:12px"><?= e($p['code']) ?> · <?= e(roles_label($p)) ?></span></td>
     <td><?= e(($p['state'] ?? '') ?: '—') ?></td>
-    <td><?= $gOk === null ? '<span class="muted">—</span>' : ($gOk ? '<span class="badge GREEN" title="' . e($g) . '">✓ valid</span>' : '<span class="badge RED" title="' . e($g) . '">check</span>') ?></td>
+    <td><?= $gOk === null ? '<span class="muted">—</span>' : ('<span style="font-family:var(--mono,monospace);white-space:nowrap">' . e($g) . '</span> ' . ($gOk ? '<span class="badge GREEN" title="Its check character is right">✓</span>' : '<span class="badge RED" title="Its last character does not match the rest — check it against the GST certificate">check</span>')) ?></td>
     <td class="n"><?= $sc['deals'] ? '<a href="/customer?id=' . (int) $p['id'] . '" title="Open the customer 360">' . (int) $sc['deals'] . '</a>' : '—' ?></td>
     <td class="n"><?= $sc['pipe'] > 0 ? e(sx_short($sc['pipe'])) : '—' ?></td>
     <td class="n"><?= $sc['won'] > 0 ? '<span class="badge GREEN">' . e(sx_short($sc['won'])) . '</span>' : '—' ?></td>

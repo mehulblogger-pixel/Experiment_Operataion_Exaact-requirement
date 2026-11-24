@@ -109,9 +109,9 @@ function person_quick_create($name, $email = '', $designation = '', $officeId = 
 //  '' when the GSTIN typed for a branch is acceptable (empty is: the branch then bills under its
 //  parent's or the company's registration), else the plain reason it is not.
 function office_gstin_problem($gstin) {
-    $g = strtoupper(preg_replace('/\s+/', '', (string)$gstin));
+    $g = clean_gstin((string)$gstin);
     if ($g === '') return '';
-    if (!preg_match('/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/', $g)) return 'That GSTIN does not look right — it is 15 characters, e.g. 27ABCDE1234F1Z5.';
+    if (!preg_match('/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/', $g)) return 'That GSTIN does not look right — it is 15 characters, e.g. ' . GSTIN_EXAMPLE . '.';
     if (defined('GST_STATE_CODES') && !isset(GST_STATE_CODES[substr($g, 0, 2)])) return 'Its first two digits (' . substr($g, 0, 2) . ') are not an Indian state code.';
     $co = strtoupper(preg_replace('/\s+/', '', (string)(function_exists('setting_get') ? setting_get('company_gstin', '') : '')));
     if (strlen($co) === 15 && substr($co, 2, 10) !== substr($g, 2, 10))
@@ -1225,7 +1225,7 @@ function ops_hierarchy_screen($method) {
             if (array_key_exists('o_gstin', $_POST) && $id) {
                 $gErr = office_gstin_problem((string)$_POST['o_gstin']);
                 if ($gErr !== '') flash($gErr . ' The branch GSTIN was not saved; everything else was.', 'warning');
-                else db()->prepare("UPDATE offices SET gstin=? WHERE id=?")->execute([strtoupper(preg_replace('/\s+/', '', (string)$_POST['o_gstin'])), $id]);
+                else db()->prepare("UPDATE offices SET gstin=? WHERE id=?")->execute([clean_gstin((string)$_POST['o_gstin']), $id]);
             }
 
         } elseif ($do === 'office-move') {                  // one-click re-parent

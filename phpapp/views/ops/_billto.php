@@ -19,8 +19,8 @@ $ip = 'width:100%;padding:9px 10px;border:1px solid var(--line,#e5e7eb);border-r
       <input id="bt-name" name="billto_name" value="<?= $e($bt['name']) ?>" maxlength="200" required style="<?= $ip ?>"></div>
     <?php if ($gstOn): ?>
     <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px" for="bt-gstin">GSTIN <span class="sub" style="font-weight:400">— to claim input tax credit</span></label>
-      <input id="bt-gstin" name="billto_gstin" value="<?= $e($bt['gstin']) ?>" maxlength="15" autocomplete="off" placeholder="leave blank if not registered"
-             pattern="[0-9]{2}[A-Za-z]{5}[0-9]{4}[A-Za-z][1-9A-Za-z][Zz][0-9A-Za-z]" title="15 characters, like 24AAACE1234F1Z5" style="<?= $ip ?>;text-transform:uppercase"></div>
+      <input id="bt-gstin" name="billto_gstin" value="<?= $e($bt['gstin']) ?>" maxlength="20" autocomplete="off" placeholder="leave blank if not registered"
+             pattern="\s*[0-9]{2}[A-Za-z]{5}[0-9]{4}[A-Za-z][1-9A-Za-z][Zz][0-9A-Za-z]\s*" title="15 characters, like <?= e(GSTIN_EXAMPLE) ?>" style="<?= $ip ?>;text-transform:uppercase"></div>
     <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:3px" for="bt-state">State <span class="sub" style="font-weight:400">— taken from the GSTIN when given</span></label>
       <select id="bt-state" name="billto_state" style="<?= $ip ?>">
         <option value="">— choose —</option>
