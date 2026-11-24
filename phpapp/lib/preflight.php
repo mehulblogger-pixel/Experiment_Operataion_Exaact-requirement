@@ -22,8 +22,8 @@
 
 // Bump on every release. Date-based: a support call quotes it and the date is
 // immediately meaningful, which "2.14.3" is not to the person reading it out.
-const APP_VERSION = '2026.11.2';
-const APP_VERSION_DATE = '2026-11-24';
+const APP_VERSION = '2026.11.3';
+const APP_VERSION_DATE = '2026-11-25';
 
 // [key, label, required?, what you lose without it]
 function preflight_checks() {
