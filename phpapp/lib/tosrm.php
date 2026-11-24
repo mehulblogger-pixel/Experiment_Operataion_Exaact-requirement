@@ -699,6 +699,17 @@ function ops_tosrm_action($route, $method) {
 
 const TOSRM_ASSIGN_STATES = ['TENTATIVE'=>'Tentative (held)','CONFIRMED'=>'Confirmed','RELEASED'=>'Released'];
 const TOSRM_ACCEPT_STATES = ['PENDING'=>'Awaiting acceptance','ACCEPTED'=>'Accepted','DECLINED'=>'Declined','CLARIFY'=>'Clarification requested','REPLACE'=>'Replacement requested'];
+// Stage 1 B4 — who is on a register row, in words: the person, else the sub-contractor
+// firm, tagged External when the company does not control their diary.
+function tosrm_resource_label($r) {
+    $name = trim((string) ($r['inspector_name'] ?? ''));
+    $ext  = in_array(strtoupper((string) ($r['staff_kind'] ?? '')), ['FREELANCER', 'SUBCON'], true);
+    if ($name === '' && trim((string) ($r['subcon_agency'] ?? '')) !== '') { $name = trim((string) $r['subcon_agency']); $ext = true; }
+    if ($name === '') return 'Unassigned';
+    return $name . ($ext ? ' · External' : '');
+}
+function tosrm_assign_label($code) { $c = strtoupper((string) $code); return $c === '' ? '—' : (TOSRM_ASSIGN_STATES[$c] ?? $c); }
+function tosrm_accept_label($code) { $c = strtoupper((string) $code); return $c === '' ? '—' : (TOSRM_ACCEPT_STATES[$c] ?? $c); }
 const TOSRM_NOSHOW_PARTIES = ['CLIENT'=>'Client','VENDOR'=>'Vendor','RESOURCE'=>'Resource','OTHER'=>'Other'];
 // Who called a cancellation off — so client-driven and office-driven cancellations
 // can be told apart on the disruptions scoreboard.
@@ -2055,11 +2066,13 @@ function tosrm_schedule_register($offices = 'ALL', $from = null, $to = null) {
     $from = $from ?: date('Y-m-d'); $to = $to ?: date('Y-m-d', strtotime($from . ' +13 days'));
     $w = tosrm_call_office_sql($offices, 'c');
     return ops_all("SELECT j.id job_id, j.job_code, j.scheduled_date, j.stage, j.assign_state, j.accept_state,
+                           j.closed_flag, j.inspector_id, j.subcon_id,
                            c.id call_id, c.call_code, c.inspection_type, bp.display_name client_name,
-                           i.name inspector_name
+                           i.name inspector_name, i.staff_kind, s.agency subcon_agency
                     FROM jobs j JOIN calls c ON c.id=j.call_id
                     LEFT JOIN business_partners bp ON bp.id=c.client_id
                     LEFT JOIN inspectors i ON i.id=j.inspector_id
+                    LEFT JOIN subcons s ON s.id=j.subcon_id
                     WHERE j.scheduled_date>=? AND j.scheduled_date<=? AND $w
                     ORDER BY j.scheduled_date, j.id", [$from, $to]) ?: [];
 }
@@ -2067,11 +2080,14 @@ function tosrm_assignment_register($offices = 'ALL', $limit = 200) {
     tosrm_migrate_d();
     $w = tosrm_call_office_sql($offices, 'c');
     return ops_all("SELECT j.id job_id, j.job_code, j.scheduled_date, j.assign_state, j.accept_state, j.accept_reason,
-                           c.call_code, c.inspection_type, bp.display_name client_name, i.name inspector_name
+                           j.inspector_id, j.subcon_id,
+                           c.call_code, c.inspection_type, bp.display_name client_name, i.name inspector_name, i.staff_kind,
+                           s.agency subcon_agency
                     FROM jobs j JOIN calls c ON c.id=j.call_id
                     LEFT JOIN business_partners bp ON bp.id=c.client_id
                     LEFT JOIN inspectors i ON i.id=j.inspector_id
-                    WHERE j.inspector_id IS NOT NULL AND $w
+                    LEFT JOIN subcons s ON s.id=j.subcon_id
+                    WHERE (j.inspector_id IS NOT NULL OR j.subcon_id IS NOT NULL) AND $w
                     ORDER BY j.id DESC LIMIT " . (int)$limit) ?: [];
 }
 

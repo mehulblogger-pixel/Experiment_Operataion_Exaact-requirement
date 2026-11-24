@@ -115,3 +115,31 @@ unit). The inspector's tiles count only that inspector's own jobs.
   - The Backlog tab and the Ops desk list open jobs whose report frequency is blank or not on the list (e.g. the demo's "SINGLE"). A person corrects them.
   - Nothing is changed automatically.
   - Until corrected, "Reports to write" leaves those jobs out.
+
+## One resource classification (B4)
+
+Helper: `res_class()` in `lib/workforce.php`. It uses the three existing fields
+(person type, whose roll, team role). Nothing new is stored.
+
+| Group | Who | Counted as free capacity? |
+|---|---|---|
+| In-house | Our people on our own roll | Yes |
+| Agency payroll | Our people paid through an agency | Yes (company-controlled) |
+| External | Freelancers and sub-contractors | **No.** Listed under "External — confirm with agency" on the availability page. |
+
+**Resources** are the field team plus coordinators. Office staff are not
+listed as free on the availability board, the scheduling board, the capacity
+outlook or "who else could take this date". The allocate picker is unchanged:
+everyone stays deputable there.
+
+**Declined or released work:**
+- a declined assignment, a released hold or a cancelled assignment no longer makes the person busy;
+- the work order returns to "No engineer yet".
+
+**Registers:**
+- the schedule register, the assignment register and the jobs register name the sub-contractor firm, tagged "External";
+- hold and acceptance show their labels (e.g. "Declined"), not codes.
+
+**Agency-staff roster** now also lists agency-payroll staff.
+
+**Data health:** an external person also marked "own roll" shows a *check* tag. Nothing is changed automatically.

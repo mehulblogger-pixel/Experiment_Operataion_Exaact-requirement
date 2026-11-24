@@ -246,6 +246,21 @@
   <?php endforeach; ?>
 <?php endif; ?>
 
+<?php // Stage 1 B4 — external people in their own group, never counted as free. ?>
+<?php if (!empty($external)): ?>
+<div class="card" style="margin-top:14px">
+  <h3 style="margin:0 0 4px">External — confirm with agency <span class="muted" style="font-size:13px">(<?= count($external) ?>)</span></h3>
+  <p class="muted" style="margin:0 0 8px;font-size:12.5px">Freelancers and sub-contractors. Their diary is not ours, so they are not counted as free above — ask the agency before booking.</p>
+  <ul style="margin:0;padding-left:18px">
+    <?php foreach ($external as $x): ?>
+      <li><?= e($x['name']) ?><?= ($x['agency_name'] ?? '') !== '' ? ' <span class="muted">· ' . e($x['agency_name']) . '</span>' : '' ?>
+        <span class="pill p-mut" style="margin-left:4px"><?= e(res_class($x)['label']) ?></span>
+        <?php if (strtoupper((string)($x['roll_type'] ?? '')) === 'OWN'): ?><span class="pill p-warn" title="Data health: an external person is also marked &quot;own roll&quot; — correct one of the two on the person's record. Nothing is changed automatically.">check: also marked own roll</span><?php endif; ?></li>
+    <?php endforeach; ?>
+  </ul>
+</div>
+<?php endif; ?>
+
 <form id="av-post" method="post" action="/availability?day=<?= e($day) ?>" style="display:none">
   <input type="hidden" name="inspector_id" id="av-post-id">
   <input type="hidden" name="status" id="av-post-status">

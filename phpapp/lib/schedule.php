@@ -517,7 +517,8 @@ function inspector_busy_on($inspectorId, $date, $exceptJobId = 0) {
         foreach (ops_all("SELECT id, job_code, engagement_type, days_count, months_count, pattern_kind,
                                  pattern_n, schedule_weekdays, schedule_end_date, inspection_dates,
                                  scheduled_date, inspection_start_date, inspection_end_date, executing_office_id
-                          FROM jobs WHERE inspector_id=? AND id<>? AND COALESCE(closed_flag,0)=0",
+                          FROM jobs WHERE inspector_id=? AND id<>? AND COALESCE(closed_flag,0)=0"
+                          . (function_exists('res_job_holds_sql') ? " AND " . res_job_holds_sql() : ''),
                          [$inspectorId, (int)$exceptJobId]) as $j) {
             $r = sched_resolve($j, $j['executing_office_id'] ?? null);
             if (in_array($date, $r['dates'], true)) return 'already on ' . $j['job_code'];
@@ -549,6 +550,9 @@ function sched_availability($dates, $inspectorId, $exceptJobId = 0, $officeId = 
 // Offered rather than imposed: the coordinator knows things the system does not.
 function sched_alternatives($date, $officeId = null, $sbu = '', $limit = 6) {
     $w = ["COALESCE(status,'ACTIVE') = 'ACTIVE'"];
+    //  Stage 1 B4 — the one classification (lib/workforce.php): field team + coordinators,
+    //  company-controlled. An external person is confirmed with the agency, not offered as free.
+    if (function_exists('res_company_sql')) { $w[] = res_company_sql(); $w[] = res_resource_sql(); }
     $a = [];
     if ($officeId) { $w[] = "home_office_id = ?"; $a[] = (int)$officeId; }
     $rows = [];

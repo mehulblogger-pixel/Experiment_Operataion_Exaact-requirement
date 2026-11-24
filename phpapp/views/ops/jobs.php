@@ -93,7 +93,7 @@
       <tr>
         <td><a href="/job?id=<?= (int)$j['id'] ?>"><b><?= e($j['job_code']) ?></b></a></td>
         <td><?= e($j['client_disp'] ?: $j['client_name'] ?: '—') ?></td>
-        <td><?= $j['inspector_name'] ? e($j['inspector_name']) : '<span class="muted">—</span>' ?></td>
+        <td><?php $rl = function_exists('tosrm_resource_label') ? tosrm_resource_label($j) : ($j['inspector_name'] ?: 'Unassigned'); ?><?= $rl !== 'Unassigned' ? e($rl) : '<span class="muted">—</span>' ?></td>
         <td><?= $j['scheduled_date'] ? ($overdue ? '<span class="down" style="font-weight:600">'.e($j['scheduled_date']).'</span>' : e($j['scheduled_date'])) : '<span class="muted">—</span>' ?></td>
         <?php if ($seeCredit): ?><td class="num"><?= $j['expected_credit'] ? fmoney($j['expected_credit']) : '<span class="muted">—</span>' ?></td><?php endif; ?>
         <td class="num"><?= $j['tat_days']===null ? '<span class="muted">—</span>' : (int)$j['tat_days'].'d' ?></td>

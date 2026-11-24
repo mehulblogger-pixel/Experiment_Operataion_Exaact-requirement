@@ -75,9 +75,9 @@
         <td><a href="/job?id=<?= (int)$s['job_id'] ?>#assign"><?= e($s['job_code']) ?></a></td>
         <td><?= e($s['client_name'] ?: '—') ?></td>
         <td><?= e(INSPECTION_TYPES[$s['inspection_type']] ?? $s['inspection_type']) ?></td>
-        <td><?= e($s['inspector_name'] ?: 'Unassigned') ?></td>
-        <td><?= e($s['assign_state'] ?: '—') ?></td>
-        <td><?= e($s['accept_state'] ?: '—') ?></td>
+        <td><?= e(function_exists('tosrm_resource_label') ? tosrm_resource_label($s) : ($s['inspector_name'] ?: 'Unassigned')) ?></td>
+        <td><?= e(function_exists('tosrm_assign_label') ? tosrm_assign_label($s['assign_state'] ?? '') : ($s['assign_state'] ?: '—')) ?></td>
+        <td><?= e(function_exists('tosrm_accept_label') ? tosrm_accept_label($s['accept_state'] ?? '') : ($s['accept_state'] ?: '—')) ?></td>
         <td><span class="badge"><?= e(function_exists('job_stage_label') ? job_stage_label($s) : '') ?></span></td>
       </tr>
     <?php endforeach; ?>

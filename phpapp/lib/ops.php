@@ -8908,8 +8908,9 @@ function ops_jobs($route, $method) {
             . "(CASE WHEN " . opk_job_live_sql('j') . " THEN 0 ELSE 1 END) opk_cancelled, "
             : '';
         $rows = ops_all("SELECT j.*, $opkJ c.call_code, bp.legal_name client_name, bp.display_name client_disp,
-            i.name inspector_name FROM jobs j LEFT JOIN calls c ON c.id=j.call_id
+            i.name inspector_name, i.staff_kind, sc.agency subcon_agency FROM jobs j LEFT JOIN calls c ON c.id=j.call_id
             LEFT JOIN business_partners bp ON bp.id=c.client_id LEFT JOIN inspectors i ON i.id=j.inspector_id
+            LEFT JOIN subcons sc ON sc.id=j.subcon_id
             WHERE $where ORDER BY j.id DESC", $args);
         if (wants_csv()) {
             $seeCredit = can('data.credit'); $today = date('Y-m-d');
