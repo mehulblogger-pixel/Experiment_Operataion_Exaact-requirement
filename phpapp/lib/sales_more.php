@@ -112,7 +112,11 @@ function sx_add_working_days($n, $officeId = null, $from = null) {
 // ---- Quick new lead ----------------------------------------------------------
 //  Possible duplicates by name (the lead register's own check) and by mobile
 //  (an open lead or any firm's contact with the same last 10 digits).
-function sx_lead_dupes($company, $phone) {
+//  $exceptPartnerId — the client the lead is being raised for. Owner test LF-01 (23 Nov 2026):
+//  picking an existing client and typing its own contact's mobile was flagged as "a contact
+//  with this mobile at <that same client>", so "Save anyway" was needed for an ordinary lead.
+//  That client's own contacts are no longer counted; contacts at OTHER firms still are.
+function sx_lead_dupes($company, $phone, $exceptPartnerId = 0) {
     $out = [];
     $hit = function_exists('lead_possible_duplicate') ? lead_possible_duplicate($company) : null;
     if ($hit) {
@@ -129,7 +133,7 @@ function sx_lead_dupes($company, $phone) {
                     $out[] = ['text' => 'An open lead with this mobile: ' . $l['ref'] . ' — ' . $l['company_name'], 'url' => '/lead?id=' . (int) $l['id']];
         } catch (Throwable $e) {}
         if (function_exists('partner_contact_clash'))
-            foreach (partner_contact_clash($phone, '', 0) as $txt) $out[] = ['text' => 'A contact with this mobile at ' . $txt, 'url' => ''];
+            foreach (partner_contact_clash($phone, '', (int) $exceptPartnerId) as $txt) $out[] = ['text' => 'A contact with this mobile at ' . $txt, 'url' => ''];
     }
     return array_slice($out, 0, 6);
 }

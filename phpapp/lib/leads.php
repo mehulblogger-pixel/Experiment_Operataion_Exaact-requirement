@@ -709,7 +709,7 @@ function lead_form_dupes(array $b) {
         if ($bp) $company = (string)($bp['display_name'] ?: $bp['legal_name']);
     }
     if ($company === '' && $phone === '') return [];
-    $out = sx_lead_dupes($company, $phone);
+    $out = sx_lead_dupes($company, $phone, $pid);
     if ($pid) {
         $out = array_values(array_filter($out, fn($d) => strpos((string)$d['url'], '/partner?id=' . $pid) === false));
         foreach (leads_try(fn() => ops_all("SELECT id, ref, company_name FROM leads WHERE status='OPEN' AND partner_id=? LIMIT 3", [$pid]), []) ?: [] as $l) {
