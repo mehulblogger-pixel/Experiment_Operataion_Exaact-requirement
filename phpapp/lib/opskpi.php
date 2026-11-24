@@ -185,7 +185,7 @@ function opk_freq_health_html() {
         . ' <span class="muted">(' . e(($j['reporting_frequency'] ?? '') !== '' ? $j['reporting_frequency'] : 'blank') . ')</span>';
     return '<p class="msg msg-warning" style="margin:0 0 12px;font-size:13px"><b>Data health:</b> ' . (int) $h['n']
          . ' open job' . ($h['n'] === 1 ? '' : 's') . ' with a report frequency that is not on the list — open each and pick one'
-         . ' (until then "Reports to write" leaves them out): ' . implode(', ', $links) . ($h['n'] > count($h['jobs']) ? ' …' : '') . '</p>';
+         . ' (until then a blank one is not counted in "Reports to write"; any other value is counted as needing a report): ' . implode(', ', $links) . ($h['n'] > count($h['jobs']) ? ' …' : '') . '</p>';
 }
 
 // Where each card opens: the register, filtered by the same predicate.

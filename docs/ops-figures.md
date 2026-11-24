@@ -114,7 +114,7 @@ unit). The inspector's tiles count only that inspector's own jobs.
 - **Data health.**
   - The Backlog tab and the Ops desk list open jobs whose report frequency is blank or not on the list (e.g. the demo's "SINGLE"). A person corrects them.
   - Nothing is changed automatically.
-  - Until corrected, "Reports to write" leaves those jobs out.
+  - Until corrected, a blank frequency is not counted in "Reports to write", and any other unknown value is counted as needing a report.
 
 ## One resource classification (B4)
 
