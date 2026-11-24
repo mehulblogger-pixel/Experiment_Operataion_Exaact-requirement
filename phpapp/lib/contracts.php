@@ -1015,7 +1015,8 @@ function contract_last_activity_date($c) {
 function contract_pending_summary($c) {
     $no = (string)$c['contract_number']; if ($no === '') return ''; $bits = [];
     try {
-        $openCalls = (int)ops_val("SELECT COUNT(*) FROM calls WHERE contract_number=? AND COALESCE(status,'') NOT IN ('CLOSED','CANCELLED','COMPLETED')", [$no]);
+        $openCalls = (int)ops_val("SELECT COUNT(*) FROM calls c WHERE c.contract_number=? AND COALESCE(c.status,'') NOT IN ('CLOSED','CANCELLED','COMPLETED')"
+            . (function_exists('opk_call_live_sql') ? " AND " . opk_call_live_sql('c') : ''), [$no]);   // Stage 1 B2: lifecycle status too
         if ($openCalls) $bits[] = $openCalls . ' open ' . Tlp('call');
     } catch (Throwable $e) {}
     try {

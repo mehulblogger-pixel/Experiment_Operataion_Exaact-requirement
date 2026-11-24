@@ -77,7 +77,7 @@
         <td><?= e($s['inspector_name'] ?: 'Unassigned') ?></td>
         <td><?= e($s['assign_state'] ?: '—') ?></td>
         <td><?= e($s['accept_state'] ?: '—') ?></td>
-        <td><span class="badge"><?= e(lk_options_or('job_stage', JOB_STAGES)[$s['stage'] ?? ''] ?? ($s['stage'] ?? '')) ?></span></td>
+        <td><span class="badge"><?= e(function_exists('job_stage_label') ? job_stage_label($s) : '') ?></span></td>
       </tr>
     <?php endforeach; ?>
     <?php if (!$schedule): ?><tr><td colspan="8">No scheduled work in this window.</td></tr><?php endif; ?>

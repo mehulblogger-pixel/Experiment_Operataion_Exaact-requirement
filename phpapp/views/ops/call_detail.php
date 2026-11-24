@@ -328,7 +328,7 @@
   // Assignment confirmation banner (executing branch has allocated an inspector)
   $engKind = ['ASSET'=>'own employee','FREELANCER'=>'freelancer','SUBCON'=>'sub-contractor'];
   foreach ($jobs as $aj) { if ($aj['inspector_name'] && $aj['scheduled_date']): ?>
-    <div class="msg msg-success" data-tab="Overview">✅ Call assigned to <strong><?= e($aj['inspector_name']) ?></strong> for <strong><?= e($aj['scheduled_date']) ?></strong> — engineer is <?= e($engKind[$aj['staff_kind'] ?? 'ASSET'] ?? 'own employee') ?><?= $aj['subcon_agency'] ? ' (' . e($aj['subcon_agency']) . ')' : '' ?>. Job <?= e($aj['job_code']) ?>, stage: <?= e(lk_options_or('job_stage', JOB_STAGES)[$aj['stage'] ?? 'ALLOCATED'] ?? '') ?>.</div>
+    <div class="msg msg-success" data-tab="Overview">✅ Call assigned to <strong><?= e($aj['inspector_name']) ?></strong> for <strong><?= e($aj['scheduled_date']) ?></strong> — engineer is <?= e($engKind[$aj['staff_kind'] ?? 'ASSET'] ?? 'own employee') ?><?= $aj['subcon_agency'] ? ' (' . e($aj['subcon_agency']) . ')' : '' ?>. Job <?= e($aj['job_code']) ?>, stage: <?= e(function_exists('job_stage_label') ? job_stage_label($aj) : '') ?>.</div>
   <?php endif; } ?>
 <?php // Phase 9 (TOSRM) — the coordinator/manager console: order playbook plus the
       // service-request panel (status lifecycle, priority/criticality/source,
@@ -360,7 +360,7 @@
     <td><?= e($j['inspector_name'] ?: ($j['subcon_agency'] ?: '—')) ?></td>
     <td><?= e($engKind[$j['staff_kind'] ?? 'ASSET'] ?? '—') ?></td>
     <td><?= e($j['scheduled_date'] ?: '—') ?></td>
-    <td><span class="badge <?= ($j['stage']??'')==='CLOSED'?'GREEN':'AMBER' ?>"><?= e(lk_options_or('job_stage', JOB_STAGES)[$j['stage'] ?? 'ALLOCATED'] ?? '') ?></span></td>
+    <?php $jsk = function_exists('job_stage_key') ? job_stage_key($j) : ''; ?><td><span class="badge <?= $jsk==='CLOSED'?'GREEN':($jsk==='CANCELLED'?'':'AMBER') ?>"><?= e(function_exists('job_stage_label') ? job_stage_label($j) : '') ?></span></td>
     <td><?= fmoney($j['expected_credit']) ?></td>
     <td><?= $j['closed_flag'] ? '<span class="badge GREEN">Closed</span>' : '<span class="badge AMBER">Open</span>' ?></td>
     <td class="row-actions"><a class="btn small secondary" href="/job?id=<?= (int)$j['id'] ?>">Open</a></td>

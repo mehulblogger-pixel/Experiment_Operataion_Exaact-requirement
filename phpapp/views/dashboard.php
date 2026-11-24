@@ -183,10 +183,14 @@
         $cw .= ' AND c.sbu IN (' . implode(',', array_fill(0, count($cSbu), '?')) . ')';
         foreach ($cSbu as $s0) $ca[] = $s0;
     }
-    $openCalls  = (int)ops_val("SELECT COUNT(*) FROM calls c WHERE c.status<>'CLOSED' AND $cw", $ca);
-    $openJobs   = (int)ops_val("SELECT COUNT(*) FROM jobs j WHERE j.closed_flag=0 AND $jw", $ja);
+    //  Stage 1 B2 — the one status reading (lib/opskpi.php): a cancelled / rejected work
+    //  order is not open; a cancelled job is neither open nor overdue.
+    $openCalls  = (int)ops_val("SELECT COUNT(*) FROM calls c WHERE " . (function_exists('opk_call_live_sql') ? opk_call_live_sql('c') : "c.status<>'CLOSED'") . " AND $cw", $ca);
+    $openJobs   = (int)ops_val("SELECT COUNT(*) FROM jobs j WHERE j.closed_flag=0 AND COALESCE(j.stage,'')<>'CANCELLED' AND $jw", $ja);
     $closedJobs = (int)ops_val("SELECT COUNT(*) FROM jobs j WHERE j.closed_flag=1 AND $jw", $ja);
-    $overdue    = (int)ops_val("SELECT COUNT(*) FROM jobs j WHERE j.closed_flag=0 AND ((j.inspection_end_date<>'' AND j.inspection_end_date<?) OR (j.inspection_end_date='' AND j.scheduled_date<>'' AND j.scheduled_date<?)) AND $jw", array_merge([$today,$today], $ja));
+    $overdue    = function_exists('opk_job_pred')
+        ? (int)ops_val("SELECT COUNT(*) FROM jobs j WHERE " . opk_job_pred('jobs_overdue') . " AND $jw", $ja)
+        : (int)ops_val("SELECT COUNT(*) FROM jobs j WHERE j.closed_flag=0 AND ((j.inspection_end_date<>'' AND j.inspection_end_date<?) OR (j.inspection_end_date='' AND j.scheduled_date<>'' AND j.scheduled_date<?)) AND $jw", array_merge([$today,$today], $ja));
     $status = ['Open'=>max(0,$openJobs-$overdue), 'Overdue'=>$overdue, 'Closed'=>$closedJobs];
 
     // M6 — neither permission is a module permission, and this dashboard renders

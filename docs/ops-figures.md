@@ -72,3 +72,29 @@ unit). The inspector's tiles count only that inspector's own jobs.
   - cancelled jobs are left out of open, closed and overdue.
 - **Weekly / monthly management e-mail:** "jobs overdue" and "Reports awaiting sign-off" (was "awaiting approval": every job with a pending approval, open or closed).
 - **Inspector dashboard and My jobs:** "Reports to write" and "Jobs overdue".
+
+## One status reading (B2)
+
+- **Job stage, derived.** Job 360, the work-order page, the contract page and
+  the schedule registers derive a job's stage from facts. The stored stage field
+  is never advanced by the application, so it is not used. The order of checks:
+  - closed → *Closed*;
+  - *Cancel assignment* → *Cancelled*;
+  - put on hold on purpose → *On hold*;
+  - a report uploaded, in review or issued → *Report submitted*;
+  - the inspection ended with a report owed → *Report pending*;
+  - the scheduled or start date reached → *Inspection in progress*;
+  - otherwise *Allocated*, or *No engineer yet* when nobody is on the job.
+
+  Function: `job_stage_label()`. The words come from the existing job-stage list.
+- **Work-order register:**
+  - one status pill per row (the lifecycle status);
+  - the progress word sits under it, and is left out when the pill already says the order is closed, cancelled or rejected.
+- **Cancelled or rejected work orders are in no count:**
+  - Ops home "Open";
+  - the backlog;
+  - the Director dashboard;
+  - Customer 360;
+  - the contract summary;
+  - the client portal, where the order now reads *Cancelled*.
+- **Backlog reason:** "No engineer yet" when nobody is on a job. A declined or released assignment counts as nobody. Statuses show by their label, not their code.

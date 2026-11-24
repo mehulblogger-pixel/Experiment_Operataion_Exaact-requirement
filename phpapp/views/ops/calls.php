@@ -153,13 +153,15 @@
         <?php if ($seeCost): ?><td class="num"><?= ((float)($c['cost_incurred'] ?? 0))>0 ? fmoney($c['cost_incurred']) : $dash ?></td><?php endif; ?>
         <td>
           <?php // Module 04 — the unified lifecycle status (over both status systems). ?>
-          <?php if (function_exists('call_status_label')): $cLc = call_status_label($c); ?>
+          <?php unset($cLc); if (function_exists('call_status_label')): $cLc = call_status_label($c); ?>
             <span class="pill <?= e($cLc['tone']) ?>"><?= e($cLc['label']) ?></span><br>
           <?php endif; ?>
-          <?php if ($closed): ?><span class="pill p-ok">Closed</span>
-          <?php elseif ($needs): ?><span class="pill p-warn">No engineer yet</span>
-          <?php elseif ($prog === 'Cancelled' || $prog === 'Rejected'): ?><span class="pill p-mut"><?= e($prog) ?></span>
-          <?php else: ?><span class="pill p-info">In progress</span><?php endif; ?>
+          <?php $lcKey = isset($cLc) ? $cLc['key'] : ''; ?>
+          <?php if (!isset($cLc)): ?><span class="pill p-info"><?= e($prog) ?></span>
+          <?php elseif (in_array($lcKey, ['CLOSED', 'CANCELLED', 'REJECTED'], true) || $prog === 'Cancelled' || $prog === 'Rejected'): ?>
+          <?php elseif ($closed): ?><small style="color:var(--ok)">Closed · every job closed</small>
+          <?php elseif ($needs): ?><small style="color:var(--warn,#b45309);font-weight:600">No engineer yet</small>
+          <?php else: ?><small class="muted">In progress</small><?php endif; ?>
         </td>
         <td style="white-space:nowrap">
           <a class="btn small secondary" href="/call?id=<?= (int)$c['id'] ?>">Open</a>

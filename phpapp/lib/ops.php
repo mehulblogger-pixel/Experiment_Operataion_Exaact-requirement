@@ -2571,12 +2571,60 @@ function job_glance($job) {
 // already exist (the nowband narrates the next step; this names the stage, the owner
 // and every blocker in one place). Blockers tagged money=true are hidden from a field
 // inspector by the caller. Every probe is guarded so a missing helper never breaks it.
+//  Stage 1 B2 (owner, 24 Nov 2026; Stage 0 S1-06) — THE JOB'S STAGE, DERIVED.
+//  jobs.stage is a field the application never advances (13 open demo jobs read
+//  "Report pending" while the Operations home counted 0), so every screen that shows
+//  a job's stage now derives it from the facts it already has: the closed flag, the
+//  dates and the report documents. Only the two states a person sets on purpose are
+//  read from the field — Cancelled (Cancel assignment) and On hold. The words are the
+//  existing job-stage list (Settings → lists) — no new stage.
+//  $facts (optional): ['any'=>n, 'review'=>n, 'issued'=>n] report-document counts the
+//  caller already has; otherwise they are read here.
+function job_stage_key($job, $facts = null) {
+    $job = (array) $job;
+    $jid = (int) ($job['id'] ?? ($job['job_id'] ?? 0));
+    // A list row may not carry every column; fill the missing ones once.
+    if ($jid && (!array_key_exists('closed_flag', $job) || !array_key_exists('reporting_frequency', $job) || !array_key_exists('inspection_end_date', $job))) {
+        try { $job += (ops_one("SELECT * FROM jobs WHERE id=?", [$jid]) ?: []); } catch (Throwable $e) {}
+    }
+    if (!empty($job['closed_flag'])) return 'CLOSED';
+    $raw = strtoupper((string) ($job['stage'] ?? ''));
+    if ($raw === 'CANCELLED') return 'CANCELLED';
+    if ($raw === 'ON_HOLD')   return 'ON_HOLD';
+    if (!is_array($facts)) {
+        $facts = ['any' => 0, 'review' => 0, 'issued' => 0];
+        if ($jid) try {
+            $r = ops_one("SELECT COUNT(*) a, SUM(CASE WHEN status IN ('VETTING','UNDER_REVIEW') THEN 1 ELSE 0 END) r,
+                                 SUM(CASE WHEN COALESCE(finalized,0)=1 THEN 1 ELSE 0 END) i
+                          FROM report_docs WHERE job_id=? AND COALESCE(deleted,0)=0", [$jid]) ?: [];
+            $facts = ['any' => (int) ($r['a'] ?? 0), 'review' => (int) ($r['r'] ?? 0), 'issued' => (int) ($r['i'] ?? 0)];
+        } catch (Throwable $e) {}
+    }
+    $today = date('Y-m-d');
+    $start = trim((string) ($job['inspection_start_date'] ?? ''));
+    $end   = trim((string) ($job['inspection_end_date'] ?? ''));
+    $sd    = trim((string) ($job['scheduled_date'] ?? ''));
+    $needsRp  = strtoupper(trim((string) ($job['reporting_frequency'] ?? ''))) !== 'NOREPORT';
+    $uploaded = trim((string) ($job['report_upload_date'] ?? '')) !== '';
+    if ($needsRp && ($facts['issued'] || $facts['review'] || $uploaded)) return 'SUBMITTED';
+    if ($needsRp && ($facts['any'] || ($end !== '' && $end < $today)))  return 'REPORT_PENDING';
+    if (($start !== '' && $start <= $today) || ($sd !== '' && $sd <= $today)) return 'IN_PROGRESS';
+    return 'ALLOCATED';
+}
+function job_stage_label($job, $facts = null) {
+    $job = (array) $job;
+    $k = job_stage_key($job, $facts);
+    $map = function_exists('lk_options_or') ? lk_options_or('job_stage', JOB_STAGES) : JOB_STAGES;
+    if ($k === 'ALLOCATED' && empty($job['inspector_id']) && empty($job['subcon_id']) && function_exists('opk_label')
+        && (array_key_exists('inspector_id', $job) || array_key_exists('subcon_id', $job)))
+        return opk_label('no_engineer');
+    return $map[$k] ?? (JOB_STAGES[$k] ?? $k);
+}
 function job_now($job) {
     $job = (array)$job;
     $jid = (int)($job['id'] ?? 0);
     $stageMap = (function_exists('lk_options_or') ? lk_options_or('job_stage', JOB_STAGES) : JOB_STAGES);
     $closed = !empty($job['closed_flag']);
-    $stage = $closed ? 'Closed' : ($stageMap[$job['stage'] ?? 'ALLOCATED'] ?? ($job['stage'] ?: 'Allocated'));
 
     // Report state, to decide the owner and reflect Module 07.
     $cnt = function ($sql, $a = []) { try { return (int) ops_val($sql, $a); } catch (Throwable $e) { return 0; } };
@@ -2585,6 +2633,8 @@ function job_now($job) {
     $issued    = $cnt("SELECT COUNT(*) FROM report_docs WHERE job_id=? AND COALESCE(deleted,0)=0 AND COALESCE(finalized,0)=1", [$jid]);
     $sched = trim((string)($job['scheduled_date'] ?? '')) !== '';
     $ins = trim((string)($job['inspector_name'] ?? '')) ?: 'the inspector';
+
+    $stage = job_stage_label($job, ['any' => $anyReport, 'review' => $inReview, 'issued' => $issued]);
 
     if ($closed)          $owner = '—';
     elseif ($inReview)    $owner = 'Reviewer / approver';
