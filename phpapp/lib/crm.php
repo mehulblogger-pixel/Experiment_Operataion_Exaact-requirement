@@ -688,6 +688,17 @@ function crm_quote_figures_problem(array $b) {
     $desc = (array)($b['l_desc'] ?? []); $svc = (array)($b['l_service'] ?? []);
     $qty = (array)($b['l_qty'] ?? []); $rate = (array)($b['l_rate'] ?? []);
     $sum = 0.0; $n = 0;
+    //  Owner test Q-13 (23 Nov 2026): a line with a quantity or a rate but neither a service
+    //  nor a description was dropped on save without a word. It is now refused, naming the
+    //  line, and everything typed stays on the form.
+    $rowNo = 0;
+    foreach ($desc as $i => $d) {
+        $rowNo++;
+        if (trim((string)$d) === '' && trim((string)($svc[$i] ?? '')) === ''
+            && (trim((string)($qty[$i] ?? '')) !== '' || trim((string)($rate[$i] ?? '')) !== ''))
+            return 'Line ' . $rowNo . ' has a quantity or rate but no service and no description, so it would not be saved. '
+                 . 'Pick its Service (from the types above) or describe it — or clear that line.';
+    }
     foreach ($desc as $i => $d) {
         if (trim((string)$d) === '' && trim((string)($svc[$i] ?? '')) === '') continue;
         $n++;
@@ -2477,7 +2488,8 @@ function ops_crm_quotes($route, $method) {
     $pdo = db();
     //  DEF-23 (owner, 21 Nov 2026, option A) — two addresses that never did anything now
     //  open the quotation register, instead of an empty page.
-    if ($route === 'quotes-export' || $route === 'quote-final') redirect('/quotes');
+    //  Owner test Q-11 (23 Nov 2026): '/quotes-final' (plural) is typed as often as '/quote-final'.
+    if ($route === 'quotes-export' || $route === 'quote-final' || $route === 'quotes-final') redirect('/quotes');
     if ($route === 'quotes') {
         //  Stage 4 (backend item 8, owner 21 Nov 2026): the register is paged, sorted and
         //  exported by the shared register, with filters by owner, branch and business unit

@@ -31,7 +31,10 @@ $links = [
   ['Reasons for losing', 'x', '/lookup?key=quote_lost_reason', 'Why we lose', $__s6open('lookup', $isAdm), 'an administrator (Admin → Lists)'],
   ['Buying roles', 'users', '/lookup?key=contact_buying_role', 'A contact\'s part in a purchase', $__s6open('lookup', $isAdm), 'an administrator (Admin → Lists)'],
   ['Public holidays', 'cal', '/m/holidays', 'Skipped when follow-up dates are worked out', $__s6open('m/holidays', function_exists('master_access_ok') ? master_access_ok('admin') : $isAdm), 'an administrator (Admin → Masters)'],
-  ['Who approves ' . Tlp('quote'), 'lock', '/sales-setup', 'Set up Sales', $__s6open('sales-setup', is_master() || can('settings.manage') || can('crm.quote.approve')), 'whoever may approve ' . Tlp('quote') . ' (Set up Sales)'],
+  //  Owner test S-05 (23 Nov 2026): this opened "Set up Sales in a few questions"; it now opens
+  //  the approval levels themselves — Admin → Approvals → Sales → the quotation tab (same rule as
+  //  that screen for who may open it).
+  ['Who approves ' . Tlp('quote'), 'lock', '/sales-approvals?tab=quote', 'Approval levels: who approves, up to what value', $__s6open('sales-approvals', is_master() || can('settings.manage') || can('crm.quote.approve')), 'whoever may approve ' . Tlp('quote') . ' (Admin → Approvals → Sales)'],
 ];
 $stageLink = $stageEditorOn && $__s6open('pipelines', (!function_exists('pipe_can_view') || pipe_can_view()));
 ?>
