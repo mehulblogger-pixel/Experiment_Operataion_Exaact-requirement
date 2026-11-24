@@ -1612,6 +1612,46 @@ function crm_quote_needs_approval($q) {
     if (crm_quote_from_approved_costing($q)) return false;
     return crm_quote_rule_steps($q) || crm_quote_unmatched_policy() !== 'none';
 }
+// ---- Draft copies and the editable Word copy (Q-05, owner 24 Nov 2026: "Yes as per
+// recommendation") ---------------------------------------------------------------
+// A quotation that has not cleared its approval can still be downloaded — managers
+// read drafts — but its PDF carries a large "DRAFT — NOT FOR CLIENT" across every
+// page, and the editable Word copy (which could be retyped into anything) is held
+// back until it has cleared, and then only for the people who send quotations
+// (crm.quote.send — the existing send right; nothing new). Every download is
+// written to the quotation's History. The approval rules themselves are untouched.
+const QUOTE_DRAFT_MARK = 'DRAFT — NOT FOR CLIENT';
+// Has it cleared — may this copy go to the client? Approved, sent or accepted; lost
+// or expired after it had cleared; or a draft that the company's approval rules let
+// go out with no approval (the same test the Send button uses).
+function crm_quote_doc_cleared($q) {
+    if (!$q) return false;
+    $st = (string)($q['status'] ?? '');
+    if (in_array($st, ['APPROVED', 'SENT', 'ACCEPTED'], true)) return true;
+    if (trim((string)($q['sent_at'] ?? '')) !== '') return true;
+    if (in_array($st, ['DRAFT', 'REJECTED'], true)) return !crm_quote_needs_approval($q);
+    if (in_array($st, ['LOST', 'EXPIRED'], true)) return crm_quote_chain_satisfied((int)($q['id'] ?? 0));
+    return false;                                             // PENDING_APPROVAL
+}
+// The editable Word copy: only once cleared, and only for those who send quotations.
+function crm_quote_word_allowed($q) {
+    return crm_quote_doc_cleared($q) && (can('crm.quote.send') || is_master());
+}
+// Why the Word copy is not offered to this person, in words ('' when it is).
+function crm_quote_word_problem($q) {
+    if (!crm_quote_doc_cleared($q)) return 'The editable Word copy is ready once this ' . Tl('quote') . ' is approved. Until then, download the PDF — it is marked "' . QUOTE_DRAFT_MARK . '".';
+    if (!(can('crm.quote.send') || is_master())) return 'The editable Word copy is for the people who send ' . Tlp('quote') . '. Download the PDF instead.';
+    return '';
+}
+// One line in the quotation's History for every download: who, when, which format,
+// draft or approved copy.
+function crm_quote_log_download($q, $format) {
+    $cleared = crm_quote_doc_cleared($q);
+    $who = user_name(current_user());
+    $line = $format . ' downloaded by ' . $who . ' — ' . ($cleared ? 'approved copy' : 'draft copy, marked "' . QUOTE_DRAFT_MARK . '"') . '.';
+    crm_log_change((int)$q['id'], $line);
+    if (function_exists('act_log')) act_log('QUOTE', (int)$q['id'], 'SYSTEM', quote_label($q) . ' — ' . $line);
+}
 // Why a quotation needs no approval — said on the quotation and in its history.
 function crm_quote_no_approval_reason($q) {
     if (!crm_quote_has_levels()) return 'your company has no approval levels';
@@ -3348,6 +3388,8 @@ function ops_crm_quotes($route, $method) {
     }
     if ($route === 'quote-doc') {
         $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
+        //  Q-05 — the editable copy only once approved, and only for those who send quotations.
+        if (($wp = crm_quote_word_problem($q)) !== '') { flash($wp, 'error'); redirect('/quote?id=' . $q['id']); }
         $tplId = (int)($_GET['tpl'] ?? 0);
         $tpl = $tplId ? ops_one("SELECT * FROM crm_templates WHERE id=? AND kind='QUOTE_DOC'", [$tplId])
                       : ops_one("SELECT * FROM crm_templates WHERE kind='QUOTE_DOC' AND active=1 ORDER BY is_default DESC, id DESC");
@@ -3355,6 +3397,7 @@ function ops_crm_quotes($route, $method) {
         [$bin, $err] = docx_fill(base64_decode($tpl['file_data']), quote_doc_map($q, $tpl), crm_quote_lines($q['id']));
         if ($err) { flash('Could not generate the Word file: ' . $err, 'error'); redirect('/quote?id=' . $q['id']); }
         $fname = 'Quote-' . preg_replace('/[^A-Za-z0-9_.-]/', '', $q['quote_no'] . ($q['rev'] > 0 ? '-R' . $q['rev'] : '')) . '.docx';
+        crm_quote_log_download($q, 'Word');
         header('Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document');
         header('Content-Disposition: attachment; filename="' . $fname . '"');
         header('Content-Length: ' . strlen($bin));
@@ -3364,7 +3407,8 @@ function ops_crm_quotes($route, $method) {
         $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
         $tpl = ops_one("SELECT * FROM crm_templates WHERE kind='QUOTE_DOC' ORDER BY is_default DESC, id DESC");   // for doc/format numbers
         $pdf = quote_pdf_build($q, crm_quote_lines($q["id"]), $tpl ?: [], quote_signature($q), quote_letterhead($q['office_id'] ?? null));
-        $fname = 'Quote-' . preg_replace('/[^A-Za-z0-9_.-]/', '', $q['quote_no'] . ($q['rev'] > 0 ? '-R' . $q['rev'] : '')) . '.pdf';
+        $fname = 'Quote-' . preg_replace('/[^A-Za-z0-9_.-]/', '', $q['quote_no'] . ($q['rev'] > 0 ? '-R' . $q['rev'] : '')) . (!crm_quote_doc_cleared($q) ? '-DRAFT' : '') . '.pdf';
+        crm_quote_log_download($q, 'PDF');
         header('Content-Type: application/pdf');
         header('Content-Disposition: attachment; filename="' . $fname . '"');
         header('Content-Length: ' . strlen($pdf));
@@ -3751,6 +3795,10 @@ function ops_crm_quotes($route, $method) {
         //  my mailbox" beside "sending is not yours to do" (owner, 14 Nov 2026).
         ops_require(can('crm.quote.send') || is_master(), 'You cannot send ' . Tlp('quote') . '.');
         ops_require(crm_quote_can_work($q), crm_assignee_words((int)crm_quote_owner_user_id($q), Tl('quote')));
+        //  Q-05 — "send from my mailbox" is sending too: not before the quotation has
+        //  cleared its approval (the page only drew these buttons once APPROVED or SENT;
+        //  a typed address could still make the e-mail of a draft).
+        if (!crm_quote_doc_cleared($q)) { flash(crm_quote_transition_problem($q, 'SENT') ?: 'This ' . Tl('quote') . ' needs approval before it goes to the ' . Tl('client') . '.', 'error'); redirect('/quote?id=' . $q['id']); }
         [$subject, $body] = crm_quote_message($q);
         [$fromEmail, $fromName] = compose_from();
         $to = (string)($q['contact_email'] ?? '');

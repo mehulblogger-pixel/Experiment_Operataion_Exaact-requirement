@@ -916,6 +916,7 @@ function billunit_contract_terms_request(array $c, $t, $p, $reason) {
     $unendorsed = false;
     if ($os === 'PENDING' && trim((string)($c['mgr_endorsed_at'] ?? '')) !== '') {
         db()->prepare("UPDATE partner_contracts SET mgr_endorsed_by='', mgr_endorsed_by_id=NULL, mgr_endorsed_at='' WHERE id=?")->execute([$id]);
+        if (function_exists('contract_mid_void')) contract_mid_void($id, 0);   // Q-08
         $unendorsed = true;
     }
     return ['kind' => 'saved', 'level' => 'success',

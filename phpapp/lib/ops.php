@@ -10352,15 +10352,16 @@ function ops_pending_tasks() {
     // screen, so a signer who cannot view quotations still reaches the buttons.
     // Each person is counted only what is theirs to sign NOW (contract_open_stage()),
     // so the number on the dashboard is the number of buttons on the screen.
-    if (function_exists('contract_open_stage') && (can_endorse_contract_open() || can_approve_contract_open())) {
-        $first = 0; $final = 0;
+    if (function_exists('contract_open_stage') && contract_is_signer()) {
+        $first = 0; $final = 0; $midN = 0;
         try {
             foreach (ops_all("SELECT * FROM partner_contracts WHERE COALESCE(open_status,'')='PENDING' AND COALESCE(bm_approved_at,'')=''") ?: [] as $pcRow) {
                 $sgNow = contract_open_stage($pcRow);
-                if ($sgNow['primary'] === 'endorse') $first++; elseif ($sgNow['primary'] === 'approve') $final++;
+                if ($sgNow['primary'] === 'endorse') $first++; elseif ($sgNow['primary'] === 'sign') $midN++; elseif ($sgNow['primary'] === 'approve') $final++;
             }
         } catch (Throwable $e) {}
         $add($first, '✍', 'contracts to endorse', 'contract openings waiting for your first signature', '/contract-openings', 'warn');
+        $add($midN, '✍', 'contracts to sign', 'contract openings waiting for your signature (between the first and the final)', '/contract-openings', 'warn');
         $add($final, '📝', 'contracts to approve', 'contract openings waiting for your approval', '/contract-openings', 'info');
     }
     // Vouchers to approve now come from the approval chain, through the hub

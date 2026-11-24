@@ -16,7 +16,9 @@
         <?php foreach ($rows as $c):
           $endorsed = trim((string)($c['mgr_endorsed_at'] ?? '')) !== '';
           $sg = contract_open_stage($c);
-          $step = $sg['need'] === 'first' ? 'Waiting for the first signature' : ($sg['signatures'] === 2 ? 'Waiting for the final approval' : 'Waiting for approval');
+          $step = $sg['need'] === 'first' ? 'Waiting for the first signature'
+                : ($sg['need'] === 'middle' ? 'Waiting for ' . contract_sig_slot_name($sg['slot'], $sg['signatures'])
+                : ($sg['signatures'] >= 2 ? 'Waiting for the final approval' : 'Waiting for approval'));
           $desc = trim((string)($c['quote_subject'] ?? ''));
         ?>
           <tr>

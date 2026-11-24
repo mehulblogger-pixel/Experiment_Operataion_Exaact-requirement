@@ -393,7 +393,8 @@ function cockpit_sections() {
     // the standard rules work untouched, so it never lowers readiness.
     if (function_exists('apsetup_open') && apsetup_open()) {
         $own = function_exists('setting_get') && (trim((string) setting_get('contract_open_signatures', '')) !== ''
-            || trim((string) setting_get('contract_sig1_roles', '')) !== '' || trim((string) setting_get('contract_sig2_roles', '')) !== '');
+            || trim((string) setting_get('contract_sig1_roles', '')) !== '' || trim((string) setting_get('contract_sig2_roles', '')) !== ''
+            || trim((string) setting_get('contract_sig3_roles', '')) !== '');
         $secs['approvals'] = [
             'key' => 'approvals', 'icon' => '✅', 'label' => 'Approvals',
             'desc' => 'Who signs off quotations, costings and contracts — the standard rules, or your own.',

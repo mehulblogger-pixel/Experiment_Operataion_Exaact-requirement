@@ -34,10 +34,20 @@ $sgEndorseForm = function ($primary) use ($sgId, $sgDo, $sgAmend, $sgCoordinator
     <button class="btn small<?= $primary ? '' : ' secondary' ?>" type="submit"><?= $primary ? 'Give the first signature' : 'Give the first signature instead' ?></button>
   </form>
 <?php };
+//  Q-08 — a signature between the first and the final one (three to five).
+$sgSignForm = function ($primary) use ($sg, $sgId, $sgDo, $sgFrom) {
+    $sgName = contract_sig_slot_name((int)($sg['slot'] ?? 0), (int)($sg['signatures'] ?? 0)); ?>
+  <form method="post" action="/contract-open" style="display:inline">
+    <input type="hidden" name="id" value="<?= (int)$sgId ?>"><input type="hidden" name="do" value="<?= e($sgDo('sign')) ?>"><?= $sgFrom ?>
+    <input type="hidden" name="slot" value="<?= (int)($sg['slot'] ?? 0) ?>">
+    <button class="btn small<?= $primary ? '' : ' secondary' ?>" type="submit">Give <?= e($sgName) ?><?= $primary ? '' : ' instead' ?></button>
+  </form>
+<?php };
 ?>
 <div class="csign">
   <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center<?= $sgCompact ? ';justify-content:flex-end' : '' ?>">
     <?php if ($sg['primary'] === 'endorse') $sgEndorseForm(true); ?>
+    <?php if ($sg['primary'] === 'sign') $sgSignForm(true); ?>
     <?php if ($sg['primary'] === 'approve'): ?>
       <form method="post" action="/contract-open" style="display:inline">
         <input type="hidden" name="id" value="<?= (int)$sgId ?>"><input type="hidden" name="do" value="<?= e($sgDo('approve')) ?>"><?= $sgFrom ?>
@@ -45,6 +55,7 @@ $sgEndorseForm = function ($primary) use ($sgId, $sgDo, $sgAmend, $sgCoordinator
       </form>
     <?php endif; ?>
     <?php if ($sg['alt'] === 'endorse') $sgEndorseForm(false); ?>
+    <?php if ($sg['alt'] === 'sign') $sgSignForm(false); ?>
     <?php if (!empty($sg['reject'])): ?>
       <?php if ($sgAmend): ?>
         <form method="post" action="/contract-open" style="display:flex;gap:6px"><input type="hidden" name="id" value="<?= (int)$sgId ?>"><input type="hidden" name="do" value="amend-reject">

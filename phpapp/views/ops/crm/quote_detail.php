@@ -43,8 +43,15 @@ $qVal = quote_validity($q);
           if ($st === 'ACCEPTED' && $cOpen && (can('ops.call.create') || is_master())): ?>
         <a class="btn" href="/call-new?contract_id=<?= (int)($contractRow['id'] ?? 0) ?>&contract=<?= e(urlencode((string)$q['contract_number'])) ?>">▶ Raise <?= e(Tl('call')) ?></a>
     <?php endif; ?>
-    <a class="btn<?= $st === 'ACCEPTED' ? ' secondary' : '' ?>" href="/quote-pdf?id=<?= (int)$q['id'] ?>">⬇ PDF (for client)</a>
-    <a class="btn secondary" href="/quote-doc?id=<?= (int)$q['id'] ?>">Word (editable)</a>
+    <?php //  Q-05 (owner, 24 Nov 2026) — before approval the PDF is a marked draft, and the
+          //  editable Word copy waits for approval and is for those who send quotations. ?>
+    <?php $qdCleared = crm_quote_doc_cleared($q); $qdWord = crm_quote_word_allowed($q); ?>
+    <?php if ($qdCleared): ?>
+      <a class="btn<?= $st === 'ACCEPTED' ? ' secondary' : '' ?>" href="/quote-pdf?id=<?= (int)$q['id'] ?>">⬇ PDF (for client)</a>
+    <?php else: ?>
+      <a class="btn secondary" href="/quote-pdf?id=<?= (int)$q['id'] ?>" title="Every page is marked “<?= e(QUOTE_DRAFT_MARK) ?>” until it is approved">⬇ PDF (draft)</a>
+    <?php endif; ?>
+    <?php if ($qdWord): ?><a class="btn secondary" href="/quote-doc?id=<?= (int)$q['id'] ?>">Word (editable)</a><?php endif; ?>
     <?php //  A re-edit the Super Admin granted on a closed quotation shows its own Edit button (SALB-061).
           //  DEF-18 — the edit screen also takes an APPROVED one (a commercial change cancels the
           //  approval, D-07), so Edit is offered there too.
@@ -332,7 +339,7 @@ $qVal = quote_validity($q);
       </form>
     <?php elseif ($canDecide): ?><?= $act('ACCEPTED', $st==='EXPIRED' ? 'Mark accepted (after expiry)' : 'Mark accepted (won)') ?>
     <?php else: ?><span class="muted" style="font-size:12.5px"><?= e($assignedName !== '' ? $assignedName . ', who is assigned to this ' . Tl('quote') . ',' : 'The person assigned to this ' . Tl('quote')) ?> records the <?= e(Tl('client')) ?>'s answer.</span><?php endif; ?>
-    <a class="btn small secondary" href="/quote-doc?id=<?= (int)$q['id'] ?>">Re-download Word</a>
+    <?php if (crm_quote_word_allowed($q)): ?><a class="btn small secondary" href="/quote-doc?id=<?= (int)$q['id'] ?>">Re-download Word</a><?php endif; ?>
   <?php endif; ?>
   <?php if (in_array($st, ['APPROVED','SENT'], true) && !empty($q['contact_email']) && !empty($canSend)): ?>
     <span style="width:1px;height:22px;background:var(--line)"></span>
@@ -968,7 +975,7 @@ $qVal = quote_validity($q);
         <b>Final copy</b> <span class="muted">— the accepted version, as sent.</span>
         <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
           <a class="btn small" href="/quote-pdf?id=<?= (int)$q['id'] ?>">⬇ PDF</a>
-          <a class="btn small secondary" href="/quote-doc?id=<?= (int)$q['id'] ?>">⬇ Word</a>
+          <?php if (crm_quote_word_allowed($q)): ?><a class="btn small secondary" href="/quote-doc?id=<?= (int)$q['id'] ?>">⬇ Word</a><?php endif; ?>
         </div>
       </div>
     <?php endif; ?>

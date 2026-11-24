@@ -81,6 +81,17 @@ function contracts_migrate() {
         decided_by VARCHAR(150) DEFAULT '', decided_by_id INT NULL, decided_at VARCHAR(30) DEFAULT '',
         decision_note VARCHAR(400) DEFAULT '')");
     if (function_exists('act_index')) act_index('contract_amendments', 'idx_camd_contract', '(contract_id)');
+    // Q-08 (owner, 24 Nov 2026: "Yes" — up to 5 ordered signatures). The first
+    // signature and the final approval keep their own columns (mgr_endorsed_* /
+    // bm_approved_* on a contract, endorsed_* / decided_* on an amendment), so every
+    // 0-, 1- and 2-signature company reads exactly as before. The signatures BETWEEN
+    // them (signature 2..4 of 5) are kept here, one row each. A row is never
+    // deleted: a re-opening voids it (voided_at) and the history stays.
+    $pdo->exec("CREATE TABLE IF NOT EXISTS contract_signatures (
+        id $pk, contract_id INT, amendment_id INT DEFAULT 0, slot INT DEFAULT 0,
+        signed_by VARCHAR(150) DEFAULT '', signed_by_id INT NULL, signed_at VARCHAR(30) DEFAULT '',
+        voided_at VARCHAR(30) DEFAULT '')");
+    if (function_exists('act_index')) act_index('contract_signatures', 'idx_csig_contract', '(contract_id)');
     // Field #3 — "Quantity sold" as a LIST of line items (man-days / man-months /
     // other), like a PO's lines, instead of one number. The contract's qty_total is
     // kept as the SUM of these, so every existing quantity gate keeps working unchanged.
@@ -730,28 +741,53 @@ const CONTRACT_OPEN_STATES = [
 //  company gets until it says otherwise — nothing changes for a company that
 //  never opens the setting. What a company may now decide, under Admin →
 //  Approvals → Sales → Contract:
-//      · how many signatures: two, one, or none (the contract opens when it is
-//        registered);
+//      · how many signatures: up to five (Q-08, owner 24 Nov 2026), two, one, or
+//        none (the contract opens when it is registered);
 //      · who gives each: any of its roles (its own custom roles included), and/or
 //        one named person;
 //      · whether one person may give both.
-//  Stored in settings: contract_open_signatures ('0'|'1'|'2'),
+//  Stored in settings: contract_open_signatures ('0'…'5'),
 //  contract_sig1_roles / contract_sig2_roles (comma list), contract_sig1_user /
 //  contract_sig2_user (a user id), contract_same_person ('yes'|'no').
 //  "Signature 2" is always the FINAL approval; "signature 1" exists only when
-//  two are asked for. The Master Admin can always sign, as before.
+//  two or more are asked for. The Master Admin can always sign, as before.
+//
+//  Q-08 (owner, 24 Nov 2026: "Yes"): up to FIVE ordered signatures. The settings
+//  keep their meaning — slot 1 is the first signature, slot 2 the final approval —
+//  and slots 3, 4 and 5 (contract_sig3_roles … contract_sig5_user) are the
+//  signatures in between, in that order. So with five: slot 1 → 3 → 4 → 5 → 2.
+//  Each one waits for the one before it. A middle slot has no standard holder: the
+//  company names who gives it (until then only the Master Admin can).
 // ---------------------------------------------------------------------------
 const CONTRACT_SIG_STANDARD = [
     1 => ['OPERATION_MANAGER', 'SBU_HEAD', 'ADMIN', 'BUSINESS_DIRECTOR'],
     2 => ['BRANCH_MANAGER', 'BRANCH_APP_MANAGER'],
+    3 => [], 4 => [], 5 => [],
 ];
+const CONTRACT_SIG_MAX = 5;
+
+//  The slots, in signing order, for $n signatures: 1 → [2]; 2 → [1, 2];
+//  3 → [1, 3, 2]; 5 → [1, 3, 4, 5, 2]. The last is always the final approval.
+function contract_sig_order($n) {
+    $n = (int)$n;
+    if ($n <= 0) return [];
+    if ($n === 1) return [2];
+    return array_merge([1], $n >= 3 ? range(3, min(CONTRACT_SIG_MAX, $n)) : [], [2]);
+}
+//  A slot's name for people: "first signature", "signature 3 of 5", "final approval".
+function contract_sig_slot_name($slot, $n) {
+    if ((int)$slot === 2) return 'final approval';
+    if ((int)$slot === 1) return 'first signature';
+    $pos = array_search((int)$slot, contract_sig_order($n), true);
+    return 'signature ' . ($pos === false ? (int)$slot - 1 : $pos + 1) . ' of ' . (int)$n;
+}
 
 function contract_open_rule() {
     $n = function_exists('setting_get') ? (string)setting_get('contract_open_signatures', '') : '';
-    $n = in_array($n, ['0', '1', '2'], true) ? (int)$n : 2;
+    $n = in_array($n, ['0', '1', '2', '3', '4', '5'], true) ? (int)$n : 2;
     $all = function_exists('roles_all') ? roles_all() : ORG_ROLES;
     $sig = [];
-    foreach ([1, 2] as $i) {
+    foreach (range(1, CONTRACT_SIG_MAX) as $i) {
         $roles = [];
         foreach (explode(',', (string)setting_get('contract_sig' . $i . '_roles', '')) as $r) {
             $r = strtoupper(trim($r));
@@ -792,7 +828,34 @@ function contract_sig_user_holds($i, $u, $rule = null) {
 function can_endorse_contract_open() {
     if (is_master()) return true;
     $rule = contract_open_rule();
-    return max(1, $rule['signatures']) === 2 && contract_sig_user_holds(1, current_user(), $rule);
+    return max(1, $rule['signatures']) >= 2 && contract_sig_user_holds(1, current_user(), $rule);
+}
+//  A signature between the first and the final one (only with three or more).
+function can_sign_contract_middle($u = null) {
+    if (is_master()) return true;
+    $rule = contract_open_rule(); $n = max(1, (int)$rule['signatures']);
+    if ($n < 3) return false;
+    $u = $u ?: current_user();
+    foreach (contract_sig_order($n) as $slot) if ($slot >= 3 && contract_sig_user_holds($slot, $u, $rule)) return true;
+    return false;
+}
+//  Anyone who gives any signature on opening (or amending) a contract.
+function contract_is_signer() {
+    return can_endorse_contract_open() || can_approve_contract_open() || can_sign_contract_middle();
+}
+//  The signatures given between the first and the final one, still standing
+//  (not voided by a re-opening): slot => row.
+function contract_mid_sigs($contractId, $amendmentId = 0) {
+    $out = [];
+    if (!(int)$contractId) return $out;
+    foreach (ops_all("SELECT * FROM contract_signatures WHERE contract_id=? AND amendment_id=? AND COALESCE(voided_at,'')='' ORDER BY id", [(int)$contractId, (int)$amendmentId]) ?: [] as $r)
+        if (!isset($out[(int)$r['slot']])) $out[(int)$r['slot']] = $r;
+    return $out;
+}
+//  A re-opening (or a change that restarts the signatures) voids them — kept, never deleted.
+function contract_mid_void($contractId, $amendmentId = 0) {
+    try { db()->prepare("UPDATE contract_signatures SET voided_at=? WHERE contract_id=? AND amendment_id=? AND COALESCE(voided_at,'')=''")
+        ->execute([date('c'), (int)$contractId, (int)$amendmentId]); } catch (Throwable $e) {}
 }
 //  The final approval.
 function can_approve_contract_open() {
@@ -840,6 +903,13 @@ function contract_rule_sentence($amend = false) {
     $rule = contract_open_rule(); $n = $amend ? contract_amend_signatures() : (int)$rule['signatures'];
     if ($n === 0) return 'no approval is needed — a contract opens as soon as it is registered';
     if ($n === 1) return 'one approval, from ' . contract_sig_label(2, $rule);
+    if ($n >= 3) {
+        $bits = [];
+        foreach (contract_sig_order($n) as $slot) $bits[] = ($slot === 2 ? 'the final approval from ' : ($slot === 1 ? 'first ' : '')) . contract_sig_label($slot, $rule);
+        $last = array_pop($bits);
+        return $n . ' signatures, one after another — ' . implode(', then ', $bits) . ', then ' . $last
+             . ($rule['same_person'] ? '' : ' (each from a different person)');
+    }
     return 'two signatures — first ' . contract_sig_label(1, $rule) . ', then the final approval from ' . contract_sig_label(2, $rule)
          . ($rule['same_person'] ? '' : ' (two different people)');
 }
@@ -853,9 +923,10 @@ function contract_rule_sentence($amend = false) {
 //    alt      '' | 'endorse'               a quieter second choice (see below)
 //    hint     a line for this viewer, or ''
 //    reject   may this viewer reject it
-function contract_sign_stage(array $first, $c = null, $amend = false) {
+function contract_sign_stage(array $first, $c = null, $amend = false, $mid = null) {
     $rule = contract_open_rule(); $n = $amend ? contract_amend_signatures() : max(1, (int)$rule['signatures']);
     $me = current_user(); $meId = (int)($me['id'] ?? 0); $master = is_master();
+    if ($n >= 3) return contract_sign_stage_many($n, $rule, $first, (array)$mid, $c, $me, $meId, $master);
     $h1 = $n === 2 && ($master || contract_sig_user_holds(1, $me, $rule));
     $h2 = $master || contract_sig_user_holds(2, $me, $rule);
     $signed = trim((string)($first['at'] ?? '')) !== '';
@@ -885,11 +956,58 @@ function contract_sign_stage(array $first, $c = null, $amend = false) {
     elseif ($h2 && $blocked) $out['hint'] = 'You gave the first signature, so the final approval must come from someone else.';
     return $out;
 }
+//  Q-08 — three to five signatures, one after another (slot order from
+//  contract_sig_order()). Same answer shape as contract_sign_stage(), plus
+//  'slot' (the slot waiting now) and 'step' (its place, 1-based). need is
+//  'first' | 'middle' | 'final'; primary/alt add 'sign' for a middle signature.
+function contract_sign_stage_many($n, $rule, array $first, array $mid, $c, $me, $meId, $master) {
+    $order = contract_sig_order($n);
+    $signedBy = [];
+    if (trim((string)($first['at'] ?? '')) !== '') $signedBy[1] = (int)($first['by_id'] ?? 0);
+    foreach ($mid as $slot => $r) $signedBy[(int)$slot] = (int)($r['signed_by_id'] ?? 0);
+    $next = 2; $step = $n;
+    foreach ($order as $i => $slot) { if ($slot === 2) break; if (!isset($signedBy[$slot])) { $next = $slot; $step = $i + 1; break; } }
+    $given = $step - 1;
+    $iSigned = $meId !== 0 && in_array($meId, $signedBy, true);
+    $blocked = $iSigned && !$rule['same_person'] && !$master;
+    $exclude = !$rule['same_person'] ? array_values($signedBy) : [];
+    $part = function ($slot) use ($n, $c, $rule, $exclude) {
+        $people = array_filter(contract_sig_people($slot, $c, 0, $rule), fn($u) => !in_array((int)$u['id'], $exclude, true));
+        $names = $people ? implode(', ', array_map('user_name', array_slice(array_values($people), 0, 3))) . (count($people) > 3 ? ' and ' . (count($people) - 3) . ' more' : '')
+                         : contract_sig_names($slot, $c, 0, $rule);
+        return ($slot === 1 || $slot === 2 ? 'the ' : '') . contract_sig_slot_name($slot, $n) . ' — ' . $names;
+    };
+    $rest = [];
+    foreach (array_slice($order, $step) as $slot) $rest[] = $part($slot);
+    $waiting = ($given ? $given . ' of ' . $n . ' signatures given. ' : '') . 'Waiting for ' . $part($next) . '.'
+             . ($rest ? ' Then ' . implode('; then ', $rest) . '.' : '');
+    $holds = $master || contract_sig_user_holds($next, $me, $rule);
+    $action = $next === 1 ? 'endorse' : ($next === 2 ? 'approve' : 'sign');
+    $reject = $master;
+    foreach ($order as $slot) if (!$reject && contract_sig_user_holds($slot, $me, $rule)) $reject = true;
+    $out = ['need' => $next === 1 ? 'first' : ($next === 2 ? 'final' : 'middle'), 'slot' => $next, 'step' => $step,
+            'waiting' => $waiting, 'primary' => '', 'alt' => '', 'hint' => '', 'reject' => $reject, 'signatures' => $n];
+    if ($master) {
+        $out['primary'] = 'approve';
+        if ($action !== 'approve') { $out['alt'] = $action; $out['hint'] = 'As Master Admin you can open it yourself, or give only the ' . contract_sig_slot_name($next, $n) . '.'; }
+    } elseif ($holds && !$blocked) $out['primary'] = $action;
+    elseif ($holds && $blocked) $out['hint'] = 'You have already signed this, so the ' . contract_sig_slot_name($next, $n) . ' must come from someone else.';
+    return $out;
+}
 function contract_open_stage(array $c) {
-    return contract_sign_stage(['at' => $c['mgr_endorsed_at'] ?? '', 'by_id' => $c['mgr_endorsed_by_id'] ?? 0], $c, false);
+    $mid = max(1, (int)contract_open_rule()['signatures']) >= 3 ? contract_mid_sigs((int)($c['id'] ?? 0), 0) : [];
+    return contract_sign_stage(['at' => $c['mgr_endorsed_at'] ?? '', 'by_id' => $c['mgr_endorsed_by_id'] ?? 0], $c, false, $mid);
 }
 function contract_amend_stage(array $c, array $am) {
-    return contract_sign_stage(['at' => $am['endorsed_at'] ?? '', 'by_id' => $am['endorsed_by_id'] ?? 0], $c, true);
+    $mid = contract_amend_signatures() >= 3 ? contract_mid_sigs((int)($c['id'] ?? 0), (int)($am['id'] ?? 0)) : [];
+    return contract_sign_stage(['at' => $am['endorsed_at'] ?? '', 'by_id' => $am['endorsed_by_id'] ?? 0], $c, true, $mid);
+}
+//  Everyone who has signed this opening / amendment so far (ids).
+function contract_signer_ids(array $first, array $mid) {
+    $ids = [];
+    if (trim((string)($first['at'] ?? '')) !== '' && (int)($first['by_id'] ?? 0)) $ids[] = (int)$first['by_id'];
+    foreach ($mid as $r) if ((int)($r['signed_by_id'] ?? 0)) $ids[] = (int)$r['signed_by_id'];
+    return $ids;
 }
 //  Who a contract waits for — said to whoever just registered or signed it.
 function contract_waiting_words(array $c) { return contract_open_stage($c)['waiting']; }
@@ -977,7 +1095,7 @@ function contract_rule_editable() { return is_master() || can('settings.manage')
 function contract_rule_save(array $post) {
     if (!contract_rule_editable()) return [];
     $before = contract_open_rule(); $changed = []; $all = function_exists('roles_all') ? roles_all() : ORG_ROLES;
-    foreach ([1, 2] as $i) {
+    foreach (range(1, CONTRACT_SIG_MAX) as $i) {
         if (!array_key_exists('contract_sig' . $i . '_sent', $post)) continue;
         $roles = [];
         foreach ((array)($post['contract_sig' . $i . '_roles'] ?? []) as $r) { $r = strtoupper(trim((string)$r)); if (isset($all[$r]) && $r !== 'MASTER_ADMIN' && !in_array($r, $roles, true)) $roles[] = $r; }
@@ -988,7 +1106,7 @@ function contract_rule_save(array $post) {
         if ($sameRoles && $uid === (int)$was['user']) continue;                 // untouched — the standard rule stays the standard rule
         setting_set('contract_sig' . $i . '_roles', implode(',', $roles));
         setting_set('contract_sig' . $i . '_user', $uid ? (string)$uid : '');
-        $changed[] = ($i === 1 ? 'First signature' : 'Final approval') . ' → ' . contract_sig_label($i);
+        $changed[] = ($i === 1 ? 'First signature' : ($i === 2 ? 'Final approval' : 'Signature ' . ($i - 1) . ' (between the first and the final)')) . ' → ' . contract_sig_label($i);
     }
     return $changed;
 }
@@ -1171,7 +1289,7 @@ function contract_quote_id($c) {
 // to view). Lists every contract still waiting to be opened, with the action
 // each viewer can take inline. The write still goes through /contract-open.
 function ops_contract_openings() {
-    ops_require(can_endorse_contract_open() || can_approve_contract_open() || is_master(),
+    ops_require(contract_is_signer() || is_master(),
         'You are not part of the contract-opening approval.');
     $rows = ops_all(
         "SELECT pc.*, q.id quote_id, q.quote_no, q.rev, q.subject quote_subject,
@@ -1221,7 +1339,7 @@ function ops_contract_open($route, $method) {
         ops_require(can_endorse_contract_open(), 'You are not one of the people who give the first signature for opening a contract.');
         if ($status !== 'PENDING') { flash('This contract is not awaiting a signature.', 'warning'); redirect($back); }
         if (trim((string)$c['mgr_endorsed_at']) !== '') { flash('The first signature has already been given.', 'warning'); redirect($back); }
-        if (max(1, (int)contract_open_rule()['signatures']) !== 2) { flash('Your company opens a contract with one approval — there is no first signature to give. Approve it instead.', 'warning'); redirect($back); }
+        if (max(1, (int)contract_open_rule()['signatures']) < 2) { flash('Your company opens a contract with one approval — there is no first signature to give. Approve it instead.', 'warning'); redirect($back); }
         // The endorsing manager may nominate the coordinator who will own the
         // calls raised from this contract — an office has several, and naming one
         // here means the work does not later land in a shared inbox. Optional;
@@ -1238,10 +1356,38 @@ function ops_contract_open($route, $method) {
         flash('First signature given. ' . preg_replace('/^First signature given\\. /', '', $now) . $coordNote);
         redirect($back);
     }
+    //  Q-08 — a signature between the first and the final one (three to five).
+    if ($do === 'sign') {
+        if ($status !== 'PENDING') { flash('This contract is not awaiting a signature.', 'warning'); redirect($back); }
+        $rule = contract_open_rule(); $n = max(1, (int)$rule['signatures']);
+        if ($n < 3) { flash('Your company asks for ' . ($n === 2 ? 'two signatures' : 'one approval') . ' — there is no middle signature to give.', 'warning'); redirect($back); }
+        $stg = contract_open_stage($c); $slot = (int)($_POST['slot'] ?? 0);
+        if ($stg['need'] !== 'middle' || (int)$stg['slot'] !== $slot) { flash('That signature is not the one waiting now. ' . $stg['waiting'], 'warning'); redirect($back); }
+        ops_require(is_master() || contract_sig_user_holds($slot, current_user(), $rule), 'You are not one of the people who give the ' . contract_sig_slot_name($slot, $n) . '.');
+        $mid = contract_mid_sigs((int)$c['id'], 0);
+        if (!$rule['same_person'] && !is_master() && $meId !== 0 && in_array($meId, contract_signer_ids(['at' => $c['mgr_endorsed_at'], 'by_id' => $c['mgr_endorsed_by_id']], $mid), true)) {
+            flash('You have already signed this contract, so the ' . contract_sig_slot_name($slot, $n) . ' must come from someone else. ' . $stg['waiting'], 'error'); redirect($back);
+        }
+        $pdo->prepare("INSERT INTO contract_signatures (contract_id, amendment_id, slot, signed_by, signed_by_id, signed_at, voided_at) VALUES (?,?,?,?,?,?, '')")
+            ->execute([(int)$c['id'], 0, $slot, $me, $meId, date('c')]);
+        $now = contract_open_stage($c)['waiting'];
+        if ($qid) crm_log_change($qid, 'Contract ' . $c['contract_number'] . ' opening — ' . contract_sig_slot_name($slot, $n) . ' given by ' . $me . ($note !== '' ? ' — ' . $note : '') . '. ' . $now);
+        flash(ucfirst(contract_sig_slot_name($slot, $n)) . ' given. ' . $now);
+        redirect($back);
+    }
     if ($do === 'approve') {
         ops_require(can_approve_contract_open(), 'You are not one of the people who give the final approval for opening a contract.');
         if ($status !== 'PENDING') { flash('This contract is not awaiting approval.', 'warning'); redirect($back); }
         $rule = contract_open_rule(); $two = max(1, (int)$rule['signatures']) === 2;
+        if (max(1, (int)$rule['signatures']) >= 3 && !is_master()) {
+            //  Q-08 — every signature before the final one, in order, and (unless the
+            //  company allows it) the final one from someone who has not signed yet.
+            $stg = contract_open_stage($c);
+            if ($stg['need'] !== 'final') { flash('It needs its earlier signatures before the final approval. ' . $stg['waiting'], 'error'); redirect($back); }
+            if (!$rule['same_person'] && in_array($meId, contract_signer_ids(['at' => $c['mgr_endorsed_at'], 'by_id' => $c['mgr_endorsed_by_id']], contract_mid_sigs((int)$c['id'], 0)), true) && $meId !== 0) {
+                flash('You have already signed this contract, so the final approval must come from someone else. ' . $stg['waiting'], 'error'); redirect($back);
+            }
+        }
         if ($two && trim((string)$c['mgr_endorsed_at']) === '' && !is_master()) {
             flash('It needs its first signature before the final approval. ' . contract_waiting_words($c), 'error'); redirect($back);
         }
@@ -1259,7 +1405,7 @@ function ops_contract_open($route, $method) {
         redirect($back);
     }
     if ($do === 'reject') {
-        ops_require(can_endorse_contract_open() || can_approve_contract_open(), 'You cannot decide this request.');
+        ops_require(contract_is_signer(), 'You cannot decide this request.');
         if ($status !== 'PENDING') { flash('This contract is not awaiting a decision.', 'warning'); redirect($back); }
         $pdo->prepare("UPDATE partner_contracts SET open_status='REJECTED', close_reason=?, closed_at=? WHERE id=?")
             ->execute(['Opening rejected by ' . $me . ($note !== '' ? ' — ' . $note : ''), date('c'), (int)$c['id']]);
@@ -1279,6 +1425,7 @@ function ops_contract_open($route, $method) {
         }
         $pdo->prepare("UPDATE partner_contracts SET open_status='PENDING', is_active=1, auto_closed=0, closed_at='', close_reason='', mgr_endorsed_by='', mgr_endorsed_by_id=NULL, mgr_endorsed_at='', bm_approved_by='', bm_approved_by_id=NULL, bm_approved_at='', requested_by=?, requested_by_id=?, requested_at=? WHERE id=?")
             ->execute([$me, $meId, date('c'), (int)$c['id']]);
+        contract_mid_void((int)$c['id'], 0);   // Q-08 — earlier middle signatures are kept, voided
         $reNow = contract_after_register((int)$c['id'], $qid);
         if ($reNow === 'OPEN' && $qid) { $rq = crm_quote_get($qid); if ($rq) crm_float_ops_packet($rq); }
         if ($qid) crm_log_change($qid, 'Contract ' . $c['contract_number'] . ' re-opening requested by ' . $me . ($note !== '' ? ' — ' . $note : '') . '. ' . $reRule . '.');
@@ -1289,22 +1436,45 @@ function ops_contract_open($route, $method) {
     // D-25 — an amendment takes the same two signatures as the opening: a manager
     // endorses, then someone else — the branch manager — approves; only then do
     // the new figures replace the old, which stay on the amendment.
-    if (in_array($do, ['amend-endorse', 'amend-approve', 'amend-reject'], true)) {
+    if (in_array($do, ['amend-endorse', 'amend-sign', 'amend-approve', 'amend-reject'], true)) {
         $am = contract_pending_amendment((int)$c['id']);
         if (!$am) { flash('There is no amendment waiting on this contract.', 'warning'); redirect('/contract?id=' . (int)$c['id']); }
         $to = '/contract?id=' . (int)$c['id'];
         if ($do === 'amend-endorse') {
             ops_require(can_endorse_contract_open(), 'You are not one of the people who give the first signature on an amendment.');
             if (trim((string)$am['endorsed_at']) !== '') { flash('The first signature has already been given.', 'warning'); redirect($to); }
-            if (contract_amend_signatures() !== 2) { flash('Your company approves an amendment with one approval — there is no first signature to give. Approve it instead.', 'warning'); redirect($to); }
+            if (contract_amend_signatures() < 2) { flash('Your company approves an amendment with one approval — there is no first signature to give. Approve it instead.', 'warning'); redirect($to); }
             db()->prepare("UPDATE contract_amendments SET endorsed_by=?, endorsed_by_id=?, endorsed_at=? WHERE id=?")->execute([$me, $meId, date('c'), (int)$am['id']]);
             $now = contract_amend_stage($c, ['endorsed_at' => date('c'), 'endorsed_by_id' => $meId] + $am)['waiting'];
             if ($qid) crm_log_change($qid, 'Contract ' . $c['contract_number'] . ' amendment — first signature given by ' . $me . ($note !== '' ? ' — ' . $note : '') . '. ' . $now);
             flash('First signature given on the amendment. ' . preg_replace('/^First signature given\\. /', '', $now)); redirect($to);
         }
+        if ($do === 'amend-sign') {
+            $aRule = contract_open_rule(); $n = contract_amend_signatures();
+            if ($n < 3) { flash('There is no middle signature to give on this amendment.', 'warning'); redirect($to); }
+            $stg = contract_amend_stage($c, $am); $slot = (int)($_POST['slot'] ?? 0);
+            if ($stg['need'] !== 'middle' || (int)$stg['slot'] !== $slot) { flash('That signature is not the one waiting now. ' . $stg['waiting'], 'warning'); redirect($to); }
+            ops_require(is_master() || contract_sig_user_holds($slot, current_user(), $aRule), 'You are not one of the people who give the ' . contract_sig_slot_name($slot, $n) . '.');
+            $mid = contract_mid_sigs((int)$c['id'], (int)$am['id']);
+            if (!$aRule['same_person'] && !is_master() && $meId !== 0 && in_array($meId, contract_signer_ids(['at' => $am['endorsed_at'], 'by_id' => $am['endorsed_by_id']], $mid), true)) {
+                flash('You have already signed this amendment, so the ' . contract_sig_slot_name($slot, $n) . ' must come from someone else. ' . $stg['waiting'], 'error'); redirect($to);
+            }
+            db()->prepare("INSERT INTO contract_signatures (contract_id, amendment_id, slot, signed_by, signed_by_id, signed_at, voided_at) VALUES (?,?,?,?,?,?, '')")
+                ->execute([(int)$c['id'], (int)$am['id'], $slot, $me, $meId, date('c')]);
+            $now = contract_amend_stage($c, $am)['waiting'];
+            if ($qid) crm_log_change($qid, 'Contract ' . $c['contract_number'] . ' amendment — ' . contract_sig_slot_name($slot, $n) . ' given by ' . $me . ($note !== '' ? ' — ' . $note : '') . '. ' . $now);
+            flash(ucfirst(contract_sig_slot_name($slot, $n)) . ' given on the amendment. ' . $now); redirect($to);
+        }
         if ($do === 'amend-approve') {
             ops_require(can_approve_contract_open(), 'You are not one of the people who give the final approval on an amendment.');
             $aRule = contract_open_rule(); $aTwo = contract_amend_signatures() === 2;
+            if (contract_amend_signatures() >= 3 && !is_master()) {
+                $stg = contract_amend_stage($c, $am);
+                if ($stg['need'] !== 'final') { flash('It needs its earlier signatures before the final approval. ' . $stg['waiting'], 'error'); redirect($to); }
+                if (!$aRule['same_person'] && $meId !== 0 && in_array($meId, contract_signer_ids(['at' => $am['endorsed_at'], 'by_id' => $am['endorsed_by_id']], contract_mid_sigs((int)$c['id'], (int)$am['id'])), true)) {
+                    flash('You have already signed this amendment, so the final approval must come from someone else. ' . $stg['waiting'], 'error'); redirect($to);
+                }
+            }
             if ($aTwo && trim((string)$am['endorsed_at']) === '' && !is_master()) { flash('It needs its first signature before the final approval. ' . contract_amend_stage($c, $am)['waiting'], 'error'); redirect($to); }
             if ($aTwo && !$aRule['same_person'] && !is_master() && (int)$am['endorsed_by_id'] === $meId && $meId !== 0) { flash('You gave the first signature, so the final approval must come from someone else. ' . contract_amend_stage($c, $am)['waiting'], 'error'); redirect($to); }
             $err = contract_amendment_apply($c, $am, $me, $meId, $note);
@@ -1312,7 +1482,7 @@ function ops_contract_open($route, $method) {
             if ($qid) crm_log_change($qid, 'Contract ' . $c['contract_number'] . ' amendment APPROVED by ' . $me . ' — ' . contract_amendment_summary($am) . '.');
             flash('Amendment approved — the contract now carries the new figures; the old ones are kept on the amendment.'); redirect($to);
         }
-        ops_require(can_endorse_contract_open() || can_approve_contract_open(), 'You cannot decide this amendment.');
+        ops_require(contract_is_signer(), 'You cannot decide this amendment.');
         if ($note === '') { flash('Say why the amendment is rejected.', 'error'); redirect($to); }
         db()->prepare("UPDATE contract_amendments SET status='REJECTED', decided_by=?, decided_by_id=?, decided_at=?, decision_note=? WHERE id=?")
             ->execute([$me, $meId, date('c'), mb_substr($note, 0, 400), (int)$am['id']]);
@@ -1557,6 +1727,7 @@ function ops_contract_edit($method) {
     $unendorsed = false;
     if ($commercialChanged && $os === 'PENDING' && trim((string)$c['mgr_endorsed_at']) !== '') {
         db()->prepare("UPDATE partner_contracts SET mgr_endorsed_by='', mgr_endorsed_by_id=NULL, mgr_endorsed_at='' WHERE id=?")->execute([$id]);
+        contract_mid_void($id, 0);   // Q-08 — the signatures after it fall with it (kept, voided)
         if ($qid) crm_log_change($qid, 'Contract ' . $c['contract_number'] . ' figures changed before approval — the first signature by ' . $c['mgr_endorsed_by'] . ' was withdrawn.');
         $unendorsed = true;
     }

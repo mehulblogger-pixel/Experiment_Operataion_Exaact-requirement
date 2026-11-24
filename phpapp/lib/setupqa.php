@@ -182,16 +182,17 @@ function setupqa_sales_set() {
                         'key' => 'contract_open_signatures',
                         'ask' => 'How many approvals does a new contract need before it opens?',
                         'why' => 'Until a contract is open, no work can be raised against it. A later change to an open contract (value, dates, quantities, billing terms) follows the same answer.',
-                        'options' => ['2' => 'Two — a first signature, then a final approval', '1' => 'One — a single approval', '0' => 'None — it opens as soon as it is registered'],
+                        'options' => ['5' => 'Five — one after another, the last is the final approval', '4' => 'Four — one after another, the last is the final approval', '3' => 'Three — one after another, the last is the final approval',
+                                      '2' => 'Two — a first signature, then a final approval', '1' => 'One — a single approval', '0' => 'None — it opens as soon as it is registered'],
                         'default' => '2',
                     ],
                     [
                         'key' => 'contract_same_person',
-                        'ask' => 'With two approvals, may one person give both?',
-                        'why' => 'Two different people is the safer answer. A very small company, where one person holds both jobs, may need "yes".',
-                        'options' => ['no' => 'No — two different people', 'yes' => 'Yes — one person may give both'],
+                        'ask' => 'With two or more approvals, may one person give more than one?',
+                        'why' => 'Different people is the safer answer. A very small company, where one person holds several jobs, may need "yes".',
+                        'options' => ['no' => 'No — each from a different person', 'yes' => 'Yes — one person may give more than one'],
                         'default' => 'no',
-                        'only_when' => ['contract_open_signatures', '2'],
+                        'only_when' => ['contract_open_signatures', '2|3|4|5'],
                     ],
                 ],
                 'editor' => 'contract_signers',
@@ -283,9 +284,9 @@ function setupqa_sales_contract_facts() {
     $rule = contract_open_rule(); $n = (int)$rule['signatures'];
     $out = ['Today: ' . contract_rule_sentence() . '.'];
     if ($n === 0) $out[] = 'A later change to an open contract still takes one approval, from ' . contract_sig_label(2, $rule) . ' — it rewrites a contract that is already in force.';
-    foreach ($n === 2 ? [1, 2] : [2] as $i)
+    foreach ($n >= 2 ? contract_sig_order($n) : [2] as $i)
         if (!contract_sig_people($i, null, 0, $rule))
-            $out[] = '⚠ Nobody can give the ' . ($i === 1 ? 'first signature' : 'final approval') . ' yet — no active person holds it (' . contract_sig_label($i, $rule) . '). Until someone is, only the Master Admin can sign.';
+            $out[] = '⚠ Nobody can give the ' . contract_sig_slot_name($i, max(1, $n)) . ' yet — no active person holds it (' . contract_sig_label($i, $rule) . '). Until someone is, only the Master Admin can sign.';
     if (!$rule['sig'][1]['standard'] || !$rule['sig'][2]['standard'] || setting_get('contract_open_signatures', '') !== '') $out[] = 'This is your company\'s own rule. The standard one is: two signatures — first Operation Manager, Business Unit Head, Admin, Business Director or anyone who manages a branch\'s users, then Branch Manager or Branch Application Manager, two different people.';
     return $out;
 }

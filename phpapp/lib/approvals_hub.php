@@ -127,7 +127,7 @@ function approvals_hub_sections() {
 //  screen offers them a button for (contract_open_stage()'s primary action).
 function approvals_hub_contracts_waiting() {
     if (!function_exists('can_endorse_contract_open') || !function_exists('contract_open_stage')) return [];
-    if (!(can_endorse_contract_open() || can_approve_contract_open())) return [];
+    if (!(function_exists('contract_is_signer') ? contract_is_signer() : (can_endorse_contract_open() || can_approve_contract_open()))) return [];
     $rows = ops_all("SELECT pc.*, q.id quote_id, q.quote_no, q.rev, COALESCE(bp.display_name, bp.legal_name) client_name
                      FROM partner_contracts pc LEFT JOIN quotations q ON q.id = pc.quotation_id
                      LEFT JOIN business_partners bp ON bp.id = pc.partner_id
@@ -183,7 +183,7 @@ function approvals_hub_row($sectionKey, array $r) {
     if ($sectionKey === 'contracts') {
         return [
             'what'  => (string)($r['contract_number'] ?? '') . ' — ' . (string)($r['client_name'] ?? ''),
-            'kind'  => contract_open_stage($r)['need'] === 'first' ? 'First signature' : 'Final approval',
+            'kind'  => (function ($s) { return $s['need'] === 'first' ? 'First signature' : ($s['need'] === 'middle' ? ucfirst(contract_sig_slot_name($s['slot'], $s['signatures'])) : 'Final approval'); })(contract_open_stage($r)),
             'who'   => (string)($r['requested_by'] ?? ''),
             'when'  => (string)substr((string)($r['requested_at'] ?? ''), 0, 10),
             'rule'  => '',

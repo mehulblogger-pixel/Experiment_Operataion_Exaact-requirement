@@ -553,8 +553,10 @@ function ops_milestones($route, $method) {
             ms_contract_replace_planned((int)$c['id'], $rows, $ret, $base);
             // A contract still awaiting its signatures: an endorsement given for
             // other terms no longer stands.
-            if (strtoupper((string)($c['open_status'] ?? '')) === 'PENDING' && trim((string)($c['mgr_endorsed_at'] ?? '')) !== '')
+            if (strtoupper((string)($c['open_status'] ?? '')) === 'PENDING' && trim((string)($c['mgr_endorsed_at'] ?? '')) !== '') {
                 db()->prepare("UPDATE partner_contracts SET mgr_endorsed_by='', mgr_endorsed_by_id=NULL, mgr_endorsed_at='' WHERE id=?")->execute([(int)$c['id']]);
+                if (function_exists('contract_mid_void')) contract_mid_void((int)$c['id'], 0);   // Q-08
+            }
             ms_log($c, 'Billing schedule set: ' . ms_snapshot_words($new));
             flash('Billing schedule saved.');
             redirect($back);

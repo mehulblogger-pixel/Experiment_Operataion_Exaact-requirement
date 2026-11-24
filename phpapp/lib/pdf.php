@@ -31,6 +31,16 @@ class SimplePDF {
         $t = $this->esc(strtoupper($this->watermark));
         $size = 74; $c = 0.7071;
         $x = $this->W * 0.5 - 175; $y = $this->H * 0.5 - 120;   // roughly centred, bottom-origin
+        //  A longer mark ("DRAFT — NOT FOR CLIENT", Q-05) is made smaller to fit the
+        //  page's diagonal and centred on it; a short one ("DRAFT", "DUPLICATE") is
+        //  drawn exactly as before.
+        $w = $this->strWidth(strtoupper($this->watermark), $size, true);
+        $fit = sqrt($this->W * $this->W + $this->H * $this->H) * 0.72;
+        if ($w > $fit) {
+            $size = max(24, floor($size * $fit / $w)); $w = $this->strWidth(strtoupper($this->watermark), $size, true);
+            $x = $this->W * 0.5 - ($w / 2) * $c + ($size * 0.35) * $c;
+            $y = $this->H * 0.5 - ($w / 2) * $c - ($size * 0.35) * $c;
+        }
         return "q 0.90 0.90 0.90 rg BT /F2 $size Tf "
              . sprintf('%.4f %.4f %.4f %.4f %.2f %.2f', $c, $c, -$c, $c, $x, $y)
              . " Tm ($t) Tj ET Q\n";
@@ -310,6 +320,9 @@ function signature_to_jpeg($raw) { return image_to_jpeg($raw, 0, 92); }
 //  $lh  = ['logo'=>jpegBytes,'name'=>..,'address'=>..,'contact'=>..,'footer'=>..] (letterhead)
 function quote_pdf_build($q, $lines, $tpl, $sig = [], $lh = []) {
     $p = new SimplePDF();
+    //  Q-05 (owner, 24 Nov 2026) — until a quotation has cleared its approval, every
+    //  copy says so across each page. The approved copy is unchanged.
+    if (function_exists('crm_quote_doc_cleared') && !crm_quote_doc_cleared($q)) $p->watermark = QUOTE_DRAFT_MARK;
     $ml = $p->ml; $right = $p->right();
     // ---- customisable letterhead ----
     $band = !empty($lh['band']) && is_array($lh['band']) ? $lh['band'] : [30, 64, 175];

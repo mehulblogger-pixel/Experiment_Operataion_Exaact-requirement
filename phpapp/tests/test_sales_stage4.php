@@ -124,6 +124,8 @@ try {
         }
         //  The register's own tab/filter links now drop a stale page number — the same address otherwise.
         if ($route === 'quotes' && strpos($href, '/quotes?') === 0) return true;
+        //  Q-05 (owner, 24 Nov 2026): the editable Word copy only once approved, and only for those who send.
+        if ($route === 'quote' && preg_match('#^/quote-doc\?id=(\d+)$#', $href, $wm)) return !s4_as($uid, fn() => crm_quote_word_allowed(crm_quote_get((int) $wm[1])));
         return false;
     };
     $formGone = function ($uid, $route, $get, $sig) {
