@@ -476,7 +476,8 @@ document.addEventListener('DOMContentLoaded', function () {
           <option value="<?= e($k) ?>" <?= $callFreq===$k?'selected':'' ?>><?= e($v) ?></option>
         <?php endforeach; ?>
       </select>
-      <small class="muted">How often the <?= e(Tl('engineer')) ?> must send progress in — shown on the <?= e(T_REG('call')) ?>.</small></div>
+      <small class="muted">How often the <?= e(Tl('engineer')) ?> must send progress in — shown on the <?= e(T_REG('call')) ?>.</small>
+      <small class="muted" id="freq_suggest_note" style="display:none">Suggested for man-day work: one report for each inspection day. Change it if this <?= e(Tl('client')) ?> agreed otherwise.</small></div>
     <div class="ff" id="call_days_wrap" style="<?= $callFreq==='CUSTOM'?'':'display:none' ?>"><label>…every how many days?</label>
       <input class="form-control" type="number" min="1" name="report_custom_days" value="<?= e($callDays) ?>" placeholder="e.g. 3"></div>
 
@@ -651,6 +652,23 @@ document.addEventListener('DOMContentLoaded', function () {
     freqSel.addEventListener('change', function(){
       daysWrap.style.display = freqSel.value === 'CUSTOM' ? '' : 'none';
     });
+  }
+  // ---- TPIA D5 (owner, 25 Nov 2026): man-day work suggests "One report per
+  //      inspection day". Only a suggestion — made while the box is still
+  //      blank and nobody has picked a frequency; any choice made by hand wins.
+  if (freqSel && freqSel.querySelector('option[value="PER_DAY"]')) {
+    var freqTouched = freqSel.value !== '';
+    freqSel.addEventListener('change', function () { freqTouched = true; var n = document.getElementById('freq_suggest_note'); if (n) n.style.display = 'none'; });
+    var suggestPerDay = function () {
+      var b = document.getElementById('billable_basis'), ct = document.querySelector('select[name="credit_type"]');
+      var manday = (b && b.value === 'MANDAY') || (ct && ct.value === 'MANDAY');
+      if (!manday || freqTouched || freqSel.value !== '') return;
+      freqSel.value = 'PER_DAY';
+      var n = document.getElementById('freq_suggest_note'); if (n) n.style.display = '';
+    };
+    ['billable_basis'].forEach(function (id) { var el = document.getElementById(id); if (el) el.addEventListener('change', suggestPerDay); });
+    var ctSel = document.querySelector('select[name="credit_type"]'); if (ctSel) ctSel.addEventListener('change', suggestPerDay);
+    suggestPerDay();
   }
 
   // ---- §a.i / §a.ii / §a.iv: the quote drives the commercial fields ---------

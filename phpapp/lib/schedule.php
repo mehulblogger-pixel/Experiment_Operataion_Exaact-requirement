@@ -713,3 +713,249 @@ function ops_sched_preview() {
     ]);
     return true;
 }
+
+// ---------------------------------------------------------------------------
+//  Report obligations — what a job owes, day by day or period by period
+//
+//  TPIA reporting Phase 1 (owner, 25 Nov 2026 — items 7, 8, 9, 10; D5, D6).
+//  ONE reading of "which reports does this job owe, and which are missing",
+//  used by the job and call pages ("Day reports 7 of 10", "next due"), the
+//  "Reports to write" figure (lib/opskpi.php) and the reminders — so the card,
+//  the list it opens and the e-mail can never disagree. Read-only; nothing here
+//  writes, and no report or visit day is ever changed by it.
+//
+//    No report / blank     owes nothing.
+//    One report per        one report for EACH visit day, dated that day (the
+//    inspection day        day's own report: a day-1 report never covers day 4).
+//                          A "No inspection" day owes none.
+//    Daily, alternate day, fixed periods counted from the job START date —
+//    weekly, fortnightly,  1, 2, 7, 14 or N days; monthly by the start date's
+//    custom (every N days) day of the month — up to the end date (or the early
+//    monthly               end). A late report counts for the oldest period
+//                          still open, and the next period's due date never
+//                          moves (no drift). Daily skips non-working days.
+//    Anything else         (an older value such as SINGLE / ONCE) owes one
+//                          report, as before.
+//
+//  A report counts once it has been SUBMITTED (or is further on: at vetting,
+//  under review, approved, issued). A draft or a report sent back is still to
+//  write. A Release Note is not a report for this purpose, and a revision that
+//  was replaced by a later one is counted once (the latest). A day closed with
+//  a report link, and the job's own "report uploaded" date, count too.
+// ---------------------------------------------------------------------------
+const REPORT_PERIOD_DAYS = ['DAILY' => 1, 'ALTERNATE' => 2, 'WEEKLY' => 7, 'FORTNIGHTLY' => 14];
+const REPORT_WRITTEN_STATES = ['SUBMITTED', 'VETTING', 'UNDER_REVIEW', 'APPROVED', 'ISSUED'];
+
+function report_written($r) {
+    return !empty($r['finalized']) || in_array(strtoupper((string)($r['status'] ?? '')), REPORT_WRITTEN_STATES, true);
+}
+
+// Reports and visit days of many jobs in three queries — the figure is worked
+// out for every open job at once, so this must not be one query per job.
+function report_evidence_batch(array $jobIds) {
+    $jobIds = array_values(array_unique(array_filter(array_map('intval', $jobIds))));
+    $out = [];
+    foreach ($jobIds as $id) $out[$id] = ['reports' => [], 'visits' => []];
+    foreach (array_chunk($jobIds, 400) as $chunk) {
+        $in = implode(',', $chunk);
+        try {
+            foreach (ops_all("SELECT id, job_id, irn, type_code, status, finalized, inspection_date, issue_date, created_at, inspector_id, revised_by_id
+                              FROM report_docs WHERE COALESCE(deleted,0)=0 AND job_id IN ($in) ORDER BY id") ?: [] as $r)
+                $out[(int)$r['job_id']]['reports'][] = $r;
+        } catch (Throwable $e) { /* reports not in use on this install */ }
+        try {
+            foreach (ops_all("SELECT * FROM job_visits WHERE job_id IN ($in) ORDER BY visit_date, id") ?: [] as $v)
+                $out[(int)$v['job_id']]['visits'][] = $v;
+        } catch (Throwable $e) {}
+    }
+    return $out;
+}
+
+function report_date_of($r) {
+    $d = trim((string)($r['inspection_date'] ?? '')) ?: trim((string)($r['issue_date'] ?? '')) ?: substr((string)($r['created_at'] ?? ''), 0, 10);
+    return preg_match('/^\d{4}-\d{2}-\d{2}/', $d) ? substr($d, 0, 10) : '';
+}
+
+// The periods of a periodic frequency: [[from, to], …] from $start to $end.
+function report_periods($freq, $start, $end, $customDays = 0, $officeId = null, array $skipDays = []) {
+    $freq = strtoupper((string)$freq);
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$start) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$end) || $end < $start) return [];
+    $len = REPORT_PERIOD_DAYS[$freq] ?? ($freq === 'CUSTOM' ? max(0, (int)$customDays) : 0);
+    $out = [];
+    if ($freq === 'MONTHLY') {
+        // By the start date's day of the month (owner D6: "Start date"): a posting
+        // that starts on the 10th reports 10 Jan–9 Feb, 10 Feb–9 Mar, … A start on
+        // the 31st runs to the last day of a shorter month.
+        $sd = (int)substr($start, 8, 2); $y = (int)substr($start, 0, 4); $m = (int)substr($start, 5, 2);
+        $at = function ($k) use ($sd, $y, $m) {
+            $mm = $m + $k; $yy = $y + intdiv($mm - 1, 12); $mm = (($mm - 1) % 12) + 1;
+            $dim = (int)date('t', mktime(0, 0, 0, $mm, 1, $yy));
+            return sprintf('%04d-%02d-%02d', $yy, $mm, min($sd, $dim));
+        };
+        for ($k = 0; $k < 400; $k++) {
+            $from = $at($k); if ($from > $end) break;
+            $to = date('Y-m-d', strtotime($at($k + 1) . ' -1 day'));
+            $out[] = [$from, min($to, $end)];
+        }
+        return $out;
+    }
+    if ($len <= 0) return [];
+    $t = strtotime($start); $endT = strtotime($end);
+    for ($k = 0; $k < 2000 && $t <= $endT; $k++) {
+        $from = date('Y-m-d', $t);
+        $to = date('Y-m-d', min($endT, strtotime("+" . ($len - 1) . " day", $t)));
+        $t = strtotime("+$len day", $t);
+        if ($len === 1) {
+            if (isset($skipDays[$from])) continue;
+            if (function_exists('is_working_day') && !is_working_day($from, $officeId)) continue;
+        }
+        $out[] = [$from, $to];
+    }
+    return $out;
+}
+
+// What the job owes. $ev = this job's entry from report_evidence_batch() (fetched
+// when not given). Returns:
+//   kind       NONE | DAY (one per inspection day) | PERIOD | LEGACY (one report)
+//   items      [from, to, met, by] — `to` is the due date
+//   total, due (to ≤ today), met, missing (due and not met), overdue (missing
+//   with to < today), next_due (the first unmet item's due date), oldest_missing,
+//   last_report (date of the latest report counted)
+function ops_report_obligations(array $job, $today = null, $ev = null) {
+    $today = $today ?: date('Y-m-d');
+    $freq = strtoupper(trim((string)($job['reporting_frequency'] ?? '')));
+    $res = ['kind' => 'NONE', 'freq' => $freq, 'items' => [], 'total' => 0, 'due' => 0, 'met' => 0, 'missing' => 0,
+            'overdue' => 0, 'next_due' => '', 'oldest_missing' => '', 'last_report' => ''];
+    if ($freq === '' || $freq === 'NOREPORT') return $res;
+    $jid = (int)($job['id'] ?? 0);
+    if ($ev === null) { $b = report_evidence_batch([$jid]); $ev = $b[$jid] ?? ['reports' => [], 'visits' => []]; }
+    $office = $job['executing_office_id'] ?? null;
+    $stop = substr(trim((string)($job['billing_stop_on'] ?? '')), 0, 10);
+    // The reports that count, oldest first.
+    $written = []; $undated = '';
+    foreach ($ev['reports'] as $r) {
+        if (in_array(strtoupper((string)($r['type_code'] ?? '')), ['RN', 'IRN'], true)) continue;
+        if ((int)($r['revised_by_id'] ?? 0) > 0) continue;            // replaced by a later revision
+        if (!report_written($r)) continue;
+        $d = report_date_of($r);
+        if ($d === '') { $undated = (string)($r['irn'] ?? '') ?: 'report'; continue; }   // counts only for a one-report job
+        $written[] = ['date' => $d, 'by' => (string)($r['irn'] ?? ''), 'inspector_id' => (int)($r['inspector_id'] ?? 0)];
+    }
+    usort($written, fn($a, $b) => strcmp($a['date'], $b['date']));
+    $visits = []; $noInsp = [];
+    foreach ($ev['visits'] as $v) {
+        $d = substr((string)($v['visit_date'] ?? ''), 0, 10); if ($d === '') continue;
+        if (strtoupper((string)($v['status'] ?? '')) === 'NO_INSPECTION') { $noInsp[$d] = true; continue; }
+        $visits[$d] = $v;
+    }
+    $linkDays = [];
+    foreach ($visits as $d => $v) if (strtoupper((string)($v['status'] ?? '')) === 'DONE' && trim((string)($v['report_link'] ?? '')) !== '') $linkDays[$d] = true;
+    $upload = substr(trim((string)($job['report_upload_date'] ?? '')), 0, 10);
+    $start = substr(trim((string)($job['inspection_start_date'] ?? '')) ?: trim((string)($job['scheduled_date'] ?? '')), 0, 10);
+    if ($start === '' && $visits) $start = array_key_first($visits);
+    $items = [];
+    $periodic = isset(REPORT_PERIOD_DAYS[$freq]) || $freq === 'MONTHLY' || ($freq === 'CUSTOM' && (int)($job['report_custom_days'] ?? 0) > 0);
+    if ($periodic && $start === '') $periodic = false;          // no start date: one report, as before
+    if ($freq === 'PER_DAY') {
+        $res['kind'] = 'DAY';
+        $days = array_keys($visits);
+        if (!$days && !$noInsp) {
+            $r = function_exists('sched_resolve') ? sched_resolve($job, $office) : ['dates' => []];
+            $days = (array)($r['dates'] ?? []);
+            if (!$days && $start !== '') $days = [$start];
+        }
+        foreach ($days as $d) {
+            if ($stop !== '' && $d > $stop) continue;
+            if (count($visits) > 1 && function_exists('is_working_day') && !is_working_day($d, $office)) continue;
+            $who = (int)($visits[$d]['inspector_id'] ?? 0);
+            $by = '';
+            foreach ($written as $w) if ($w['date'] === $d && (!$who || !$w['inspector_id'] || $w['inspector_id'] === $who)) { $by = $w['by']; break; }
+            if ($by === '' && isset($linkDays[$d])) $by = 'report link';
+            if ($by === '' && $upload !== '' && $upload === $d) $by = 'report uploaded';
+            $items[] = ['from' => $d, 'to' => $d, 'met' => $by !== '', 'by' => $by];
+        }
+    } elseif ($periodic) {
+        $res['kind'] = 'PERIOD';
+        $end = substr(trim((string)($job['inspection_end_date'] ?? '')), 0, 10);
+        if ($end === '' && $visits) $end = array_key_last($visits);
+        if ($end === '' || $end < $start) $end = $start;
+        if ($stop !== '' && $stop < $end) $end = max($start, $stop);
+        $periods = report_periods($freq, $start, $end, (int)($job['report_custom_days'] ?? 0), $office, $noInsp);
+        foreach ($periods as [$from, $to]) {
+            // A period whose every planned visit day was "No inspection" owes no report.
+            $hasV = false; $hasNo = false;
+            foreach ($visits as $d => $v) if ($d >= $from && $d <= $to) { $hasV = true; break; }
+            foreach ($noInsp as $d => $x) if ($d >= $from && $d <= $to) { $hasNo = true; break; }
+            if ($hasNo && !$hasV) continue;
+            $items[] = ['from' => $from, 'to' => $to, 'met' => false, 'by' => ''];
+        }
+        // Each report (or link / upload) fills the OLDEST period still open that
+        // has begun by its date — so week 1's report filed on day 9 is week 1's,
+        // and week 2 stays due on day 14.
+        $evd = $written;
+        foreach (array_keys($linkDays) as $d) $evd[] = ['date' => $d, 'by' => 'report link'];
+        if ($upload !== '') $evd[] = ['date' => $upload, 'by' => 'report uploaded'];
+        usort($evd, fn($a, $b) => strcmp($a['date'], $b['date']));
+        foreach ($evd as $w) {
+            foreach ($items as $i => $it) {
+                if ($it['met']) continue;
+                if ($it['from'] <= $w['date'] || $i === 0) { $items[$i]['met'] = true; $items[$i]['by'] = $w['by']; }
+                break;
+            }
+        }
+    } else {
+        $res['kind'] = 'LEGACY';
+        $by = $written ? $written[count($written) - 1]['by'] : ($undated !== '' ? $undated : ($upload !== '' ? 'report uploaded' : ($linkDays ? 'report link' : '')));
+        $items[] = ['from' => $start, 'to' => $start !== '' && $start < $today ? $start : $today, 'met' => $by !== '', 'by' => $by];
+    }
+    $res['items'] = $items;
+    foreach ($items as $it) {
+        $res['total']++;
+        if ($it['met']) $res['met']++;
+        if ($it['to'] <= $today) {
+            $res['due']++;
+            if (!$it['met']) {
+                $res['missing']++;
+                if ($res['oldest_missing'] === '') $res['oldest_missing'] = $it['to'];
+                if ($it['to'] < $today) $res['overdue']++;
+            }
+        }
+        if (!$it['met'] && $res['next_due'] === '') $res['next_due'] = $it['to'];
+    }
+    if ($written) $res['last_report'] = $written[count($written) - 1]['date'];
+    return $res;
+}
+
+// The jobs, among the given ones, that have a report missing today.
+function ops_jobs_missing_reports(array $jobs, $today = null) {
+    $ev = report_evidence_batch(array_column($jobs, 'id'));
+    $out = [];
+    foreach ($jobs as $j) {
+        $o = ops_report_obligations($j, $today, $ev[(int)$j['id']] ?? ['reports' => [], 'visits' => []]);
+        if ($o['missing'] > 0) $out[(int)$j['id']] = $o;
+    }
+    return $out;
+}
+
+// One plain line for the job and call pages.
+function ops_report_progress_line(array $job, $today = null) {
+    if (!empty($job['id']) && !array_key_exists('reporting_frequency', $job))
+        $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)$job['id']]) ?: $job;
+    $o = ops_report_obligations($job, $today);
+    if ($o['kind'] === 'NONE') return '';
+    $f = function ($d) { return $d !== '' && function_exists('fdate') ? fdate($d) : $d; };
+    if ($o['kind'] === 'DAY') {
+        $s = 'Day reports: ' . $o['met'] . ' of ' . $o['total'];
+        if ($o['missing']) $s .= ' · ' . $o['missing'] . ' day' . ($o['missing'] === 1 ? '' : 's') . ' still without a report (oldest ' . $f($o['oldest_missing']) . ')';
+        return $s;
+    }
+    if ($o['kind'] === 'PERIOD') {
+        $lab = (defined('REPORT_FREQ') ? (REPORT_FREQ[$o['freq']] ?? $o['freq']) : $o['freq']);
+        $s = $lab . ' reports: ' . $o['met'] . ' of ' . $o['total'];
+        if ($o['last_report'] !== '') $s .= ' · last ' . $f($o['last_report']);
+        if ($o['next_due'] !== '') $s .= ' · next due ' . $f($o['next_due']);
+        if ($o['overdue']) $s .= ' · OVERDUE since ' . $f($o['oldest_missing']);
+        return $s;
+    }
+    return $o['met'] ? 'Report: written' : 'Report: still to write';
+}

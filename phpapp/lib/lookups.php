@@ -99,6 +99,8 @@ function lk_migrate() {
     lk_ensure_values_from_map('inspection_type', INSPECTION_TYPES);
     // add CUSTOM to reporting frequency on existing installs
     lk_ensure_value('reporting_frequency', 'CUSTOM', 'Custom (every N days)');
+    // TPIA Phase 1 (owner, 25 Nov 2026 — D5): one report per inspection day.
+    lk_ensure_value('reporting_frequency', 'PER_DAY', 'One report per inspection day');
     // trade + skills (skills depend on trade) — seed on upgrade if missing
     if ((int)ops_val("SELECT COUNT(*) FROM lookup_types") > 0 && !lk_type('trade')) lk_seed_trade_skill();
     // The acronyms are gone from the app. Existing installs still carry the old

@@ -49,7 +49,7 @@ something the register would hide.
 | Today's services | Live jobs scheduled for today | `/jobs?f=today` |
 | Jobs overdue | Live, open jobs whose planned end (else their scheduled date) has passed. A cancelled job is never overdue. | `/jobs?f=jobs_overdue` |
 | Reports awaiting sign-off | Closed jobs whose report still waits for the reporting manager's sign-off (the job-close track) | `/jobs?f=signoff` |
-| Reports to write | Live, open jobs that need a report (a frequency other than "No report") with none uploaded and none issued yet. A job whose report is already issued is not counted, so it can never be both "report to write" and "ready to close". | `/jobs?f=to_write` and the inspector's *My jobs → Reports to write* |
+| Reports to write | Live, open jobs that need reports (a frequency other than "No report") with **at least one report missing today** (TPIA Phase 1, owner 25 Nov 2026 — item 9). *One report per inspection day*: every visit day up to today without its own report dated that day (a "No inspection" day owes none). *Daily / alternate day / weekly / fortnightly / every N days / monthly*: every fixed period counted from the job start date (monthly by the start date's day of the month), ended by today, whose report is not in; a late report counts for the oldest open period, so the next due date never moves. A report counts once it is **submitted** or further on (a draft or a sent-back report is still to write); a Release Note does not count; a replaced revision counts once. A day closed with a report link and the job's "report uploaded" date count too. A job with no dates, or an older value such as "Once", still owes one report, as before. The job stays counted until its last missing report is in — it is no longer dropped at its first report. One reading: `ops_report_obligations()` (`lib/schedule.php`), also used by the job / call page line ("Day reports: 7 of 10", "next due") and the nightly reminders. | `/jobs?f=to_write`, the inspector's *My jobs → Reports to write* and the *Your pending tasks* "reports to upload" card |
 
 **Scope for these cards:** the jobs register's own scope (office and business
 unit). The inspector's tiles count only that inspector's own jobs.
@@ -72,6 +72,13 @@ unit). The inspector's tiles count only that inspector's own jobs.
   - cancelled jobs are left out of open, closed and overdue.
 - **Weekly / monthly management e-mail:** "jobs overdue" and "Reports awaiting sign-off" (was "awaiting approval": every job with a pending approval, open or closed).
 - **Inspector dashboard and My jobs:** "Reports to write" and "Jobs overdue".
+- **Your pending tasks → "reports to upload"** (TPIA Phase 1, item 18): now the same
+  "Reports to write" reading, so the card equals the *My jobs → Reports to write* list it opens.
+- **Nightly reminders** (TPIA Phase 1, item 10): a report reminder is sent only for a
+  missing report under the same reading ("day report for 4 Nov", "weekly report due
+  18 Nov", "+2 more missing"); escalation counts the days since the oldest missing due
+  date. A "No report" job never gets a report reminder — only the existing "close this
+  job" reminder once its end date has passed.
 
 ## One status reading (B2)
 

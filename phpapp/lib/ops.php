@@ -12,7 +12,9 @@ const OPS_SBUS = ['IND'=>'Industrial','OGC'=>'Oil, Gas & Chemicals','MIN'=>'Mine
 const PRODUCT_CATS = ['ELEC'=>'Electrical equipment','MECH'=>'Mechanical equipment','STRUCT'=>'Structural / Fabrication','PIPE'=>'Pipes & Fittings','VALVE'=>'Valves','PUMP'=>'Pumps & Rotating','TRANSFORMER'=>'Transformers','CABLE'=>'Cables','INSTRUMENT'=>'Instrumentation','CIVIL'=>'Civil / Construction','OTHER'=>'Others'];
 const CREDIT_TYPES = ['MANDAY'=>'Man-day','MANMONTH'=>'Man-month','LUMP'=>'Lump sum','LATER'=>'Decide later','OTHER'=>'Other'];
 const CREDIT_DIRECTIONS = ['RECEIVED'=>'Received (from the other office)','GIVEN'=>'Given (to the other office)'];
-const REPORT_FREQ = ['DAILY'=>'Daily','ALTERNATE'=>'Alternate day','WEEKLY'=>'Weekly','FORTNIGHTLY'=>'Fortnightly','MONTHLY'=>'Monthly','CUSTOM'=>'Custom (every N days)','NOREPORT'=>'No report'];
+//  PER_DAY (TPIA Phase 1, owner 25 Nov 2026 — D5): one report for EACH inspection
+//  (visit) day, dated that day; suggested for man-day work, always changeable.
+const REPORT_FREQ = ['DAILY'=>'Daily','PER_DAY'=>'One report per inspection day','ALTERNATE'=>'Alternate day','WEEKLY'=>'Weekly','FORTNIGHTLY'=>'Fortnightly','MONTHLY'=>'Monthly','CUSTOM'=>'Custom (every N days)','NOREPORT'=>'No report'];
 // Types of inspection service (third-party inspection industry).
 const INSPECTION_TYPES = ['INSPECTION'=>'Inspection (third-party / TPI)','EXPEDITING'=>'Expediting','DEPUTATION'=>'Resident / site posting','VENDOR_ASSESS'=>'Vendor assessment','VENDOR_AUDIT'=>'Vendor audit','PRE_PROD'=>'Pre-production inspection','DURING_PROD'=>'During-production inspection','STAGE'=>'Stage / In-process inspection','FINAL'=>'Final inspection','FRI'=>'Final random inspection (FRI)','PSI'=>'Pre-shipment inspection (PSI)','WITNESS'=>'Witness / Test witnessing','FAT'=>'Factory Acceptance Test (FAT)','SAT'=>'Site Acceptance Test (SAT)','SOURCE'=>'Source inspection','SURVEILLANCE'=>'Surveillance','LOADING'=>'Loading / container supervision','SAMPLING'=>'Sampling','DIMENSIONAL'=>'Dimensional inspection','WELDING'=>'Welding inspection','NDT'=>'NDT witnessing','PMI'=>'Material verification (PMI)','COATING'=>'Painting / coating inspection','MECH_TEST'=>'Mechanical testing witness','CALIB'=>'Calibration verification','SAFETY_AUDIT'=>'Safety audit','SYSTEM_AUDIT'=>'Management-system audit','SECOND_PARTY'=>'Second-party audit','DESKTOP'=>'Desktop / Document review','TECH_AUDIT'=>'Technical audit','SUPPLY_CHAIN'=>'Supply-chain posting','SITE_SUP'=>'Site supervision','COMMISSIONING'=>'Commissioning & installation','SITE_QAQC'=>'Site QA / QC','TYPE_TEST'=>'Type test','TENDER_REVIEW'=>'Tender review','OTHER'=>'Other'];
 // Deliverables / report formats produced after a job.
@@ -3104,21 +3106,27 @@ function ops_run_reminders($today = null) {
     $today = $today ?: date('Y-m-d');
     $sent = 0;
     $open = ops_all("SELECT * FROM jobs WHERE closed_flag=0 AND inspector_id IS NOT NULL");
+    //  TPIA Phase 1 item 10 (owner, 25 Nov 2026): a reminder follows a MISSING
+    //  report — an inspection day without its own report, or a fixed period whose
+    //  report is not in — never the calendar days since the last upload (which a
+    //  report filed through the reports module never set, so it nagged forever).
+    //  The same reading as the "Reports to write" figure. A "No report" job is
+    //  never reminded about a report; only the existing "close this job" reminder
+    //  after its end date applies to it.
+    $ev = function_exists('report_evidence_batch') ? report_evidence_batch(array_column($open, 'id')) : [];
     foreach ($open as $j) {
-        if ($j['reporting_frequency'] === 'NOREPORT') {
-            // only overdue-closure reminder applies
-        }
         $due = false; $why = '';
         $end = $j['inspection_end_date'] ?: $j['scheduled_date'];
-        $last = $j['report_upload_date'] ?: $j['inspection_start_date'] ?: $j['scheduled_date'];
-        $since = days_between($last, $today);
-        switch ($j['reporting_frequency']) {
-            case 'DAILY': if ($since !== null && $since >= 1) { $due = true; $why = 'daily report'; } break;
-            case 'ALTERNATE': if ($since !== null && $since >= 2) { $due = true; $why = 'alternate-day report'; } break;
-            case 'WEEKLY': if ($since !== null && $since >= 7) { $due = true; $why = 'weekly report'; } break;
-            case 'FORTNIGHTLY': if ($since !== null && $since >= 14) { $due = true; $why = 'fortnightly report'; } break;
-            case 'MONTHLY': if ($since !== null && $since >= 30) { $due = true; $why = 'monthly report'; } break;
-            case 'CUSTOM': $n = (int)($j['report_custom_days'] ?? 0); if ($n > 0 && $since !== null && $since >= $n) { $due = true; $why = "report (every $n days)"; } break;
+        $since = null;
+        if (function_exists('ops_report_obligations')) {
+            $ob = ops_report_obligations($j, $today, $ev[(int)$j['id']] ?? ['reports' => [], 'visits' => []]);
+            if ($ob['missing'] > 0) {
+                $due = true;
+                $since = days_between($ob['oldest_missing'], $today);
+                $why = ($ob['kind'] === 'DAY' ? 'day report for ' . fdate($ob['oldest_missing'])
+                        : ($ob['kind'] === 'PERIOD' ? strtolower(REPORT_FREQ[$ob['freq']] ?? 'periodic') . ' report due ' . fdate($ob['oldest_missing']) : 'report'))
+                     . ($ob['missing'] > 1 ? ' (+' . ($ob['missing'] - 1) . ' more missing)' : '');
+            }
         }
         // Overdue closure: past inspection end and still open
         $pastEnd = $end && days_between($end, $today) !== null && days_between($end, $today) > 0;
@@ -10486,7 +10494,10 @@ function ops_pending_tasks() {
             '↩', 'to fix &amp; resubmit', 'reports sent back to you', '/documents?status=REJECTED', 'bad', 'reports');
         // My open jobs still needing a report uploaded.
         $today = date('Y-m-d');
-        $add($cnt("SELECT COUNT(*) FROM jobs WHERE inspector_id=? AND closed_flag=0 AND reporting_frequency<>'NOREPORT' AND (report_upload_date IS NULL OR report_upload_date='')", [$insId]),
+        //  TPIA Phase 1 item 18 — the same reading as "Reports to write" and the
+        //  My jobs list this card opens (lib/opskpi.php), so the two always agree.
+        $add(function_exists('opk_count_my_jobs') ? opk_count_my_jobs('to_write', $insId)
+                 : $cnt("SELECT COUNT(*) FROM jobs WHERE inspector_id=? AND closed_flag=0 AND reporting_frequency<>'NOREPORT' AND (report_upload_date IS NULL OR report_upload_date='')", [$insId]),
             '📄', 'reports to upload', 'jobs of yours still needing a report', '/my-jobs?f=reports', 'warn', 'jobs');
         // My open jobs whose report is issued (or none needed) — ready to close and
         // record the day's expenses. Surfaced here because a job may carry several
