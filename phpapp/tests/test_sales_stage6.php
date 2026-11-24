@@ -184,7 +184,8 @@ try {
     t_ok(!s6_opens($sset, '/lookup?key=lead_source') && !s6_opens($sset, '/m/holidays'), '…and those screens do refuse them (the reason the links went)');
     t_ok(strpos($ss['text'], 'kept by an administrator') !== false, '…instead each list is named, with who keeps it');
     $ms = $draws['Master admin']['sales-settings[]'][1];
-    foreach (['/lookup?key=lead_source', '/lookup?key=quote_lost_reason', '/lookup?key=contact_buying_role', '/m/holidays', '/sales-setup'] as $h)
+    //  Owner test S-05 (23 Nov 2026): "Who approves" opens the approval levels; the guided set-up keeps its own link.
+    foreach (['/lookup?key=lead_source', '/lookup?key=quote_lost_reason', '/lookup?key=contact_buying_role', '/m/holidays', '/sales-setup', '/sales-approvals?tab=quote'] as $h)
         t_ok(in_array($h, $ms['hrefs'], true) && s6_opens($f['master'], $h), "Master admin is offered $h, and it opens");
     t_ok(strpos($ms['text'], 'kept by') === false, 'Master admin sees no "kept by" note');
 

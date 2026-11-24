@@ -35,6 +35,9 @@ $links = [
   //  the approval levels themselves — Admin → Approvals → Sales → the quotation tab (same rule as
   //  that screen for who may open it).
   ['Who approves ' . Tlp('quote'), 'lock', '/sales-approvals?tab=quote', 'Approval levels: who approves, up to what value', $__s6open('sales-approvals', is_master() || can('settings.manage') || can('crm.quote.approve')), 'whoever may approve ' . Tlp('quote') . ' (Admin → Approvals → Sales)'],
+  //  The guided set-up stays one click away, under its own name (it is no longer behind
+  //  "Who approves").
+  ['Set up Sales in a few questions', 'flow', '/sales-setup', 'Plain questions: approvals, contract opening, deal stages', $__s6open('sales-setup', is_master() || can('settings.manage') || can('crm.quote.approve')), 'whoever may approve ' . Tlp('quote') . ' (Set up Sales)'],
 ];
 $stageLink = $stageEditorOn && $__s6open('pipelines', (!function_exists('pipe_can_view') || pipe_can_view()));
 ?>
