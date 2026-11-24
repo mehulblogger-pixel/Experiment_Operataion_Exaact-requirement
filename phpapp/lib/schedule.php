@@ -118,6 +118,15 @@ function sched_migrate() {
     ensure_column('job_visits', 'report_doc_id', 'INT NULL');
     ensure_column('job_visits', 'closed_by', "VARCHAR(150) DEFAULT ''");
     ensure_column('job_visits', 'closed_at', "VARCHAR(30) DEFAULT ''");
+    //  TPIA Phase 1 / D8 (owner, 25 Nov 2026) — a planned day on which no
+    //  inspection happened is closed as NO_INSPECTION with a reason from the
+    //  editable list below and a note; the planned date stays as it was. A new
+    //  date, when one is agreed, is a NEW planned day that records the day it
+    //  was moved from (moved_from), so both stay in History.
+    ensure_column('job_visits', 'reason_code', "VARCHAR(24) DEFAULT ''");
+    ensure_column('job_visits', 'reason_note', "VARCHAR(400) DEFAULT ''");
+    ensure_column('job_visits', 'moved_from', "VARCHAR(20) DEFAULT ''");
+    if (function_exists('lk_ensure_type_map')) lk_ensure_type_map('visit_no_insp_reason', 'No-inspection reason (visit day)', VISIT_NO_INSP_REASONS, 'tosrm');
     // Older records predate the type. Work out what they were from what they
     // carry, so no register row is left blank.
     try {
@@ -601,7 +610,10 @@ function job_visits_sync($jobId, $defaultInspectorId = null, $perDate = []) {
     // Dates that are no longer part of the engagement stop being visits — unless
     // the day was already worked and closed with its report: that is an earned,
     // billable man-day and evidence, and moving the schedule must not erase it.
-    $done = array_map(function ($v) { return (int)$v['id']; }, array_filter(array_values($have), fn($v) => ($v['status'] ?? '') === 'DONE'));
+    // Likewise a day closed as "No inspection" (its planned date, reason and
+    // note are the record) and a day added in its place (moved_from) are kept.
+    $done = array_map(function ($v) { return (int)$v['id']; }, array_filter(array_values($have),
+        fn($v) => in_array(($v['status'] ?? ''), ['DONE', 'NO_INSPECTION'], true) || trim((string)($v['moved_from'] ?? '')) !== ''));
     $gone = array_diff(array_map(function ($v) { return (int)$v['id']; }, array_values($have)), $keep, $done);
     foreach ($gone as $id) db()->prepare("DELETE FROM job_visits WHERE id=?")->execute([$id]);
     return ops_all("SELECT * FROM job_visits WHERE job_id=? ORDER BY visit_date", [$jobId]);
@@ -614,28 +626,151 @@ function job_visits($jobId) {
     catch (Throwable $e) { return []; }
 }
 
-// §WO-8 — close one day of a multi-day job. A report (a link or an IDEMS report
-// on the job) is required; without it the day cannot be marked done. Creates the
-// visit row lazily if the schedule was never synced.
+// Reasons a planned day saw no inspection (TPIA D8). STARTING values only — the
+// list is the "No-inspection reason (visit day)" master (Masters → lookups), so a
+// company renames, adds or removes entries without a code change.
+const VISIT_NO_INSP_REASONS = ['MATERIAL_NOT_READY' => 'Material not ready', 'POSTPONED_MFR' => 'Postponed by manufacturer',
+    'POSTPONED_CLIENT' => 'Postponed by client', 'CANCELLED_CLIENT' => 'Cancelled by client',
+    'ACCESS_REFUSED' => 'Access refused', 'OTHER' => 'Other'];
+function visit_no_insp_reasons() {
+    return function_exists('lk_options_or') ? lk_options_or('visit_no_insp_reason', VISIT_NO_INSP_REASONS) : VISIT_NO_INSP_REASONS;
+}
+// A visit day's status in words.
+function visit_status_label($v) {
+    $st = strtoupper((string)($v['status'] ?? 'PLANNED'));
+    if ($st === 'DONE') return 'Done';
+    if ($st === 'NO_INSPECTION') {
+        $r = visit_no_insp_reasons()[$v['reason_code'] ?? ''] ?? (string)($v['reason_code'] ?? '');
+        return 'No inspection' . ($r !== '' ? ' — ' . $r : '') . (trim((string)($v['reason_note'] ?? '')) !== '' ? ' (' . trim((string)$v['reason_note']) . ')' : '');
+    }
+    return trim((string)($v['moved_from'] ?? '')) !== '' ? 'Planned (moved from ' . (function_exists('fdate') ? fdate($v['moved_from']) : $v['moved_from']) . ')' : 'Planned';
+}
+
+// The report that closes one visit day (TPIA Phase 1 item 5 — the day's OWN
+// report, not "the latest report on the job" as before). Returns [docId, why]:
+// docId 0 with a plain reason when there is none.
+//   One report per inspection day / daily: a report on this job dated that day
+//     (and, when the day has its own inspector, that inspector's or unnamed).
+//   Alternate / weekly / fortnightly / monthly / every N days: the report of the
+//     fixed period the day falls in (periods from the job start date).
+//   Anything else (one report for the job): any report on the job, as before.
+function job_visit_day_report(array $job, $date, $visitInspector = 0) {
+    $jobId = (int)$job['id'];
+    try { $reps = ops_all("SELECT id, irn, inspection_date, issue_date, created_at, inspector_id, type_code FROM report_docs
+                           WHERE job_id=? AND COALESCE(deleted,0)=0 AND UPPER(COALESCE(type_code,'')) NOT IN ('RN','IRN') ORDER BY id DESC", [$jobId]) ?: []; }
+    catch (Throwable $e) { return [0, 'Reports are not in use here.']; }
+    $freq = strtoupper(trim((string)($job['reporting_frequency'] ?? '')));
+    $fd = function ($d) { return function_exists('fdate') ? fdate($d) : $d; };
+    if (in_array($freq, ['PER_DAY', 'DAILY'], true)) {
+        foreach ($reps as $r) {
+            if (report_date_of($r) !== $date) continue;
+            if ($visitInspector && (int)($r['inspector_id'] ?? 0) && (int)$r['inspector_id'] !== (int)$visitInspector) continue;
+            return [(int)$r['id'], ''];
+        }
+        $n = 0; $k = 0;
+        foreach (job_visits($jobId) as $v) { if (strtoupper((string)($v['status'] ?? '')) === 'NO_INSPECTION') continue; $k++; if (substr((string)$v['visit_date'], 0, 10) === $date) { $n = $k; break; } }
+        return [0, ($n ? 'Day ' . $n . ' (' . $fd($date) . ')' : $fd($date)) . ' needs its own report: a ' . Tl('report') . ' on this ' . Tl('job')
+                 . ' dated ' . $fd($date) . ($visitInspector ? ' by that day\'s ' . Tl('engineer') : '') . ', or paste the report link. Another day\'s report does not close it.'];
+    }
+    $start = substr(trim((string)($job['inspection_start_date'] ?? '')) ?: trim((string)($job['scheduled_date'] ?? '')), 0, 10);
+    $periodic = isset(REPORT_PERIOD_DAYS[$freq]) || $freq === 'MONTHLY' || ($freq === 'CUSTOM' && (int)($job['report_custom_days'] ?? 0) > 0);
+    if ($periodic && $start !== '' && $date >= $start) {
+        foreach (report_periods($freq, $start, $date, (int)($job['report_custom_days'] ?? 0)) as [$from, $to]) {
+            if ($date < $from || $date > $to) continue;
+            foreach ($reps as $r) { $d = report_date_of($r); if ($d >= $from && $d <= $to) return [(int)$r['id'], '']; }
+            // The period's report may have been filed late (week 1's report on day 9):
+            // the one reading of what the job owes says whether this period is covered.
+            $ob = ops_report_obligations($job);
+            foreach ($ob['items'] as $it) {
+                if (!$it['met'] || $date < $it['from'] || $date > $it['to']) continue;
+                foreach ($reps as $r) if ((string)($r['irn'] ?? '') !== '' && (string)$r['irn'] === (string)$it['by']) return [(int)$r['id'], ''];
+                return [-1, ''];                                   // covered by a link / the upload date
+            }
+            return [0, 'The report for ' . $fd($from) . ($to !== $from ? ' to ' . $fd($to) : '') . ' (the period this day falls in) is not on this '
+                     . Tl('job') . ' yet. File it first, or paste the report link.'];
+        }
+    }
+    if ($reps) return [(int)$reps[0]['id'], ''];
+    return [0, 'A report (a link, or an inspection report on this ' . Tl('job') . ') is required before a day can be closed.'];
+}
+
+// §WO-8 — close one day of a multi-day job with ITS report (TPIA item 5): a link,
+// or the day's own report on the job. A job that owes no reports ("No report",
+// TPIA item 6) closes its days without one. Creates the visit row lazily if the
+// schedule was never synced. A day already closed (done or "No inspection") is
+// never overwritten.
 function job_visit_close($jobId, $date, $reportLink = '', $reportDocId = 0) {
     $jobId = (int)$jobId; $date = substr((string)$date, 0, 10);
     if (!$jobId || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) return 'That is not a valid visit date.';
+    $job = ops_one("SELECT * FROM jobs WHERE id=?", [$jobId]);
+    if (!$job) return 'That ' . Tl('job') . ' no longer exists.';
     $reportLink = trim((string)$reportLink);
-    if ($reportLink === '' && !$reportDocId) {
-        // accept an IDEMS report already filed against this job as the evidence
-        try { $reportDocId = (int)ops_val("SELECT id FROM report_docs WHERE job_id=? AND deleted=0 ORDER BY id DESC LIMIT 1", [$jobId]); } catch (Throwable $e) {}
-    }
-    if ($reportLink === '' && !$reportDocId) return 'A report (a link, or an inspection report on this ' . Tl('job') . ') is required before a day can be closed.';
     $row = ops_one("SELECT * FROM job_visits WHERE job_id=? AND substr(visit_date,1,10)=?", [$jobId, $date]);
+    $st = strtoupper((string)($row['status'] ?? ''));
+    if ($st === 'DONE') return 'That day is already closed.';
+    if ($st === 'NO_INSPECTION') return 'That day was already closed as "No inspection".';
+    $noReport = in_array(strtoupper(trim((string)($job['reporting_frequency'] ?? ''))), ['NOREPORT'], true);
+    if (!$noReport && $reportLink === '' && !$reportDocId) {
+        [$reportDocId, $why] = job_visit_day_report($job, $date, (int)($row['inspector_id'] ?? 0));
+        if (!$reportDocId) return $why;
+    }
     $me = function_exists('user_name') ? user_name(current_user()) : '';
+    $reportDocId = (int)$reportDocId > 0 ? (int)$reportDocId : 0;    // -1 = covered by a link / upload date
     if ($row) {
         db()->prepare("UPDATE job_visits SET status='DONE', report_link=?, report_doc_id=?, closed_by=?, closed_at=? WHERE id=?")
             ->execute([$reportLink, $reportDocId ?: null, $me, date('c'), (int)$row['id']]);
     } else {
-        $insp = (int)ops_val("SELECT inspector_id FROM jobs WHERE id=?", [$jobId]);
+        $insp = (int)($job['inspector_id'] ?? 0);
         db()->prepare("INSERT INTO job_visits (job_id,visit_date,inspector_id,status,report_link,report_doc_id,closed_by,closed_at,note) VALUES (?,?,?, 'DONE', ?,?,?,?, '')")
             ->execute([$jobId, $date, $insp ?: null, $reportLink, $reportDocId ?: null, $me, date('c')]);
     }
+    return '';
+}
+
+// TPIA Phase 1 / D8 — close a planned day as "No inspection": the reason (from the
+// editable list), a note (required for "Other"), and optionally the new date the
+// visit moves to. The planned day keeps its date; the new date is a NEW planned
+// day carrying moved_from, and the move is written to the assignment history.
+// No report is owed for the day and it is never billed (only DONE days earn).
+function job_visit_no_inspection($jobId, $date, $reason, $note = '', $newDate = '') {
+    $jobId = (int)$jobId; $date = substr((string)$date, 0, 10);
+    $reason = strtoupper(trim((string)$reason)); $note = trim((string)$note); $newDate = substr(trim((string)$newDate), 0, 10);
+    if (!$jobId || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) return 'That is not a valid visit date.';
+    $job = ops_one("SELECT * FROM jobs WHERE id=?", [$jobId]);
+    if (!$job) return 'That ' . Tl('job') . ' no longer exists.';
+    $reasons = visit_no_insp_reasons();
+    if ($reason === '' || !isset($reasons[$reason])) return 'Pick why no inspection happened.';
+    if ($reason === 'OTHER' && mb_strlen($note) < 3) return 'Say what happened (a short note is needed for "Other").';
+    if (mb_strlen($note) > 400) $note = mb_substr($note, 0, 400);
+    $row = ops_one("SELECT * FROM job_visits WHERE job_id=? AND substr(visit_date,1,10)=?", [$jobId, $date]);
+    $st = strtoupper((string)($row['status'] ?? 'PLANNED'));
+    if ($st === 'DONE') return 'That day is already closed with its report.';
+    if ($st === 'NO_INSPECTION') return 'That day was already closed as "No inspection".';
+    if ($newDate !== '') {
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $newDate)) return 'The new date is not a valid date.';
+        if ($newDate <= $date) return 'The new date must be after ' . (function_exists('fdate') ? fdate($date) : $date) . '.';
+        if (ops_one("SELECT id FROM job_visits WHERE job_id=? AND substr(visit_date,1,10)=?", [$jobId, $newDate]))
+            return (function_exists('fdate') ? fdate($newDate) : $newDate) . ' is already a visit day on this ' . Tl('job') . '.';
+    }
+    $me = function_exists('user_name') ? user_name(current_user()) : '';
+    $insp = (int)($row['inspector_id'] ?? 0) ?: (int)($job['inspector_id'] ?? 0);
+    if ($row) {
+        db()->prepare("UPDATE job_visits SET status='NO_INSPECTION', reason_code=?, reason_note=?, closed_by=?, closed_at=? WHERE id=?")
+            ->execute([$reason, $note, $me, date('c'), (int)$row['id']]);
+    } else {
+        db()->prepare("INSERT INTO job_visits (job_id,visit_date,inspector_id,status,reason_code,reason_note,closed_by,closed_at,note) VALUES (?,?,?, 'NO_INSPECTION', ?,?,?,?, '')")
+            ->execute([$jobId, $date, $insp ?: null, $reason, $note, $me, date('c')]);
+    }
+    $fd = function ($d) { return function_exists('fdate') ? fdate($d) : $d; };
+    $words = 'Visit day ' . $fd($date) . ' closed as No inspection — ' . $reasons[$reason] . ($note !== '' ? ': ' . $note : '');
+    if ($newDate !== '') {
+        db()->prepare("INSERT INTO job_visits (job_id,visit_date,inspector_id,status,moved_from,note) VALUES (?,?,?, 'PLANNED', ?, ?)")
+            ->execute([$jobId, $newDate, $insp ?: null, $date, mb_substr('Moved from ' . $fd($date) . ' — ' . $reasons[$reason], 0, 255)]);
+        $words .= '. New date ' . $fd($newDate) . ' added.';
+        if (function_exists('tosrm_assign_event'))
+            try { tosrm_assign_event($jobId, 'RESCHEDULE', ['old_date' => $date, 'new_date' => $newDate, 'reason' => $reasons[$reason] . ($note !== '' ? ' — ' . $note : '')]); } catch (Throwable $e) {}
+    }
+    if (function_exists('act_log')) try { act_log('JOB', $jobId, 'SYSTEM', $words . ' (by ' . $me . ')'); } catch (Throwable $e) {}
     return '';
 }
 
@@ -652,7 +787,8 @@ function job_visits_open_days($job) {
         $d = substr((string)$v['visit_date'], 0, 10);
         if ($stop !== '' && $d > $stop) continue;
         $working = function_exists('is_working_day') ? is_working_day($d, $job['executing_office_id'] ?? null) : true;
-        if ($working && ($v['status'] ?? 'PLANNED') !== 'DONE') $open[] = $d;
+        // A day closed as "No inspection" (TPIA D8) is closed: it owes no report.
+        if ($working && !in_array(($v['status'] ?? 'PLANNED'), ['DONE', 'NO_INSPECTION'], true)) $open[] = $d;
     }
     return $open;
 }

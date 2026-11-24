@@ -209,6 +209,7 @@ job-ready-set	jobs	map
 job-reassign	jobs	map
 job-unlock	jobs	map
 job-visit-close	jobs	map
+job-visit-no-inspection	jobs	map
 jobs	jobs	map
 leads	leads	map
 learning	idems	map

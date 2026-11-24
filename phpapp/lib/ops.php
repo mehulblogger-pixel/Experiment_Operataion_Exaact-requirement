@@ -3617,7 +3617,7 @@ function ops_module_family($route) {
 function ops_route_module_map() {
     static $map = [
         'calls'=>'calls','call'=>'calls','call-new'=>'calls','call-edit'=>'calls','call-delete'=>'calls',
-        'jobs'=>'jobs','job'=>'jobs','job-new'=>'jobs','job-edit'=>'jobs','job-close'=>'jobs','job-unlock'=>'jobs','job-invoice'=>'invoicing','job-bill'=>'invoicing','job-advance'=>'jobs','job-reassign'=>'jobs','job-visit-close'=>'jobs','job-qap-upload'=>'jobs','job-qap'=>'jobs','job-qap-del'=>'jobs','job-forward-report'=>'jobs','report-approve'=>'jobs','expense-delete'=>'jobs',
+        'jobs'=>'jobs','job'=>'jobs','job-new'=>'jobs','job-edit'=>'jobs','job-close'=>'jobs','job-unlock'=>'jobs','job-invoice'=>'invoicing','job-bill'=>'invoicing','job-advance'=>'jobs','job-reassign'=>'jobs','job-visit-close'=>'jobs','job-visit-no-inspection'=>'jobs','job-qap-upload'=>'jobs','job-qap'=>'jobs','job-qap-del'=>'jobs','job-forward-report'=>'jobs','report-approve'=>'jobs','expense-delete'=>'jobs',
         'bill-add'=>'jobs','bill-delete'=>'jobs','bill-file'=>'jobs',
         'invoicing'=>'invoicing',
         'tally'=>'invoicing','tally-export'=>'invoicing','tally-settings'=>'invoicing','tally-undo'=>'invoicing',
@@ -3849,7 +3849,7 @@ function ops_module_gate($route, $peek = false) {
     // the posted job id); every other job route still needs the module, and each
     // handler still applies its own finer checks (e.g. reassign stays coordinator).
     if ($mod === 'jobs' && !can('mod.jobs.view')
-        && in_array($base, ['job','job-close','job-qap-upload','job-qap','job-qap-del','bill-add','bill-file','bill-delete','expense-delete','job-visit-close','checkin-photo'], true)) {
+        && in_array($base, ['job','job-close','job-qap-upload','job-qap','job-qap-del','bill-add','bill-file','bill-delete','expense-delete','job-visit-close','job-visit-no-inspection','checkin-photo'], true)) {
         $jid = (int)($_GET['id'] ?? $_GET['job'] ?? $_POST['id'] ?? $_POST['job_id'] ?? $_POST['job'] ?? 0);
         if ($jid && job_owned_by_me($jid)) return;   // owner may proceed
     }
@@ -4049,7 +4049,7 @@ function ops_dispatch($route, $method) {
             ops_raise_call(); return true;
         case $route === 'calls' || $route === 'call-new' || $route === 'call-edit' || $route === 'call' || $route === 'call-delete' || $route === 'call-credit':
             ops_calls($route, $method); return true;
-        case $route === 'jobs' || $route === 'job-new' || $route === 'job-edit' || $route === 'job' || $route === 'job-close' || $route === 'job-invoice' || $route === 'job-bill' || $route === 'job-advance' || $route === 'job-reassign' || $route === 'job-visit-close' || $route === 'expense-delete':
+        case $route === 'jobs' || $route === 'job-new' || $route === 'job-edit' || $route === 'job' || $route === 'job-close' || $route === 'job-invoice' || $route === 'job-bill' || $route === 'job-advance' || $route === 'job-reassign' || $route === 'job-visit-close' || $route === 'job-visit-no-inspection' || $route === 'expense-delete':
             ops_jobs($route, $method); return true;
         // §R1-D — QAP documents on a job (attach only, never parsed).
         case $route === 'job-forward-report' && $method === 'POST': return ops_job_forward_report($method);
@@ -9522,7 +9522,7 @@ function ops_jobs($route, $method) {
                 if ($openDays) {
                     view('ops/job_close', ['job'=>$job, 'error'=>'This ' . Tl('job') . ' still has ' . count($openDays)
                         . ' visit day(s) open: ' . implode(', ', array_map('fdate', array_slice($openDays, 0, 6)))
-                        . (count($openDays) > 6 ? ' …' : '') . '. Close each day with its report first (below the day-by-day plan).']);
+                        . (count($openDays) > 6 ? ' …' : '') . '. Close each day with its report first, or mark it "No inspection" (below the day-by-day plan).']);
                     return;
                 }
             }
@@ -9607,6 +9607,25 @@ function ops_jobs($route, $method) {
         if ($err === '' && $ownDay) redirect('/voucher-day?job=' . (int)$job['id'] . '&date=' . $vDate);
         redirect('/job?id=' . $job['id'] . '#visits');
     }
+    // TPIA Phase 1 / D8 (owner, 25 Nov 2026) — close a planned day as "No
+    // inspection" with a reason, optionally moving the visit to a new date. The
+    // SAME people who may close a visit day may do this (the gate above), no one
+    // else: a coordinator-level person, Master Admin, or the engineer on that day.
+    if ($route === 'job-visit-no-inspection' && $method === 'POST') {
+        $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$job) { http_response_code(404); view('notfound'); return; }
+        $vDate = substr((string)($_POST['date'] ?? ''), 0, 10);
+        $ownDay = exp_visit_is_mine((int)my_inspector_id(), $job, $vDate);
+        ops_require(is_coordinator_level() || is_master() || $ownDay, 'You cannot close a visit day.');
+        if (!empty($job['closed_flag'])) { flash('This ' . Tl('job') . ' is already closed.', 'warning'); redirect('/job?id=' . $job['id'] . '#visit-close'); }
+        $err = function_exists('job_visit_no_inspection')
+            ? job_visit_no_inspection($job['id'], $vDate, $_POST['reason'] ?? '', $_POST['reason_note'] ?? '', $_POST['new_date'] ?? '')
+            : 'This is unavailable.';
+        flash($err !== '' ? $err : ('Visit of ' . fdate($vDate) . ' closed as "No inspection". No report is owed for it.'
+            . (trim((string)($_POST['new_date'] ?? '')) !== '' ? ' New date ' . fdate(substr((string)$_POST['new_date'], 0, 10)) . ' added.' : '')),
+            $err !== '' ? 'error' : 'success');
+        redirect('/job?id=' . $job['id'] . '#visit-close');
+    }
     if ($route === 'job-reassign' && $method === 'POST') {
         ops_require(job_allocate_role_can(), 'You cannot reassign ' . Tlp('job') . '.');
         $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)($_GET['id'] ?? 0)]);
@@ -9669,6 +9688,9 @@ function ops_jobs($route, $method) {
                 // §WO-8 per-day completion
                 'status' => (string)($v['status'] ?? 'PLANNED'),
                 'done' => (($v['status'] ?? '') === 'DONE'),
+                // TPIA D8 — a day closed as "No inspection", with its reason
+                'no_insp' => (($v['status'] ?? '') === 'NO_INSPECTION'),
+                'status_label' => function_exists('visit_status_label') ? visit_status_label($v) : (string)($v['status'] ?? ''),
                 'report_link' => (string)($v['report_link'] ?? ''),
                 'closed_by' => (string)($v['closed_by'] ?? '')];
         }
