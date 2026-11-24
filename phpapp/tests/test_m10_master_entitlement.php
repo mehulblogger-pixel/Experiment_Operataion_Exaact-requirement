@@ -235,6 +235,11 @@ $BASELINE = [
     // check, asked only inside /opportunity-add-customer and the deal page, Sales routes the
     // M5 gate refuses without Sales (Category B). Same answer for a master as before.
     'job_invoice_record_can', 'opp_can_add_customer',
+    // Owner, 24 Nov 2026 ("Delete deals" switch, docs/02 19y7). opp_can_delete() is the
+    // /opportunity-delete check (is_master() || crm.deal.delete) lifted into a function —
+    // asked only inside that handler and on the deal page, Sales routes the M5 gate refuses
+    // without Sales (Category B). Same answer for a master as before (is_admin_level()).
+    'opp_can_delete',
 ];
 $unclassified = array_values(array_diff($open, $BASELINE));
 t_ok(!$unclassified,
