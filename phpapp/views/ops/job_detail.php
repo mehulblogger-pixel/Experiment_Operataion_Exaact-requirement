@@ -252,19 +252,21 @@
             <?php elseif (!empty($x['no_insp'])): ?><span class="pill p-mut" title="<?= e($x['status_label'] ?? '') ?>">no inspection</span>
             <?php else: ?><span class="pill" style="background:#b45309;color:#fff">open</span><?php endif; ?>
             <?php if (!empty($x['status_label']) && strpos((string)$x['status_label'], 'moved from') !== false): ?><br><small class="muted"><?= e($x['status_label']) ?></small><?php endif; ?></td>
-        <td><?php if (!empty($x['done'])): ?>
+        <td><?php if (!empty($x['done'])): ?><span style="min-width:0">
               <?php if (!empty($x['report_link'])): ?><a href="<?= e($x['report_link']) ?>" target="_blank" rel="noopener">report</a>
               <?php else: ?><span class="muted"><?= $vcNoReport ? 'no report needed' : 'report on file' ?></span><?php endif; ?>
-              <?php if (!empty($x['closed_by'] ?? '')): ?> <span class="muted" style="font-size:11px">by <?= e($x['closed_by']) ?></span><?php endif; ?>
-            <?php elseif (!empty($x['no_insp'])): ?>
+              <?php if (!empty($x['closed_by'] ?? '')): ?> <span class="muted" style="font-size:11px">by <?= e($x['closed_by']) ?></span><?php endif; ?></span>
+            <?php elseif (!empty($x['no_insp'])): ?><span style="min-width:0">
               <span class="muted"><?= e(preg_replace('/^No inspection — /', '', (string)($x['status_label'] ?? ''))) ?></span>
-              <?php if (!empty($x['closed_by'] ?? '')): ?> <span class="muted" style="font-size:11px">by <?= e($x['closed_by']) ?></span><?php endif; ?>
+              <?php if (!empty($x['closed_by'] ?? '')): ?> <span class="muted" style="font-size:11px">by <?= e($x['closed_by']) ?></span><?php endif; ?></span>
             <?php elseif ($x['working'] && (is_coordinator_level() || (function_exists('exp_visit_is_mine') && exp_visit_is_mine((int)my_inspector_id(), $job, $x['date'])))): /* Expenses Phase 1 — his own day too */ ?>
+              <?php // one block, so the phone card (td = flex row) stacks it under its label ?>
+              <div style="flex:1 1 auto;min-width:0;text-align:left">
               <form method="post" action="/job-visit-close?id=<?= (int)$job['id'] ?>" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
                 <input type="hidden" name="date" value="<?= e($x['date']) ?>">
                 <?php if (!$vcNoReport): ?>
                 <input class="form-control" name="report_link" aria-label="Report link for <?= e($x['pretty']) ?>"
-                       placeholder="<?= $vcPerDay ? 'report link — or leave blank to use this day\'s report on the ' . e(Tl('job')) : 'report link — or leave blank to use the report on this ' . e(Tl('job')) ?>" style="width:300px;max-width:100%">
+                       placeholder="<?= $vcPerDay ? 'report link — or leave blank to use this day\'s report' : 'report link — or leave blank to use the report on file' ?>" style="flex:1 1 220px;min-width:0;max-width:320px">
                 <?php endif; ?>
                 <button class="btn small" type="submit"><?= $vcNoReport ? 'Close day (no report needed)' : 'Close day' ?></button>
               </form>
@@ -283,6 +285,7 @@
                 <small class="muted">The planned date stays on record with the reason. No report is owed for the day and it is not billed.</small>
               </details>
               <?php endif; ?>
+              </div>
             <?php else: ?><span class="muted">—</span><?php endif; ?></td>
       </tr>
     <?php endforeach; ?>

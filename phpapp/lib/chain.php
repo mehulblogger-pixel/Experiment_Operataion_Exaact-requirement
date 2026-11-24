@@ -550,8 +550,7 @@ function chain_history_for_call($callId, $by = '') {
             $st = (string)($v['status'] ?? 'PLANNED');
             $lab = $vlab ? $vlab($v) : $st;
             $add($v['visit_date'], 2, $st === 'NO_INSPECTION' ? '⛔' : ($st === 'DONE' ? '✅' : '📅'), 'Visit day — ' . $lab,
-                 trim(($v['inspector_name'] ?: '') . (trim((string)($v['moved_from'] ?? '')) !== '' ? ' · moved from ' . fdate($v['moved_from']) : '')
-                      . (trim((string)($v['closed_by'] ?? '')) !== '' ? ' · closed by ' . $v['closed_by'] : ''), ' ·'),
+                 trim(($v['inspector_name'] ?: '') . (trim((string)($v['closed_by'] ?? '')) !== '' ? ' · closed by ' . $v['closed_by'] : ''), ' ·'),
                  '/job?id=' . (int)$v['job_id'] . '#visit-close', $jobCall[(int)$v['job_id']] ?? '');
         }
     }
