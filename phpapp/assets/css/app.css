@@ -45,6 +45,13 @@ form.stack label{display:block;font-size:13px;color:var(--muted);margin:12px 0 4
 .master-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
 .filter-bar{display:flex;gap:8px;margin:10px 0 18px;flex-wrap:wrap}.filter-bar .form-control{max-width:320px}.filter-bar select.form-control{max-width:200px}
 .kv{display:grid;grid-template-columns:200px 1fr;gap:6px 12px;font-size:14px}.kv dt{color:var(--muted)}.kv dd{margin:0}
+/* Owner test Q-02 (23 Nov 2026, "the boxes are not inline … bleeding into each other"): .kv is a
+   two-column grid made for <dl>. Seven <table class="kv"> (quote, contract and job pages) were
+   laid into that grid, so a row's label wrapped ("Business / Unit") and its value slid out of
+   line. A table stays a table; its label column is one width and never wraps. */
+table.kv{display:table;width:100%;border-collapse:collapse;font-size:14px}
+table.kv td,table.kv th{padding:5px 12px 5px 0;vertical-align:top}
+table.kv td.muted:first-child{width:140px;white-space:nowrap}
 .pill-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;align-items:center}
 .hierarchy{background:var(--soft);border:1px solid var(--line);border-radius:8px;padding:12px 14px}.hierarchy .child{margin-left:18px;font-size:14px;margin-top:4px}
 .addr-card{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px}
@@ -2078,6 +2085,14 @@ button.sxw-ib{cursor:pointer;font-family:inherit}
 .sxqt-f .btn.small{min-height:36px}
 .sxqt .sxl-reg td .num,.sxqt .sxl-reg td b{white-space:nowrap}
 /* quotation page */
+/* Owner test Q-02 (23 Nov 2026): on the quote page boxes sat flush on each other ("Still a draft"
+   on Actions, Actions on the tabs, the playbook on the costing bar, the costing bar on the
+   pre-order review, the review on Client / Commercials): .panel carries no margin and these were
+   stacked straight. One gap, 14px — the Client | Commercials gutter — all round. A flex column's
+   gap skips the hidden tabs' boxes, so no stray space appears when a tab is switched. */
+.sxqd>.nowband+.panel,.sxqd>.panel+.tabbar{margin-top:14px}
+.sxqd>[data-tabs]{display:flex;flex-direction:column;gap:14px}
+.sxqd>[data-tabs]>*{margin-top:0;margin-bottom:0}
 .sxqd-top{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:stretch;margin:0 0 12px}
 .sxqd-hd{margin:0;display:flex;flex-direction:column;gap:10px}
 .sxqd-t{display:flex;gap:12px;align-items:flex-start;min-width:0}
