@@ -47,10 +47,10 @@
 <h3 class="tab-sub fam">🛠️ Operations</h3>
 <div class="stat-row">
   <div class="stat-card"><div class="sc-num"><?= (int)$op['calls'] ?></div><div class="sc-lbl">Calls</div></div>
-  <div class="stat-card"><div class="sc-num" style="color:<?= $op['pending']?'var(--warn)':'var(--ok)' ?>"><?= (int)$op['pending'] ?></div><div class="sc-lbl">Pending scheduling</div></div>
+  <div class="stat-card"><div class="sc-num" style="color:<?= $op['pending']?'var(--warn)':'var(--ok)' ?>"><?= (int)$op['pending'] ?></div><div class="sc-lbl">No engineer yet</div></div>
   <div class="stat-card"><div class="sc-num"><?= (int)$op['open'] ?></div><div class="sc-lbl">Open jobs</div></div>
   <div class="stat-card"><div class="sc-num"><?= (int)$op['closed'] ?></div><div class="sc-lbl">Closed jobs</div></div>
-  <div class="stat-card"><div class="sc-num" style="color:<?= $op['overdue']?'var(--bad)':'var(--ok)' ?>"><?= (int)$op['overdue'] ?></div><div class="sc-lbl">Overdue closure</div></div>
+  <div class="stat-card"><div class="sc-num" style="color:<?= $op['overdue']?'var(--bad)':'var(--ok)' ?>"><?= (int)$op['overdue'] ?></div><div class="sc-lbl">Jobs overdue</div></div>
   <div class="stat-card"><div class="sc-num"><?= $op['tatTotal']?round($op['tatOn']/$op['tatTotal']*100):0 ?>%</div><div class="sc-lbl">TAT on-time (≤<?= (int)$tatThresh ?>d)</div></div>
   <div class="stat-card"><div class="sc-num"><?= $op['tatTotal']?round($op['tatSum']/$op['tatTotal'],1):0 ?></div><div class="sc-lbl">Avg TAT (days)</div></div>
 </div>

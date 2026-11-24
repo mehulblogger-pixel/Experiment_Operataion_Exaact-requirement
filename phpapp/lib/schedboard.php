@@ -56,8 +56,10 @@ function sched_capacity($board) {
 // Calls that still need a person — OPEN, not cancelled, with no job carrying an
 // inspector. This is the "demand" side of the capacity picture.
 function sched_unallocated_calls($offices, $limit = 40) {
-    $w = ["c.status NOT IN ('CLOSED','CANCELLED')",
-          "NOT EXISTS (SELECT 1 FROM jobs j WHERE j.call_id=c.id AND j.inspector_id IS NOT NULL)"];
+    //  Stage 1 B1/B4 — the "No engineer yet" definition (lib/opskpi.php): live, not done,
+    //  nobody on a job; a declined or released assignment does not count as "on it".
+    $w = [function_exists('opk_call_pred') ? opk_call_pred('no_engineer')
+                                           : "c.status NOT IN ('CLOSED','CANCELLED') AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.call_id=c.id AND j.inspector_id IS NOT NULL)"];
     $a = [];
     if (is_array($offices)) {
         if (!$offices) return [];

@@ -3,9 +3,11 @@
   $f = $f ?? '';
   // optional focused filter from a dashboard card
   $filters = [
-    'open'    => ['Open jobs to do',   fn($j)=>!$j['closed_flag']],
-    'overdue' => ['Overdue jobs',       fn($j)=>!$j['closed_flag'] && ($j['inspection_end_date']?:$j['scheduled_date']) && ($j['inspection_end_date']?:$j['scheduled_date'])<$today],
-    'reports' => ['Reports pending',    fn($j)=>!$j['closed_flag'] && ($j['reporting_frequency']??'')!=='NOREPORT' && ($j['reporting_frequency']??'')!=='' && ($j['report_upload_date']??'')===''],
+    // Stage 1 B1: "Jobs overdue" and "Reports to write" read the flags the dashboard
+    // tiles counted (lib/opskpi.php), so a tile and this list always agree.
+    'open'    => ['Open jobs to do',   fn($j)=>!$j['closed_flag'] && empty($j['opk_cancelled'])],
+    'overdue' => ['Jobs overdue',       fn($j)=>isset($j['opk_jobs_overdue']) ? (int)$j['opk_jobs_overdue'] === 1 : (!$j['closed_flag'] && ($j['inspection_end_date']?:$j['scheduled_date']) && ($j['inspection_end_date']?:$j['scheduled_date'])<$today)],
+    'reports' => ['Reports to write',   fn($j)=>isset($j['opk_to_write']) ? (int)$j['opk_to_write'] === 1 : (!$j['closed_flag'] && ($j['reporting_frequency']??'')!=='NOREPORT' && ($j['reporting_frequency']??'')!=='' && ($j['report_upload_date']??'')==='')],
     'toclose' => ['Jobs ready to close', fn($j)=>!$j['closed_flag'] && (($j['reporting_frequency']??'')==='NOREPORT' || (function_exists('job_has_issued_report') && job_has_issued_report((int)$j['id'])))],
     'closed'  => ['Completed jobs',     fn($j)=>(bool)$j['closed_flag']],
   ];
@@ -16,7 +18,7 @@
   usort($open, function($a,$b){ $ea=$a['scheduled_date']?:'9999'; $eb=$b['scheduled_date']?:'9999'; return strcmp($ea,$eb); });
   $jobCard = function($j) use ($today) {
     $end = $j['inspection_end_date'] ?: $j['scheduled_date'];
-    $overdue = !$j['closed_flag'] && $end && $end < $today;
+    $overdue = isset($j['opk_jobs_overdue']) ? (int)$j['opk_jobs_overdue'] === 1 : (!$j['closed_flag'] && $end && $end < $today);
     $sched = $j['scheduled_date'] ?: '';
     ob_start(); ?>
     <div class="jobcard <?= $j['closed_flag']?'is-closed':($overdue?'is-late':'') ?>">

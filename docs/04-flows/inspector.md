@@ -26,8 +26,8 @@ flowchart TD
 attendance widget + the **personal KPI board** — the same universal
 `connect_kpi_board`/`connect_kpi_render` engine that powers the client and
 freelancer dashboards, here at `audience='inspector'` scope (own `inspector_id`):
-**Active jobs · Reports pending · Overdue · Ratings · Completed**, with one-tap
-attention chips (reports pending / overdue) — plus quick-action cards ("All my
+**Active jobs · Reports to write · Jobs overdue · Ratings · Completed** (Stage 1 B1 names; the same definitions as the Operations home, `lib/opskpi.php`), with one-tap
+attention chips (reports to write / jobs overdue) — plus quick-action cards ("All my
 jobs", "My Voucher") and the "Your pending tasks" panel. Least-privilege: the
 board shows **no money figure**; the monthly voucher stays a link, not a total.
 

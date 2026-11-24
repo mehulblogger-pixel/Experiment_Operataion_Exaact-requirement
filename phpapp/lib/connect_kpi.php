@@ -119,14 +119,14 @@ function connect_kpi_board($scope = []) {
          'url' => $isClient ? '/portal/requests' : '/complaints'],
         ['key' => 'ratings', 'icon' => '⭐', 'label' => 'Ratings', 'value' => $ratingAvg !== null ? nf($ratingAvg, 1) : '—',
          'sub' => $ratingN > 0 ? ($ratingN . ' rated') : 'no ratings yet', 'tone' => ($ratingAvg !== null && $ratingAvg >= 4) ? 'ok' : '', 'url' => ''],
-        ['key' => 'reports', 'icon' => '📄', 'label' => 'Reports pending', 'value' => (string)$reportsPending,
-         'sub' => $reportsPending > 0 ? 'awaiting issue' : 'up to date', 'tone' => $reportsPending > 0 ? 'warn' : 'ok',
+        ['key' => 'reports', 'icon' => '📄', 'label' => 'Reports awaiting issue', 'value' => (string)$reportsPending,
+         'sub' => $reportsPending > 0 ? 'in drafting or review' : 'up to date', 'tone' => $reportsPending > 0 ? 'warn' : 'ok',
          'url' => $isClient ? '/portal/reports' : '/documents'],
     ];
 
     // --- Appropriate actions — "what needs attention". ------------------------
     $actions = [];
-    if ($reportsPending > 0) $actions[] = ['label' => 'Reports pending', 'n' => $reportsPending, 'url' => $isClient ? '/portal/reports' : '/documents', 'tone' => 'warn'];
+    if ($reportsPending > 0) $actions[] = ['label' => 'Reports awaiting issue', 'n' => $reportsPending, 'url' => $isClient ? '/portal/reports' : '/documents', 'tone' => 'warn'];
     if ($concerns > 0)       $actions[] = ['label' => 'Open concerns', 'n' => $concerns, 'url' => $isClient ? '/portal/requests' : '/complaints', 'tone' => 'bad'];
     if ($outstanding > 0)    $actions[] = ['label' => $isClient ? 'Invoices outstanding' : 'Receivables outstanding', 'n' => 0, 'value' => $inr($outstanding), 'url' => $isClient ? '/portal/invoices' : '/billable-events', 'tone' => 'warn'];
     if ($inspOpen > 0)       $actions[] = ['label' => 'Inspections in progress', 'n' => $inspOpen, 'url' => $isClient ? '/portal/calls' : '/jobs', 'tone' => ''];
@@ -137,7 +137,7 @@ function connect_kpi_board($scope = []) {
     // Visibility only, permissive until an operating company is designated.
     if (!$isClient && function_exists('connect_cap_owner_shows') && !connect_cap_owner_shows('reporting')) {
         $tiles   = array_values(array_filter($tiles, fn($t) => !in_array($t['key'], ['inspections', 'reports'], true)));
-        $actions = array_values(array_filter($actions, fn($a) => !in_array($a['label'] ?? '', ['Reports pending', 'Inspections in progress'], true)));
+        $actions = array_values(array_filter($actions, fn($a) => !in_array($a['label'] ?? '', ['Reports awaiting issue', 'Inspections in progress'], true)));
     }
 
     return [
@@ -268,10 +268,17 @@ function connect_kpi_board_inspector($inspectorId) {
         if ($inspectorId <= 0) return 0;
         return connect_kpi_val("SELECT COUNT(*) FROM jobs WHERE inspector_id=? AND $sql", array_merge([$inspectorId], $extra));
     };
-    $open    = $c("closed_flag=0");
+    $open    = $c("closed_flag=0 AND COALESCE(stage,'')<>'CANCELLED'");
     $done    = $c("closed_flag=1");
-    $overdue = $c("closed_flag=0 AND ((inspection_end_date<>'' AND inspection_end_date<?) OR (inspection_end_date='' AND scheduled_date<>'' AND scheduled_date<?))", [$today, $today]);
-    $reports = $c("closed_flag=0 AND reporting_frequency<>'NOREPORT' AND (report_upload_date IS NULL OR report_upload_date='')");
+    //  Stage 1 B1: "Jobs overdue" and "Reports to write" are the ONE definition in
+    //  lib/opskpi.php — the same the Operations home and the My jobs filter use.
+    if (function_exists('opk_count_my_jobs')) {
+        $overdue = $inspectorId > 0 ? opk_count_my_jobs('jobs_overdue', $inspectorId) : 0;
+        $reports = $inspectorId > 0 ? opk_count_my_jobs('to_write', $inspectorId) : 0;
+    } else {
+        $overdue = $c("closed_flag=0 AND ((inspection_end_date<>'' AND inspection_end_date<?) OR (inspection_end_date='' AND scheduled_date<>'' AND scheduled_date<?))", [$today, $today]);
+        $reports = $c("closed_flag=0 AND reporting_frequency<>'NOREPORT' AND (report_upload_date IS NULL OR report_upload_date='')");
+    }
 
     // Ratings — reuse the inspector rating summary (marketplace two-way ratings).
     $ratingAvg = null; $ratingN = 0;
@@ -287,9 +294,9 @@ function connect_kpi_board_inspector($inspectorId) {
     $tiles = [
         ['key' => 'active', 'icon' => '🗂', 'label' => 'Active jobs', 'value' => (string)$open,
          'sub' => $open > 0 ? 'assigned to you' : 'nothing open', 'tone' => 'info', 'url' => '/my-jobs?f=open'],
-        ['key' => 'reports', 'icon' => '📄', 'label' => 'Reports pending', 'value' => (string)$reports,
+        ['key' => 'reports', 'icon' => '📄', 'label' => 'Reports to write', 'value' => (string)$reports,
          'sub' => $reports > 0 ? 'to write & submit' : 'up to date', 'tone' => $reports > 0 ? 'warn' : 'ok', 'url' => '/my-jobs?f=reports'],
-        ['key' => 'overdue', 'icon' => '⏰', 'label' => 'Overdue', 'value' => (string)$overdue,
+        ['key' => 'overdue', 'icon' => '⏰', 'label' => 'Jobs overdue', 'value' => (string)$overdue,
          'sub' => $overdue > 0 ? 'past due date' : 'on track', 'tone' => $overdue > 0 ? 'bad' : 'ok', 'url' => '/my-jobs?f=overdue'],
         ['key' => 'ratings', 'icon' => '⭐', 'label' => 'Ratings', 'value' => $ratingAvg !== null ? nf($ratingAvg, 1) : '—',
          'sub' => $ratingN > 0 ? ($ratingN . ' rated') : 'no ratings yet', 'tone' => ($ratingAvg !== null && $ratingAvg >= 4) ? 'ok' : '', 'url' => ''],
@@ -298,8 +305,8 @@ function connect_kpi_board_inspector($inspectorId) {
     ];
 
     $actions = [];
-    if ($reports > 0) $actions[] = ['label' => 'Reports pending', 'n' => $reports, 'url' => '/my-jobs?f=reports', 'tone' => 'warn'];
-    if ($overdue > 0) $actions[] = ['label' => 'Overdue jobs', 'n' => $overdue, 'url' => '/my-jobs?f=overdue', 'tone' => 'bad'];
+    if ($reports > 0) $actions[] = ['label' => 'Reports to write', 'n' => $reports, 'url' => '/my-jobs?f=reports', 'tone' => 'warn'];
+    if ($overdue > 0) $actions[] = ['label' => 'Jobs overdue', 'n' => $overdue, 'url' => '/my-jobs?f=overdue', 'tone' => 'bad'];
 
     return [
         'audience' => 'inspector',

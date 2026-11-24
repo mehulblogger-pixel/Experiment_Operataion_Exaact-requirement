@@ -49,16 +49,24 @@ $right = '<div class="sxw-ctl ox-acts">'
 sxw_head('Operations', 'Everything the field delivers — work orders, jobs, scheduling, deputation and the TPIA service lines, scoped to your branches.', 'flow', $right); ?>
 <div class="ox-live"><span class="dot"></span>Live — computed from source records now · <?= e(date('d M Y H:i')) ?><?= $scopeLabel ? ' · ' . e($scopeLabel) : '' ?></div>
 
-<div class="sxw-kp" style="--n:4">
+<div class="sxw-kp" style="--n:3">
 <?php
-sxw_kpi('info', 'file',   'New requests',       'New requests',       (string) (int) ($m['new'] ?? 0),            'awaiting triage',          '/calls');
-sxw_kpi('warn', 'cal',    'Unscheduled',        'Unscheduled',        (string) (int) ($m['unscheduled'] ?? 0),    'ready but no date',        '/schedule');
-sxw_kpi('warn', 'msg',    'Clarification open', 'Clarification open', (string) (int) ($m['clarification'] ?? 0),  'waiting on client/vendor', '/calls');
-sxw_kpi('ok',   'checkc', 'Ready to schedule',  'Ready to schedule',  (string) (int) ($m['ready'] ?? 0),          'all inputs complete',      '/schedule');
-sxw_kpi('info', 'clock',  "Today's services",   'Today’s services',   (string) (int) ($m['today'] ?? 0),          'scheduled for today',      '/operations#schedule');
-sxw_kpi('bad',  'alert',  'Overdue',            'Overdue',            (string) (int) ($m['overdue'] ?? 0),        'past required date',       '/operations#backlog');
-sxw_kpi('bad',  'bolt',   'Critical',           'Critical',           (string) (int) ($m['critical'] ?? 0),       'flagged priority',         '/calls');
-sxw_kpi('warn', 'note',   'Report pending',     'Report pending',     (string) (int) ($m['report_pending'] ?? 0), 'done, not issued',         '/jobs');
+//  Stage 1 B1 (owner, 24 Nov 2026): one definition per card (lib/opskpi.php). The
+//  label, the note and the link all come from that one place, and each card opens
+//  its register filtered to exactly the rows it counted.
+foreach ([
+    ['info', 'file',   'new',           'new'],
+    ['warn', 'cal',    'no_engineer',   'no_engineer'],
+    ['warn', 'msg',    'clarification', 'clarification'],
+    ['ok',   'checkc', 'ready',         'ready'],
+    ['info', 'clock',  'today',         'today'],
+    ['bad',  'alert',  'wo_overdue',    'overdue'],
+    ['bad',  'alert',  'jobs_overdue',  'jobs_overdue'],
+    ['bad',  'bolt',   'critical',      'critical'],
+    ['warn', 'note',   'signoff',       'report_pending'],
+] as [$tone, $ic, $key, $mk]) {
+    sxw_kpi($tone, $ic, opk_label($key), opk_label($key), (string) (int) ($m[$mk] ?? 0), opk_hint($key), opk_href($key));
+}
 ?>
 </div>
 
@@ -145,8 +153,8 @@ sxw_kpi('warn', 'note',   'Report pending',     'Report pending',     (string) (
   $tile('/calls', '📋', THP('call'), 'Orders from the client, with lead time and delay.',
         [[$c['calls_open'], 'Open'], [$m['new'] ?? null, 'New']]);
   $tile('/jobs', '🗂️', THP('job'), 'Allocation, execution and per-day closure.',
-        [[$c['jobs_active'], 'Active'], [$m['unscheduled'] ?? null, 'Unscheduled']],
-        ($m['report_pending'] ?? 0) > 0 ? [(int) $m['report_pending'] . ' report pending', 'amber'] : null);
+        [[$c['jobs_active'], 'Active'], [$m['jobs_overdue'] ?? null, opk_label('jobs_overdue')]],
+        ($m['report_pending'] ?? 0) > 0 ? [(int) $m['report_pending'] . ' awaiting sign-off', 'amber'] : null);
   // Scheduling board, capacity outlook and availability are one workspace with tabs.
   if (function_exists('sched_board_can') && sched_board_can())
     $tile('/schedule', '🗓️', 'Scheduling board', 'Board, capacity and availability — one workspace with tabs.',

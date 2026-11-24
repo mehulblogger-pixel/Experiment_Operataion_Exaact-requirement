@@ -125,11 +125,21 @@ function tosrm_derive_status($call) {
     if ($legacy === 'CANCELLED') return 'CANCELLED';
     if ($legacy === 'ALLOCATED') return 'ASSIGNED';
     if ($legacy === 'FORWARDED') return 'READY_TO_SCHEDULE';
+    //  Stage 1 B2 — a legacy open order that already has somebody on a job is not
+    //  "awaiting triage" (Stage 0: 47 of 54 "new requests" had an engineer and a date).
+    //  Same rule as opk_status_sql(), so the pill and the counts agree.
+    if (!empty($call['id']) && function_exists('opk_has_person_sql')) {
+        try { if ((int) ops_val("SELECT COUNT(*) FROM calls c WHERE c.id=? AND " . opk_has_person_sql('c'), [(int) $call['id']]) > 0) return 'ASSIGNED'; } catch (Throwable $e) {}
+    }
     return 'RECEIVED';
 }
 function tosrm_call_status($call) {
     $op = trim((string)($call['op_status'] ?? ''));
-    return $op !== '' ? $op : tosrm_derive_status($call);
+    if ($op !== '') return $op;
+    // A register row already carries the same reading computed in SQL (opk_status_sql)
+    // — use it rather than one more query per row.
+    if (!empty($call['opk_status'])) return (string) $call['opk_status'];
+    return tosrm_derive_status($call);
 }
 
 // Phase 2 §46 — "do not allow two statuses to silently disagree." A call carries a
@@ -1963,20 +1973,24 @@ function tosrm_ops_metrics($offices = 'ALL') {
     $w = tosrm_call_office_sql($offices, 'c');
     $today = date('Y-m-d');
     $one = fn($sql, $a = []) => (int)(ops_one($sql, $a)['n'] ?? 0);
+    //  Stage 1 B1 (owner, 24 Nov 2026) — every figure comes from lib/opskpi.php, the one
+    //  definition the register it opens is filtered by (card = rows). Work orders are
+    //  counted on the executing desk $offices (the home passes tosrm_office_scope(), as
+    //  the filtered register does) within the register's own visibility; jobs under the
+    //  jobs register's scope.
     $m = [];
-    $m['unscheduled'] = count(function_exists('sched_unallocated_calls') ? sched_unallocated_calls($offices, 999) : []);
-    $m['clarification'] = $one("SELECT COUNT(DISTINCT c.id) n FROM calls c JOIN call_clarifications cc ON cc.call_id=c.id AND cc.status='OPEN' WHERE $w");
-    $m['ready'] = $one("SELECT COUNT(*) n FROM calls c WHERE c.op_status='READY_TO_SCHEDULE' AND $w");
-    $m['new'] = $one("SELECT COUNT(*) n FROM calls c WHERE (c.op_status IN ('RECEIVED','DRAFT','UNDER_REVIEW') OR (COALESCE(c.op_status,'')='' AND c.status='OPEN')) AND $w");
-    $m['today'] = $one("SELECT COUNT(*) n FROM jobs j JOIN calls c ON c.id=j.call_id WHERE j.scheduled_date=? AND $w", [$today]);
-    $m['overdue'] = $one("SELECT COUNT(*) n FROM calls c WHERE c.status<>'CLOSED' AND COALESCE(c.op_status,'')<>'CLOSED' AND c.inspection_required_date<>'' AND c.inspection_required_date<? AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.call_id=c.id AND j.closed_flag=1) AND $w", [$today]);
-    // R10 (fixed, Revamp P5): jobs.stage is vestigial — never advanced past the
-    // default/CANCELLED — so counting j.stage='REPORT_PENDING' was always 0. The
-    // real "report pending" signal is a CLOSED job whose report is still awaiting
-    // the reporting manager's sign-off (report_approval='PENDING'), which is the
-    // live lifecycle field.
-    $m['report_pending'] = $one("SELECT COUNT(*) n FROM jobs j JOIN calls c ON c.id=j.call_id WHERE j.closed_flag=1 AND j.report_approval='PENDING' AND $w");
-    $m['critical'] = $one("SELECT COUNT(*) n FROM calls c WHERE c.priority='CRITICAL' AND c.status<>'CLOSED' AND $w");
+    $m['unscheduled']   = opk_count_calls('no_engineer', $offices);      // "No engineer yet"
+    $m['no_engineer']   = $m['unscheduled'];
+    $m['clarification'] = opk_count_calls('clarification', $offices);
+    $m['ready']         = opk_count_calls('ready', $offices);
+    $m['new']           = opk_count_calls('new', $offices);
+    $m['today']         = opk_count_jobs('today');
+    $m['overdue']       = opk_count_calls('wo_overdue', $offices);       // "Work orders overdue"
+    $m['wo_overdue']    = $m['overdue'];
+    $m['jobs_overdue']  = opk_count_jobs('jobs_overdue');
+    $m['report_pending'] = opk_count_jobs('signoff');                    // "Reports awaiting sign-off"
+    $m['signoff']       = $m['report_pending'];
+    $m['critical']      = opk_count_calls('critical', $offices);
     return $m;
 }
 
@@ -2373,13 +2387,20 @@ function tosrm_xo_calls($offices, $limit = 120) {
 // scheduling". A call is pending when it is open and no job carries a date yet.
 // Scope: calls this branch executes (or raised with no executing branch set yet).
 function tosrm_pending_scheduling($offices, $limit = 200) {
-    $w = ["c.status<>'CLOSED'",
-          "COALESCE(c.op_status,'') NOT IN ('CLOSED','CANCELLED')",
-          "NOT EXISTS (SELECT 1 FROM jobs j WHERE j.call_id=c.id AND COALESCE(j.scheduled_date,'')<>'')"];
-    if (is_array($offices)) {
-        if (!$offices) return [];
-        $in = implode(',', array_map('intval', $offices));
-        $w[] = "(c.executing_office_id IN ($in) OR (COALESCE(c.executing_office_id,0)=0 AND c.ibo_office_id IN ($in)))";
+    if (is_array($offices) && !$offices) return [];
+    //  Stage 1 B1 (owner, 24 Nov 2026): "Waiting for a person" is the SAME list the
+    //  "No engineer yet" card counts (lib/opskpi.php) — nobody on a job yet, a
+    //  declined / released assignment counting as nobody — under the card's scope.
+    if (function_exists('opk_call_pred')) {
+        $w = [opk_call_pred('no_engineer'), opk_calls_visible_scope($offices)];
+    } else {
+        $w = ["c.status<>'CLOSED'",
+              "COALESCE(c.op_status,'') NOT IN ('CLOSED','CANCELLED')",
+              "NOT EXISTS (SELECT 1 FROM jobs j WHERE j.call_id=c.id AND COALESCE(j.scheduled_date,'')<>'')"];
+        if (is_array($offices)) {
+            $in = implode(',', array_map('intval', $offices));
+            $w[] = "(c.executing_office_id IN ($in) OR (COALESCE(c.executing_office_id,0)=0 AND c.ibo_office_id IN ($in)))";
+        }
     }
     try {
         return ops_all("SELECT c.id, c.call_code, c.client_id, c.inspection_type, c.sbu,

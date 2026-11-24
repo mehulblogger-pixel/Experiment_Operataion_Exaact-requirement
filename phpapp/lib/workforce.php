@@ -786,10 +786,17 @@ function ops_run_mis_digest($period = 'weekly') {
     $today = date('Y-m-d');
     $since = $period === 'monthly' ? date('Y-m-d', strtotime('-1 month')) : date('Y-m-d', strtotime('-7 days'));
     $v = fn($sql, $a = []) => (float)ops_val($sql, $a);
-    $openJobs   = (int)$v("SELECT COUNT(*) FROM jobs WHERE closed_flag=0");
-    $overdue    = (int)$v("SELECT COUNT(*) FROM jobs WHERE closed_flag=0 AND ((inspection_end_date<>'' AND inspection_end_date<?) OR (inspection_end_date='' AND scheduled_date<>'' AND scheduled_date<?))", [$today, $today]);
+    //  Stage 1 B1/B2: the digest reads the same definitions as the Operations home
+    //  (lib/opskpi.php): a cancelled job is not open; overdue = "Jobs overdue";
+    //  reports = "Reports awaiting sign-off" (closed jobs, sign-off pending).
+    $openJobs   = (int)$v("SELECT COUNT(*) FROM jobs j WHERE j.closed_flag=0 AND COALESCE(j.stage,'')<>'CANCELLED'");
+    $overdue    = function_exists('opk_job_pred')
+        ? (int)$v("SELECT COUNT(*) FROM jobs j WHERE " . opk_job_pred('jobs_overdue'))
+        : (int)$v("SELECT COUNT(*) FROM jobs WHERE closed_flag=0 AND ((inspection_end_date<>'' AND inspection_end_date<?) OR (inspection_end_date='' AND scheduled_date<>'' AND scheduled_date<?))", [$today, $today]);
     $closed     = (int)$v("SELECT COUNT(*) FROM jobs WHERE closed_flag=1 AND closed_at>=?", [$since]);
-    $repPending = (int)$v("SELECT COUNT(*) FROM jobs WHERE report_approval='PENDING'");
+    $repPending = function_exists('opk_job_pred')
+        ? (int)$v("SELECT COUNT(*) FROM jobs j WHERE " . opk_job_pred('signoff'))
+        : (int)$v("SELECT COUNT(*) FROM jobs WHERE report_approval='PENDING'");
     $newCalls   = (int)$v("SELECT COUNT(*) FROM calls WHERE call_received_date>=?", [$since]);
     // sales (guard if CRM not present)
     $hasQuotes  = (int)$v("SELECT COUNT(*) FROM quotations");
@@ -804,10 +811,10 @@ function ops_run_mis_digest($period = 'weekly') {
     $label = $period === 'monthly' ? 'Monthly' : 'Weekly';
     $body = "$label management summary — " . app_name() . "\nPeriod: since $since\n\n"
         . "OPERATIONS\n"
-        . "  Open jobs: $openJobs  (overdue: $overdue)\n"
+        . "  Open jobs: $openJobs  (jobs overdue: $overdue)\n"
         . "  Jobs closed in period: $closed\n"
         . "  New calls in period: $newCalls\n"
-        . "  Reports awaiting approval: $repPending\n\n"
+        . "  Reports awaiting sign-off: $repPending\n\n"
         . "SALES / CRM\n"
         . "  Open quotations: $qOpen\n"
         . "  Won in period: $qWon  (₹" . nf($wonVal, 0) . ")\n"

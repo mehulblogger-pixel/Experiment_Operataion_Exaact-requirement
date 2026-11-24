@@ -43,8 +43,8 @@ t_ok(strpos($det, $rawLine) === false, 'the bare raw-legacy-status line is gone 
 
 // The register shows the unified status pill (additively; the scheduling chips stay).
 t_ok(strpos($reg, 'call_status_label($c)') !== false, 'the register shows the unified lifecycle status per row');
-t_ok(strpos($reg, 'To schedule') !== false && strpos($reg, 'In progress') !== false,
-    'the existing scheduling chips are preserved (additive)');
+t_ok(strpos($reg, 'No engineer yet') !== false && strpos($reg, 'In progress') !== false,
+    'the existing scheduling chips are preserved (additive; Stage 1 B1 renamed "To schedule" to "No engineer yet")');
 
 // Guardrails: derivation and the R6 transition rules are untouched.
 t_ok(strpos($tos, 'function tosrm_derive_status') !== false && strpos($tos, 'function tosrm_can_transition') !== false,

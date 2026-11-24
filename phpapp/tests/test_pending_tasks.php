@@ -32,7 +32,7 @@ $mk('APPROVED');   // to issue
 $tasks = ops_pending_tasks();
 $byLabel = []; foreach ($tasks as $t) $byLabel[$t['label']] = (int)$t['n'];
 t_ok(($byLabel['to vet'] ?? 0) >= 1, 'a VETTING report shows under "to vet" for a vetter');
-t_ok(($byLabel['to issue'] ?? 0) >= 1, 'an APPROVED (not issued) report shows under "to issue"');
+t_ok(($byLabel['reports awaiting issue'] ?? 0) >= 1, 'an APPROVED (not issued) report shows under "reports awaiting issue" (Stage 1 B1 name)');
 
 $html2 = ops_render_pending_tasks();
 t_ok(strpos($html2, 'to vet') !== false, 'the rendered panel lists the pending vet task');

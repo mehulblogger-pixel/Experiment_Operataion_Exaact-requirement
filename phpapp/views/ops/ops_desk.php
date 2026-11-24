@@ -13,20 +13,17 @@
 <section class="card" style="margin-bottom:14px">
   <p style="margin:0 0 10px;font-size:14px"><strong>Today:</strong> <?= e($summary['text']) ?>
     <?php if (!empty($summary['ai'])): ?><span class="badge" title="Phrased by the AI assistant from these figures — advisory only">AI</span><?php endif; ?></p>
-  <div class="kpi-row" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+  <div class="kpi-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">
     <?php
-      $cards = [
-        ['New requests', $m['new'], '/calls'],
-        ['Unscheduled', $m['unscheduled'], '/schedule'],
-        ['Clarification open', $m['clarification'], '/calls'],
-        ['Ready to schedule', $m['ready'], '/schedule'],
-        ['Today’s services', $m['today'], '#schedule'],
-        ['Overdue', $m['overdue'], '#backlog'],
-        ['Critical', $m['critical'], '/calls'],
-        ['Report pending', $m['report_pending'], '/jobs'],
-      ];
-      foreach ($cards as [$lbl,$val,$href]):
-        $tone = ($lbl==='Overdue' || $lbl==='Critical') && $val>0 ? 'color:#b4232b' : (($lbl==='Clarification open'||$lbl==='Unscheduled') && $val>0 ? 'color:#b45309' : '');
+      //  Stage 1 B1 (owner, 24 Nov 2026): the same nine figures, labels and filtered
+      //  links as the Operations home — one definition each, in lib/opskpi.php.
+      $cards = [];
+      foreach (['new' => 'new', 'no_engineer' => 'no_engineer', 'clarification' => 'clarification', 'ready' => 'ready',
+                'today' => 'today', 'wo_overdue' => 'overdue', 'jobs_overdue' => 'jobs_overdue', 'critical' => 'critical',
+                'signoff' => 'report_pending'] as $key => $mk)
+        $cards[] = [opk_label($key), (int) ($m[$mk] ?? 0), opk_href($key), $key];
+      foreach ($cards as [$lbl,$val,$href,$key]):
+        $tone = in_array($key, ['wo_overdue','jobs_overdue','critical'], true) && $val>0 ? 'color:#b4232b' : (in_array($key, ['clarification','no_engineer'], true) && $val>0 ? 'color:#b45309' : '');
     ?>
       <a href="<?= e($href) ?>" class="kpi" style="border:1px solid var(--hair,#e4e1d8);border-radius:9px;padding:10px 12px;text-decoration:none;color:inherit">
         <div style="font-size:22px;font-weight:700;<?= $tone ?>"><?= (int)$val ?></div>

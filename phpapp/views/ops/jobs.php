@@ -5,8 +5,11 @@
   $nOpen = 0; $nOverdue = 0; $nClosed = 0; $nLocked = 0; $nDueSoon = 0;
   $locks = [];
   foreach ($rows as $j) {
-    if ($j['closed_flag']) { $nClosed++; }
-    else { $nOpen++; $end = $j['inspection_end_date'] ?: $j['scheduled_date']; if ($end && $end < $today) $nOverdue++; }
+    // Stage 1 B1/B2: a cancelled job is neither open nor overdue; "overdue" is the
+    // same definition the Operations-home "Jobs overdue" card counts (lib/opskpi.php).
+    if (!empty($j['opk_cancelled'])) { /* cancelled — counted nowhere */ }
+    elseif ($j['closed_flag']) { $nClosed++; }
+    else { $nOpen++; if (isset($j['opk_jobs_overdue']) ? (int)$j['opk_jobs_overdue'] === 1 : (($e0 = $j['inspection_end_date'] ?: $j['scheduled_date']) && $e0 < $today)) $nOverdue++; }
     // The deadline is only useful while there is still time to act on it, so
     // it belongs in the register and not only on the job itself.
     $st = job_lock_state($j);
@@ -17,7 +20,11 @@
 ?>
 <div class="master-head">
   <div><h1><?= e(T_REG('job')) ?></h1>
-  <p class="sub" style="margin:2px 0 0">Allocated inspection jobs — open one to schedule, record the report, or close it.</p></div>
+  <?php $fKpi = $fKpi ?? ''; if ($fKpi !== '' && function_exists('opk_label')): ?>
+  <p class="sub" style="margin:2px 0 0">Showing: <b><?= e(opk_label($fKpi)) ?></b> — <?= e(opk_hint($fKpi)) ?>. <a href="/jobs" style="margin-left:6px">Clear filter →</a></p>
+  <?php else: ?>
+  <p class="sub" style="margin:2px 0 0">Allocated inspection jobs — open one to schedule, record the report, or close it.</p>
+  <?php endif; ?></div>
   <a class="btn secondary" href="/jobs?<?= e(http_build_query(array_merge($_GET, ['export'=>'csv']))) ?>">⬇ Download CSV</a>
 </div>
 
@@ -73,7 +80,8 @@
     <tbody>
     <?php foreach ($rows as $j):
       $end = $j['inspection_end_date'] ?: $j['scheduled_date'];
-      $overdue = !$j['closed_flag'] && $end && $end < $today;
+      $jCancelled = !empty($j['opk_cancelled']);
+      $overdue = isset($j['opk_jobs_overdue']) ? (int)$j['opk_jobs_overdue'] === 1 : (!$j['closed_flag'] && $end && $end < $today);
       // money sub-status (only meaningful once closed)
       $money = '';
       if ($j['closed_flag']) {
@@ -90,7 +98,8 @@
         <?php if ($seeCredit): ?><td class="num"><?= $j['expected_credit'] ? fmoney($j['expected_credit']) : '<span class="muted">—</span>' ?></td><?php endif; ?>
         <td class="num"><?= $j['tat_days']===null ? '<span class="muted">—</span>' : (int)$j['tat_days'].'d' ?></td>
         <td>
-          <?php if ($j['closed_flag']): ?><span class="pill p-ok">Closed</span>
+          <?php if ($jCancelled): ?><span class="pill p-mut">Cancelled</span>
+          <?php elseif ($j['closed_flag']): ?><span class="pill p-ok">Closed</span>
           <?php elseif ($overdue): ?><span class="pill p-bad">Overdue</span>
           <?php else: ?><span class="pill p-warn">Open</span><?php endif; ?>
           <?php if ($seeCredit && $money): ?><span class="pill <?= $money[1] ?>" style="margin-left:4px"><?= $money[0] ?></span><?php endif; ?>

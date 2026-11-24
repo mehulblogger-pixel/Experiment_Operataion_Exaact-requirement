@@ -114,9 +114,10 @@
 <?php if (function_exists('is_field_inspector') ? is_field_inspector() : is_inspector()): ?>
   <?php $myId = $u['inspector_id'] ?? 0;
     $mc = fn($sql, $extra = []) => $myId ? (int)ops_val("SELECT COUNT(*) FROM jobs WHERE inspector_id=? AND $sql", array_merge([$myId], $extra)) : 0;
-    $myOpen    = $mc("closed_flag=0");
-    $myOverdue = $mc("closed_flag=0 AND ((inspection_end_date<>'' AND inspection_end_date<?) OR (inspection_end_date='' AND scheduled_date<>'' AND scheduled_date<?))", [$today, $today]);
-    $myReports = $mc("closed_flag=0 AND reporting_frequency<>'NOREPORT' AND (report_upload_date IS NULL OR report_upload_date='')");
+    $myOpen    = $mc("closed_flag=0 AND COALESCE(stage,'')<>'CANCELLED'");
+    // Stage 1 B1 — the one definition (lib/opskpi.php), as on the KPI board above.
+    $myOverdue = function_exists('opk_count_my_jobs') ? opk_count_my_jobs('jobs_overdue', $myId) : $mc("closed_flag=0 AND ((inspection_end_date<>'' AND inspection_end_date<?) OR (inspection_end_date='' AND scheduled_date<>'' AND scheduled_date<?))", [$today, $today]);
+    $myReports = function_exists('opk_count_my_jobs') ? opk_count_my_jobs('to_write', $myId) : $mc("closed_flag=0 AND reporting_frequency<>'NOREPORT' AND (report_upload_date IS NULL OR report_upload_date='')");
     $myDone    = $mc("closed_flag=1");
   ?>
   <?php // My cockpit — the SAME universal KPI board that powers the client and
@@ -127,8 +128,8 @@
   <?php else: ?>
     <div class="qcards" style="margin-top:18px">
       <a class="qcard tone-info" href="/my-jobs?f=open"><div class="qic">🗂</div><div class="qn"><?= $myOpen ?></div><div class="ql">Open jobs to do</div></a>
-      <a class="qcard tone-warn" href="/my-jobs?f=reports"><div class="qic">📄</div><div class="qn"><?= $myReports ?></div><div class="ql">Reports pending</div></a>
-      <a class="qcard tone-bad" href="/my-jobs?f=overdue"><div class="qic">⏰</div><div class="qn"><?= $myOverdue ?></div><div class="ql">Overdue</div></a>
+      <a class="qcard tone-warn" href="/my-jobs?f=reports"><div class="qic">📄</div><div class="qn"><?= $myReports ?></div><div class="ql">Reports to write</div></a>
+      <a class="qcard tone-bad" href="/my-jobs?f=overdue"><div class="qic">⏰</div><div class="qn"><?= $myOverdue ?></div><div class="ql">Jobs overdue</div></a>
       <a class="qcard tone-ok" href="/vouchers"><div class="qic">🧾</div><div class="qn"><?= e(cur_sym()) ?></div><div class="ql">This month's voucher</div></a>
     </div>
   <?php endif; ?>
