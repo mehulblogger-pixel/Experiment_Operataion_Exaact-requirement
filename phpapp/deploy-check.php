@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'v2026.11.1 · 33b875af · 2026-11-24 15:33 UTC · 752 files';
+$RELEASE = 'v2026.11.2 · c5309541 · 2026-11-24 17:43 UTC · 752 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -196,7 +196,7 @@ $EXPECT  = [
     'lib/platform_mail.php' => ['s'=>22419,'h'=>'95ffd0e9fea3845d'],
     'lib/portal.php' => ['s'=>132773,'h'=>'037527c042694ece'],
     'lib/position.php' => ['s'=>19441,'h'=>'a0a9d1a9e6a9b10c'],
-    'lib/preflight.php' => ['s'=>5451,'h'=>'7c20d528a3a81111'],
+    'lib/preflight.php' => ['s'=>5451,'h'=>'38d9a12297119b5a'],
     'lib/pricing_admin.php' => ['s'=>16307,'h'=>'d7af986c89fc5cfc'],
     'lib/projcosting.php' => ['s'=>149496,'h'=>'720ad75e641034ac'],
     'lib/pwreset.php' => ['s'=>9509,'h'=>'50675e1d291df7b0'],
@@ -464,7 +464,7 @@ $EXPECT  = [
     'views/ops/crm/inquiry_detail.php' => ['s'=>15531,'h'=>'a5b4428f677bfbda'],
     'views/ops/crm/inquiry_form.php' => ['s'=>9563,'h'=>'f120333e29be132c'],
     'views/ops/crm/inquiry_list.php' => ['s'=>10507,'h'=>'b84470fa7917faa6'],
-    'views/ops/crm/quote_detail.php' => ['s'=>97837,'h'=>'fb51459a25261db1'],
+    'views/ops/crm/quote_detail.php' => ['s'=>107280,'h'=>'ae0459c4597482f0'],
     'views/ops/crm/quote_external.php' => ['s'=>9571,'h'=>'2d07593b1093f7e7'],
     'views/ops/crm/quote_form.php' => ['s'=>53071,'h'=>'d0554bd6dc807067'],
     'views/ops/crm/quote_list.php' => ['s'=>12604,'h'=>'507402ce056c9a52'],
