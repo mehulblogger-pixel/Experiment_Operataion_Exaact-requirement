@@ -101,7 +101,8 @@ try {
     $render = function ($route, $fn) {
         $GLOBALS['__nv'] = null; $GLOBALS['__nv_tpl'] = null;
         try { $fn($route, 'GET'); } catch (Throwable $e) { return 'THREW ' . $e->getMessage(); }
-        $tpl = __DIR__ . '/../views/' . ($GLOBALS['__nv_tpl'] ?? '') . '.php';
+        // Another test may have defined the capturing stub without recording the template.
+        $tpl = __DIR__ . '/../views/' . ($GLOBALS['__nv_tpl'] ?? ('ops/' . $route)) . '.php';
         if (!is_array($GLOBALS['__nv']) || !is_file($tpl)) return '';
         ob_start();
         try { (function () use ($tpl) { extract($GLOBALS['__nv']); include $tpl; })(); } catch (Throwable $e) { echo 'THREW ' . $e->getMessage(); }

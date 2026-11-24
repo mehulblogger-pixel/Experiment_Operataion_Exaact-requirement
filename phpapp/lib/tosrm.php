@@ -2010,6 +2010,8 @@ function tosrm_ops_metrics($offices = 'ALL') {
     $m['overdue']       = opk_count_calls('wo_overdue', $offices);       // "Work orders overdue"
     $m['wo_overdue']    = $m['overdue'];
     $m['jobs_overdue']  = opk_count_jobs('jobs_overdue');
+    //  (R10, kept: jobs.stage is vestigial — never advanced — so "report pending" is read
+    //  from the closed job's report_approval, never from j.stage.)
     $m['report_pending'] = opk_count_jobs('signoff');                    // "Reports awaiting sign-off"
     $m['signoff']       = $m['report_pending'];
     $m['critical']      = opk_count_calls('critical', $offices);
