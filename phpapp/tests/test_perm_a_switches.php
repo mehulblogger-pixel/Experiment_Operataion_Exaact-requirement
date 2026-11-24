@@ -13,7 +13,9 @@ require_once __DIR__ . '/_bbv_fixture.php';
 
 $NEW = ['crm.sales.see_all', 'crm.targets.set', 'crm.deal.view', 'crm.deal.edit', 'crm.pipeline.manage',
         'crm.lead.export', 'crm.deal.export', 'crm.quote.export', 'crm.settings.manage', 'data.customer_money',
-        'costing.view', 'costing.prepare', 'costing.heads.manage'];
+        'costing.view', 'costing.prepare', 'costing.heads.manage',
+        //  Owner, 24 Nov 2026 (docs/02 19y7): "Delete deals" joins the switches.
+        'crm.deal.delete'];
 
 t_section('Foundation A — every new switch is a named, explained, grantable right');
 foreach ($NEW as $k) {
@@ -26,6 +28,13 @@ t_ok(in_array(PERM_SPLIT_TAG, perm_close_implications(['mod.leads.view']), true)
 $stamped = perm_upgrade_split(['data.credit', PERM_SPLIT_TAG], 'COORDINATOR');
 t_ok(!in_array('data.customer_money', $stamped, true), 'a stamped set that leaves "customer money" off keeps it off, though it holds the old credit tick');
 t_ok(in_array('data.customer_money', perm_upgrade_split(['data.credit'], 'COORDINATOR'), true), 'an unstamped (older) set gets it from the old credit tick, as before');
+//  "Delete deals": an older set derives it from the old rule (a management role), except for the
+//  four management roles the owner narrowed it away from; a stamped set keeps what was saved.
+t_ok(in_array('crm.deal.delete', perm_upgrade_split(['mod.leads.view'], 'ADMIN'), true)
+     && !in_array('crm.deal.delete', perm_upgrade_split(['mod.leads.view'], 'BRANCH_MANAGER'), true)
+     && !in_array('crm.deal.delete', perm_upgrade_split(['mod.leads.view'], 'BUSINESS_DEV_MANAGER'), true)
+     && !in_array('crm.deal.delete', perm_upgrade_split(['mod.leads.view', PERM_SPLIT_TAG], 'ADMIN'), true),
+     'Delete deals: an older Admin set derives it; a Branch Manager or BDM set does not; a stamped set is left as saved');
 
 $f = bbv_fixture();
 $pdo = db();

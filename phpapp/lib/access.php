@@ -280,6 +280,9 @@ const PERMISSIONS = [
     //  Owner, 22 Nov 2026 (answer 9: "Don't hardcode it but allowed from permission list"):
     //  the "add the customer" step on a won deal that never had a lead (19y4).
     'crm.deal.add_customer' => 'Add a customer from a won deal that had no lead',
+    //  Owner, 24 Nov 2026 ("as recommended"): deleting a deal is a switch of its own, like
+    //  deleting a lead — it used to ride on the job title (is_admin_level()) (19y7).
+    'crm.deal.delete'     => 'Delete deals (never a won one, or one with a quotation)',
     'data.customer_money' => 'See what customers were billed and paid (Sales screens and Receivables)',
     'costing.view'        => 'View project costings',
     'costing.prepare'     => 'Prepare project costings',
@@ -296,7 +299,7 @@ function permission_groups() {
         'Money'                          => ['finance.reconcile','data.customer_money'],
         'Marketing & Sales (CRM)'        => ['crm.quote.create','crm.quote.approve','crm.quote.send','crm.followup.manage','crm.contract.register','crm.template.manage',
                                              'crm.sales.see_all','crm.targets.set','crm.deal.view','crm.deal.edit','crm.pipeline.manage',
-                                             'crm.lead.export','crm.deal.export','crm.quote.export','crm.settings.manage','crm.deal.add_customer'],
+                                             'crm.lead.export','crm.deal.export','crm.quote.export','crm.settings.manage','crm.deal.add_customer','crm.deal.delete'],
         'Project costing'                => ['costing.view','costing.prepare','costing.heads.manage'],
         'Recruitment'                    => ['hiring.admin','hiring.material_change.propose','hiring.review.clear'],
         'Identity documents (personal data)' => ['person.iddoc.view','person.iddoc.manage'],
@@ -404,7 +407,7 @@ function permission_nav_groups() {
     $fine = [
         'Sales'                   => ['crm.quote.create','crm.quote.approve','crm.quote.send','crm.followup.manage','crm.contract.register','crm.template.manage',
                                       'crm.sales.see_all','crm.targets.set','crm.deal.view','crm.deal.edit','crm.pipeline.manage',
-                                      'crm.lead.export','crm.deal.export','crm.quote.export','crm.settings.manage','crm.deal.add_customer',
+                                      'crm.lead.export','crm.deal.export','crm.quote.export','crm.settings.manage','crm.deal.add_customer','crm.deal.delete',
                                       'costing.view','costing.prepare','costing.heads.manage'],
         'Operations'              => ['ops.call.create','ops.job.allocate','ops.job.close','ops.call.delete','workforce.availability','workforce.report.approve'],
         //  R-14, second half. module_groups() gave recruitment its own heading on
@@ -575,6 +578,7 @@ function perm_help($key) {
             'crm.deal.export'     => 'Download the deal list to Excel / CSV. A file can leave the company — grant deliberately.',
             'crm.quote.export'    => 'Download the quotation register to Excel / CSV. A file can leave the company — grant deliberately.',
             'crm.settings.manage' => 'Change Sales settings: follow-up outcomes and days, weekly off, when a deal is stale, and who gets new leads in each office. Not the other company settings.',
+            'crm.deal.delete'     => 'Delete a deal that is not won and has no quotation (those are part of the record and are kept). It cannot be undone; the deletion is written to History with who and when. Who: administrators and the Business Director — grant deliberately.',
             'crm.deal.add_customer' => 'On a deal that was won without a lead, add its customer to the master (with GSTIN / PAN, checked against the customers already on file). A deal from a lead gets its customer by converting the lead. Who: the people who work leads and deals.',
             'data.customer_money' => 'See what customers were billed, what they paid and what is overdue — on the Sales screens (Orders, Today, Sales home, Advertising return, client register) and in Receivables. Who: finance and those who chase payment.',
             'costing.view'        => 'Open project costings — the cost build-up behind a quotation, including salary figures. Who: sales, recruitment and managers who price work.',
@@ -764,7 +768,8 @@ function perm_legacy_edit_also_granted() {
 //  to administrators would strip it from five roles that can delete today.
 //
 //    inquiries  delete  is_admin_level()        (lib/crm.php inquiry-delete)
-//    leads      delete  is_admin_level()        (lib/opportunities.php opportunity-delete)
+//    leads      delete  is_admin_level()        (lib/opportunities.php opportunity-delete —
+//                                              since 24 Nov 2026 its own switch crm.deal.delete)
 //    jobs       delete  is_coordinator_level()  (lib/ops.php expense-delete, lib/bills.php bill-delete)
 //
 //  Granting these keeps day one identical. The owner can then UNTICK them on
@@ -925,6 +930,9 @@ function perm_split_rules() {
         //  leads_can_edit() && leads_works_leads() — Leads or Enquiries edit, and Leads
         //  add or edit. That rule, kept, is who holds the switch on day one.
         'crm.deal.add_customer' => fn($h, $mgmt) => ($h('mod.leads.edit') || $h('mod.inquiries.edit')) && ($h('mod.leads.add') || $h('mod.leads.edit')),
+        //  opportunity-delete: is_master() || is_admin_level() — narrowed by the owner (24 Nov
+        //  2026) for the roles in ACCESS_DEAL_DELETE_NARROWED, through PERM_SPLIT_NOT_FOR.
+        'crm.deal.delete'     => fn($h, $mgmt) => $mgmt,
         //  ar_can(): finance.reconcile || data.credit (|| master), with Invoicing
         'data.customer_money' => fn($h, $mgmt) => $h('finance.reconcile') || $h('data.credit'),
         //  pc_can() / pc_can_edit(): Quotations, Recruitment or Enquiries — or a
@@ -942,7 +950,12 @@ function perm_split_rules() {
 //  stays the historical one). D1 (owner, 21 Nov 2026): Finance reads Quotes but
 //  does not see deals — so Quotes view no longer brings "View deals" to Finance.
 //  An administrator may still switch it on for the role on "Who can do what".
-const PERM_SPLIT_NOT_FOR = ['crm.deal.view' => ['FINANCE']];
+//  Owner, 24 Nov 2026 ("as recommended"): "Delete deals" is NOT carried to the Branch
+//  Manager and the SBU Head (view and download only since 21 Nov, 19x), nor to the Branch
+//  App Manager and the Operation Manager, though all four are management roles. It starts
+//  with the Admin and the Business Director (and the Master Admin, who holds everything).
+const ACCESS_DEAL_DELETE_NARROWED = ['SBU_HEAD', 'BRANCH_MANAGER', 'BRANCH_APP_MANAGER', 'OPERATION_MANAGER'];
+const PERM_SPLIT_NOT_FOR = ['crm.deal.view' => ['FINANCE'], 'crm.deal.delete' => ACCESS_DEAL_DELETE_NARROWED];
 function perm_upgrade_split(array $perms, $role) {
     if (in_array(PERM_SPLIT_TAG, $perms, true)) return $perms;
     $base = function_exists('role_effective_key') ? role_effective_key(strtoupper((string) $role)) : strtoupper((string) $role);
@@ -1583,6 +1596,10 @@ function access_owner_grants() {
         //  split rule above no longer reads it) on exactly the old rule — never by role.
         'ADD-CUSTOMER-SWITCH-2026-11-22' => ['perms' => ['crm.deal.add_customer'],
                                              'rule' => fn($h) => perm_split_rules()['crm.deal.add_customer']($h, false)],
+        //  Owner, 24 Nov 2026: "Delete deals" reaches a grid SAVED after foundation A (stamped
+        //  @split1, which the split rule no longer reads) for exactly the roles it starts with.
+        //  Nobody else ever held the switch, so nothing has to be taken away (no revoke).
+        'DEAL-DELETE-SWITCH-2026-11-24' => ['perms' => ['crm.deal.delete'], 'roles' => ['ADMIN', 'BUSINESS_DIRECTOR']],
     ];
 }
 //  Does owner grant $g apply to a set held by a person / role of base role $role?

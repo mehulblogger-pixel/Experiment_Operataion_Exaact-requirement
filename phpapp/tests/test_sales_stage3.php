@@ -166,6 +166,12 @@ try {
             }
             if (!$ok) $lost[] = $sig;
         }
+        //  Owner, 24 Nov 2026 (docs/02 19y7): "Delete deals" is its own switch and is no longer
+        //  held by the Branch Manager / SBU Head / Branch App Manager / Operation Manager — the
+        //  one intended difference: their deal page loses the Delete form, and only theirs.
+        $keep = $_SESSION['uid'] ?? null; bbv_as($uid); $mayDelDeal = function_exists('opp_can_delete') && opp_can_delete(); if ($keep) bbv_as($keep);
+        if ($route === 'opportunity' && !$mayDelDeal)
+            $lost = array_values(array_filter($lost, fn($sig) => strpos($sig, 'post /opportunity-delete [') !== 0));
         t_eq($lost, [], "$label · $pg — every form (same address, every field) is on the new one");
         t_eq(array_values(array_diff($o['money'], $nn['money'])), [], "$label · $pg — every amount of the old page is on the new one");
         return [$o, $n];

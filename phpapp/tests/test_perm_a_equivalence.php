@@ -73,6 +73,7 @@ try {
                 'quote_export' => $b(can('mod.quotes.view') && (!function_exists('crm_quote_can_export') || crm_quote_can_export())),
                 'crmdash' => $b(crmdash_can()), 'leads_view' => $b(leads_can_view()), 'leads_edit' => $b(leads_can_edit()), 'reopen' => $b(leads_can_reopen()),
                 'adv' => $b(adv_can()), 'roi' => $b(roi_can()), 'admin_level' => $b(is_admin_level()), 'master' => $b(is_master()),
+                'deal_delete' => $b(function_exists('opp_can_delete') ? opp_can_delete() : (is_admin_level() || is_master())),
                 'offices' => $sc === 'ALL' ? 'ALL' : implode(',', array_map(fn($i) => array_search((int) $i, $off, true) ?: 'other', (array) $sc)),
             ];
             $tiles = [];
@@ -148,6 +149,21 @@ try {
         $now = $answers($oldKeys);
         $result[$sc] = $now;
         if ($writeTo === '') {
+            //  The fourth intended change (owner, 24 Nov 2026, docs/02 19y7): deleting a deal was
+            //  is_admin_level() || is_master() — the snapshot holds both answers — and is now the
+            //  switch "Delete deals". It must be identical for everyone EXCEPT the four management
+            //  roles the owner narrowed it away from, who may only move from yes to no.
+            $dd = [];
+            foreach ($snap[$sc] as $user => $w) {
+                $was = (int) ($w['g']['admin_level'] ?? 0) === 1 || (int) ($w['g']['master'] ?? 0) === 1;
+                $nowD = (int) ($now[$user]['g']['deal_delete'] ?? -1);
+                $narrowedRole = in_array($roleOf[$user] ?? '', ACCESS_DEAL_DELETE_NARROWED, true) && (int) ($w['g']['master'] ?? 0) !== 1;
+                if ($nowD === (int) $was) continue;
+                if ($narrowedRole && $was && $nowD === 0) { $narrowed++; continue; }
+                $dd[] = "$user: before " . (int) $was . ", now $nowD";
+            }
+            t_ok(!$dd, "scenario $sc: \"Delete deals\" — everyone as before except the Branch Manager, SBU Head, Branch App Manager and Operation Manager, who lose it"
+                 . ($dd ? ' — ' . implode(' | ', array_slice($dd, 0, 10)) : ''));
             $compare($now, $snap[$sc], "scenario $sc (" . ($sc === 'A' ? 'built-in role defaults' : 'a saved Roles & access grid') . '): ' . count($now) . ' people, every gate and every old right — identical to before');
             $n = $migrate();
             t_ok(is_int($n) && $n > 0, "scenario $sc: the one-time move to \"differences from the role\" converted $n stored sets");

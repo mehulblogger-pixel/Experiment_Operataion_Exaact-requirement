@@ -122,7 +122,8 @@ t_section('The policy the audit read is still the policy in force');
 // because there is no "activate" right to ask for. That is R-20 in one line.
 $POLICY = [
   'inquiry-delete'     => ["lib/crm.php",        "is_admin_level() || is_master()"],
-  'opportunity-delete' => ["lib/opportunities.php", "is_admin_level() || is_master()"],
+  //  Owner, 24 Nov 2026 (docs/02 19y7): deleting a deal is the switch "Delete deals".
+  'opportunity-delete' => ["lib/opportunities.php", "ops_require(opp_can_delete(),"],
   'contract-delete'    => ["lib/contracts.php",  "can('crm.contract.register') || is_master()"],
   'call-delete'        => ["lib/ops.php",        "is_master() || can('ops.call.delete')"],
   'lead-delete'        => ["lib/leads.php",      "can('mod.leads.edit') || is_master()"],

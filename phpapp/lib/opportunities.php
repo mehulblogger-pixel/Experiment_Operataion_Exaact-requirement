@@ -79,6 +79,11 @@ function opp_can_add_customer() {
     //  only READS leads and deals (Branch Manager / SBU Head view) does not add customers from them.
     return can('crm.deal.add_customer') && (!function_exists('leads_works_leads') || leads_works_leads());
 }
+//  "Delete deals" (crm.deal.delete — owner, 24 Nov 2026, docs/02 19y7). It used to be any
+//  management role (is_admin_level()), which let the Branch Manager and the SBU Head — view
+//  and download only since 21 Nov — delete deals. The won and quoted blocks in the handler
+//  are unchanged, and every deletion is still written to History.
+function opp_can_delete() { return is_master() || can('crm.deal.delete'); }
 function opp_can_export() { return is_master() || can('crm.deal.export'); }
 
 function opp_try($fn, $fb = []) {
@@ -1286,7 +1291,7 @@ function ops_opportunities($route, $method) {
     // Deleting an opportunity — administrators only, and never once it is WON or
     // has quotations linked to it (those are the record of real business).
     if ($route === 'opportunity-delete' && $method === 'POST') {
-        ops_require(is_admin_level() || is_master(), 'Only an administrator can delete ' . Tlp('opportunity') . '.');
+        ops_require(opp_can_delete(), 'Deleting ' . Tlp('opportunity') . ' needs the "Delete deals" permission.');
         $id = (int)($_POST['id'] ?? 0);
         $o  = $id ? opp_row($id) : null;
         if (!$o) { flash('That ' . Tl('opportunity') . ' no longer exists.', 'error'); redirect('/opportunities'); }

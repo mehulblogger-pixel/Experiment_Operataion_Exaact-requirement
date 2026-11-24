@@ -38,7 +38,7 @@ $sbuL = function_exists('lk_options_or') ? lk_options_or('sbu', OPS_SBUS) : OPS_
 $short = fn($d) => $d ? date('j M', strtotime((string)$d)) : '';
 $todayYmd = date('Y-m-d');
 $tel = function_exists('sx_tel') ? sx_tel($o['contact_phone'] ?? '') : '';
-$canDelete = (is_admin_level() || is_master()) && $o['status'] !== 'WON' && !count($quotes);
+$canDelete = (function_exists('opp_can_delete') ? opp_can_delete() : is_master()) && $o['status'] !== 'WON' && !count($quotes);
 $canReopen = function_exists('leads_can_reopen') && leads_can_reopen();
 $wonReopen = $won && empty($o['call_id']) && empty($o['contract_id']) && trim((string)($o['sent_to_accounts_at'] ?? '')) === '';
 
