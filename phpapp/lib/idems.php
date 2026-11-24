@@ -88,15 +88,35 @@ function job_final_docs_missing($job) {
     if (strtoupper((string)($job['billing_stop_kind'] ?? '')) === 'TERMINATED') return [];
     if (($job['reporting_frequency'] ?? 'NOREPORT') === 'NOREPORT') return [];
     $jobId = (int)($job['id'] ?? 0); if (!$jobId) return [];
+    // TPIA Phase 1 / D7 (owner, 25 Nov 2026) — each is required only when it is
+    // ticked in the "Types of report required" of the job (else of its call). A
+    // stage-only inspection or a deputation that never owed a Release Note now
+    // closes without one; with it ticked, it is still required.
+    [$wantFir, $wantRn] = job_final_docs_wanted($job);
+    if (!$wantFir && !$wantRn) return [];
     $fir = 0; $rn = 0;
     try {
         $fir = (int)ops_val("SELECT COUNT(*) FROM report_docs WHERE job_id=? AND COALESCE(deleted,0)=0 AND type_code='FIR'", [$jobId]);
         $rn  = (int)ops_val("SELECT COUNT(*) FROM report_docs WHERE job_id=? AND COALESCE(deleted,0)=0 AND type_code IN ('RN','IRN')", [$jobId]);
     } catch (Throwable $e) { return []; }   // reports not in use on this install
     $miss = [];
-    if (!$fir) $miss[] = 'a Final Inspection Report';
-    if (!$rn)  $miss[] = 'a Release Note';
+    if ($wantFir && !$fir) $miss[] = 'a Final Inspection Report';
+    if ($wantRn && !$rn)   $miss[] = 'a Release Note';
     return $miss;
+}
+// Which final documents this job's ticked report types ask for: [FIR?, Release Note?].
+// The job's own list wins; a job with none ticked reads its call's. "Final Report"
+// (FINAL_REP) or the FIR report type asks for the Final Inspection Report; "Release
+// Note" (RN) or "Inspection Release Note" (IRN) asks for the Release Note.
+function job_final_docs_wanted($job) {
+    $id = (int)($job['id'] ?? 0);
+    if ($id && (!array_key_exists('deliverables', $job) || !array_key_exists('call_id', $job)))
+        $job += (ops_one("SELECT deliverables, call_id FROM jobs WHERE id=?", [$id]) ?: []);
+    $codes = trim((string)($job['deliverables'] ?? ''));
+    if ($codes === '' && (int)($job['call_id'] ?? 0) > 0)
+        $codes = trim((string)(ops_val("SELECT deliverables FROM calls WHERE id=?", [(int)$job['call_id']]) ?: ''));
+    $set = array_map('strtoupper', array_filter(array_map('trim', explode(',', $codes))));
+    return [(bool)array_intersect($set, ['FINAL_REP', 'FIR']), (bool)array_intersect($set, ['RN', 'IRN'])];
 }
 
 // ---------------------------------------------------------------------------

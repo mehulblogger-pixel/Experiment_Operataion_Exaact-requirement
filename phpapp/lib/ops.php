@@ -9521,12 +9521,14 @@ function ops_jobs($route, $method) {
             // §WO-6 — the last day of an inspection needs the Final Inspection
             // Report and the Release Note before the job is closed. A terminated
             // job is the exception (owner, 8 Nov 2026) — and the record says so.
+            // TPIA D7 (owner, 25 Nov 2026): only the ones ticked in "Types of report required".
             if (function_exists('job_final_docs_missing')) {
                 $fd = job_final_docs_missing($job);
                 if ($fd) {
-                    view('ops/job_close', ['job'=>$job, 'error'=>'The final day of an inspection needs '
-                        . implode(' and ', $fd) . ' on file before this ' . Tl('job') . ' can be closed. '
-                        . 'Create them with "New report" on the ' . Tl('job') . ' (Final Inspection Report and Release Note).']);
+                    view('ops/job_close', ['job'=>$job, 'error'=>'This ' . Tl('job') . ' was asked for '
+                        . implode(' and ', $fd) . ' (ticked in its "Types of report required"), and '
+                        . (count($fd) > 1 ? 'they are' : 'it is') . ' not on file yet. '
+                        . 'Create ' . (count($fd) > 1 ? 'them' : 'it') . ' with "New report" on the ' . Tl('job') . ', then close it.']);
                     return;
                 }
             }

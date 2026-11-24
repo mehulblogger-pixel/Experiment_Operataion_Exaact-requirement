@@ -92,7 +92,14 @@ stateDiagram-v2
   gate that asks for the Final Inspection Report and Release Note (§WO-6,
   `job_final_docs_missing()`) does not apply to a job whose early end is **TERMINATED**
   (`jobs.billing_stop_kind`); closing it records `CLOSED_TERMINATED` in the job's activity.
-  Completed-early and demobilised jobs still need both. After any early end, visit days
+  Completed-early and demobilised jobs still need both — **when ticked** (next point).
+- **Final documents only when ticked** (TPIA Phase 1 / D7, owner 25 Nov 2026). The
+  Final Inspection Report is asked for only when "Final Report" (`FINAL_REP`, or the
+  `FIR` type) is ticked in the job's "Types of report required" (else its call's); the
+  Release Note only when "Release Note" (`RN`) or "Inspection Release Note" (`IRN`) is
+  ticked (`job_final_docs_wanted()`). Nothing ticked → nothing demanded. The company
+  switch `require_final_docs_on_close`, the TERMINATED exit and the "No report" exit are
+  unchanged. No new status. After any early end, visit days
   dated after the end date no longer hold the job open (`job_visits_open_days()`); days up
   to it still do. No new status.
 - `report_approval`: `'' → PENDING` at close; `PENDING → APPROVED/REJECTED` via
