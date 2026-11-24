@@ -259,6 +259,19 @@
       <div><span class="k"><?= e(TH('job')) ?> site</span><?= e($sa ? trim(($sa['label']?:'Site').' '.$sa['town_village'].' '.$sa['city'].' '.$sa['state']) : '—') ?></div><?php endif; ?>
     <?php if (($call['po_id']??null)): $po = ops_one("SELECT po_number FROM partner_purchase_orders WHERE id=?", [$call['po_id']]); $liw = ($call['po_line_item_id']??null) ? ops_one("SELECT description FROM po_line_items WHERE id=?", [$call['po_line_item_id']]) : null; ?>
       <div><span class="k">Against PO</span><?= e($po['po_number'] ?? '—') ?><?= $liw ? ' · '.e($liw['description']) : '' ?></div><?php endif; ?>
+    <?php //  TPIA Phase 1 — each reference opens the inspection history matched on it. ?>
+    <?php $hb = '/call?id=' . (int)$call['id'] . '&hist='; ?>
+    <div><span class="k"><?= e(T('client')) ?>'s call no.</span><?= trim((string)($call['client_call_ref'] ?? '')) !== ''
+        ? '<a href="' . e($hb . 'ref#tpia-history') . '" title="Inspection history for this number">' . e($call['client_call_ref']) . '</a>' : '<span class="muted">—</span>' ?></div>
+    <div><span class="k"><?= e(T('client')) ?> PO (on the <?= e(Tl('manufacturer')) ?>)</span><?= trim((string)($call['supply_po_ref'] ?? '')) !== ''
+        ? '<a href="' . e($hb . 'po#tpia-history') . '" title="Inspection history for this PO">' . e($call['supply_po_ref']) . '</a>' : '<span class="muted">—</span>' ?></div>
+    <div><span class="k">Lot / stage / qty offered</span><?= trim((string)($call['offered_scope'] ?? '')) !== '' ? e($call['offered_scope']) : '<span class="muted">—</span>' ?></div>
+    <?php if ((int)($call['vendor_id'] ?? 0) > 0): ?>
+      <div><span class="k">History at this <?= e(Tl('manufacturer')) ?></span><a href="<?= e($hb . 'mfr#tpia-history') ?>">All <?= e(Tlp('call')) ?> at <?= e($call['vendor_name'] ?: Tl('manufacturer')) ?> →</a></div>
+    <?php endif; ?>
+    <?php if (function_exists('ops_report_progress_line')): foreach ($jobs as $pj): $pl = ops_report_progress_line($pj); if ($pl === '') continue; ?>
+      <div><span class="k"><?= e(TH('report')) ?>s — <?= e($pj['job_code']) ?></span><?= e($pl) ?></div>
+    <?php endforeach; endif; ?>
     <div><span class="k">Product</span><?= e((lk_options_or('product', PRODUCT_CATS)[$call['product_category']] ?? '') ?: ($call['product_other'] ?: '—')) ?></div>
     <div><span class="k">Engagement</span><?= e($call['deputation_type'] ?: '—') ?></div>
     <?php if (!empty($sameOffice)): ?>
@@ -369,4 +382,5 @@
   <?php if (!$jobs): ?><tr><td colspan="8">No jobs yet. <?php if (is_coordinator_level()): ?><a href="/job-new?call=<?= (int)$call['id'] ?>">Allocate one</a>.<?php endif; ?></td></tr><?php endif; ?>
 </table>
 </div><!-- /Jobs -->
+<?= function_exists('chain_history_panel') ? chain_history_panel($call, (string)($_GET['hist'] ?? '')) : '' ?>
 </div><!-- /data-tabs (work order) -->

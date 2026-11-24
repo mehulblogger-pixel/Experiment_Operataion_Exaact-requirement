@@ -31,9 +31,15 @@
 //                          scheduled date) has passed.
 //    Reports awaiting      a closed job whose report still waits for the
 //    sign-off              reporting manager's sign-off.
-//    Reports to write      an open, not-cancelled job that needs a report
-//                          (a frequency other than "No report") with none
-//                          uploaded and none issued yet.
+//    Reports to write      an open, not-cancelled job that needs reports (a
+//                          frequency other than "No report") with at least one
+//                          report MISSING today: a past inspection day without
+//                          its own report (one report per inspection day) or a
+//                          fixed period whose report is not in (daily, weekly,
+//                          fortnightly, monthly, every N days — counted from the
+//                          start date). TPIA Phase 1, owner 25 Nov 2026 (item 9):
+//                          it no longer drops a job at its first report. The
+//                          reading is ops_report_obligations() in lib/schedule.php.
 //
 //  "Live" = not closed, cancelled or rejected. "Done" = closed, or every
 //  (not-cancelled) job under it closed — the rule the work-order page uses.
@@ -107,11 +113,27 @@ function opk_job_defs() {
                            . " AND COALESCE(NULLIF(j.inspection_end_date,''), j.scheduled_date)<'" . $today . "'"],
         'signoff'      => ['Reports awaiting sign-off', 'closed jobs, report not yet signed off',
                            "COALESCE(j.closed_flag,0)=1 AND j.report_approval='PENDING'"],
-        'to_write'     => ['Reports to write', 'open jobs still needing a report',
-                           "$live AND COALESCE(j.closed_flag,0)=0 AND COALESCE(j.reporting_frequency,'') NOT IN ('','NOREPORT')"
-                           . " AND COALESCE(j.report_upload_date,'')=''"
-                           . " AND NOT EXISTS (SELECT 1 FROM report_docs rdw WHERE rdw.job_id=j.id AND COALESCE(rdw.deleted,0)=0 AND COALESCE(rdw.finalized,0)=1)"],
+        // The predicate is built by opk_to_write_sql() only when it is asked for
+        // (it reads every open job's reports) — opk_job_pred('to_write').
+        'to_write'     => ['Reports to write', 'open jobs with a report missing (a day or a period)', null],
     ];
+}
+
+// "Reports to write" as SQL on jobs j: the open, reporting jobs that the one
+// reading (ops_report_obligations) finds a report missing for today. Worked out
+// in PHP over the open reporting jobs, then handed back as an id list, so every
+// card, register filter and list that already used the SQL keeps working.
+function opk_to_write_pre_sql($j = 'j') {
+    return opk_job_live_sql($j) . " AND COALESCE($j.closed_flag,0)=0 AND COALESCE($j.reporting_frequency,'') NOT IN ('','NOREPORT')";
+}
+function opk_to_write_ids($today = null) {
+    if (!function_exists('ops_jobs_missing_reports')) return [];
+    try { $jobs = ops_all("SELECT j.* FROM jobs j WHERE " . opk_to_write_pre_sql('j')) ?: []; } catch (Throwable $e) { return []; }
+    return array_keys(ops_jobs_missing_reports($jobs, $today));
+}
+function opk_to_write_sql($today = null) {
+    $ids = opk_to_write_ids($today);
+    return '(' . opk_to_write_pre_sql('j') . ' AND ' . ($ids ? 'j.id IN (' . implode(',', array_map('intval', $ids)) . ')' : '1=0') . ')';
 }
 
 // Branch scope used by BOTH the Operations-home card and the filtered register it
@@ -143,7 +165,10 @@ function opk_jobs_scope() {
 }
 
 function opk_call_pred($key) { $d = opk_call_defs(); return $d[$key][2] ?? null; }
-function opk_job_pred($key)  { $d = opk_job_defs();  return $d[$key][2] ?? null; }
+function opk_job_pred($key)  {
+    if ($key === 'to_write') return opk_to_write_sql();
+    $d = opk_job_defs();  return $d[$key][2] ?? null;
+}
 
 // $offices: the executing-office desk the caller already resolved (the Operations
 // home passes tosrm_office_scope(), which is what the filtered register uses).

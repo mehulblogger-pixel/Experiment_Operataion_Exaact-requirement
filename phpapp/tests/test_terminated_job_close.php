@@ -4,8 +4,10 @@
 // the end date (never worked) no longer hold the job open.
 t_section('A terminated job closes without its final documents');
 setting_set('require_final_docs_on_close', '1');
-$base = ['id' => 987654321, 'reporting_frequency' => 'DAILY'];
-t_eq(count(job_final_docs_missing($base)), 2, 'an ordinary job still needs a Final Inspection Report and a Release Note');
+//  TPIA Phase 1 / D7 (owner, 25 Nov 2026): the two documents are required only
+//  when ticked in the job's "Types of report required" — so the job here ticks both.
+$base = ['id' => 987654321, 'reporting_frequency' => 'DAILY', 'deliverables' => 'IR,FINAL_REP,RN', 'call_id' => 0];
+t_eq(count(job_final_docs_missing($base)), 2, 'an ordinary job that ticked both still needs a Final Inspection Report and a Release Note');
 t_eq(job_final_docs_missing($base + ['billing_stop_kind' => 'TERMINATED']), [], 'a terminated job does not');
 t_eq(count(job_final_docs_missing($base + ['billing_stop_kind' => 'COMPLETED_EARLY'])), 2, 'a job completed early still does');
 t_eq(count(job_final_docs_missing($base + ['billing_stop_kind' => 'DEMOBILIZED'])), 2, 'and so does a demobilised one');

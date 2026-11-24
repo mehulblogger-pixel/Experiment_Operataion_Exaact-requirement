@@ -12,7 +12,9 @@ const OPS_SBUS = ['IND'=>'Industrial','OGC'=>'Oil, Gas & Chemicals','MIN'=>'Mine
 const PRODUCT_CATS = ['ELEC'=>'Electrical equipment','MECH'=>'Mechanical equipment','STRUCT'=>'Structural / Fabrication','PIPE'=>'Pipes & Fittings','VALVE'=>'Valves','PUMP'=>'Pumps & Rotating','TRANSFORMER'=>'Transformers','CABLE'=>'Cables','INSTRUMENT'=>'Instrumentation','CIVIL'=>'Civil / Construction','OTHER'=>'Others'];
 const CREDIT_TYPES = ['MANDAY'=>'Man-day','MANMONTH'=>'Man-month','LUMP'=>'Lump sum','LATER'=>'Decide later','OTHER'=>'Other'];
 const CREDIT_DIRECTIONS = ['RECEIVED'=>'Received (from the other office)','GIVEN'=>'Given (to the other office)'];
-const REPORT_FREQ = ['DAILY'=>'Daily','ALTERNATE'=>'Alternate day','WEEKLY'=>'Weekly','FORTNIGHTLY'=>'Fortnightly','MONTHLY'=>'Monthly','CUSTOM'=>'Custom (every N days)','NOREPORT'=>'No report'];
+//  PER_DAY (TPIA Phase 1, owner 25 Nov 2026 — D5): one report for EACH inspection
+//  (visit) day, dated that day; suggested for man-day work, always changeable.
+const REPORT_FREQ = ['DAILY'=>'Daily','PER_DAY'=>'One report per inspection day','ALTERNATE'=>'Alternate day','WEEKLY'=>'Weekly','FORTNIGHTLY'=>'Fortnightly','MONTHLY'=>'Monthly','CUSTOM'=>'Custom (every N days)','NOREPORT'=>'No report'];
 // Types of inspection service (third-party inspection industry).
 const INSPECTION_TYPES = ['INSPECTION'=>'Inspection (third-party / TPI)','EXPEDITING'=>'Expediting','DEPUTATION'=>'Resident / site posting','VENDOR_ASSESS'=>'Vendor assessment','VENDOR_AUDIT'=>'Vendor audit','PRE_PROD'=>'Pre-production inspection','DURING_PROD'=>'During-production inspection','STAGE'=>'Stage / In-process inspection','FINAL'=>'Final inspection','FRI'=>'Final random inspection (FRI)','PSI'=>'Pre-shipment inspection (PSI)','WITNESS'=>'Witness / Test witnessing','FAT'=>'Factory Acceptance Test (FAT)','SAT'=>'Site Acceptance Test (SAT)','SOURCE'=>'Source inspection','SURVEILLANCE'=>'Surveillance','LOADING'=>'Loading / container supervision','SAMPLING'=>'Sampling','DIMENSIONAL'=>'Dimensional inspection','WELDING'=>'Welding inspection','NDT'=>'NDT witnessing','PMI'=>'Material verification (PMI)','COATING'=>'Painting / coating inspection','MECH_TEST'=>'Mechanical testing witness','CALIB'=>'Calibration verification','SAFETY_AUDIT'=>'Safety audit','SYSTEM_AUDIT'=>'Management-system audit','SECOND_PARTY'=>'Second-party audit','DESKTOP'=>'Desktop / Document review','TECH_AUDIT'=>'Technical audit','SUPPLY_CHAIN'=>'Supply-chain posting','SITE_SUP'=>'Site supervision','COMMISSIONING'=>'Commissioning & installation','SITE_QAQC'=>'Site QA / QC','TYPE_TEST'=>'Type test','TENDER_REVIEW'=>'Tender review','OTHER'=>'Other'];
 // Deliverables / report formats produced after a job.
@@ -307,6 +309,18 @@ function ops_migrate() {
     ensure_column('calls', 'deliverables', "VARCHAR(255) DEFAULT ''");
     ensure_column('calls', 'po_id', 'INT NULL');
     ensure_column('calls', 'po_line_item_id', 'INT NULL');
+    //  TPIA reporting Phase 1 (owner, 25 Nov 2026 — D1/D2/D3). Three plain-text
+    //  references our coordinator types from the client's request, all optional
+    //  and empty on every older work order:
+    //    client_call_ref  the client's own inspection call number (searchable; a
+    //                     repeat only warns — it never blocks or merges calls)
+    //    supply_po_ref    "Client PO no. (placed on the manufacturer)" — the
+    //                     client's purchase order on the manufacturer, NOT our
+    //                     service PO (po_id). Reports copy it as their P.O.
+    //    offered_scope    the lot / stage / quantity offered on this call
+    ensure_column('calls', 'client_call_ref', "VARCHAR(80) DEFAULT ''");
+    ensure_column('calls', 'supply_po_ref', "VARCHAR(80) DEFAULT ''");
+    ensure_column('calls', 'offered_scope', "VARCHAR(255) DEFAULT ''");
     // Contracting-vs-executing credit model
     ensure_column('calls', 'contracting_office_id', 'INT NULL');       // office that owns the client/PO
     ensure_column('calls', 'coordinator_id', 'INT NULL');             // the named coordinator the call is forwarded to
@@ -3092,21 +3106,27 @@ function ops_run_reminders($today = null) {
     $today = $today ?: date('Y-m-d');
     $sent = 0;
     $open = ops_all("SELECT * FROM jobs WHERE closed_flag=0 AND inspector_id IS NOT NULL");
+    //  TPIA Phase 1 item 10 (owner, 25 Nov 2026): a reminder follows a MISSING
+    //  report — an inspection day without its own report, or a fixed period whose
+    //  report is not in — never the calendar days since the last upload (which a
+    //  report filed through the reports module never set, so it nagged forever).
+    //  The same reading as the "Reports to write" figure. A "No report" job is
+    //  never reminded about a report; only the existing "close this job" reminder
+    //  after its end date applies to it.
+    $ev = function_exists('report_evidence_batch') ? report_evidence_batch(array_column($open, 'id')) : [];
     foreach ($open as $j) {
-        if ($j['reporting_frequency'] === 'NOREPORT') {
-            // only overdue-closure reminder applies
-        }
         $due = false; $why = '';
         $end = $j['inspection_end_date'] ?: $j['scheduled_date'];
-        $last = $j['report_upload_date'] ?: $j['inspection_start_date'] ?: $j['scheduled_date'];
-        $since = days_between($last, $today);
-        switch ($j['reporting_frequency']) {
-            case 'DAILY': if ($since !== null && $since >= 1) { $due = true; $why = 'daily report'; } break;
-            case 'ALTERNATE': if ($since !== null && $since >= 2) { $due = true; $why = 'alternate-day report'; } break;
-            case 'WEEKLY': if ($since !== null && $since >= 7) { $due = true; $why = 'weekly report'; } break;
-            case 'FORTNIGHTLY': if ($since !== null && $since >= 14) { $due = true; $why = 'fortnightly report'; } break;
-            case 'MONTHLY': if ($since !== null && $since >= 30) { $due = true; $why = 'monthly report'; } break;
-            case 'CUSTOM': $n = (int)($j['report_custom_days'] ?? 0); if ($n > 0 && $since !== null && $since >= $n) { $due = true; $why = "report (every $n days)"; } break;
+        $since = null;
+        if (function_exists('ops_report_obligations')) {
+            $ob = ops_report_obligations($j, $today, $ev[(int)$j['id']] ?? ['reports' => [], 'visits' => []]);
+            if ($ob['missing'] > 0) {
+                $due = true;
+                $since = days_between($ob['oldest_missing'], $today);
+                $why = ($ob['kind'] === 'DAY' ? 'day report for ' . fdate($ob['oldest_missing'])
+                        : ($ob['kind'] === 'PERIOD' ? strtolower(REPORT_FREQ[$ob['freq']] ?? 'periodic') . ' report due ' . fdate($ob['oldest_missing']) : 'report'))
+                     . ($ob['missing'] > 1 ? ' (+' . ($ob['missing'] - 1) . ' more missing)' : '');
+            }
         }
         // Overdue closure: past inspection end and still open
         $pastEnd = $end && days_between($end, $today) !== null && days_between($end, $today) > 0;
@@ -3597,7 +3617,7 @@ function ops_module_family($route) {
 function ops_route_module_map() {
     static $map = [
         'calls'=>'calls','call'=>'calls','call-new'=>'calls','call-edit'=>'calls','call-delete'=>'calls',
-        'jobs'=>'jobs','job'=>'jobs','job-new'=>'jobs','job-edit'=>'jobs','job-close'=>'jobs','job-unlock'=>'jobs','job-invoice'=>'invoicing','job-bill'=>'invoicing','job-advance'=>'jobs','job-reassign'=>'jobs','job-visit-close'=>'jobs','job-qap-upload'=>'jobs','job-qap'=>'jobs','job-qap-del'=>'jobs','job-forward-report'=>'jobs','report-approve'=>'jobs','expense-delete'=>'jobs',
+        'jobs'=>'jobs','job'=>'jobs','job-new'=>'jobs','job-edit'=>'jobs','job-close'=>'jobs','job-unlock'=>'jobs','job-invoice'=>'invoicing','job-bill'=>'invoicing','job-advance'=>'jobs','job-reassign'=>'jobs','job-visit-close'=>'jobs','job-visit-no-inspection'=>'jobs','job-qap-upload'=>'jobs','job-qap'=>'jobs','job-qap-del'=>'jobs','job-forward-report'=>'jobs','report-approve'=>'jobs','expense-delete'=>'jobs',
         'bill-add'=>'jobs','bill-delete'=>'jobs','bill-file'=>'jobs',
         'invoicing'=>'invoicing',
         'tally'=>'invoicing','tally-export'=>'invoicing','tally-settings'=>'invoicing','tally-undo'=>'invoicing',
@@ -3829,7 +3849,7 @@ function ops_module_gate($route, $peek = false) {
     // the posted job id); every other job route still needs the module, and each
     // handler still applies its own finer checks (e.g. reassign stays coordinator).
     if ($mod === 'jobs' && !can('mod.jobs.view')
-        && in_array($base, ['job','job-close','job-qap-upload','job-qap','job-qap-del','bill-add','bill-file','bill-delete','expense-delete','job-visit-close','checkin-photo'], true)) {
+        && in_array($base, ['job','job-close','job-qap-upload','job-qap','job-qap-del','bill-add','bill-file','bill-delete','expense-delete','job-visit-close','job-visit-no-inspection','checkin-photo'], true)) {
         $jid = (int)($_GET['id'] ?? $_GET['job'] ?? $_POST['id'] ?? $_POST['job_id'] ?? $_POST['job'] ?? 0);
         if ($jid && job_owned_by_me($jid)) return;   // owner may proceed
     }
@@ -4029,7 +4049,7 @@ function ops_dispatch($route, $method) {
             ops_raise_call(); return true;
         case $route === 'calls' || $route === 'call-new' || $route === 'call-edit' || $route === 'call' || $route === 'call-delete' || $route === 'call-credit':
             ops_calls($route, $method); return true;
-        case $route === 'jobs' || $route === 'job-new' || $route === 'job-edit' || $route === 'job' || $route === 'job-close' || $route === 'job-invoice' || $route === 'job-bill' || $route === 'job-advance' || $route === 'job-reassign' || $route === 'job-visit-close' || $route === 'expense-delete':
+        case $route === 'jobs' || $route === 'job-new' || $route === 'job-edit' || $route === 'job' || $route === 'job-close' || $route === 'job-invoice' || $route === 'job-bill' || $route === 'job-advance' || $route === 'job-reassign' || $route === 'job-visit-close' || $route === 'job-visit-no-inspection' || $route === 'expense-delete':
             ops_jobs($route, $method); return true;
         // §R1-D — QAP documents on a job (attach only, never parsed).
         case $route === 'job-forward-report' && $method === 'POST': return ops_job_forward_report($method);
@@ -5706,7 +5726,9 @@ function ops_calls($route, $method) {
             $conds[] = "c.sbu IN ($ph)"; foreach ($sbu as $s) $args[] = $s;
         }
         $where = $conds ? implode(' AND ', $conds) : '1=1';
-        if ($q) { $where .= " AND (c.call_code LIKE ? OR bp.legal_name LIKE ? OR v.legal_name LIKE ?)"; array_push($args, "%$q%","%$q%","%$q%"); }
+        //  TPIA Phase 1 — the client's call number and the client PO on the
+        //  manufacturer are searchable here too (owner, 25 Nov 2026 — D1).
+        if ($q) { $where .= " AND (c.call_code LIKE ? OR bp.legal_name LIKE ? OR v.legal_name LIKE ? OR c.client_call_ref LIKE ? OR c.supply_po_ref LIKE ?)"; array_push($args, "%$q%","%$q%","%$q%","%$q%","%$q%"); }
         // See every call under one contract, or under one quotation — the "all
         // calls under this contract / quote" view asked for from those screens.
         $fContract = trim((string)($_GET['contract'] ?? ''));
@@ -6081,6 +6103,25 @@ function ops_calls($route, $method) {
                 view('ops/call_form', array_merge(call_form_vars($call, $b), ['error' => $entryErr, 'errorFields' => $entryBad]));
                 return;
             }
+            //  TPIA Phase 1 / D1 (owner, 25 Nov 2026) — the client's call number is
+            //  optional and may repeat. A repeat for the same client only WARNS and
+            //  lists the other call(s); the person decides. Nothing is blocked or
+            //  merged; the acknowledged repeat is written to History below.
+            foreach (['client_call_ref', 'supply_po_ref', 'offered_scope'] as $tf) $b[$tf] = trim((string)($b[$tf] ?? ''));
+            $dupAck = '';
+            $refChanged = $b['client_call_ref'] !== '' && (!$call || trim((string)($call['client_call_ref'] ?? '')) !== $b['client_call_ref']);
+            if ($refChanged) {
+                $dupRef = call_client_ref_dups($b['client_call_ref'], (int)($b['client_id'] ?? 0), (int)($call['id'] ?? 0));
+                if ($dupRef['rows'] || $dupRef['hidden']) {
+                    if (empty($b['client_ref_dup_ok'])) {
+                        view('ops/call_form', array_merge(call_form_vars($call, $b), ['dupRef' => $dupRef, 'errorFields' => ['client_call_ref'],
+                            'error' => ucfirst(Tl('client')) . "'s call no. " . $b['client_call_ref'] . ' is already on another ' . Tl('call')
+                                . '. Check the list beside the box, then tick "Save anyway" if this is a separate request. Nothing was saved yet.']));
+                        return;
+                    }
+                    $dupAck = implode(', ', array_column($dupRef['rows'], 'call_code')) . ($dupRef['hidden'] ? ' (+' . (int)$dupRef['hidden'] . ' outside this branch)' : '');
+                }
+            }
             $fields = call_save_fields();
             // Drop any field whose column is missing (partial upload) so the whole
             // save cannot crash on one unknown column — it is added on next boot.
@@ -6154,6 +6195,7 @@ function ops_calls($route, $method) {
                 touch_row_version('calls', $call['id']);
                 if ($forwardNow) $pdo->prepare("UPDATE calls SET forwarded_at=?, status='FORWARDED' WHERE id=?")->execute([date('c'), $call['id']]);
                 custom_save('call', $call['id'], $b);
+                if ($dupAck !== '') call_client_ref_dup_log((int)$call['id'], $b['client_call_ref'], $dupAck);
                 // Notify on the office forward, and also when a coordinator is
                 // newly named (a same-office hand-off, or a re-assignment) so the
                 // person now owning the call actually hears about it.
@@ -6180,6 +6222,7 @@ function ops_calls($route, $method) {
                 $id = $pdo->lastInsertId();
                 touch_row_version('calls', (int)$id);   // F-OP-04 — protected from its first edit
                 custom_save('call', $id, $b);
+                if ($dupAck !== '') call_client_ref_dup_log((int)$id, $b['client_call_ref'], $dupAck);
                 $coordNamed = (int)($b['coordinator_id'] ?? 0) > 0;
                 if ($execOffice || $coordNamed) send_forward_email($id);
                 flash("$code created." . ($execOffice ? ' Forwarded to the branch — email sent.'
@@ -6269,6 +6312,24 @@ function normalise_city($input) {
 // $posted: when a save is refused, re-render with what was typed rather than
 // with what is in the database. Losing twenty fields because one was wrong is
 // the kind of thing that makes people stop using a system.
+//  TPIA Phase 1 / D1 — other work orders of the same client carrying the same
+//  client call number. Returns the ones the signed-in person may open, and only
+//  a count of any outside their branch (their numbers are not shown).
+function call_client_ref_dups($ref, $clientId, $excludeId = 0) {
+    $ref = trim((string)$ref); $out = ['ref' => $ref, 'rows' => [], 'hidden' => 0];
+    if ($ref === '') return $out;
+    $w = "LOWER(TRIM(c.client_call_ref))=LOWER(?) AND c.id<>?"; $a = [$ref, (int)$excludeId];
+    if ((int)$clientId > 0) { $w .= " AND c.client_id=?"; $a[] = (int)$clientId; }
+    try { $rows = ops_all("SELECT c.id, c.call_code, c.executing_office_id, c.ibo_office_id, c.sbu FROM calls c WHERE $w ORDER BY c.id", $a) ?: []; }
+    catch (Throwable $e) { return $out; }
+    foreach ($rows as $r) { if (call_view_scope_allows($r)) $out['rows'][] = $r; else $out['hidden']++; }
+    return $out;
+}
+function call_client_ref_dup_log($callId, $ref, $others) {
+    if (!function_exists('act_log')) return;
+    try { act_log('CALL', (int)$callId, 'SYSTEM', ucfirst(Tl('client')) . "'s call no. " . $ref . ' is also on ' . $others
+        . ' — saved as a separate ' . Tl('call') . ' by ' . user_name(current_user()) . '; nothing was merged.'); } catch (Throwable $e) {}
+}
 function call_form_vars($call, $posted = null) {
     $u = current_user();
     if ($posted !== null) {
@@ -6336,7 +6397,8 @@ function call_save_fields() {
         'inspection_dates','schedule_end_date','schedule_weekdays',
         'engagement_type','days_count','months_count','pattern_kind','pattern_n',
         'force_dates','manmonth_basis','manmonth_min_days',
-        'reporting_frequency','report_custom_days','deliverables','is_outstation','chargeable_heads'];
+        'reporting_frequency','report_custom_days','deliverables','is_outstation','chargeable_heads',
+        'client_call_ref','supply_po_ref','offered_scope'];
 }
 function job_save_fields() {
     return ['executing_office_id','inspector_id','subcon_id','job_type','stage','scheduled_date',
@@ -9460,19 +9522,21 @@ function ops_jobs($route, $method) {
                 if ($openDays) {
                     view('ops/job_close', ['job'=>$job, 'error'=>'This ' . Tl('job') . ' still has ' . count($openDays)
                         . ' visit day(s) open: ' . implode(', ', array_map('fdate', array_slice($openDays, 0, 6)))
-                        . (count($openDays) > 6 ? ' …' : '') . '. Close each day with its report first (below the day-by-day plan).']);
+                        . (count($openDays) > 6 ? ' …' : '') . '. Close each day with its report first, or mark it "No inspection" (below the day-by-day plan).']);
                     return;
                 }
             }
             // §WO-6 — the last day of an inspection needs the Final Inspection
             // Report and the Release Note before the job is closed. A terminated
             // job is the exception (owner, 8 Nov 2026) — and the record says so.
+            // TPIA D7 (owner, 25 Nov 2026): only the ones ticked in "Types of report required".
             if (function_exists('job_final_docs_missing')) {
                 $fd = job_final_docs_missing($job);
                 if ($fd) {
-                    view('ops/job_close', ['job'=>$job, 'error'=>'The final day of an inspection needs '
-                        . implode(' and ', $fd) . ' on file before this ' . Tl('job') . ' can be closed. '
-                        . 'Create them with "New report" on the ' . Tl('job') . ' (Final Inspection Report and Release Note).']);
+                    view('ops/job_close', ['job'=>$job, 'error'=>'This ' . Tl('job') . ' was asked for '
+                        . implode(' and ', $fd) . ' (ticked in its "Types of report required"), and '
+                        . (count($fd) > 1 ? 'they are' : 'it is') . ' not on file yet. '
+                        . 'Create ' . (count($fd) > 1 ? 'them' : 'it') . ' with "New report" on the ' . Tl('job') . ', then close it.']);
                     return;
                 }
             }
@@ -9543,6 +9607,25 @@ function ops_jobs($route, $method) {
         if ($err === '' && $ownDay) redirect('/voucher-day?job=' . (int)$job['id'] . '&date=' . $vDate);
         redirect('/job?id=' . $job['id'] . '#visits');
     }
+    // TPIA Phase 1 / D8 (owner, 25 Nov 2026) — close a planned day as "No
+    // inspection" with a reason, optionally moving the visit to a new date. The
+    // SAME people who may close a visit day may do this (the gate above), no one
+    // else: a coordinator-level person, Master Admin, or the engineer on that day.
+    if ($route === 'job-visit-no-inspection' && $method === 'POST') {
+        $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)($_GET['id'] ?? 0)]);
+        if (!$job) { http_response_code(404); view('notfound'); return; }
+        $vDate = substr((string)($_POST['date'] ?? ''), 0, 10);
+        $ownDay = exp_visit_is_mine((int)my_inspector_id(), $job, $vDate);
+        ops_require(is_coordinator_level() || is_master() || $ownDay, 'You cannot close a visit day.');
+        if (!empty($job['closed_flag'])) { flash('This ' . Tl('job') . ' is already closed.', 'warning'); redirect('/job?id=' . $job['id'] . '#visit-close'); }
+        $err = function_exists('job_visit_no_inspection')
+            ? job_visit_no_inspection($job['id'], $vDate, $_POST['reason'] ?? '', $_POST['reason_note'] ?? '', $_POST['new_date'] ?? '')
+            : 'This is unavailable.';
+        flash($err !== '' ? $err : ('Visit of ' . fdate($vDate) . ' closed as "No inspection". No report is owed for it.'
+            . (trim((string)($_POST['new_date'] ?? '')) !== '' ? ' New date ' . fdate(substr((string)$_POST['new_date'], 0, 10)) . ' added.' : '')),
+            $err !== '' ? 'error' : 'success');
+        redirect('/job?id=' . $job['id'] . '#visit-close');
+    }
     if ($route === 'job-reassign' && $method === 'POST') {
         ops_require(job_allocate_role_can(), 'You cannot reassign ' . Tlp('job') . '.');
         $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)($_GET['id'] ?? 0)]);
@@ -9605,6 +9688,9 @@ function ops_jobs($route, $method) {
                 // §WO-8 per-day completion
                 'status' => (string)($v['status'] ?? 'PLANNED'),
                 'done' => (($v['status'] ?? '') === 'DONE'),
+                // TPIA D8 — a day closed as "No inspection", with its reason
+                'no_insp' => (($v['status'] ?? '') === 'NO_INSPECTION'),
+                'status_label' => function_exists('visit_status_label') ? visit_status_label($v) : (string)($v['status'] ?? ''),
                 'report_link' => (string)($v['report_link'] ?? ''),
                 'closed_by' => (string)($v['closed_by'] ?? '')];
         }
@@ -10430,7 +10516,10 @@ function ops_pending_tasks() {
             '↩', 'to fix &amp; resubmit', 'reports sent back to you', '/documents?status=REJECTED', 'bad', 'reports');
         // My open jobs still needing a report uploaded.
         $today = date('Y-m-d');
-        $add($cnt("SELECT COUNT(*) FROM jobs WHERE inspector_id=? AND closed_flag=0 AND reporting_frequency<>'NOREPORT' AND (report_upload_date IS NULL OR report_upload_date='')", [$insId]),
+        //  TPIA Phase 1 item 18 — the same reading as "Reports to write" and the
+        //  My jobs list this card opens (lib/opskpi.php), so the two always agree.
+        $add(function_exists('opk_count_my_jobs') ? opk_count_my_jobs('to_write', $insId)
+                 : $cnt("SELECT COUNT(*) FROM jobs WHERE inspector_id=? AND closed_flag=0 AND reporting_frequency<>'NOREPORT' AND (report_upload_date IS NULL OR report_upload_date='')", [$insId]),
             '📄', 'reports to upload', 'jobs of yours still needing a report', '/my-jobs?f=reports', 'warn', 'jobs');
         // My open jobs whose report is issued (or none needed) — ready to close and
         // record the day's expenses. Surfaced here because a job may carry several

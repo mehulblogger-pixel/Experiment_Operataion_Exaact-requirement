@@ -234,7 +234,14 @@
   <?php if ($vcHwOpen): ?>
     <div class="msg msg-error" style="margin:0 0 10px">✋ <?= (int)$vcHwOpen ?> open hold / witness point<?= $vcHwOpen===1?'':'s' ?> — the manufacturer should not proceed / despatch until these are cleared or waived (<a href="#holdpoints">open the panel</a>).</div>
   <?php endif; ?>
-  <table class="grid">
+  <?php // TPIA Phase 1 — each day closes with ITS report (a "No report" job needs
+        // none), or as "No inspection" with a reason (owner D8, 25 Nov 2026).
+        $vcNoReport = strtoupper((string)($job['reporting_frequency'] ?? '')) === 'NOREPORT';
+        $vcPerDay = in_array(strtoupper((string)($job['reporting_frequency'] ?? '')), ['PER_DAY', 'DAILY'], true);
+        $vcReasons = function_exists('visit_no_insp_reasons') ? visit_no_insp_reasons() : [];
+        $vcLine = function_exists('ops_report_progress_line') ? ops_report_progress_line($job) : ''; ?>
+  <?php if ($vcLine !== ''): ?><p style="margin:0 0 8px"><b><?= e($vcLine) ?></b></p><?php endif; ?>
+  <div class="table-wrap"><table class="grid">
     <tr><th>Date</th><th><?= e(ucfirst(Tl('engineer'))) ?></th><th>Status</th><th>Report &amp; close</th></tr>
     <?php foreach ($vp as $x): ?>
       <tr>
@@ -242,21 +249,47 @@
         <td><?= e($x['inspector_name'] ?: '—') ?></td>
         <td><?php if (!$x['working']): ?><span class="pill p-mut">non-working</span>
             <?php elseif (!empty($x['done'])): ?><span class="pill p-ok">closed</span>
-            <?php else: ?><span class="pill" style="background:#b45309;color:#fff">open</span><?php endif; ?></td>
-        <td><?php if (!empty($x['done'])): ?>
+            <?php elseif (!empty($x['no_insp'])): ?><span class="pill p-mut" title="<?= e($x['status_label'] ?? '') ?>">no inspection</span>
+            <?php else: ?><span class="pill" style="background:#b45309;color:#fff">open</span><?php endif; ?>
+            <?php if (!empty($x['status_label']) && strpos((string)$x['status_label'], 'moved from') !== false): ?><br><small class="muted"><?= e($x['status_label']) ?></small><?php endif; ?></td>
+        <td><?php if (!empty($x['done'])): ?><span style="min-width:0">
               <?php if (!empty($x['report_link'])): ?><a href="<?= e($x['report_link']) ?>" target="_blank" rel="noopener">report</a>
-              <?php else: ?><span class="muted">report on file</span><?php endif; ?>
-              <?php if (!empty($x['closed_by'] ?? '')): ?> <span class="muted" style="font-size:11px">by <?= e($x['closed_by']) ?></span><?php endif; ?>
+              <?php else: ?><span class="muted"><?= $vcNoReport ? 'no report needed' : 'report on file' ?></span><?php endif; ?>
+              <?php if (!empty($x['closed_by'] ?? '')): ?> <span class="muted" style="font-size:11px">by <?= e($x['closed_by']) ?></span><?php endif; ?></span>
+            <?php elseif (!empty($x['no_insp'])): ?><span style="min-width:0">
+              <span class="muted"><?= e(preg_replace('/^No inspection — /', '', (string)($x['status_label'] ?? ''))) ?></span>
+              <?php if (!empty($x['closed_by'] ?? '')): ?> <span class="muted" style="font-size:11px">by <?= e($x['closed_by']) ?></span><?php endif; ?></span>
             <?php elseif ($x['working'] && (is_coordinator_level() || (function_exists('exp_visit_is_mine') && exp_visit_is_mine((int)my_inspector_id(), $job, $x['date'])))): /* Expenses Phase 1 — his own day too */ ?>
+              <?php // one block, so the phone card (td = flex row) stacks it under its label ?>
+              <div style="flex:1 1 auto;min-width:0;text-align:left">
               <form method="post" action="/job-visit-close?id=<?= (int)$job['id'] ?>" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
                 <input type="hidden" name="date" value="<?= e($x['date']) ?>">
-                <input class="form-control" name="report_link" placeholder="report link — or leave blank to use a report already on this <?= e(Tl('job')) ?>" style="width:300px">
-                <button class="btn small" type="submit">Close day</button>
+                <?php if (!$vcNoReport): ?>
+                <input class="form-control" name="report_link" aria-label="Report link for <?= e($x['pretty']) ?>"
+                       placeholder="<?= $vcPerDay ? 'report link — or leave blank to use this day\'s report' : 'report link — or leave blank to use the report on file' ?>" style="flex:1 1 220px;min-width:0;max-width:320px">
+                <?php endif; ?>
+                <button class="btn small" type="submit"><?= $vcNoReport ? 'Close day (no report needed)' : 'Close day' ?></button>
               </form>
+              <?php if ($vcReasons): ?>
+              <details style="margin-top:6px"><summary class="muted" style="cursor:pointer;font-size:12.5px">No inspection this day…</summary>
+                <form method="post" action="/job-visit-no-inspection?id=<?= (int)$job['id'] ?>" style="display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap;margin-top:6px">
+                  <input type="hidden" name="date" value="<?= e($x['date']) ?>">
+                  <label style="font-size:12px">Why<br><select class="form-control" name="reason" required>
+                    <option value="">— pick —</option>
+                    <?php foreach ($vcReasons as $rk => $rl): ?><option value="<?= e($rk) ?>"><?= e($rl) ?></option><?php endforeach; ?>
+                  </select></label>
+                  <label style="font-size:12px">Note <span class="muted">(needed for Other)</span><br><input class="form-control" name="reason_note" maxlength="400" style="width:220px;max-width:100%"></label>
+                  <label style="font-size:12px">New date <span class="muted">(if moved)</span><br><input class="form-control" type="date" name="new_date" min="<?= e(date('Y-m-d', strtotime($x['date'] . ' +1 day'))) ?>"></label>
+                  <button class="btn small secondary" type="submit">Close as no inspection</button>
+                </form>
+                <small class="muted">The planned date stays on record with the reason. No report is owed for the day and it is not billed.</small>
+              </details>
+              <?php endif; ?>
+              </div>
             <?php else: ?><span class="muted">—</span><?php endif; ?></td>
       </tr>
     <?php endforeach; ?>
-  </table>
+  </table></div>
 </div>
 <?php endif; ?>
 
@@ -510,6 +543,22 @@
       <?= $cRow($vendorInfo, Tl('vendor')) ?>
     </div>
   </div>
+  <?php //  TPIA Phase 1 — what the client asked for on this call, and how the
+        //  reports this job owes stand (one line, from the same calculation as
+        //  the "Reports to write" figure). ?>
+  <?php $tpRef = trim((string)($jcall['client_call_ref'] ?? '')); $tpPo = trim((string)($jcall['supply_po_ref'] ?? '')); $tpLot = trim((string)($jcall['offered_scope'] ?? ''));
+        $tpLine = function_exists('ops_report_progress_line') ? ops_report_progress_line($job) : ''; ?>
+  <?php if ($tpRef !== '' || $tpPo !== '' || $tpLot !== '' || $tpLine !== ''): ?>
+  <div class="ct-site" id="tpia-refs">
+    <span class="lab-sm">What was offered</span>
+    <div class="kv-grid">
+      <?php if ($tpRef !== ''): ?><div><span class="k"><?= e(T('client')) ?>'s call no.</span><a href="/call?id=<?= (int)$job['call_id'] ?>&amp;hist=ref#tpia-history"><?= e($tpRef) ?></a></div><?php endif; ?>
+      <?php if ($tpPo !== ''): ?><div><span class="k"><?= e(T('client')) ?> PO (on the <?= e(Tl('manufacturer')) ?>)</span><a href="/call?id=<?= (int)$job['call_id'] ?>&amp;hist=po#tpia-history"><?= e($tpPo) ?></a></div><?php endif; ?>
+      <?php if ($tpLot !== ''): ?><div><span class="k">Lot / stage / qty offered</span><?= e($tpLot) ?></div><?php endif; ?>
+      <?php if ($tpLine !== ''): ?><div><span class="k"><?= e(TH('report')) ?>s</span><?= e($tpLine) ?></div><?php endif; ?>
+    </div>
+  </div>
+  <?php endif; ?>
   <div class="ct-site">
     <span class="lab-sm">Site address</span>
     <?php if ($siteTxt !== ''): ?>

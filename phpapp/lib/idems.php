@@ -88,15 +88,35 @@ function job_final_docs_missing($job) {
     if (strtoupper((string)($job['billing_stop_kind'] ?? '')) === 'TERMINATED') return [];
     if (($job['reporting_frequency'] ?? 'NOREPORT') === 'NOREPORT') return [];
     $jobId = (int)($job['id'] ?? 0); if (!$jobId) return [];
+    // TPIA Phase 1 / D7 (owner, 25 Nov 2026) — each is required only when it is
+    // ticked in the "Types of report required" of the job (else of its call). A
+    // stage-only inspection or a deputation that never owed a Release Note now
+    // closes without one; with it ticked, it is still required.
+    [$wantFir, $wantRn] = job_final_docs_wanted($job);
+    if (!$wantFir && !$wantRn) return [];
     $fir = 0; $rn = 0;
     try {
         $fir = (int)ops_val("SELECT COUNT(*) FROM report_docs WHERE job_id=? AND COALESCE(deleted,0)=0 AND type_code='FIR'", [$jobId]);
         $rn  = (int)ops_val("SELECT COUNT(*) FROM report_docs WHERE job_id=? AND COALESCE(deleted,0)=0 AND type_code IN ('RN','IRN')", [$jobId]);
     } catch (Throwable $e) { return []; }   // reports not in use on this install
     $miss = [];
-    if (!$fir) $miss[] = 'a Final Inspection Report';
-    if (!$rn)  $miss[] = 'a Release Note';
+    if ($wantFir && !$fir) $miss[] = 'a Final Inspection Report';
+    if ($wantRn && !$rn)   $miss[] = 'a Release Note';
     return $miss;
+}
+// Which final documents this job's ticked report types ask for: [FIR?, Release Note?].
+// The job's own list wins; a job with none ticked reads its call's. "Final Report"
+// (FINAL_REP) or the FIR report type asks for the Final Inspection Report; "Release
+// Note" (RN) or "Inspection Release Note" (IRN) asks for the Release Note.
+function job_final_docs_wanted($job) {
+    $id = (int)($job['id'] ?? 0);
+    if ($id && (!array_key_exists('deliverables', $job) || !array_key_exists('call_id', $job)))
+        $job += (ops_one("SELECT deliverables, call_id FROM jobs WHERE id=?", [$id]) ?: []);
+    $codes = trim((string)($job['deliverables'] ?? ''));
+    if ($codes === '' && (int)($job['call_id'] ?? 0) > 0)
+        $codes = trim((string)(ops_val("SELECT deliverables FROM calls WHERE id=?", [(int)$job['call_id']]) ?: ''));
+    $set = array_map('strtoupper', array_filter(array_map('trim', explode(',', $codes))));
+    return [(bool)array_intersect($set, ['FINAL_REP', 'FIR']), (bool)array_intersect($set, ['RN', 'IRN'])];
 }
 
 // ---------------------------------------------------------------------------
@@ -3405,16 +3425,47 @@ function idems_fields($typeId, $sectionId = null) {
 // its own report, and only a second report for a P.O. already reported is blocked.
 // Returns the settling report (id, irn, status) or null. No P.O. → no lock (there
 // is nothing to key the items on), so nothing that worked before is prevented.
+//
+// TPIA Phase 1 / D4 (owner, 25 Nov 2026): the lock is keyed on the INSPECTION
+// CALL. Each new lot or stage is its own call, so a report on a different call
+// under the same P.O. (Lot 2 after Lot 1, or Inspector Y's later stage) is
+// allowed; a second report on the SAME call is still refused, as before. A
+// report with no call keeps the old key (P.O. + client + type).
+// One reading follows from D5/item 5 (each visit day closes with its own
+// report): on a job that reports more than once (any frequency except "No
+// report", over more than one day), a report for a DIFFERENT inspection day of
+// the same call is that day's own report, not a repeat — so it is not refused.
+// The same day is still refused.
 function idems_po_locked($f, $excludeId = 0) {
     $typeId = (int)($f['report_type_id'] ?? 0);
     $client = (int)($f['client_id'] ?? 0);
     $po     = trim((string)($f['po_ref'] ?? ''));
     if (!$typeId || $po === '') return null;
+    $callId = (int)($f['call_id'] ?? 0);
+    $jobId  = (int)($f['job_id'] ?? 0);
+    if (!$callId && $jobId) $callId = (int)(ops_val("SELECT call_id FROM jobs WHERE id=?", [$jobId]) ?: 0);
     $where = "deleted=0 AND report_type_id=? AND po_ref=? AND (status IN ('APPROVED','ISSUED') OR COALESCE(finalized,0)=1)";
     $args = [$typeId, $po];
     if ($client) { $where .= " AND client_id=?"; $args[] = $client; }
+    if ($callId) {
+        $where .= " AND (call_id=? OR job_id IN (SELECT id FROM jobs WHERE call_id=?))"; $args[] = $callId; $args[] = $callId;
+        $day = trim((string)($f['inspection_date'] ?? ''));
+        if ($day !== '' && $jobId && idems_job_reports_more_than_once($jobId)) {
+            $where .= " AND (COALESCE(inspection_date,'')='' OR inspection_date=?)"; $args[] = $day;
+        }
+    }
     if ($excludeId) { $where .= " AND id<>?"; $args[] = (int)$excludeId; }
     return ops_one("SELECT id, irn, status FROM report_docs WHERE $where ORDER BY id DESC LIMIT 1", $args) ?: null;
+}
+// A job that owes more than one report: a frequency other than "No report" /
+// blank, over more than one day (several visit days, or an end after its start).
+function idems_job_reports_more_than_once($jobId) {
+    $j = ops_one("SELECT id, reporting_frequency, scheduled_date, inspection_start_date, inspection_end_date FROM jobs WHERE id=?", [(int)$jobId]);
+    if (!$j || in_array(strtoupper(trim((string)($j['reporting_frequency'] ?? ''))), ['', 'NOREPORT'], true)) return false;
+    try { if ((int)ops_val("SELECT COUNT(*) FROM job_visits WHERE job_id=?", [(int)$jobId]) > 1) return true; } catch (Throwable $e) {}
+    $st = trim((string)($j['inspection_start_date'] ?? '')) ?: trim((string)($j['scheduled_date'] ?? ''));
+    $en = trim((string)($j['inspection_end_date'] ?? ''));
+    return $st !== '' && $en !== '' && substr($en, 0, 10) > substr($st, 0, 10);
 }
 function idems_existing_twin($f) {
     $typeId = (int)($f['report_type_id'] ?? 0);
@@ -4354,11 +4405,29 @@ function idems_report_playbook($doc, $approvals = [], $hasSchema = true) {
 // report, never against a draft or a merely-approved one still to be issued.
 // Exception: if a Release Note already exists we still surface the link to it,
 // whatever the current status, so it is never orphaned.
+// TPIA Phase 1 item 19 — the Release Note raised from inspection report N.
+// The old lookup was data LIKE '%"source_report_id":N%', which for report 1 also
+// matched 12, 13, 100 … so a report could show ANOTHER report's Release Note as
+// "already raised". Now: the release_of_id column (set when the note is raised),
+// else an EXACT match on the number in the stored data (followed by , or }).
+function idems_release_note_for($reportId) {
+    $id = (int)$reportId; if ($id <= 0) return null;
+    try {
+        $r = ops_one("SELECT id, irn FROM report_docs WHERE type_code='RN' AND deleted=0 AND release_of_id=? ORDER BY id LIMIT 1", [$id]);
+        if ($r) return $r;
+        // a release that covers this report as one of several (URADE link table)
+        $r = ops_one("SELECT r.id, r.irn FROM release_inspections ri JOIN report_docs r ON r.id=ri.release_doc_id
+                      WHERE ri.inspection_doc_id=? AND r.type_code='RN' AND r.deleted=0 ORDER BY r.id LIMIT 1", [$id]);
+        if ($r) return $r;
+    } catch (Throwable $e) { /* release_of_id / link table not on this install yet */ }
+    return ops_one("SELECT id, irn FROM report_docs WHERE type_code='RN' AND deleted=0 AND (data LIKE ? OR data LIKE ?) ORDER BY id LIMIT 1",
+                   ['%"source_report_id":' . $id . ',%', '%"source_report_id":' . $id . '}%']) ?: null;
+}
 function idems_release_note_offer($doc) {
     $typeCode = strtoupper((string)($doc['type_code'] ?? ''));
     if (in_array($typeCode, ['RN', 'IRN'], true)) return null;
     $id = (int)($doc['id'] ?? 0);
-    $existing = $id ? ops_one("SELECT id, irn FROM report_docs WHERE type_code='RN' AND deleted=0 AND data LIKE ?", ['%"source_report_id":' . $id . '%']) : null;
+    $existing = $id ? idems_release_note_for($id) : null;
     if ($existing) return ['existing' => $existing, 'doc_id' => $id];   // already raised — always link it
     $status = (string)($doc['status'] ?? '');
     $issued = !empty($doc['finalized']) || $status === 'ISSUED';
@@ -9286,6 +9355,16 @@ function idems_context_for($callId, $jobId = 0) {
             $po = ops_one("SELECT po_number, title FROM partner_purchase_orders WHERE id=?", [$call['po_id']]);
             if ($po) { $ctx['po_ref'] = $po['po_number']; $ctx['po_title'] = $po['title']; }
         }
+        //  TPIA Phase 1 (owner, 25 Nov 2026 — D3): the P.O. on an inspection report
+        //  is the CLIENT's purchase order placed on the manufacturer, typed on the
+        //  call. When it is there it is the report's P.O.; our own service PO above
+        //  stays the fallback, so a call without it reads exactly as before.
+        if (trim((string)($call['supply_po_ref'] ?? '')) !== '') {
+            if (!empty($ctx['po_ref'])) $ctx['service_po'] = $ctx['po_ref'];
+            $ctx['po_ref'] = trim((string)$call['supply_po_ref']);
+        }
+        if (trim((string)($call['client_call_ref'] ?? '')) !== '') $ctx['client_call_ref'] = trim((string)$call['client_call_ref']);
+        if (trim((string)($call['offered_scope'] ?? '')) !== '') $ctx['offered_scope'] = trim((string)$call['offered_scope']);
         if (!empty($call['po_line_item_id'])) {
             $li = ops_one("SELECT description, quantity, site FROM po_line_items WHERE id=?", [$call['po_line_item_id']]);
             if ($li) { $ctx['item_desc'] = $li['description']; $ctx['quantity'] = $li['quantity']; if (!empty($li['site'])) $ctx['location'] = $li['site']; }
@@ -9343,6 +9422,9 @@ function idems_field_aliases() {
         'inspection_date'=>['inspection_date','date_of_inspection','insp_date','date','visit_date','inspected_on'],
         'inspector_name'=> ['inspector','inspector_name','inspected_by','surveyor','engineer'],
         'call_code'     => ['call_no','call_number','inspection_call','call_ref','call_code','ic_no'],
+        // TPIA Phase 1 — the client's own call number and the lot / stage offered.
+        'client_call_ref'=>['client_call_no','client_call_ref','client_call_number','client_ic_no','customer_call_no'],
+        'offered_scope' => ['offered_scope','lot','lot_no','lot_stage','lot_offered','stage_offered','lot_stage_qty'],
         'job_code'      => ['job_no','job_code','job_number','work_order'],
         'project_name'  => ['project','project_name','project_title'],
         'project_code'  => ['project_code','project_no','project_number'],
@@ -10733,7 +10815,7 @@ function ops_idems_release_note($method) {
     $rnTypeId = idems_build_release_note();   // form-driven RN type, seeded once
     // don't duplicate — match on the numeric source id (JSON escapes slashes, so
     // matching the IRN text is unreliable).
-    $exists = ops_one("SELECT id, irn FROM report_docs WHERE type_code='RN' AND deleted=0 AND data LIKE ?", ['%"source_report_id":' . (int)$src['id'] . '%']);
+    $exists = idems_release_note_for((int)$src['id']);
     if ($exists) { flash('A Release Note already exists for this report: ' . $exists['irn'] . '.', 'warning'); redirect('/document?id=' . $exists['id']); }
     $fields = idems_fields($src['report_type_id']);
     $data = json_decode($src['data'] ?: '[]', true) ?: [];

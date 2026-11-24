@@ -118,6 +118,26 @@ document.addEventListener('DOMContentLoaded', function () {
       <label class="chk" style="margin-top:5px"><input type="checkbox" id="site_is_client">
         Inspection is at the <?= e(Tl('client')) ?>'s own premises</label>
       <small class="muted" id="sic_note" style="display:none">The <?= e(Tl('client')) ?> is recorded as the site too.</small></div>
+    <?php //  TPIA Phase 1 (owner, 25 Nov 2026) — typed by our coordinator from the
+          //  client's request. All optional; a new lot or stage is a new call. ?>
+    <div class="ff"><label for="client_call_ref"><?= e(T('client')) ?>'s inspection call no. <span class="muted">— optional</span></label>
+      <input class="form-control" id="client_call_ref" name="client_call_ref" maxlength="80" value="<?= e($call['client_call_ref'] ?? '') ?>" placeholder="e.g. IC-778">
+      <small class="muted">The number the <?= e(Tl('client')) ?> gave this request. Searchable; a repeat only warns.</small></div>
+    <div class="ff"><label for="supply_po_ref"><?= e(T('client')) ?> PO no. (placed on the <?= e(Tl('manufacturer')) ?>) <span class="muted">— optional</span></label>
+      <input class="form-control" id="supply_po_ref" name="supply_po_ref" maxlength="80" value="<?= e($call['supply_po_ref'] ?? '') ?>" placeholder="e.g. PO-4587">
+      <small class="muted">Copied as the P.O. on every <?= e(Tl('report')) ?> of this <?= e(Tl('call')) ?>.</small></div>
+    <div class="ff ff-wide"><label for="offered_scope">Lot / stage / quantity offered <span class="muted">— optional</span></label>
+      <input class="form-control" id="offered_scope" name="offered_scope" maxlength="255" value="<?= e($call['offered_scope'] ?? '') ?>" placeholder="e.g. Lot 1 — 40 of 100 valves, final stage">
+      <small class="muted">From the <?= e(Tl('client')) ?>'s request. Shown on the <?= e(Tl('call')) ?>, its <?= e(Tlp('job')) ?> and <?= e(Tlp('report')) ?>.</small></div>
+    <?php if (!empty($dupRef)): ?>
+    <div class="ff ff-wide" id="dup_ref_box"><div class="msg msg-warning" style="margin:0">
+      <b><?= e(T('client')) ?>'s call no. <?= e($dupRef['ref']) ?> is already on <?= count($dupRef['rows']) + (int)$dupRef['hidden'] ?> other <?= e(Tl('call')) ?><?= count($dupRef['rows']) + (int)$dupRef['hidden'] === 1 ? '' : 's' ?>:</b>
+      <?php foreach ($dupRef['rows'] as $i => $dr): ?><?= $i ? ', ' : ' ' ?><a href="/call?id=<?= (int)$dr['id'] ?>" target="_blank" rel="noopener"><?= e($dr['call_code']) ?></a><?php endforeach; ?>
+      <?php if ((int)$dupRef['hidden'] > 0): ?> <span class="muted">(+<?= (int)$dupRef['hidden'] ?> outside your branch)</span><?php endif; ?>.
+      Nothing is merged. If this is a separate request (another lot or stage), tick below and save again.
+      <label class="chk" style="margin-top:6px"><input type="checkbox" name="client_ref_dup_ok" value="1"> Save anyway — this is a separate <?= e(Tl('call')) ?></label>
+    </div></div>
+    <?php endif; ?>
     <div class="ff ff-wide"><label>Shared folder / drive link <span class="muted">— the client's papers and our working files</span></label>
       <input class="form-control" type="url" name="folder_link" value="<?= e($call['folder_link'] ?? '') ?>" placeholder="https://…  (SharePoint, Google Drive, OneDrive)">
       <small class="muted">Travels with the <?= e(Tl('job')) ?>, so the <?= e(Tl('engineer')) ?> gets it too.</small></div>
@@ -456,7 +476,8 @@ document.addEventListener('DOMContentLoaded', function () {
           <option value="<?= e($k) ?>" <?= $callFreq===$k?'selected':'' ?>><?= e($v) ?></option>
         <?php endforeach; ?>
       </select>
-      <small class="muted">How often the <?= e(Tl('engineer')) ?> must send progress in — shown on the <?= e(T_REG('call')) ?>.</small></div>
+      <small class="muted">How often the <?= e(Tl('engineer')) ?> must send progress in — shown on the <?= e(T_REG('call')) ?>.</small>
+      <small class="muted" id="freq_suggest_note" style="display:none">Suggested for man-day work: one report for each inspection day. Change it if this <?= e(Tl('client')) ?> agreed otherwise.</small></div>
     <div class="ff" id="call_days_wrap" style="<?= $callFreq==='CUSTOM'?'':'display:none' ?>"><label>…every how many days?</label>
       <input class="form-control" type="number" min="1" name="report_custom_days" value="<?= e($callDays) ?>" placeholder="e.g. 3"></div>
 
@@ -631,6 +652,23 @@ document.addEventListener('DOMContentLoaded', function () {
     freqSel.addEventListener('change', function(){
       daysWrap.style.display = freqSel.value === 'CUSTOM' ? '' : 'none';
     });
+  }
+  // ---- TPIA D5 (owner, 25 Nov 2026): man-day work suggests "One report per
+  //      inspection day". Only a suggestion — made while the box is still
+  //      blank and nobody has picked a frequency; any choice made by hand wins.
+  if (freqSel && freqSel.querySelector('option[value="PER_DAY"]')) {
+    var freqTouched = freqSel.value !== '';
+    freqSel.addEventListener('change', function () { freqTouched = true; var n = document.getElementById('freq_suggest_note'); if (n) n.style.display = 'none'; });
+    var suggestPerDay = function () {
+      var b = document.getElementById('billable_basis'), ct = document.querySelector('select[name="credit_type"]');
+      var manday = (b && b.value === 'MANDAY') || (ct && ct.value === 'MANDAY');
+      if (!manday || freqTouched || freqSel.value !== '') return;
+      freqSel.value = 'PER_DAY';
+      var n = document.getElementById('freq_suggest_note'); if (n) n.style.display = '';
+    };
+    ['billable_basis'].forEach(function (id) { var el = document.getElementById(id); if (el) el.addEventListener('change', suggestPerDay); });
+    var ctSel = document.querySelector('select[name="credit_type"]'); if (ctSel) ctSel.addEventListener('change', suggestPerDay);
+    suggestPerDay();
   }
 
   // ---- §a.i / §a.ii / §a.iv: the quote drives the commercial fields ---------

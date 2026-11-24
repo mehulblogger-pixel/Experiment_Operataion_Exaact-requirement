@@ -92,9 +92,43 @@ stateDiagram-v2
   gate that asks for the Final Inspection Report and Release Note (§WO-6,
   `job_final_docs_missing()`) does not apply to a job whose early end is **TERMINATED**
   (`jobs.billing_stop_kind`); closing it records `CLOSED_TERMINATED` in the job's activity.
-  Completed-early and demobilised jobs still need both. After any early end, visit days
+  Completed-early and demobilised jobs still need both — **when ticked** (next point).
+- **Final documents only when ticked** (TPIA Phase 1 / D7, owner 25 Nov 2026). The
+  Final Inspection Report is asked for only when "Final Report" (`FINAL_REP`, or the
+  `FIR` type) is ticked in the job's "Types of report required" (else its call's); the
+  Release Note only when "Release Note" (`RN`) or "Inspection Release Note" (`IRN`) is
+  ticked (`job_final_docs_wanted()`). Nothing ticked → nothing demanded. The company
+  switch `require_final_docs_on_close`, the TERMINATED exit and the "No report" exit are
+  unchanged. No new status. After any early end, visit days
   dated after the end date no longer hold the job open (`job_visits_open_days()`); days up
   to it still do. No new status.
+- **Visit day (`job_visits.status`)** — one row per planned day of a multi-day job
+  (§WO-8). TPIA Phase 1 (owner 25 Nov 2026, D8) adds one status, **NO_INSPECTION**:
+
+  ```mermaid
+  stateDiagram-v2
+    [*] --> PLANNED : job_visits_sync() from the job's dates · or a new date when a day is moved
+    PLANNED --> DONE : job-visit-close · the day's own report (or a link); none needed on a "No report" job
+    PLANNED --> NO_INSPECTION : job-visit-no-inspection · reason from the editable list + note
+    DONE --> [*]
+    NO_INSPECTION --> [*]
+  ```
+
+  - **DONE** needs the day's OWN report (TPIA item 5): *one report per inspection
+    day* / *daily* — a report on the job dated that day (and that day's engineer's);
+    a periodic frequency — the report of the fixed period the day falls in; a job
+    owing one report — any report on the job, as before. A **"No report"** job closes
+    its days without a report (item 6). Who may: the job-visit-close gate (docs/02).
+  - **NO_INSPECTION** (material not ready, postponed by manufacturer or client,
+    cancelled by client, access refused, other — the `visit_no_insp_reason` list,
+    editable in Masters). Same people as DONE. Keeps the planned date, the reason,
+    the note, who and when; writes the job's History. Optional **new date**: a new
+    PLANNED day carrying `moved_from` (and an `assignment_events` RESCHEDULE row) —
+    the original day is never moved or deleted. No report is owed for the day, it
+    does not hold the job open (`job_visits_open_days()`), and it is never billed
+    (only DONE days earn a man-day).
+  - Both end states are final: a closed day is never overwritten (closing it again
+    is refused). A schedule change never deletes a DONE, NO_INSPECTION or moved day.
 - `report_approval`: `'' → PENDING` at close; `PENDING → APPROVED/REJECTED` via
   `report-approve` (`workforce.php:701-704`), gated by `can_approve_report` (master, the
   inspector's reporting manager, `workforce.report.approve`, or `ops.job.close`+admin/coord).
