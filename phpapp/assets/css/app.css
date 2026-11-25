@@ -58,6 +58,14 @@ table.kv td.muted:first-child{width:140px;white-space:nowrap}
 .note-item{border-left:3px solid var(--brand);padding:6px 12px;margin-bottom:10px;background:var(--soft);border-radius:0 8px 8px 0}
 .inline-add{display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;align-items:end;background:var(--soft);border:1px solid var(--line);border-radius:10px;padding:14px}
 .inline-add .ff-wide,.inline-add button{grid-column:1/-1}
+/* On a phone an inline form is one column, buttons full width, and nothing in it
+   may push the page sideways (owner screenshot, 25 Nov 2026: the billing-address
+   form ran off the right edge). */
+@media (max-width:560px){
+  .inline-add{grid-template-columns:minmax(0,1fr)}
+  .inline-add > *{min-width:0}
+  .inline-add button,.inline-add .btn{width:100%}
+}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 16px}.form-grid .ff-wide{grid-column:1/-1}
 .ff label{display:block;font-size:12px;color:var(--muted);font-weight:600;margin-bottom:3px}
 .ff-check{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.ff-check label{margin:0}

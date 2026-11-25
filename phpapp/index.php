@@ -1616,15 +1616,17 @@ if ($route === 'partner-billing-location' && $method === 'POST') {
     $do = (string) ($_POST['do'] ?? '');
     if ($do === 'add') {
         $r = custid_add_location((int) $p['id'], $_POST);
-        flash(!empty($r['err']) ? $r['err'] : 'Billing location added.', !empty($r['err']) ? 'error' : 'success');
+        flash(!empty($r['err']) ? $r['err'] : (!empty($r['same_gstin']) ? 'Billing address added under the same GSTIN.' : 'Billing address added.'), !empty($r['err']) ? 'error' : 'success');
     } elseif ($do === 'update') {
         $e = custid_update_location((int) $p['id'], (int) ($_POST['loc'] ?? 0), $_POST);
-        flash($e !== '' ? $e : 'Billing location saved.', $e !== '' ? 'error' : 'success');
+        flash($e !== '' ? $e : 'Billing address saved.', $e !== '' ? 'error' : 'success');
     } elseif ($do === 'stop') {
         $e = custid_stop_location((int) $p['id'], (int) ($_POST['loc'] ?? 0));
         flash($e !== '' ? $e : 'That location is no longer offered for new bills. Bills already raised keep it.', $e !== '' ? 'error' : 'success');
     }
-    redirect('/partner?id=' . (int) $p['id'] . '#billing-locations');
+    // Back to the page the box was on: the master record or the Sales customer
+    // page (owner, 25 Nov 2026: Q3). Only these two — never a free address.
+    redirect(custid_back_url($_POST, (int) $p['id']));
 }
 
 // D1 — move an existing branch company (same PAN) under its main customer as a
