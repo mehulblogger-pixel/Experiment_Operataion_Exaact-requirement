@@ -5428,6 +5428,7 @@ function ops_idems_documents($route, $method) {
         $pdo->prepare("UPDATE report_docs SET finalized=1, status='ISSUED', finalized_at=?, finalized_by=?, issue_date=?, updated_at=? WHERE id=?")
             ->execute([date('c'), user_name(current_user()), $issue, date('c'), $doc['id']]);
         idems_snapshot_signatures($doc);   // freeze inspector + approver signatures onto the report
+        if (function_exists('pochain_snapshot_doc')) pochain_snapshot_doc($doc);   // freeze the order chain ("PO references") as issued
         idems_seal_content($doc['id']);    // freeze a content hash so /verify can prove it is unaltered
         idems_freeze_presentation($doc['id']); // §33 freeze the form schema + company template used, so later edits never change this issued report
         // Vendor platform — when a scored Vendor Assessment is issued against a
@@ -8141,6 +8142,16 @@ function report_pdf_build($doc, $sections, $fields, $data, $files, $lh, $sigs, $
             $p->y = $yrow + 13;
         }
     }
+    // Order chain — "PO references" (owner, 25 Nov 2026, Q2). Printed only when the
+    // call has an order chain; an issued report prints only what was frozen onto it.
+    $pcLines = function_exists('pochain_print_lines') ? pochain_print_lines($doc) : [];
+    if ($pcLines) {
+        $p->needSpace(28); $p->gap(2);
+        $p->text($ml, 'PO references:', 8.5, true, [90,90,90]); $p->y += 12;
+        foreach ($pcLines as $pcl) foreach ($p->wrap(str_replace('→', '->', (string)$pcl), 9, $right - $ml - 12) as $pcw) {
+            $p->needSpace(12); $p->text($ml + 10, $pcw, 9); $p->y += 11;
+        }
+    }
     $p->gap(4);
     // body sections
     $bySec = []; foreach ($fields as $f) $bySec[(int)$f['section_id']][] = $f;
@@ -8633,6 +8644,9 @@ function report_docx_build($doc, $sections, $fields, $data, $lh) {
         $kvRows[] = [$k1 . ': ' . $kv[$k1], $k2 !== null ? ($k2 . ': ' . $kv[$k2]) : ''];
     }
     if ($kvRows) $body .= $mkTable(['Reference', 'Reference'], $kvRows);
+    // Order chain — "PO references" (owner, 25 Nov 2026, Q2), only when there is one.
+    $pcLines = function_exists('pochain_print_lines') ? pochain_print_lines($doc) : [];
+    if ($pcLines) $body .= $mkTable(['PO references'], array_map(fn($l) => [(string)$l], $pcLines));
 
     // --- Body sections ------------------------------------------------------
     $bySec = []; foreach ($fields as $f) $bySec[(int)$f['section_id']][] = $f;

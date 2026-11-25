@@ -547,13 +547,17 @@
         //  reports this job owes stand (one line, from the same calculation as
         //  the "Reports to write" figure). ?>
   <?php $tpRef = trim((string)($jcall['client_call_ref'] ?? '')); $tpPo = trim((string)($jcall['supply_po_ref'] ?? '')); $tpLot = trim((string)($jcall['offered_scope'] ?? ''));
-        $tpLine = function_exists('ops_report_progress_line') ? ops_report_progress_line($job) : ''; ?>
-  <?php if ($tpRef !== '' || $tpPo !== '' || $tpLot !== '' || $tpLine !== ''): ?>
+        $tpLine = function_exists('ops_report_progress_line') ? ops_report_progress_line($job) : '';
+        $tpChain = (function_exists('pochain_lines') && (int)($job['call_id'] ?? 0) > 0) ? pochain_lines((int)$job['call_id']) : []; ?>
+  <?php if ($tpRef !== '' || $tpPo !== '' || $tpLot !== '' || $tpLine !== '' || $tpChain): ?>
   <div class="ct-site" id="tpia-refs">
     <span class="lab-sm">What was offered</span>
     <div class="kv-grid">
       <?php if ($tpRef !== ''): ?><div><span class="k"><?= e(T('client')) ?>'s call no.</span><a href="/call?id=<?= (int)$job['call_id'] ?>&amp;hist=ref#tpia-history"><?= e($tpRef) ?></a></div><?php endif; ?>
       <?php if ($tpPo !== ''): ?><div><span class="k"><?= e(T('client')) ?> PO (on the <?= e(Tl('manufacturer')) ?>)</span><a href="/call?id=<?= (int)$job['call_id'] ?>&amp;hist=po#tpia-history"><?= e($tpPo) ?></a></div><?php endif; ?>
+      <?php foreach ($tpChain as $pcI => $pcR): if (pochain_line_text($pcR) === '') continue; $pcWho = trim($pcR['placed_by'] . ($pcR['placed_by'] !== '' && $pcR['placed_on'] !== '' ? ' → ' : '') . $pcR['placed_on']); $pcRole = pochain_roles()[$pcR['role_code']] ?? ''; ?>
+        <div><span class="k"><?= $pcI === 0 ? 'Order chain — other POs' : '&nbsp;' ?></span><?= e($pcWho) ?><?php if (trim((string)$pcR['po_no']) !== ''): ?><?= $pcWho !== '' ? ' · ' : '' ?><a href="/call?id=<?= (int)$job['call_id'] ?>&amp;hist=po&amp;po=<?= e(rawurlencode(trim((string)$pcR['po_no']))) ?>#tpia-history">PO <?= e($pcR['po_no']) ?></a><?php endif; ?><?= $pcRole !== '' ? ' <span class="muted">· ' . e($pcRole) . '</span>' : '' ?></div>
+      <?php endforeach; ?>
       <?php if ($tpLot !== ''): ?><div><span class="k">Lot / stage / qty offered</span><?= e($tpLot) ?></div><?php endif; ?>
       <?php if ($tpLine !== ''): ?><div><span class="k"><?= e(TH('report')) ?>s</span><?= e($tpLine) ?></div><?php endif; ?>
     </div>

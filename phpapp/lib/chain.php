@@ -484,12 +484,22 @@ const CHAIN_HIST_KEYS = ['ref' => "client's call no.", 'po' => 'client PO on the
 
 function chain_history_default_key(array $call) {
     if (trim((string)($call['client_call_ref'] ?? '')) !== '') return 'ref';
-    if (trim((string)($call['supply_po_ref'] ?? '')) !== '') return 'po';
+    if (trim((string)($call['supply_po_ref'] ?? '')) !== '' || chain_history_first_chain_po($call) !== '') return 'po';
     if ((int)($call['vendor_id'] ?? 0) > 0) return 'mfr';
     return 'self';
 }
 
-function chain_history_for_call($callId, $by = '') {
+// The first PO no. on the call's order chain ('' none) — used when the main
+// client PO is blank but a chain PO is there (owner, 25 Nov 2026).
+function chain_history_first_chain_po(array $call) {
+    if (!function_exists('pochain_lines') || empty($call['id'])) return '';
+    foreach (pochain_lines((int)$call['id']) as $r) if (trim((string)$r['po_no']) !== '') return trim((string)$r['po_no']);
+    return '';
+}
+
+// $po — matching on a PO, which of the call's own PO nos. (its main client PO
+// or an order-chain PO). Anything that is not one of the call's own is ignored.
+function chain_history_for_call($callId, $by = '', $po = '') {
     $call = chain_one("SELECT * FROM calls WHERE id=?", [(int)$callId]);
     $out = ['by' => 'self', 'value' => '', 'calls' => [], 'events' => [], 'hidden_calls' => 0, 'hidden_reports' => 0];
     if (!$call) return $out;
@@ -497,7 +507,13 @@ function chain_history_for_call($callId, $by = '') {
     $client = (int)($call['client_id'] ?? 0);
     $w = ''; $a = [];
     if ($by === 'ref' && ($v = trim((string)($call['client_call_ref'] ?? ''))) !== '') { $w = "LOWER(TRIM(c.client_call_ref))=LOWER(?)"; $a = [$v]; $out['value'] = $v; }
-    elseif ($by === 'po' && ($v = trim((string)($call['supply_po_ref'] ?? ''))) !== '') { $w = "LOWER(TRIM(c.supply_po_ref))=LOWER(?)"; $a = [$v]; $out['value'] = $v; }
+    elseif ($by === 'po' && ($v = (function_exists('pochain_call_has_po') && trim((string)$po) !== '' ? pochain_call_has_po($call, $po) : '')
+                                  ?: (trim((string)($call['supply_po_ref'] ?? '')) ?: chain_history_first_chain_po($call))) !== '') {
+        // The main client PO of a call, or a PO on its order chain — both match.
+        $w = "LOWER(TRIM(c.supply_po_ref))=LOWER(?)"; $a = [$v]; $out['value'] = $v;
+        $viaChain = function_exists('pochain_call_ids_for_po') ? pochain_call_ids_for_po($v) : [];
+        if ($viaChain) $w = "($w OR c.id IN (" . implode(',', array_map('intval', $viaChain)) . "))";
+    }
     elseif ($by === 'mfr' && (int)($call['vendor_id'] ?? 0) > 0) {
         $w = "c.vendor_id=?"; $a = [(int)$call['vendor_id']];
         $out['value'] = (string)(chain_one("SELECT COALESCE(NULLIF(display_name,''), legal_name) n FROM business_partners WHERE id=?", [(int)$call['vendor_id']])['n'] ?? '');
@@ -581,17 +597,19 @@ function chain_history_for_call($callId, $by = '') {
 
 // The panel on the work-order page. $by comes from the link that was clicked
 // (the client's call no., the PO or the manufacturer).
-function chain_history_panel($call, $by = '') {
-    $h = chain_history_for_call((int)($call['id'] ?? 0), $by);
+function chain_history_panel($call, $by = '', $po = '') {
+    $h = chain_history_for_call((int)($call['id'] ?? 0), $by, $po);
     $base = '/call?id=' . (int)($call['id'] ?? 0) . '&hist=';
     $o = '<div class="panel" id="tpia-history" data-tab="Inspection history">';
     $o .= '<div class="ctitle" style="margin-top:0"><h3>Inspection history';
-    if ($h['by'] !== 'self') $o .= ' <span class="muted">— every ' . e(Tl('call')) . ' with the same ' . e(CHAIN_HIST_KEYS[$h['by']]) . ' <b>' . e($h['value']) . '</b>, oldest first, never merged</span>';
+    $hLab = CHAIN_HIST_KEYS[$h['by']] ?? '';
+    if ($h['by'] === 'po' && strcasecmp(trim((string)($call['supply_po_ref'] ?? '')), (string)$h['value']) !== 0) $hLab = 'PO (main or on the order chain)';
+    if ($h['by'] !== 'self') $o .= ' <span class="muted">— every ' . e(Tl('call')) . ' with the same ' . e($hLab) . ' <b>' . e($h['value']) . '</b>, oldest first, never merged</span>';
     else $o .= ' <span class="muted">— this ' . e(Tl('call')) . ' only (no client call no., PO or manufacturer to match on)</span>';
     $o .= '</h3></div>';
     $sw = [];
     foreach (CHAIN_HIST_KEYS as $k => $lab) {
-        $has = $k === 'ref' ? trim((string)($call['client_call_ref'] ?? '')) !== '' : ($k === 'po' ? trim((string)($call['supply_po_ref'] ?? '')) !== '' : (int)($call['vendor_id'] ?? 0) > 0);
+        $has = $k === 'ref' ? trim((string)($call['client_call_ref'] ?? '')) !== '' : ($k === 'po' ? (trim((string)($call['supply_po_ref'] ?? '')) !== '' || chain_history_first_chain_po($call) !== '') : (int)($call['vendor_id'] ?? 0) > 0);
         if (!$has) continue;
         $sw[] = $k === $h['by'] ? '<span class="pill p-ok">' . e(ucfirst($lab)) . '</span>'
               : '<a class="pill p-mut" href="' . e($base . $k . '#tpia-history') . '">' . e(ucfirst($lab)) . '</a>';

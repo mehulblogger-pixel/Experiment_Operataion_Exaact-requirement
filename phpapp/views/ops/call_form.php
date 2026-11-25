@@ -126,6 +126,65 @@ document.addEventListener('DOMContentLoaded', function () {
     <div class="ff"><label for="supply_po_ref"><?= e(T('client')) ?> PO no. (placed on the <?= e(Tl('manufacturer')) ?>) <span class="muted">— optional</span></label>
       <input class="form-control" id="supply_po_ref" name="supply_po_ref" maxlength="80" value="<?= e($call['supply_po_ref'] ?? '') ?>" placeholder="e.g. PO-4587">
       <small class="muted">Copied as the P.O. on every <?= e(Tl('report')) ?> of this <?= e(Tl('call')) ?>.</small></div>
+    <?php //  Order chain — other POs (owner, 25 Nov 2026, Q1 Option B). One line per
+          //  link: who ordered on whom, the PO no. and the role of the party ordered
+          //  on. All optional; empty lines are ignored. The PO above stays the main PO.
+          if (function_exists('pochain_roles')):
+            $pcRoles = pochain_roles();
+            if (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST' && isset($_POST['pc_present'])) {
+                $pcRows = [];
+                $pcN = max(count((array)($_POST['pc_by'] ?? [])), count((array)($_POST['pc_po'] ?? [])));
+                for ($i = 0; $i < $pcN; $i++) $pcRows[] = ['placed_by' => (string)(($_POST['pc_by'] ?? [])[$i] ?? ''), 'placed_on' => (string)(($_POST['pc_on'] ?? [])[$i] ?? ''),
+                    'po_no' => (string)(($_POST['pc_po'] ?? [])[$i] ?? ''), 'role_code' => (string)(($_POST['pc_role'] ?? [])[$i] ?? '')];
+            } else $pcRows = !empty($call['id']) ? pochain_lines((int)$call['id']) : [];
+            $pcRows[] = ['placed_by' => '', 'placed_on' => '', 'po_no' => '', 'role_code' => '']; ?>
+    <div class="ff ff-wide" id="po_chain">
+      <input type="hidden" name="pc_present" value="1">
+      <label>Order chain — other POs <span class="muted">— optional, as many lines as needed</span></label>
+      <small class="muted" style="display:block;margin-bottom:6px">When the order passed through several hands, e.g. IOCL → L&amp;T → KSB → ABC Castings: one line per order. The PO above stays the main one.</small>
+      <div id="pc_rows">
+        <?php foreach ($pcRows as $pr): ?>
+        <div class="pc-row">
+          <div class="pc-cell"><span class="pc-lab">Placed by</span><input class="form-control" name="pc_by[]" maxlength="150" value="<?= e($pr['placed_by']) ?>" placeholder="e.g. IOCL" aria-label="Placed by"></div>
+          <div class="pc-cell"><span class="pc-lab">Placed on</span><input class="form-control" name="pc_on[]" maxlength="150" value="<?= e($pr['placed_on']) ?>" placeholder="e.g. L&amp;T" aria-label="Placed on"></div>
+          <div class="pc-cell"><span class="pc-lab">PO no.</span><input class="form-control" name="pc_po[]" maxlength="80" value="<?= e($pr['po_no']) ?>" placeholder="e.g. PO-IOC-1001" aria-label="PO no."></div>
+          <div class="pc-cell"><span class="pc-lab">Role of "placed on"</span><select class="form-control" name="pc_role[]" aria-label="Role of the party ordered on">
+            <option value="">—</option>
+            <?php foreach ($pcRoles as $rk => $rl): ?><option value="<?= e($rk) ?>" <?= (string)$pr['role_code'] === (string)$rk ? 'selected' : '' ?>><?= e($rl) ?></option><?php endforeach; ?>
+          </select></div>
+          <button type="button" class="btn small secondary pc-del" title="Clear this line" aria-label="Clear this line">✕</button>
+        </div>
+        <?php endforeach; ?>
+      </div>
+      <button type="button" class="btn small secondary" id="pc_add" style="margin-top:6px">+ Add another PO</button>
+    </div>
+    <style>
+      #po_chain .pc-row{display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:8px;align-items:end;margin-bottom:8px}
+      #po_chain .pc-cell{min-width:0}
+      #po_chain .pc-lab{display:block;font-size:11.5px;color:var(--muted,#667085);margin-bottom:2px}
+      @media (max-width:700px){
+        #po_chain .pc-row{grid-template-columns:1fr;gap:6px;padding:8px;border:1px solid var(--border,#e4e7ec);border-radius:8px}
+        #po_chain .pc-del{justify-self:start}
+      }
+    </style>
+    <script>
+    (function(){
+      var box = document.getElementById('pc_rows'), add = document.getElementById('pc_add');
+      if (!box || !add) return;
+      add.addEventListener('click', function(){
+        var rows = box.querySelectorAll('.pc-row'); var c = rows[rows.length-1].cloneNode(true);
+        c.querySelectorAll('input').forEach(function(i){ i.value=''; }); c.querySelectorAll('select').forEach(function(s){ s.selectedIndex=0; });
+        box.appendChild(c); var f = c.querySelector('input'); if (f) f.focus();
+      });
+      box.addEventListener('click', function(ev){
+        var b = ev.target.closest('.pc-del'); if (!b) return;
+        var row = b.closest('.pc-row');
+        if (box.querySelectorAll('.pc-row').length > 1) row.remove();
+        else { row.querySelectorAll('input').forEach(function(i){ i.value=''; }); row.querySelectorAll('select').forEach(function(s){ s.selectedIndex=0; }); }
+      });
+    })();
+    </script>
+    <?php endif; ?>
     <div class="ff ff-wide"><label for="offered_scope">Lot / stage / quantity offered <span class="muted">— optional</span></label>
       <input class="form-control" id="offered_scope" name="offered_scope" maxlength="255" value="<?= e($call['offered_scope'] ?? '') ?>" placeholder="e.g. Lot 1 — 40 of 100 valves, final stage">
       <small class="muted">From the <?= e(Tl('client')) ?>'s request. Shown on the <?= e(Tl('call')) ?>, its <?= e(Tlp('job')) ?> and <?= e(Tlp('report')) ?>.</small></div>

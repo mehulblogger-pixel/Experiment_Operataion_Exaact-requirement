@@ -251,6 +251,8 @@ function search_sources() {
         function ($q, $n) use ($like) {
             $l = $like($q);
             [$sw, $sa] = scope_clause('c.executing_office_id', 'c.sbu');
+            // Order chain — a PO no. on any line of a call's chain finds the call (owner, 25 Nov 2026).
+            [$pcSql, $pcArg] = function_exists('pochain_search_sql') ? pochain_search_sql('c', $l) : ['', []];
             return array_map(fn($r) => [
                 'title'    => $r['call_code'],
                 'subtitle' => trim(($r['client_name'] ?: '') . (($r['client_call_ref'] ?? '') !== '' ? ' · call no. ' . $r['client_call_ref'] : '')
@@ -263,9 +265,9 @@ function search_sources() {
                  FROM calls c LEFT JOIN business_partners bp ON bp.id = c.client_id
                  WHERE $sw AND (c.call_code LIKE ? OR c.notes LIKE ? OR c.contract_number LIKE ?
                                 OR bp.display_name LIKE ? OR bp.legal_name LIKE ?
-                                OR c.client_call_ref LIKE ? OR c.supply_po_ref LIKE ?)
+                                OR c.client_call_ref LIKE ? OR c.supply_po_ref LIKE ?$pcSql)
                  ORDER BY c.id DESC LIMIT $n",
-                array_merge($sa, [$l, $l, $l, $l, $l, $l, $l])));
+                array_merge($sa, [$l, $l, $l, $l, $l, $l, $l], $pcArg)));
         });
 
     // ---- Deputations ---------------------------------------------------------

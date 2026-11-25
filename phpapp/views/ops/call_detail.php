@@ -265,6 +265,12 @@
         ? '<a href="' . e($hb . 'ref#tpia-history') . '" title="Inspection history for this number">' . e($call['client_call_ref']) . '</a>' : '<span class="muted">—</span>' ?></div>
     <div><span class="k"><?= e(T('client')) ?> PO (on the <?= e(Tl('manufacturer')) ?>)</span><?= trim((string)($call['supply_po_ref'] ?? '')) !== ''
         ? '<a href="' . e($hb . 'po#tpia-history') . '" title="Inspection history for this PO">' . e($call['supply_po_ref']) . '</a>' : '<span class="muted">—</span>' ?></div>
+    <?php //  Order chain — other POs (owner, 25 Nov 2026). Each PO opens the same history. ?>
+    <?php foreach ((function_exists('pochain_lines') ? pochain_lines((int)$call['id']) : []) as $pcI => $pcR): $pcT = pochain_line_text($pcR); if ($pcT === '') continue; ?>
+      <div><span class="k"><?= $pcI === 0 ? 'Order chain — other POs' : '&nbsp;' ?></span><?= e(trim(($pcR['placed_by'] !== '' || $pcR['placed_on'] !== '') ? trim($pcR['placed_by'] . ($pcR['placed_by'] !== '' && $pcR['placed_on'] !== '' ? ' → ' : '') . $pcR['placed_on']) : '')) ?>
+        <?php if (trim((string)$pcR['po_no']) !== ''): ?><?= ($pcR['placed_by'] !== '' || $pcR['placed_on'] !== '') ? ' · ' : '' ?><a href="<?= e($hb . 'po&po=' . rawurlencode(trim((string)$pcR['po_no'])) . '#tpia-history') ?>" title="Inspection history for this PO">PO <?= e($pcR['po_no']) ?></a><?php endif; ?>
+        <?php $pcRole = pochain_roles()[$pcR['role_code']] ?? ''; if ($pcRole !== ''): ?> <span class="muted">· <?= e($pcRole) ?></span><?php endif; ?></div>
+    <?php endforeach; ?>
     <div><span class="k">Lot / stage / qty offered</span><?= trim((string)($call['offered_scope'] ?? '')) !== '' ? e($call['offered_scope']) : '<span class="muted">—</span>' ?></div>
     <?php if ((int)($call['vendor_id'] ?? 0) > 0): ?>
       <div><span class="k">History at this <?= e(Tl('manufacturer')) ?></span><a href="<?= e($hb . 'mfr#tpia-history') ?>">All <?= e(Tlp('call')) ?> at <?= e($call['vendor_name'] ?: Tl('manufacturer')) ?> →</a></div>
@@ -382,5 +388,5 @@
   <?php if (!$jobs): ?><tr><td colspan="8">No jobs yet. <?php if (is_coordinator_level()): ?><a href="/job-new?call=<?= (int)$call['id'] ?>">Allocate one</a>.<?php endif; ?></td></tr><?php endif; ?>
 </table>
 </div><!-- /Jobs -->
-<?= function_exists('chain_history_panel') ? chain_history_panel($call, (string)($_GET['hist'] ?? '')) : '' ?>
+<?= function_exists('chain_history_panel') ? chain_history_panel($call, (string)($_GET['hist'] ?? ''), (string)($_GET['po'] ?? '')) : '' ?>
 </div><!-- /data-tabs (work order) -->

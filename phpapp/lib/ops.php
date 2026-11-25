@@ -5728,7 +5728,11 @@ function ops_calls($route, $method) {
         $where = $conds ? implode(' AND ', $conds) : '1=1';
         //  TPIA Phase 1 — the client's call number and the client PO on the
         //  manufacturer are searchable here too (owner, 25 Nov 2026 — D1).
-        if ($q) { $where .= " AND (c.call_code LIKE ? OR bp.legal_name LIKE ? OR v.legal_name LIKE ? OR c.client_call_ref LIKE ? OR c.supply_po_ref LIKE ?)"; array_push($args, "%$q%","%$q%","%$q%","%$q%","%$q%"); }
+        if ($q) {
+            // Order chain — a PO no. on any line of the chain finds its call too (owner, 25 Nov 2026).
+            [$pcSql, $pcArg] = function_exists('pochain_search_sql') ? pochain_search_sql('c', "%$q%") : ['', []];
+            $where .= " AND (c.call_code LIKE ? OR bp.legal_name LIKE ? OR v.legal_name LIKE ? OR c.client_call_ref LIKE ? OR c.supply_po_ref LIKE ?$pcSql)"; array_push($args, "%$q%","%$q%","%$q%","%$q%","%$q%", ...$pcArg);
+        }
         // See every call under one contract, or under one quotation — the "all
         // calls under this contract / quote" view asked for from those screens.
         $fContract = trim((string)($_GET['contract'] ?? ''));
@@ -6196,6 +6200,8 @@ function ops_calls($route, $method) {
                 if ($forwardNow) $pdo->prepare("UPDATE calls SET forwarded_at=?, status='FORWARDED' WHERE id=?")->execute([date('c'), $call['id']]);
                 custom_save('call', $call['id'], $b);
                 if ($dupAck !== '') call_client_ref_dup_log((int)$call['id'], $b['client_call_ref'], $dupAck);
+                // Order chain — other POs (owner, 25 Nov 2026). Saving the call replaces its lines.
+                if (function_exists('pochain_save') && isset($b['pc_present'])) pochain_save((int)$call['id'], pochain_from_post($b));
                 // Notify on the office forward, and also when a coordinator is
                 // newly named (a same-office hand-off, or a re-assignment) so the
                 // person now owning the call actually hears about it.
@@ -6223,6 +6229,7 @@ function ops_calls($route, $method) {
                 touch_row_version('calls', (int)$id);   // F-OP-04 — protected from its first edit
                 custom_save('call', $id, $b);
                 if ($dupAck !== '') call_client_ref_dup_log((int)$id, $b['client_call_ref'], $dupAck);
+                if (function_exists('pochain_save') && isset($b['pc_present'])) pochain_save((int)$id, pochain_from_post($b));
                 $coordNamed = (int)($b['coordinator_id'] ?? 0) > 0;
                 if ($execOffice || $coordNamed) send_forward_email($id);
                 flash("$code created." . ($execOffice ? ' Forwarded to the branch — email sent.'
@@ -6330,6 +6337,154 @@ function call_client_ref_dup_log($callId, $ref, $others) {
     try { act_log('CALL', (int)$callId, 'SYSTEM', ucfirst(Tl('client')) . "'s call no. " . $ref . ' is also on ' . $others
         . ' — saved as a separate ' . Tl('call') . ' by ' . user_name(current_user()) . '; nothing was merged.'); } catch (Throwable $e) {}
 }
+// ---- Order chain — other POs on an inspection call (owner, 25 Nov 2026) -----
+//  Q1 "Option B", Q2 "Yes". One client's order often passes down a chain:
+//  IOCL (end user) orders on L&T (EPC contractor), L&T on KSB (manufacturer),
+//  KSB on ABC Castings (sub-vendor, where we inspect). "Client PO no. (placed on
+//  the manufacturer)" (calls.supply_po_ref) stays the MAIN PO — the report's P.O.
+//  and the PO lock key (D4) are unchanged. The other links are listed here, one
+//  line each, every box optional; party names are plain text, so no trader has
+//  to be added to the masters first. The role is an editable list.
+//  Each PO no. is searchable and opens the same Inspection history; the chain
+//  prints as "PO references" on reports and Release Notes not yet issued, and
+//  is frozen onto a report the moment it is issued.
+const CALL_PO_CHAIN_ROLES = ['END_USER' => 'End user', 'EPC' => 'EPC contractor', 'MANUFACTURER' => 'Manufacturer',
+    'TRADER' => 'Trader / stockist', 'SUB_VENDOR' => 'Sub-vendor', 'OTHER' => 'Other'];
+
+function pochain_migrate() {
+    $pk = pk_clause();
+    try {
+        db()->exec("CREATE TABLE IF NOT EXISTS call_po_chain (
+            id $pk, call_id INT NOT NULL, seq INT DEFAULT 0,
+            placed_by VARCHAR(150) DEFAULT '', placed_on VARCHAR(150) DEFAULT '',
+            po_no VARCHAR(80) DEFAULT '', role_code VARCHAR(30) DEFAULT '',
+            created_at VARCHAR(30) DEFAULT '')");
+    } catch (Throwable $e) {}
+    if (function_exists('idx_add')) { try { idx_add('call_po_chain', 'ix_cpc_call', '(call_id)'); idx_add('call_po_chain', 'ix_cpc_po', '(po_no)'); } catch (Throwable $e) {} }
+    // The chain as it stood when a report was issued (JSON list of printed lines).
+    // Empty on every report issued before this, so their prints never change.
+    if (function_exists('ensure_column')) { try { ensure_column('report_docs', 'po_chain_snap', 'TEXT NULL'); } catch (Throwable $e) {} }
+    if (function_exists('lk_ensure_type_map')) lk_ensure_type_map('call_po_role', 'Order chain — role of the party ordered on', CALL_PO_CHAIN_ROLES, 'tosrm');
+}
+/** Is the order-chain table there yet (a site mid-upgrade may not have it)? */
+function pochain_ready() {
+    static $ok = null;
+    if ($ok === null) { try { db()->query("SELECT 1 FROM call_po_chain WHERE 1=0"); $ok = true; } catch (Throwable $e) { $ok = false; } }
+    return $ok;
+}
+/** SQL to add to a calls search: " OR c.id IN (…chain PO LIKE ?)" and its one argument, or ['', []]. */
+function pochain_search_sql($alias, $like) {
+    if (!pochain_ready()) return ['', []];
+    return [" OR $alias.id IN (SELECT call_id FROM call_po_chain WHERE po_no LIKE ?)", [$like]];
+}
+function pochain_roles() {
+    return function_exists('lk_options_or') ? lk_options_or('call_po_role', CALL_PO_CHAIN_ROLES) : CALL_PO_CHAIN_ROLES;
+}
+/** The chain lines of one call, in order. */
+function pochain_lines($callId) {
+    if ((int)$callId <= 0) return [];
+    try { return ops_all("SELECT * FROM call_po_chain WHERE call_id=? ORDER BY seq, id", [(int)$callId]) ?: []; }
+    catch (Throwable $e) { return []; }
+}
+/** Read the posted rows (pc_by[], pc_on[], pc_po[], pc_role[]); empty rows are dropped. */
+function pochain_from_post(array $b) {
+    $by = (array)($b['pc_by'] ?? []); $on = (array)($b['pc_on'] ?? []); $po = (array)($b['pc_po'] ?? []); $ro = (array)($b['pc_role'] ?? []);
+    $roles = pochain_roles();
+    $n = max(count($by), count($on), count($po), count($ro));
+    $out = [];
+    for ($i = 0; $i < $n; $i++) {
+        $r = ['placed_by' => substr(trim((string)($by[$i] ?? '')), 0, 150), 'placed_on' => substr(trim((string)($on[$i] ?? '')), 0, 150),
+              'po_no' => substr(trim((string)($po[$i] ?? '')), 0, 80), 'role_code' => trim((string)($ro[$i] ?? ''))];
+        if (!isset($roles[$r['role_code']])) $r['role_code'] = '';
+        if ($r['placed_by'] === '' && $r['placed_on'] === '' && $r['po_no'] === '') continue;   // a role alone is not a line
+        $out[] = $r;
+    }
+    return $out;
+}
+/** One line in words: "IOCL → L&T · PO-IOC-1001 · EPC contractor". */
+function pochain_line_text(array $r) {
+    $who = trim((string)($r['placed_by'] ?? '')) . ((trim((string)($r['placed_by'] ?? '')) !== '' && trim((string)($r['placed_on'] ?? '')) !== '') ? ' → ' : '') . trim((string)($r['placed_on'] ?? ''));
+    $role = pochain_roles()[(string)($r['role_code'] ?? '')] ?? '';
+    return implode(' · ', array_filter([trim($who), trim((string)($r['po_no'] ?? '')) !== '' ? 'PO ' . trim((string)$r['po_no']) : '', $role], 'strlen'));
+}
+/**
+ * Replace a call's chain with $rows. Returns true when it changed, and then writes
+ * the call's History (old → new). Never touches supply_po_ref.
+ */
+function pochain_save($callId, array $rows) {
+    $callId = (int)$callId;
+    if ($callId <= 0) return false;
+    $old = pochain_lines($callId);
+    $txt = fn($list) => implode('; ', array_map('pochain_line_text', $list));
+    $key = fn($list) => json_encode(array_map(fn($r) => [(string)$r['placed_by'], (string)$r['placed_on'], (string)$r['po_no'], (string)$r['role_code']], array_values($list)));
+    if ($key($old) === $key($rows)) return false;
+    $pdo = db();
+    $pdo->prepare("DELETE FROM call_po_chain WHERE call_id=?")->execute([$callId]);
+    $ins = $pdo->prepare("INSERT INTO call_po_chain (call_id,seq,placed_by,placed_on,po_no,role_code,created_at) VALUES (?,?,?,?,?,?,?)");
+    foreach (array_values($rows) as $i => $r) $ins->execute([$callId, $i + 1, $r['placed_by'], $r['placed_on'], $r['po_no'], $r['role_code'], date('c')]);
+    if (function_exists('act_log')) {
+        // A short subject (the History list) and the full old → new in the body.
+        $full = 'Order chain: ' . ($old ? $txt($old) : '(none)') . ' → ' . ($rows ? $txt($rows) : '(none)');
+        try { act_log('CALL', $callId, 'SYSTEM', 'Order chain changed by ' . user_name(current_user()) . ' — ' . count($rows) . ' line' . (count($rows) === 1 ? '' : 's') . ' now',
+            ['body' => $full]); } catch (Throwable $e) {}
+    }
+    return true;
+}
+/** Is this PO no. one of the call's own (its main client PO or a chain line)? Returns the stored spelling. */
+function pochain_call_has_po($call, $po) {
+    $po = trim((string)$po);
+    if ($po === '' || empty($call['id'])) return '';
+    if (strcasecmp(trim((string)($call['supply_po_ref'] ?? '')), $po) === 0) return trim((string)$call['supply_po_ref']);
+    foreach (pochain_lines((int)$call['id']) as $r) if (strcasecmp(trim((string)$r['po_no']), $po) === 0) return trim((string)$r['po_no']);
+    return '';
+}
+/** Ids of calls carrying this PO no. in their chain. */
+function pochain_call_ids_for_po($po) {
+    $po = trim((string)$po);
+    if ($po === '') return [];
+    try { return array_map('intval', array_column(ops_all("SELECT DISTINCT call_id FROM call_po_chain WHERE LOWER(TRIM(po_no))=LOWER(?)", [$po]) ?: [], 'call_id')); }
+    catch (Throwable $e) { return []; }
+}
+/** The printed "PO references" lines for a call: the main client PO first, then the chain. [] when there is no chain. */
+function pochain_print_lines_for_call($callId) {
+    $lines = pochain_lines((int)$callId);
+    if (!$lines) return [];
+    $call = ops_one("SELECT supply_po_ref FROM calls WHERE id=?", [(int)$callId]);
+    $out = [];
+    if ($call && trim((string)$call['supply_po_ref']) !== '') $out[] = ucfirst(Tl('client')) . ' PO on the ' . Tl('manufacturer') . ' · PO ' . trim((string)$call['supply_po_ref']);
+    foreach ($lines as $r) { $t = pochain_line_text($r); if ($t !== '') $out[] = $t; }
+    return $out;
+}
+/** The call behind a report (its own call, else its job's). */
+function pochain_doc_call_id(array $doc) {
+    $cid = (int)($doc['call_id'] ?? 0);
+    if ($cid <= 0 && (int)($doc['job_id'] ?? 0) > 0) $cid = (int)ops_val("SELECT call_id FROM jobs WHERE id=?", [(int)$doc['job_id']]);
+    return $cid;
+}
+/**
+ * The "PO references" lines a report prints. An ISSUED report prints only what was
+ * frozen onto it when it was issued (nothing, for one issued before this existed),
+ * so a later change to the call never alters it. A report not yet issued reads
+ * the call's chain as it is now.
+ */
+function pochain_print_lines(array $doc) {
+    if (!empty($doc['finalized'])) {
+        $snap = json_decode((string)($doc['po_chain_snap'] ?? ''), true);
+        return is_array($snap) ? array_values(array_filter(array_map('strval', $snap), 'strlen')) : [];
+    }
+    $cid = pochain_doc_call_id($doc);
+    return $cid > 0 ? pochain_print_lines_for_call($cid) : [];
+}
+/** Freeze the chain onto a report as it is issued. */
+function pochain_snapshot_doc($doc) {
+    $id = (int)(is_array($doc) ? ($doc['id'] ?? 0) : $doc);
+    if ($id <= 0) return;
+    $d = is_array($doc) ? $doc : (ops_one("SELECT * FROM report_docs WHERE id=?", [$id]) ?: []);
+    $cid = pochain_doc_call_id($d);
+    $lines = $cid > 0 ? pochain_print_lines_for_call($cid) : [];
+    try { db()->prepare("UPDATE report_docs SET po_chain_snap=? WHERE id=?")->execute([$lines ? json_encode($lines, JSON_UNESCAPED_UNICODE) : '', $id]); } catch (Throwable $e) {}
+}
+
 function call_form_vars($call, $posted = null) {
     $u = current_user();
     if ($posted !== null) {
