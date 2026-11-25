@@ -77,7 +77,7 @@ try {
     $loc = custid_add_location($tb, ['gstin' => $mah, 'label' => 'Mumbai plant', 'line1' => 'Trans-Thane Creek', 'city' => 'Navi Mumbai', 'pincode' => '400705']);
     t_ok(!empty($loc['id']), 'location · Maharashtra added to TB Refinery' . (!empty($loc['err']) ? ' — ' . $loc['err'] : ''));
     $mahId = (int) ($loc['id'] ?? 0);
-    t_ok(!empty(custid_add_location($tb, ['gstin' => $mah])['err']), 'location · the same GSTIN cannot be added twice');
+    t_ok(!empty(custid_add_location($tb, ['gstin' => $mah])['err']), 'location · the same GSTIN again without its own address is refused (another office in the same state needs its address — owner 25 Nov, Q3)');
     t_ok(strpos((string) (custid_add_location($tb, ['gstin' => $G('33', 'AAACZ5555Q')])['err'] ?? ''), 'different PAN') !== false, 'location · a GSTIN with another PAN is refused (a different company)');
     t_eq(custid_match('Y', $mah, '', 0)['kind'], 'GSTIN', 'location · its GSTIN is now known to the central list');
     $locs = custid_locations($tb);

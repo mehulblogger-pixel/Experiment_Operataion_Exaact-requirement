@@ -164,11 +164,13 @@
         }
         if ($bcOffices): ?>
   <details style="margin-top:14px">
-    <summary style="cursor:pointer;font-weight:600;font-size:13px">➕ Add a branch / GSTIN of this client for another office</summary>
+    <summary style="cursor:pointer;font-weight:600;font-size:13px">➕ Create a separate branch company (handled by another of our offices)</summary>
     <p class="muted" style="font-size:12px;margin:6px 0 8px">
       Use this when the same customer has an office that orders and pays separately —
       a different GSTIN, its own quotations and its own contracts. It stays inside this
       client's group for reporting, but <strong>only the office you choose can see or edit it</strong>.
+      To bill another address or GSTIN of this same customer, use
+      <a href="#billing-locations">“+ Add a billing address / GSTIN”</a> in the Billing addresses box below instead.
     </p>
     <form method="post" action="/customer?id=<?= (int)$p['id'] ?>" style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
       <input type="hidden" name="action" value="add_branch_company">
@@ -190,6 +192,13 @@
   <?php endif; ?>
 </div>
 <?php endif; ?>
+
+<?php // Billing addresses / GSTINs of this customer — the same box as on the
+      // master record (owner, 25 Nov 2026: Q3), so it is found from Sales too.
+      // Everyone who can open this page sees the list; only those who may edit
+      // the client record (custid_can_edit) see Add / Change / Stop.
+      $blBack = 'customer';
+      include __DIR__ . '/_billing_locations.php'; ?>
 
 <div class="panel-split" style="margin-top:16px">
   <div>

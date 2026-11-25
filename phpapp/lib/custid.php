@@ -249,7 +249,7 @@ function custid_match_message(array $m, $gstin = '') {
     $r = $m['row'] ?? null; if (!$r) return '';
     $who = trim((string) ($r['code'] ?? '') . ' — ' . (string) ($r['legal_name'] ?? ''));
     switch ($m['kind']) {
-        case 'GSTIN': return 'This GSTIN already belongs to ' . $who . '. Open that ' . Tl('client') . ' instead of adding a second one.';
+        case 'GSTIN': return 'This GSTIN already belongs to ' . $who . '. Open that ' . Tl('client') . ' instead of adding a second one — another office of it, even in the same state, is added there with "+ Add a billing address / GSTIN".';
         case 'PAN':   return $who . ' already has this PAN, so it is the same company. '
                            . (clean_gstin($gstin) !== '' ? 'Add ' . custid_state_name(substr(clean_gstin($gstin), 0, 2)) . ' (' . clean_gstin($gstin) . ') as a new billing location of it instead.'
                                                        : 'Open it instead of adding a second record.');
@@ -360,14 +360,23 @@ function custid_add_location($partnerId, array $b, $excludeOwnerId = 0) {
     $mine = strtoupper(trim((string) ($p['pan'] ?? '')));
     if ($mine !== '' && $pan !== $mine)
         return ['err' => 'This GSTIN carries the PAN ' . $pan . ', but ' . $p['legal_name'] . '\'s PAN is ' . $mine . '. A billing location must belong to the same PAN — a different PAN is a different company.'];
-    if (clean_gstin($p['gstin'] ?? '') === $g) return ['err' => 'That is already the main GSTIN of ' . $p['legal_name'] . '.'];
     $own = custid_gstin_owner($g, (int) $partnerId);
     if ($own && (int) $own['id'] !== (int) $excludeOwnerId)
         return ['err' => 'That GSTIN already belongs to ' . trim(($own['code'] ?? '') . ' — ' . ($own['legal_name'] ?? '')) . '.'];
-    if (ops_val("SELECT id FROM partner_addresses WHERE partner_id=? AND is_billing=1 AND UPPER(gstin)=?", [(int) $partnerId, $g]))
-        return ['err' => 'That GSTIN is already one of ' . $p['legal_name'] . '\'s billing locations.'];
+    // The same GSTIN again = another office of this customer in the same state
+    // (GST "additional place of business", owner 25 Nov 2026: Q3). Allowed with
+    // its own address; the address is what tells the two offices apart, so it
+    // is required, and the very same address twice is refused.
+    $sameGst = clean_gstin($p['gstin'] ?? '') === $g
+            || (bool) ops_val("SELECT id FROM partner_addresses WHERE partner_id=? AND is_billing=1 AND UPPER(gstin)=?", [(int) $partnerId, $g]);
+    if ($sameGst) {
+        if (trim((string) ($b['line1'] ?? '')) === '' || trim((string) ($b['city'] ?? '')) === '')
+            return ['err' => $g . ' is already one of ' . $p['legal_name'] . '\'s GSTINs. To add another office in the same state under it, enter that office\'s billing address and city — they are what tell the two offices apart on a bill.'];
+        if (($dup = custid_same_address_as((int) $partnerId, $g, $b)) !== '')
+            return ['err' => 'That address is already a billing address of ' . $p['legal_name'] . ' under GSTIN ' . $g . ' (' . $dup . ').'];
+    }
     $state = state_from_gstin($g);
-    $label = trim((string) ($b['label'] ?? '')) ?: $state;
+    $label = trim((string) ($b['label'] ?? '')) ?: ($sameGst ? (trim((string) ($b['city'] ?? '')) ?: $state) : $state);
     db()->prepare("INSERT INTO partner_addresses (partner_id,address_type,label,line1,line2,city,state,pincode,country,is_primary,gstin,state_code,is_billing)
                    VALUES (?,'BILLING',?,?,?,?,?,?,'India',0,?,?,1)")
         ->execute([(int) $partnerId, substr($label, 0, 150), substr(trim((string) ($b['line1'] ?? '')), 0, 255), substr(trim((string) ($b['line2'] ?? '')), 0, 255),
@@ -375,9 +384,52 @@ function custid_add_location($partnerId, array $b, $excludeOwnerId = 0) {
     $id = (int) db()->lastInsertId();
     // A customer saved before this rule may have had no PAN on its own record.
     if ($mine === '') db()->prepare("UPDATE business_partners SET pan=? WHERE id=? AND COALESCE(pan,'')=''")->execute([$pan, (int) $partnerId]);
-    if (function_exists('act_log')) act_log('PARTNER', (int) $partnerId, 'BILLING_LOCATION', 'Billing location added: ' . $label . ' — GSTIN ' . $g, ['partner_id' => (int) $partnerId]);
+    if (function_exists('act_log')) act_log('PARTNER', (int) $partnerId, 'BILLING_LOCATION', 'Billing location added: ' . $label . ' — GSTIN ' . $g . ($sameGst ? ' (same GSTIN, another address)' : ''), ['partner_id' => (int) $partnerId]);
     if (function_exists('idems_log')) idems_log('partner', (int) $partnerId, 'BILLING_LOCATION_ADDED', ['field' => $g, 'new' => $label]);
-    return ['id' => $id];
+    return ['id' => $id, 'same_gstin' => $sameGst];
+}
+
+/**
+ * Where Add / Change / Stop of a billing address lands: back on the page the box
+ * was on — the Sales customer page or the master record (owner, 25 Nov 2026: Q3).
+ * Only these two; anything else posted is ignored (never a free address).
+ */
+function custid_back_url(array $post, $partnerId) {
+    $base = (string) ($post['back'] ?? '') === 'customer' ? '/customer?id=' : '/partner?id=';
+    return $base . (int) $partnerId . '#billing-locations';
+}
+
+/** One address reduced to what makes it the same place: line 1, city, PIN — case, spaces and punctuation ignored. */
+function custid_addr_key($a) {
+    $n = fn($x) => preg_replace('/[^a-z0-9]+/', '', strtolower((string) $x));
+    return $n($a['line1'] ?? '') . '|' . $n($a['city'] ?? '') . '|' . $n($a['pincode'] ?? '');
+}
+
+/**
+ * The name of this customer's billing place that already has this GSTIN AND
+ * this address ('' = none). $skipLocId leaves one location out (itself, on a change).
+ */
+function custid_same_address_as($partnerId, $gstin, array $b, $skipLocId = 0) {
+    $g = clean_gstin($gstin);
+    $key = custid_addr_key($b);
+    if ($key === '||') return '';
+    foreach (custid_locations((int) $partnerId) as $l) {
+        if ($l['gstin'] !== $g || (!$l['is_main'] && (int) $l['id'] === (int) $skipLocId)) continue;
+        if ($l['addr'] && custid_addr_key($l['addr']) === $key) return (string) $l['label'];
+    }
+    return '';
+}
+
+/**
+ * How a location is named in a pick-list: name — state — GSTIN, plus the city
+ * when another location shares its GSTIN (two offices in one state).
+ */
+function custid_location_words(array $l, array $all) {
+    $n = 0;
+    foreach ($all as $o) if ($o['gstin'] !== '' && $o['gstin'] === $l['gstin']) $n++;
+    $city = trim((string) ($l['addr']['city'] ?? ''));
+    return $l['label'] . ' — ' . ($l['state'] ?: 'state not set') . ($l['gstin'] !== '' ? ' — ' . $l['gstin'] : '')
+         . ($n > 1 && $city !== '' && stripos($l['label'], $city) === false ? ' — ' . $city : '');
 }
 
 /** Change a location's name and address (the GSTIN is its identity and stays). */
@@ -385,6 +437,9 @@ function custid_update_location($partnerId, $locId, array $b) {
     custid_migrate();
     $a = ops_one("SELECT * FROM partner_addresses WHERE id=? AND partner_id=? AND is_billing=1", [(int) $locId, (int) $partnerId]);
     if (!$a) return 'That billing location is not on this ' . Tl('client') . '.';
+    // A changed address may not become the very same place as another one under its GSTIN.
+    if (($dup = custid_same_address_as((int) $partnerId, (string) $a['gstin'], $b, (int) $locId)) !== '')
+        return 'That address is already a billing address under GSTIN ' . clean_gstin($a['gstin']) . ' (' . $dup . ').';
     db()->prepare("UPDATE partner_addresses SET label=?, line1=?, line2=?, city=?, pincode=? WHERE id=?")
         ->execute([substr(trim((string) ($b['label'] ?? '')) ?: (string) $a['label'], 0, 150), substr(trim((string) ($b['line1'] ?? '')), 0, 255),
                    substr(trim((string) ($b['line2'] ?? '')), 0, 255), substr(trim((string) ($b['city'] ?? '')), 0, 120),
@@ -484,8 +539,9 @@ function custid_location_map() {
     $out = [];
     foreach (ops_all("SELECT DISTINCT partner_id FROM partner_addresses WHERE is_billing=1") ?: [] as $r) {
         $pid = (int) $r['partner_id'];
-        foreach (custid_locations($pid) as $l)
-            $out[$pid][] = [(int) $l['id'], $l['label'] . ' — ' . ($l['state'] ?: 'state not set') . ($l['gstin'] !== '' ? ' — ' . $l['gstin'] : '')];
+        $all = custid_locations($pid);
+        foreach ($all as $l)
+            $out[$pid][] = [(int) $l['id'], custid_location_words($l, $all)];
     }
     return $out;
 }

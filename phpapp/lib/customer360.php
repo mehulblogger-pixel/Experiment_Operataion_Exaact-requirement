@@ -339,7 +339,7 @@ function ops_customer360($route, $method) {
         $gstin = clean_gstin($_POST['gstin'] ?? '');
         if ($gstin === '') { flash('Enter the branch company\'s GSTIN. A branch that is not GST-registered is an address on this ' . Tl('client') . ', not a separate company.', 'error'); redirect('/customer?id=' . $pid); }
         if (($why = custid_gstin_problem($gstin)) !== '') { flash($why, 'error'); redirect('/customer?id=' . $pid); }
-        if ($own = custid_gstin_owner($gstin)) { flash('GSTIN ' . $gstin . ' is already on ' . trim(($own['code'] ?? '') . ' — ' . ($own['legal_name'] ?? '')) . '.', 'error'); redirect('/customer?id=' . $pid); }
+        if ($own = custid_gstin_owner($gstin)) { flash('GSTIN ' . $gstin . ' is already on ' . trim(($own['code'] ?? '') . ' — ' . ($own['legal_name'] ?? '')) . '. Another office of it under the same GSTIN is added with "+ Add a billing address / GSTIN" in its Billing addresses box, not as a branch company.', 'error'); redirect('/customer?id=' . $pid); }
         $rootId = (int) ($parent['parent_id'] ?? 0) ?: (int) $parent['id'];
         $rootRow = c360_one("SELECT * FROM business_partners WHERE id=?", [$rootId]) ?: $parent;
         $groupPan = strtoupper(trim((string) ($rootRow['pan'] ?? ''))) ?: pan_from_gstin($rootRow['gstin'] ?? '');
@@ -348,7 +348,7 @@ function ops_customer360($route, $method) {
             $r = custid_add_location($rootId, ['gstin' => $gstin, 'label' => trim((string) ($_POST['display_name'] ?? '')) ?: $name]);
             if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/customer?id=' . $pid); }
             flash($name . ' has the same PAN (' . $groupPan . ') as ' . ($rootRow['display_name'] ?: $rootRow['legal_name']) . ', so it is the same company: GSTIN ' . $gstin . ' (' . state_from_gstin($gstin) . ') was added as its billing location — no second record.');
-            redirect('/partner?id=' . $rootId . '#billing-locations');
+            redirect('/customer?id=' . $rootId . '#billing-locations');   // the box is on this page too (owner, 25 Nov 2026: Q3)
         }
 
         $br = (int) ($_POST['home_branch_id'] ?? 0);
