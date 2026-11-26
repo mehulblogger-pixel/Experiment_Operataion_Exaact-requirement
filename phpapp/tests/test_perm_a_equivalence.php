@@ -129,6 +129,13 @@ try {
                     && ($k === 'tiles' ? !array_diff(array_filter(explode(' ', (string) $now)), array_filter(explode(' ', (string) $v))) : ((int) $v === 1 && (int) $now === 0))) { $narrowed++; continue; }
                 if ($isViewer && in_array($k, $mayGain['g'], true) && ($k === 'tiles' || ((int) $v === 0 && (int) $now === 1))) { $intended++; continue; }
                 if ($isSetter && in_array($k, $mayGainT['g'], true) && (int) $v === 0 && (int) $now === 1) { $intended++; continue; }
+                //  The fifth intended change (owner, 26 Nov 2026, R-04 / R-06; docs/02 19ab): the
+                //  "New lead" tile (/sales-lead) is shown only to someone who works leads — Add or
+                //  Edit on Leads, the same rule as "+ New lead" on the register. A tile list may
+                //  lose exactly that one tile, for someone who holds neither.
+                if ($k === 'tiles' && !(int) ($w['can']['mod.leads.add'] ?? 0) && !(int) ($w['can']['mod.leads.edit'] ?? 0) && empty($w['g']['master'])
+                    && array_values(array_diff(array_filter(explode(' ', (string) $v)), array_filter(explode(' ', (string) $now)))) === ['/sales-lead']
+                    && !array_diff(array_filter(explode(' ', (string) $now)), array_filter(explode(' ', (string) $v)))) { $intended++; continue; }
                 $bad[] = "$user · $k: before " . var_export($v, true) . ', now ' . var_export($now, true);
             }
             foreach ($w['can'] as $k => $v) {

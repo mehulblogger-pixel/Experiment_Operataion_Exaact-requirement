@@ -573,6 +573,12 @@ function whocan_history($kind, $id, $limit = 8) {
             foreach (['scope_offices' => Tlp('office'), 'scope_business units' => 'business units'] as $k => $w)
                 if (isset($n[$k]) && is_array($n[$k])) $bits[] = $w . ' changed';
             if (isset($n['active'])) $bits[] = !empty($n['active'][1]) ? 'switched on' : 'switched off';
+            //  Owner, 26 Nov 2026 (H-23): the "Whose records they see" choice is a change too,
+            //  and was shown as "saved (no right changed)".
+            if (isset($n['records_seen']) && is_array($n['records_seen'])) {
+                $rw = fn($m) => $m === 'as role' ? 'as the role' : strtolower((string) (SALES_REC_MODES[$m] ?? $m));
+                $bits[] = 'whose records they see: ' . $rw((string) ($n['records_seen']['from'] ?? '')) . ' → ' . $rw((string) ($n['records_seen']['to'] ?? ''));
+            }
         }
         $bits = array_values(array_filter($bits));
         $out[] = ['when' => substr((string) $r['created_at'], 0, 10), 'who' => (string) $r['username'],

@@ -112,13 +112,17 @@ try {
             bbv_as($uid); $mayWork = sales_record_can_work($own); if ($keep) bbv_as($keep);
             if (!$mayWork) $gone = array_values(array_filter($gone, fn($h) => !preg_match('#^/(quote-new|project-costings)\?lead(_id)?=\d+$#', $h)));
         }
+        //  Owner, 26 Nov 2026 (docs/02 19ab): the lead page's Delete / "Remove this lead" follows the
+        //  server's delete rule — someone it refuses (the Branch Manager, the SBU Head) is not offered it.
+        bbv_as($uid); $mayDel = can('mod.leads.edit') || is_master(); if ($keep) bbv_as($keep);
+        if ($route === 'lead' && !$mayDel) $gone = array_values(array_diff($gone, ['#remove']));
         t_eq($gone, [], "$label · $pg — every link of the old page is on the new one (except “+ Add new” customer for someone who may not add one — B4)");
         //  A form keeps its address and every field it had (a new page may add one — the business unit).
         $lost = [];
         foreach (array_unique($o['forms']) as $sig) {
             [$at, $fl] = s2_form_split($sig); $ok = false;
             foreach ($n['forms'] as $ns) { [$nat, $nfl] = s2_form_split($ns); if ($nat === $at && !array_diff($fl, $nfl)) { $ok = true; break; } }
-            if (!$ok) $lost[] = $sig;
+            if (!$ok && !($route === 'lead' && !$mayDel && $at === 'post /lead-delete')) $lost[] = $sig;
         }
         t_eq($lost, [], "$label · $pg — every form (same address, every field) is on the new one");
         t_eq(array_values(array_diff($o['money'], $n['money'])), [], "$label · $pg — every amount of the old page is on the new one");

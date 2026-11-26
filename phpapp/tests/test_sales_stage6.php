@@ -138,6 +138,10 @@ try {
         //  Owner findings B1 (21 Nov 2026): the "New quote" tile was /quote-edit with no quotation
         //  ("Not found"); it is /quote-new now, and only for someone who may write a quotation.
         if ($route === 'sales-home' && $href === '/quote-edit') return true;
+        //  Owner, 26 Nov 2026 (R-04 / R-06, docs/02 19ab): New lead / New deal only for someone the
+        //  server lets add one (the registers' "+ New" rule).
+        if ($route === 'sales-home' && in_array($href, ['/sales-lead', '/opportunity-new'], true))
+            return !s6_as($uid, fn() => leads_works_leads() && ($href === '/sales-lead' ? leads_can_edit() : opp_can_edit()));
         return false;
     };
     $compare = function ($label, $uid, $route, $get) use ($gone) {

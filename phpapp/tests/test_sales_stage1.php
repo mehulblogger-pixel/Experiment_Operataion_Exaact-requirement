@@ -81,6 +81,14 @@ try {
                 $keep = $_SESSION['uid'] ?? null; bbv_as($uid); $may = sales_record_can_work($owner); if ($keep) bbv_as($keep);
                 return !$may;
             }
+            //  Owner, 26 Nov 2026 (R-04 / R-06, docs/02 19ab): the New lead / New deal shortcuts are
+            //  shown only to someone the server lets add one (the registers' "+ New" rule).
+            if ($href === '/sales-lead' || $href === '/opportunity-new') {
+                $keep = $_SESSION['uid'] ?? null; bbv_as($uid);
+                $may = leads_works_leads() && ($href === '/sales-lead' ? leads_can_edit() : opp_can_edit());
+                if ($keep) bbv_as($keep);
+                return !$may;
+            }
             if ($href !== '/quote-edit') return false;
             $keep = $_SESSION['uid'] ?? null; bbv_as($uid); $mayWrite = crm_quote_can_create(); if ($keep) bbv_as($keep);
             return $mayWrite ? in_array('/quote-new', $n['hrefs'], true) : !in_array('/quote-new', $n['hrefs'], true);

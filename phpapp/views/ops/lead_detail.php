@@ -88,9 +88,10 @@ $fwd = array_values(array_filter($stages, fn($s) => $s['kind'] === 'OPEN' && (in
 $won = array_values(array_filter($stages, fn($s) => $s['kind'] === 'WON'));
 $lostSt = array_values(array_filter($stages, fn($s) => $s['kind'] === 'LOST'));
 $canMarkLost = !function_exists('lead_can_mark_lost') || lead_can_mark_lost($l);
-//  Both old doors to delete are kept: the header button (administrators, not on a won
-//  lead) and the "Remove this lead" panel (anyone who edits leads).
-$canDelete = can('mod.leads.edit') || is_master() || (is_admin_level() && !$converted);
+//  Owner, 26 Nov 2026: the button follows exactly the server's rule for lead-delete
+//  (Edit on Leads, or the master) — an administrator-level job title without it (e.g. the
+//  Branch Manager, who reads leads) is no longer offered a button that is then refused.
+$canDelete = can('mod.leads.edit') || is_master();
 $canDeal = $canEdit && $open && !$oppId && function_exists('opp_can_edit') && opp_can_edit();
 $canCost = function_exists('pc_can_edit') && pc_can_edit();
 

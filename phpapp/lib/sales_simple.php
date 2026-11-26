@@ -62,12 +62,29 @@ function sx_my_reportees() {
     if (function_exists('sales_rec_mode') && sales_rec_mode() === 'own') return [];
     return sales_reportee_ids($me);
 }
+//  Owner, 26 Nov 2026 (R-11): "My team" is the people below me who do sales work — those
+//  who own a lead or deal, or whose rights let them add / change leads or deals (the same
+//  signal as leads_works_leads() for the person signed in). A coordinator or an assistant
+//  manager in the reporting line, who never works a lead, is not listed with an empty list.
 function sx_team_people() {
     $ids = sx_my_reportees(); if (!$ids) return [];
     $in = implode(',', array_map('intval', $ids)); $out = [];
-    try { foreach (ops_all("SELECT * FROM users WHERE id IN ($in) AND is_active=1 ORDER BY first_name, last_name") ?: [] as $u) $out[(int) $u['id']] = user_name($u); }
+    $owners = [];
+    try { foreach (ops_all("SELECT DISTINCT owner_user_id u FROM leads WHERE owner_user_id IN ($in) UNION SELECT DISTINCT owner_user_id u FROM opportunities WHERE owner_user_id IN ($in)") ?: [] as $r) $owners[(int) $r['u']] = true; }
+    catch (Throwable $e) {}
+    try { foreach (ops_all("SELECT * FROM users WHERE id IN ($in) AND is_active=1 ORDER BY first_name, last_name") ?: [] as $u) {
+        if (empty($owners[(int) $u['id']]) && !sx_user_works_sales($u)) continue;
+        $out[(int) $u['id']] = user_name($u);
+    } }
     catch (Throwable $e) {}
     return $out;
+}
+//  Does this user (a row, not the person signed in) work leads or deals?
+function sx_user_works_sales(array $u) {
+    if (!empty($u['is_superuser']) || strtoupper((string) ($u['role'] ?? '')) === 'MASTER_ADMIN') return true;
+    if (!function_exists('user_effective_perms')) return true;
+    $p = user_effective_perms($u);
+    return (bool) array_intersect(['mod.leads.add', 'mod.leads.edit', 'crm.deal.edit'], $p);
 }
 function sx_people() {
     try {
@@ -224,6 +241,41 @@ function sx_branch_name() {
     if (!$b) return '';
     foreach (sx_branch_choices() as $o) if ((int) $o['id'] === $b) return (string) $o['name'];
     return '';
+}
+//  Owner, 26 Nov 2026 (LP-20): a lead, deal or enquiry is never handed to someone who could
+//  not open it afterwards — the same branch (and business-unit) boundary the record's own page
+//  asks. Returns '' when that person may have it, else the plain sentence to show.
+//    sales_handover_problem(<user id or row>, <office id>, <sbu code>, 'lead')
+function sales_handover_problem($to, $officeId, $sbu = '', $noun = 'record') {
+    $u = is_array($to) ? $to : ops_one("SELECT * FROM users WHERE id=?", [(int) $to]);
+    if (!$u) return 'Choose an active person to give it to.';
+    if (!empty($u['is_superuser']) || strtoupper((string) ($u['role'] ?? '')) === 'MASTER_ADMIN') return '';
+    if (!function_exists('user_scope_covers')) return '';
+    $officeId = (int) $officeId; $sbu = (string) $sbu;
+    $name = function_exists('user_name') ? user_name($u) : 'That person';
+    if ($officeId && !user_scope_covers($u, $officeId, '')) {
+        $br = function_exists('office_name') ? office_name($officeId) : '';
+        $br = $br !== '' ? 'the ' . $br . ' branch' : 'that branch';
+        return $name . ' does not work for ' . $br . ', so they could not open this ' . $noun . '. Choose someone from that branch.';
+    }
+    if ($sbu !== '' && !user_scope_covers($u, $officeId ?: null, $sbu)) {
+        $bu = function_exists('sbu_label') ? sbu_label($sbu) : $sbu;
+        return $name . ' does not work for the ' . $bu . ' business unit, so they could not open this ' . $noun . '. Choose someone from that unit.';
+    }
+    return '';
+}
+//  The pick-lists of who a record may go to: only people who could open it, plus whoever
+//  holds it now (so the current holder is still shown, even if their branch has changed).
+function sales_people_covering(array $people, $officeId, $sbu = '', $keepId = 0) {
+    static $rows = [];
+    $out = [];
+    foreach ($people as $p) {
+        $id = (int) ($p['id'] ?? 0);
+        if ($id && $id === (int) $keepId) { $out[] = $p; continue; }
+        if (!array_key_exists($id, $rows)) $rows[$id] = ops_one("SELECT * FROM users WHERE id=?", [$id]);
+        if ($rows[$id] && sales_handover_problem($rows[$id], $officeId, $sbu) === '') $out[] = $p;
+    }
+    return $out;
 }
 //  Does this user's office scope cover that office? (Same rules as their own login.)
 function sx_user_covers_office($uid, $officeId) {

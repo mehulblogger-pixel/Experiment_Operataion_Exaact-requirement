@@ -58,6 +58,11 @@ const ACT_KINDS = [
     // joining record exists to answer. Registering them makes the trail real.
     'JOINED'            => 'Joined',
     'JOINING_CLEARED'   => 'Joining removed',
+    // Owner, 26 Nov 2026 (DL-20) — the same defect once more: deleting a lead, deal or
+    // enquiry has always logged act_log(..., 'DELETED', ...), stored as a hand-typed Note.
+    // Registered as a system kind, it is shown as "Deleted", can be filtered for, and is
+    // never offered in the composer or editable as a person's note.
+    'DELETED'           => 'Deleted',
 ];
 
 // Which kinds a PERSON may record by hand. The rest are events the system
@@ -67,7 +72,7 @@ const ACT_KINDS = [
 // `SYSTEM` was already being skipped at the one composer that remembered to;
 // this makes the rule the list's own, so every composer gets it right.
 const ACT_KINDS_SYSTEM = ['SYSTEM', 'IDENTITY_LINKED', 'IDENTITY_UNLINKED', 'IDENTITY_REFUSED',
-                          'JOINED', 'JOINING_CLEARED'];
+                          'JOINED', 'JOINING_CLEARED', 'DELETED'];
 function act_kinds_manual() {
     $out = [];
     foreach (ACT_KINDS as $k => $v) if (!in_array($k, ACT_KINDS_SYSTEM, true)) $out[$k] = $v;
@@ -509,7 +514,8 @@ function act_log($entityKind, $entityId, $kind, $subject, array $opt = []) {
                 substr(trim((string)($opt['owner'] ?? ($u ? user_name($u) : ''))), 0, 150),
                 ($opt['office_id'] ?? '') !== '' ? (int)$opt['office_id'] : (($u['home_office_id'] ?? null) ?: null),
                 (string)($opt['sbu'] ?? ''),
-                !empty($opt['auto']) ? 1 : 0,
+                //  A deletion is always the system's own record, never a person's note.
+                (!empty($opt['auto']) || $kind === 'DELETED') ? 1 : 0,
                 $u ? user_name($u) : (string)($opt['created_by'] ?? 'system'),
                 date('c')]);
         $id = (int) db()->lastInsertId();
@@ -814,6 +820,12 @@ function ops_activity($route, $method) {
     $dt   = dt_state('activities', $cols, ['default_sort' => 'when', 'default_dir' => 'desc', 'per' => 50]);
 
     $w = '1=1'; $a = [];
+    //  Owner, 26 Nov 2026 (found while answering DL-20): the register showed every branch's
+    //  activities to a branch-scoped person (a Mumbai coordinator read Ahmedabad's calls and
+    //  deletions). It now asks the same branch boundary as every other register: the office
+    //  the entry belongs to, through scope_office_clause() (an entry with no office stays
+    //  visible, as for leads and deals).
+    if (function_exists('scope_office_clause')) { [$sw] = scope_office_clause('a.office_id'); $w .= ' AND ' . $sw; }
     if ($kind !== '' && isset(ACT_KINDS[$kind])) { $w .= ' AND a.kind=?'; $a[] = $kind; }
     if ($pid) { $w .= ' AND a.partner_id=?'; $a[] = $pid; }
     if (($_GET['manual'] ?? '') === '1') $w .= ' AND a.auto=0';

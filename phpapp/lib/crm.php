@@ -2383,6 +2383,14 @@ function ops_crm_inquiries($route, $method) {
                 $dateErr = 'The received date is not a real date — pick it from the calendar.';
             elseif ($recv !== '' && $recv > date('Y-m-d'))
                 $dateErr = '⚠ The received date ' . fdate($recv) . ' is in the future. An ' . Tl('inquiry') . ' can only be recorded as received today or earlier — it was not saved.';
+            //  Owner, 26 Nov 2026 (LP-20): "Assigned to" must be someone who could open this
+            //  enquiry in its branch and unit — asked when the person or the unit changes.
+            $asg = (int)($vals[10] ?? 0);
+            if ($asg && function_exists('sales_handover_problem')
+                && (!$inq || $asg !== (int)($inq['assigned_to'] ?? 0) || (string)$vals[7] !== (string)($inq['sbu'] ?? ''))) {
+                $inqOff = $inq ? (int)($inq['office_id'] ?? 0) : (int)(crm_inquiry_office_for_recorder() ?? 0);
+                if (($hp = sales_handover_problem($asg, $inqOff, (string)$vals[7], Tl('inquiry'))) !== '') $dateErr = trim($dateErr . ' ' . $hp);
+            }
             if ($need || $dateErr !== '') {
                 view('ops/crm/inquiry_form', ['inq' => ($inq ? array_merge($inq, $b) : $b), 'error' => trim(($need ? 'Please add ' . implode('; ', $need) . '. ' : '') . $dateErr),
                     'clients' => clients_list(), 'sbuOpts' => lk_options_or('sbu', OPS_SBUS),
@@ -2433,7 +2441,13 @@ function ops_crm_inquiries($route, $method) {
         $originRef = ($inq && !empty($inq['lead_id'])) ? (string)ops_val("SELECT ref FROM leads WHERE id=?", [(int)$inq['lead_id']]) : '';
         view('ops/crm/inquiry_form', ['inq' => $inq, 'originRef' => $originRef, 'clients' => clients_list(), 'sbuOpts' => lk_options_or('sbu', OPS_SBUS),
             'sourceOpts' => INQUIRY_SOURCES, 'statusOpts' => crm_inquiry_status_opts(),
-            'users' => ops_all("SELECT id, first_name, last_name, username FROM users WHERE is_active=1 ORDER BY first_name, username")]);
+            //  Owner, 26 Nov 2026 (LP-20): "Assigned to" lists people of this enquiry's branch
+            //  (the unit is checked when saving, as it can still change on the form).
+            'users' => (function () use ($inq) {
+                $all = ops_all("SELECT id, first_name, last_name, username FROM users WHERE is_active=1 ORDER BY first_name, username");
+                $off = $inq ? (int)($inq['office_id'] ?? 0) : (int)(crm_inquiry_office_for_recorder() ?? 0);
+                return function_exists('sales_people_covering') ? sales_people_covering($all, $off, '', (int)($inq['assigned_to'] ?? 0)) : $all;
+            })()]);
         return;
     }
     //  DROP — closed without a quotation, with a reason (owner, 13 Nov 2026). Who may: whoever
@@ -2478,7 +2492,7 @@ function ops_crm_inquiries($route, $method) {
             flash('A ' . Tl('quote') . ' has been raised against ' . $inq['inquiry_no'] . ', so it is part of the record and cannot be deleted. It follows that quotation; mark the quotation lost if the work is not coming.', 'error');
             redirect('/inquiries');
         }
-        if (function_exists('act_log')) act_log('INQUIRY', $id, 'DELETED', 'Inquiry ' . $inq['inquiry_no'] . ' deleted.');
+        if (function_exists('act_log')) act_log('INQUIRY', $id, 'DELETED', 'Inquiry ' . $inq['inquiry_no'] . ' deleted — ' . (string)($inq['client_name'] ?? '') . ' (by ' . user_name(current_user()) . ')', ['office_id' => (int)($inq['office_id'] ?? 0) ?: '', 'sbu' => (string)($inq['sbu'] ?? '')]);
         db()->prepare("DELETE FROM crm_inquiries WHERE id=?")->execute([$id]);
         flash('Inquiry ' . $inq['inquiry_no'] . ' deleted.');
         redirect('/inquiries');
