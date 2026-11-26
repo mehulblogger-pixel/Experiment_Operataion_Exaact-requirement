@@ -101,6 +101,7 @@ $right = '<div class="sxw-ctl">' . ($canAdd ? '<a class="sxw-bt p" href="/inquir
       <?php if ($st !== ''): ?><input type="hidden" name="st" value="<?= e($st) ?>"><?php endif; ?>
       <label class="lab">Year</label><?= fy_select_html($fy ?? current_fy()) ?>
     </form>
+    <?= function_exists('sx_branch_select') ? sx_branch_select('inquiries') : '' //  R-05 — only for a person who sees more than one branch ?>
     <?php if ($q !== '' || $st !== '' || ($fy ?? current_fy()) !== current_fy()): ?><a class="sxw-bt" href="/inquiries">Reset</a><?php endif; ?>
   </div>
   <?php // DEF-SAL-024 — a card opened a group of statuses: say which, as the status box shows one at a time.

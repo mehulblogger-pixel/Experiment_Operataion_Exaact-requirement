@@ -698,7 +698,9 @@ function ops_sales_more($route, $method) {
             $def = sx_renewal_days();
             $opts = array_values(array_unique(array_merge([30, 60, 90, 180], [$def]))); sort($opts);
             $days = in_array((int) ($_GET['d'] ?? $def), $opts, true) ? (int) ($_GET['d'] ?? $def) : $def;
-            view('ops/sx_renewals', ['rows' => sx_renewals_list($days), 'days' => $days, 'opts' => $opts, 'def' => $def,
+            //  R-03 (owner, 26 Nov 2026): a card narrows the list to its own band.
+            $band = in_array((string) ($_GET['band'] ?? ''), ['late', 'm', 'later'], true) ? (string) $_GET['band'] : '';
+            view('ops/sx_renewals', ['rows' => sx_renewals_list($days), 'days' => $days, 'opts' => $opts, 'def' => $def, 'band' => $band,
                 'example' => sx_renewal_days_is_example(), 'money' => sx_contract_money_can(), 'canLog' => sx_renewal_log_can(),
                 'canQuote' => can('crm.quote.create') || can('mod.quotes.edit') || is_master_of('quotes'),
                 'canContract' => is_master() || can('mod.clients.view') || can('mod.vendors.view') || can('crm.contract.register') || can('data.credit') || can('finance.reconcile')]);   // ops_contract_360()'s own gate

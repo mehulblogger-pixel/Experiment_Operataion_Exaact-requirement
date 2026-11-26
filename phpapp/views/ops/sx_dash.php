@@ -23,7 +23,8 @@ $ring = ['var(--info)', 'var(--brand)', 'var(--warn)', '#7a5bb5', 'var(--ok)', '
 <div class="rec sxw has-bn">
   <?php sxw_nav('/sales-dashboard'); ?>
   <?php sxw_head('Sales dashboard', 'Why you\'re here: the health of sales in 30 seconds. ' . $dd['label'] . ': ' . fdate($dd['from']) . ' – ' . fdate($dd['to']) . '.', 'chart',
-        '<div class="sxw-ctl">' . $per . sxw_person('sales-dashboard', $whoKey, $people, $seeAll, '&p=' . $p) . '</div>'); ?>
+        '<div class="sxw-ctl">' . $per . sxw_person('sales-dashboard', $whoKey, $people, $seeAll, '&p=' . $p)
+        . (function_exists('sx_branch_select') ? sx_branch_select('sales-dashboard') : '') . '</div>'); //  R-05 ?>
 
   <div class="sxw-kp" style="--n:4">
     <?php sxw_kpi('info', 'users', 'New leads', 'New leads', (string) $k['leads'], $k['deals_new'] . ' deals started', '/leads');

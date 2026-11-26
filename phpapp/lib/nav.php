@@ -633,3 +633,33 @@ function nav_back_info($route) {
 
 function nav_back($route)       { return nav_back_info($route)['url']; }
 function nav_back_label($route) { return nav_back_info($route)['label']; }
+
+// ---- OS22-02 (owner, 26 Nov 2026): the "⌂ Sales home" button -----------------
+//  "Customer register does not have 'Sales home' button, it has 'Sales' button."
+//  A screen is a Sales screen when the Sales menu places it (nav_sales_place /
+//  the Sales area), and also when it is opened as part of Sales: the customer
+//  register's Sales view (/clients?view=sales) and a client page or customer 360
+//  opened from a Sales screen (their links carry from=sales). The same page
+//  opened from the Directory stays a Directory page, with no Sales button.
+function nav_is_sales_screen($cur, array $get = null) {
+    $cur = trim((string) $cur, '/'); $get = $get ?? $_GET;
+    if ($cur === '' || $cur === 'sales-home') return false;
+    if ($cur === 'clients' && ($get['view'] ?? '') === 'sales') return true;
+    if (in_array($cur, ['partner', 'customer'], true) && ($get['from'] ?? '') === 'sales') return true;
+    return (function_exists('nav_sales_place') && nav_sales_place($cur) !== null)
+        || (function_exists('nav_route_area') && nav_route_area($cur) === 'Sales');
+}
+//  Draw the button? Only on a Sales screen, only for people who may open Sales home
+//  (sx_can — Finance is refused it, decision D1), and never twice: not when Back
+//  already goes to Sales home.
+function nav_sales_home_button($cur, $back = null, array $get = null) {
+    if (!nav_is_sales_screen($cur, $get)) return false;
+    if (!function_exists('sx_can') || !sx_can()) return false;
+    return !($back && trim((string) ($back['url'] ?? ''), '/') === 'sales-home');
+}
+//  The Back button's words. Back to the Sales menu page reads "All Sales screens"
+//  (it read "← Sales", which looked like a twin of the Sales home button).
+function nav_back_words($back) {
+    $u = trim((string) ($back['url'] ?? ''), '/');
+    return $u === 'sales' ? 'All Sales screens' : (string) ($back['label'] ?? '');
+}

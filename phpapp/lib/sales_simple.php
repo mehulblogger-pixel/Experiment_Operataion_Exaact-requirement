@@ -121,7 +121,11 @@ function sx_days_since($ts) { $t = strtotime(substr((string) $ts, 0, 10)); retur
 //  Overdue and soon-due invoices (receivables ageing — the register's own rows).
 function sx_receivables() {
     if (!function_exists('ar_rows') || (function_exists('ar_can') && !ar_can())) return null;
-    try { return ar_rows('DUE'); } catch (Throwable $e) { return null; }
+    try { $rows = ar_rows('DUE'); } catch (Throwable $e) { return null; }
+    //  R-05: the branch picked on this Sales screen (the rows carry the branch's name).
+    $bn = sx_branch_name();
+    if ($bn !== '' && is_array($rows)) $rows = array_values(array_filter($rows, fn($r) => (string) ($r['office_name'] ?? '') === $bn));
+    return $rows;
 }
 //  The overdue list of Orders & payments. $invIds = the invoices of the orders on
 //  screen when one person is picked (the same list "Received this month" and "Days
@@ -151,8 +155,75 @@ function sx_renewals($days = null) {
 //  A contract belongs to its branch (else its client's home branch); a person
 //  sees only those of the offices they cover — the contract register's own rule.
 function sx_scope_contracts(array $rows) {
-    if (!function_exists('scope_office_allows')) return $rows;
-    return array_values(array_filter($rows, fn($r) => scope_office_allows(($r['branch_id'] ?? null) ?: (($r['client_branch'] ?? null) ?: null))));
+    $br = function_exists('sales_branch_narrow') ? sales_branch_narrow() : 0;   // R-05 — the branch picked on this screen
+    if (!function_exists('scope_office_allows') && !$br) return $rows;
+    return array_values(array_filter($rows, function ($r) use ($br) {
+        $off = ($r['branch_id'] ?? null) ?: (($r['client_branch'] ?? null) ?: null);
+        if ($br && (int) $off !== $br) return false;
+        return !function_exists('scope_office_allows') || scope_office_allows($off);
+    }));
+}
+
+// ---- R-05 (owner, 26 Nov 2026) — a Branch filter on the Sales screens --------------
+//  "For Director or person having central data access like business head, directors
+//   and so on … they shall have filter branch wise also." The Quotes register's Branch
+//  filter, on Leads, Deals, Enquiries, Pipeline board, Sales dashboard, Sales home and
+//  Today. Only for a person who sees more than one branch; it offers only their own
+//  branches and only narrows (lib/access.php sales_branch_sql()). The last pick is
+//  remembered per screen for the session; "All my branches" clears it.
+const SX_BRANCH_SCREENS = ['leads', 'opportunities', 'inquiries', 'sales-board', 'sales-dashboard', 'sales-home', 'sales-today'];
+function sx_branch_choices() {
+    static $memo = [];
+    $uid = (int) (current_user()['id'] ?? 0);
+    if (isset($memo[$uid])) return $memo[$uid];
+    $rows = [];
+    try { $rows = ops_all("SELECT id, name FROM offices ORDER BY name") ?: []; } catch (Throwable $e) {}
+    if (function_exists('scope_office_allows')) $rows = array_values(array_filter($rows, fn($o) => scope_office_allows((int) $o['id'])));
+    return $memo[$uid] = count($rows) > 1 ? $rows : [];
+}
+//  Called by ops_dispatch() for every request: sets the pick for this one request.
+function sx_branch_begin($route, $method) {
+    $GLOBALS['__sales_branch'] = 0;
+    if (strtoupper((string) $method) !== 'GET' || !in_array((string) $route, SX_BRANCH_SCREENS, true)) return 0;
+    if (!function_exists('current_user') || !current_user()) return 0;
+    $ch = sx_branch_choices();
+    if (!$ch) return 0;                                   // one branch (or none): nothing to pick, a typed br changes nothing
+    $ids = array_map('intval', array_column($ch, 'id'));
+    $hasSess = isset($_SESSION) && is_array($_SESSION);
+    if (array_key_exists('br', $_GET)) {
+        $v = (string) $_GET['br'];
+        //  A branch of theirs is kept; "" (All my branches) or a branch they do not see is ignored.
+        $pick = ($v !== '' && ctype_digit($v) && in_array((int) $v, $ids, true)) ? (int) $v : 0;
+        if ($hasSess) { if ($pick) $_SESSION['sx_br'][$route] = $pick; else unset($_SESSION['sx_br'][$route]); }
+    } else {
+        $pick = $hasSess ? (int) ($_SESSION['sx_br'][$route] ?? 0) : 0;
+        if (!in_array($pick, $ids, true)) $pick = 0;
+    }
+    return $GLOBALS['__sales_branch'] = $pick;
+}
+//  The control: a small form that keeps the screen's other filters. '' when the person
+//  has one branch.
+function sx_branch_select($route) {
+    $ch = sx_branch_choices();
+    if (!$ch) return '';
+    $cur = function_exists('sales_branch_narrow') ? sales_branch_narrow() : 0;
+    $id = 'sxbr-' . preg_replace('/[^a-z]/', '', (string) $route);
+    $h = '<form method="get" action="/' . e($route) . '" class="sxl-f sxbr">';
+    foreach ($_GET as $k => $v) {
+        if (in_array($k, ['br', 'page', 'export'], true) || is_array($v) || (string) $v === '' || ($k === 'id' && !(int) $v)) continue;
+        $h .= '<input type="hidden" name="' . e($k) . '" value="' . e($v) . '">';
+    }
+    $h .= '<label class="lab" for="' . $id . '">Branch</label><select class="form-control" id="' . $id . '" name="br" onchange="this.form.submit()">'
+        . '<option value="">All my branches</option>';
+    foreach ($ch as $o) $h .= '<option value="' . (int) $o['id'] . '"' . ((int) $o['id'] === $cur ? ' selected' : '') . '>' . e($o['name']) . '</option>';
+    return $h . '</select><noscript><button class="btn small secondary">Show</button></noscript></form>';
+}
+//  The picked branch's name, for "Showing …" lines and the receivables filter.
+function sx_branch_name() {
+    $b = function_exists('sales_branch_narrow') ? sales_branch_narrow() : 0;
+    if (!$b) return '';
+    foreach (sx_branch_choices() as $o) if ((int) $o['id'] === $b) return (string) $o['name'];
+    return '';
 }
 //  Does this user's office scope cover that office? (Same rules as their own login.)
 function sx_user_covers_office($uid, $officeId) {

@@ -2192,6 +2192,7 @@ function inquiries_due($today = null) {
     }
     if (function_exists('scope_office_clause')) { [$ow, $oa] = scope_office_clause('i.office_id'); $w[] = $ow; $a = array_merge($a, $oa); }
     if (function_exists('sales_owner_sql')) $w[] = sales_owner_sql('i.assigned_to');   // Q10
+    if (function_exists('sales_branch_sql')) $w[] = sales_branch_sql('i.office_id');   // R-05 — branch picked on a Sales screen
     $rows = ops_all("SELECT i.*, bp.display_name client_disp, u.first_name owner_first, u.last_name owner_last, u.username owner_username
                      FROM crm_inquiries i
                      LEFT JOIN business_partners bp ON bp.id=i.client_id
@@ -2256,6 +2257,7 @@ function ops_crm_inquiries($route, $method) {
         if ($sb !== 'ALL' && is_array($sb) && $sb) { $ph = implode(',', array_fill(0, count($sb), '?')); $w[] = "(i.sbu IN ($ph) OR i.sbu='')"; foreach ($sb as $s) $args[] = $s; }
         [$ow, $oa] = scope_office_clause('i.office_id'); $w[] = $ow; $args = array_merge($args, $oa);
         if (function_exists('sales_owner_sql')) $w[] = sales_owner_sql('i.assigned_to');   // Q10
+        if (function_exists('sales_branch_sql')) $w[] = sales_branch_sql('i.office_id');   // R-05 — the Branch filter
         // Financial-year window (defaults to the current FY; "All years" removes it).
         $fy = fy_filter();
         if (!$fy['all']) { $w[] = 'i.created_at >= ?'; $args[] = $fy['from']; $w[] = 'i.created_at < ?'; $args[] = $fy['to_excl']; }

@@ -25,14 +25,20 @@ $right = '<div class="sxw-ctl">'
   <?php sxw_nav('/leads'); ?>
   <?php sxw_head('Leads', 'People we are chasing before they are customers. When one says yes it becomes a ' . Tl('client') . ' and an ' . Tl('inquiry') . ' by itself — nothing is typed twice.', 'users', $right); ?>
 
+  <?php //  OS22-06 / R-03 (owner, 26 Nov 2026): every card opens the list of exactly the
+        //  leads it counted (lib/leads.php leads_tile_filter()), for the same year. ?>
+  <?php $tileHref = fn($t) => '/leads?' . http_build_query(array_filter(['v' => 'list', 'tile' => $t, 'fy' => $fy ?? '', 'only' => !empty($onlyYear) ? 1 : null], fn($x) => $x !== null && $x !== '')); ?>
   <div class="sxw-kp" style="--n:6">
-    <?php sxw_kpi('teal', 'users', 'Open' . $openTag, 'Open' . ($isYear ? ' · FY' : ''), (string)(int)$c['open'], $isYear ? (!empty($onlyYear) ? 'created in FY ' . $fy : 'FY ' . $fy . ' + carried forward') : 'all years');
-          sxw_kpi('info', 'rupee', 'Open pipeline value' . $openTag, 'Pipeline value', fmoney_short($c['value']), (int)$c['open'] . ' open ' . ((int)$c['open'] === 1 ? 'lead' : 'leads'));
-          sxw_kpi($c['stalled'] ? 'warn' : 'grey', 'hour', "Past their stage's service level", 'Past stage time', (string)(int)$c['stalled'], 'stalled');
-          sxw_kpi($dueCount ? 'bad' : 'grey', 'alert', 'Need attention now', 'Need attention', (string)$dueCount, 'any year');
-          sxw_kpi('ok', 'trophy', 'Won — now customers' . $fyTag, 'Won' . ($isYear ? ' · FY' : ''), (string)(int)$c['converted'], 'now ' . Tlp('client'));
-          sxw_kpi('grey', 'x', 'Not pursued' . $fyTag, 'Not pursued' . ($isYear ? ' · FY' : ''), (string)(int)($c['lost'] ?? 0), $isYear ? 'FY ' . $fy : 'all years'); ?>
+    <?php sxw_kpi('teal', 'users', 'Open' . $openTag, 'Open' . ($isYear ? ' · FY' : ''), (string)(int)$c['open'], $isYear ? (!empty($onlyYear) ? 'created in FY ' . $fy : 'FY ' . $fy . ' + carried forward') : 'all years', $tileHref('open'));
+          sxw_kpi('info', 'rupee', 'Open pipeline value' . $openTag, 'Pipeline value', fmoney_short($c['value']), (int)$c['open'] . ' open ' . ((int)$c['open'] === 1 ? 'lead' : 'leads'), $tileHref('open'));
+          sxw_kpi($c['stalled'] ? 'warn' : 'grey', 'hour', "Past their stage's service level", 'Past stage time', (string)(int)$c['stalled'], 'stalled', $tileHref('stalled'));
+          sxw_kpi($dueCount ? 'bad' : 'grey', 'alert', 'Need attention now', 'Need attention', (string)$dueCount, 'any year', $tileHref('due'));
+          sxw_kpi('ok', 'trophy', 'Won — now customers' . $fyTag, 'Won' . ($isYear ? ' · FY' : ''), (string)(int)$c['converted'], 'now ' . Tlp('client'), $tileHref('won'));
+          sxw_kpi('grey', 'x', 'Not pursued' . $fyTag, 'Not pursued' . ($isYear ? ' · FY' : ''), (string)(int)($c['lost'] ?? 0), $isYear ? 'FY ' . $fy : 'all years', $tileHref('lost')); ?>
   </div>
+  <?php if (($tile ?? '') !== ''): ?>
+  <p class="sxl-show" role="status">Showing: <b><?= (int)$total ?></b> · <?= e($tileWords) ?> · <a href="/leads?<?= e(http_build_query(['v' => 'list', 'fy' => $fy ?? ''])) ?>">Show all</a></p>
+  <?php endif; ?>
 
   <?php if ($dueCount): ?>
   <div class="sxl-ban warn" role="status">
@@ -61,6 +67,7 @@ $right = '<div class="sxw-ctl">'
       <?php if ($view === 'list' && $status !== ''): ?><input type="hidden" name="status" value="<?= e($status) ?>"><?php endif; ?>
       <label class="lab">Year</label><?= fy_select_html($fy ?? current_fy()) ?>
     </form>
+    <?= function_exists('sx_branch_select') ? sx_branch_select('leads') : '' //  R-05 — only for a person who sees more than one branch ?>
     <?php if ($view === 'list'): //  The status filter the server always honoured, now with a control. ?>
     <form method="get" action="/leads" class="sxl-f">
       <input type="hidden" name="v" value="list"><input type="hidden" name="fy" value="<?= e($fy ?? current_fy()) ?>">

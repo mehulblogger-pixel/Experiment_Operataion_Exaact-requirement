@@ -470,6 +470,11 @@ function leads_where($filter = []) {
     if (!empty($filter['open']))   { $w[] = "l.status = 'OPEN'"; }
     if (!empty($filter['pipeline'])) { $w[] = 'l.pipeline_id = ?'; $a[] = (int)$filter['pipeline']; }
     if (!empty($filter['owner']))  { $w[] = 'l.owner_user_id = ?'; $a[] = (int)$filter['owner']; }
+    //  A KPI card's own rows (owner, 26 Nov 2026 — OS22-06): the ids the card counted.
+    if (array_key_exists('ids', $filter)) {
+        $ids = array_values(array_filter(array_map('intval', (array)$filter['ids'])));
+        $w[] = $ids ? 'l.id IN (' . implode(',', $ids) . ')' : '1=0';
+    }
     if (!empty($filter['q'])) {
         $w[] = '(l.company_name LIKE ? OR l.contact_name LIKE ? OR l.ref LIKE ? OR l.contact_email LIKE ?)';
         $like = '%' . $filter['q'] . '%'; array_push($a, $like, $like, $like, $like);
@@ -1410,6 +1415,27 @@ function lead_board($pipelineId = 0, array $fyWin = [], $only = false) {
 
 //  $fyWin = ['from' => …, 'to_excl' => …] — the year the board shows (empty =
 //  all years). Every card counts that same year, so the cards and the board agree.
+//  OS22-06 / R-03 (owner, 26 Nov 2026: "under Leads no tiles are clickable"). Each
+//  card on the register opens the list of exactly the leads it counted — the same
+//  question leads_counts() / leads_due() ask, so the card's number and the rows the
+//  list shows cannot disagree. Returns [filter, words] or null for an unknown card.
+const LEAD_TILES = ['open' => 'open leads', 'stalled' => "open leads past their stage's service level",
+                    'due' => 'leads that need attention now', 'won' => 'leads won — now customers', 'lost' => 'leads not pursued'];
+function leads_tile_filter($tile, array $fyWin = [], $only = false) {
+    $tile = (string)$tile;
+    if (!isset(LEAD_TILES[$tile])) return null;
+    $openF = ['open' => 1, 'fy_from' => $only ? ($fyWin['from'] ?? '') : '', 'fy_to_excl' => $fyWin['to_excl'] ?? ''];
+    $yearF = ['fy_from' => $fyWin['from'] ?? '', 'fy_to_excl' => $fyWin['to_excl'] ?? ''];
+    switch ($tile) {
+        case 'open':    return [$openF, LEAD_TILES[$tile]];
+        case 'stalled': return [['ids' => array_column(array_values(array_filter(leads_all($openF), 'lead_stalled')), 'id')], LEAD_TILES[$tile]];
+        case 'due':     return [['ids' => array_column(leads_due(), 'id')], LEAD_TILES[$tile]];
+        case 'won':     return [['status' => 'CONVERTED'] + $yearF, LEAD_TILES[$tile]];
+        case 'lost':    return [['status' => 'LOST'] + $yearF, LEAD_TILES[$tile]];
+    }
+    return null;
+}
+
 function leads_counts(array $fyWin = [], $only = false) {
     leads_migrate();
     [$sw, $sa] = scope_sales_clause('l');
@@ -1660,6 +1686,10 @@ function ops_leads($route, $method) {
         $onlyYear = !$fy['all'] && !empty($_GET['only']);
         $filter = ['status' => (string)($_GET['status'] ?? ''), 'q' => $dt['q'],
                    'fy_from' => $fy['all'] ? '' : $fy['from'], 'fy_to_excl' => $fy['all'] ? '' : $fy['to_excl']];
+        //  A KPI card was pressed (OS22-06): the list of exactly the leads it counted.
+        $tile = (string)($_GET['tile'] ?? ''); $tileWords = '';
+        if ($tile !== '' && ($tf = leads_tile_filter($tile, $fyWin, $onlyYear))) { $view = 'list'; $filter = $tf[0] + ['q' => $dt['q']]; $tileWords = $tf[1]; }
+        else $tile = '';
 
         if (wants_csv()) {
             ops_require(leads_can_export(), 'Downloading the lead list needs the "Download leads to Excel / CSV" permission.');
@@ -1700,7 +1730,7 @@ function ops_leads($route, $method) {
         view('ops/leads', [
             'view' => $view, 'rows' => $rows ?: [], 'total' => (int)$total, 'fy' => $fy['fy'],
             'dt' => $dt, 'cols' => $cols, 'counts' => leads_counts($fyWin, $onlyYear), 'dueCount' => leads_due_count(),
-            'onlyYear' => $onlyYear,
+            'onlyYear' => $onlyYear, 'tile' => $tile, 'tileWords' => $tileWords,
             'board' => $view === 'list' ? ['pipeline' => null, 'stages' => [], 'columns' => []]
                                         : lead_board((int)($_GET['pipeline'] ?? 0), $fyWin, $onlyYear),
             'pipelines' => pipelines_all(), 'canEdit' => $canEdit,

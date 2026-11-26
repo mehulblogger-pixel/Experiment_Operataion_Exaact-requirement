@@ -37,7 +37,8 @@ $fixN = count(array_filter($health, fn($h) => (int) $h[1] > 0));
 ?>
 <div class="rec sxw has-bn">
   <?php sxw_nav('/sales-home'); ?>
-  <?php sxw_head('Sales Command Centre', ($company !== '' ? $company . ' · ' : '') . 'Sales — leads, deals, quotations, orders, renewals and targets', 'chart'); ?>
+  <?php sxw_head('Sales Command Centre', ($company !== '' ? $company . ' · ' : '') . 'Sales — leads, deals, quotations, orders, renewals and targets', 'chart',
+        function_exists('sx_branch_select') && ($__br = sx_branch_select('sales-home')) !== '' ? '<div class="sxw-ctl">' . $__br . '</div>' : ''); //  R-05 ?>
 
   <div class="sxw-hello" role="<?= $tch ? 'status' : 'note' ?>">
     <span style="color:var(--warn)"><?= rec_icon($tch ? 'target' : 'spark') ?></span>

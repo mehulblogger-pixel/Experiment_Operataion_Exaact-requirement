@@ -205,6 +205,15 @@ function opp_where(array $f = []) {
     if (!empty($f['open']))     { $w[] = "o.status = 'OPEN'"; }
     if (!empty($f['pipeline'])) { $w[] = 'o.pipeline_id = ?'; $a[] = (int)$f['pipeline']; }
     if (!empty($f['partner']))  { $w[] = 'o.partner_id = ?'; $a[] = (int)$f['partner']; }
+    //  A KPI card's own rows (owner, 26 Nov 2026 — R-03): the ids it counted, or the
+    //  won and lost of the win-rate window (opp_win_rate()'s own date rule).
+    if (array_key_exists('ids', $f)) {
+        $ids = array_values(array_filter(array_map('intval', (array)$f['ids'])));
+        $w[] = $ids ? 'o.id IN (' . implode(',', $ids) . ')' : '1=0';
+    }
+    if (!empty($f['closed_since'])) {
+        $w[] = "o.status IN ('WON','LOST') AND COALESCE(NULLIF(o.won_at,''), o.updated_at, o.created_at) >= ?"; $a[] = $f['closed_since'];
+    }
     if (!empty($f['q'])) {
         $w[] = '(o.ref LIKE ? OR o.name LIKE ? OR o.partner_name LIKE ? OR o.contact_name LIKE ?)';
         $like = '%' . $f['q'] . '%'; array_push($a, $like, $like, $like, $like);
@@ -276,6 +285,18 @@ function opp_stalled($o, $today = null) {
 function opp_weighted($o) {
     $p = (int)($o['probability'] ?: $o['stage_prob'] ?? 0);
     return round((float)$o['value'] * max(0, min(100, $p)) / 100, 2);
+}
+
+//  OS22-06 / R-03 (owner, 26 Nov 2026: "Deals … tiles are not clickable"). Each card
+//  opens exactly the deals it counted (opp_counts() / opp_win_rate()). [filter, words].
+function opp_tile_filter($tile, $days = 365) {
+    switch ((string)$tile) {
+        case 'open':    return [['open' => 1], 'open ' . Tlp('opportunity')];
+        case 'stalled': return [['ids' => array_column(array_values(array_filter(opp_all(['open' => 1]), 'opp_stalled')), 'id')],
+                                'open ' . Tlp('opportunity') . " past their stage's service level"];
+        case 'closed':  return [['closed_since' => date('Y-m-d', strtotime("-$days days"))], Tlp('opportunity') . ' won or lost in the last 12 months'];
+    }
+    return null;
 }
 
 function opp_counts() {
@@ -1263,6 +1284,10 @@ function ops_opportunities($route, $method) {
         $fy   = fy_filter();
         $filter = ['status' => (string)($_GET['status'] ?? ''), 'q' => $dt['q'],
                    'fy_from' => $fy['all'] ? '' : $fy['from'], 'fy_to_excl' => $fy['all'] ? '' : $fy['to_excl']];
+        //  A KPI card was pressed (R-03): the list of exactly the deals it counted.
+        $tile = (string)($_GET['tile'] ?? ''); $tileWords = '';
+        if ($tile !== '' && ($tf = opp_tile_filter($tile))) { $view = 'list'; $filter = $tf[0] + ['q' => $dt['q']]; $tileWords = $tf[1]; }
+        else $tile = '';
 
         if (wants_csv()) {
             ops_require(opp_can_export(), 'Downloading the ' . Tl('opportunity') . ' list needs the "Download deals to Excel / CSV" permission.');
@@ -1285,7 +1310,7 @@ function ops_opportunities($route, $method) {
             'dt' => $dt, 'cols' => $cols, 'counts' => opp_counts(),
             'board' => $view === 'list' ? ['pipeline' => null, 'stages' => [], 'columns' => []] : opp_board((int)($_GET['pipeline'] ?? 0)),
             'pipelines' => pipelines_all('OPPORTUNITY'), 'canEdit' => $canEdit,
-            'win' => opp_win_rate(365), 'losses' => opp_loss_reasons(365),
+            'win' => opp_win_rate(365), 'losses' => opp_loss_reasons(365), 'tile' => $tile, 'tileWords' => $tileWords,
         ]);
         return true;
     }

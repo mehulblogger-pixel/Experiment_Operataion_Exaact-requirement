@@ -614,16 +614,15 @@
       $__back = (function_exists('nav_back_info') && ($nav_crumbs ?? true) && $cur !== '')
                 ? nav_back_info($cur) : null;
       if ($__back && !empty($__back['url']) && trim($__back['url'], '/') !== $cur):
+          $__bw = function_exists('nav_back_words') ? nav_back_words($__back) : $__back['label'];
 ?>      <a class="crumb-back" href="<?= e($__back['url']) ?>"
-         title="Back to <?= e($__back['label']) ?>">&larr; <?= e($__back['label']) ?></a>
+         title="Back to <?= e($__bw) ?>">&larr; <?= e($__bw) ?></a>
 <?php endif;
       //  Owner, 22 Nov 2026 (design request 7a): on every Sales screen a "Sales home"
       //  button sits beside Back, in the same place, for anyone who may open Sales home.
-      $__isSales = $cur !== 'sales-home' && $cur !== ''
-          && ((function_exists('nav_sales_place') && nav_sales_place($cur) !== null)
-              || (function_exists('nav_route_area') && nav_route_area($cur) === 'Sales'));
-      if ($__isSales && ($nav_crumbs ?? true) && function_exists('sx_can') && sx_can()
-          && !($__back && trim((string) $__back['url'], '/') === 'sales-home')): ?>
+      //  OS22-02 (owner, 26 Nov 2026): also the customer register's Sales view and a client
+      //  page / 360 opened from Sales — one rule, lib/nav.php nav_sales_home_button().
+      if (($nav_crumbs ?? true) && function_exists('nav_sales_home_button') && nav_sales_home_button($cur, $__back)): ?>
       <a class="crumb-back crumb-sales-home" href="/sales-home" title="Sales home">&#8962; Sales home</a>
 <?php endif;
       if (count($__trail) > 1): ?>
