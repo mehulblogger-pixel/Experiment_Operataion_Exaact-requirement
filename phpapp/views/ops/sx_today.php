@@ -22,7 +22,7 @@ $canWork = fn($r) => !function_exists('sales_record_can_work') || sales_record_c
 ?>
 <div class="rec sxw has-bn">
   <?php sxw_nav('/sales-today'); ?>
-  <?php sxw_head('Today — My work · ' . date('l, j M Y'), 'Why you\'re here: everything that needs attention today, in one place. Work top to bottom · WhatsApp / call to contact · Log what happened — the next follow-up date fills itself in.', 'task', sxw_person('sales-today', $whoKey, $people, $seeAll)); ?>
+  <?php sxw_head('Today — My work · ' . date('l, j M Y'), 'Why you\'re here: everything that needs attention today, in one place. Work top to bottom · WhatsApp / call to contact · Log what happened — the next follow-up date fills itself in.', 'task', sxw_person('sales-today', $whoKey, $people, $seeAll) . (function_exists('sx_branch_select') ? sx_branch_select('sales-today') : '')); //  R-05 ?>
 
   <div class="sxw-kp sm" style="--n:<?= 6 + ($d['ar'] ? 1 : 0) ?>">
     <?php sxw_kpi('bad', 'cal', 'Overdue', 'Overdue', (string) $c['overdue'], 'deals + leads', '#deals');

@@ -1963,6 +1963,8 @@ details[open]>summary .chev{transform:rotate(45deg)}
 .sxl-reg .dt-bulk .btn.small{min-height:38px}
 .sxl-find{margin-left:auto}
 .sxl-note{font-size:12.5px;color:var(--muted);margin:0 0 12px}
+/* A pressed KPI card says what the list now shows (owner, 26 Nov 2026 — OS22-06 / R-03). */
+.sxl-show{font-size:13px;margin:-2px 0 12px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card)}
 .sxl-board{overflow-x:auto;margin:0 0 8px;padding-bottom:4px}
 .sxl-board .sxw-bd{min-width:calc(var(--n,6) * 170px)}
 .sxl-pills{display:flex !important;flex-wrap:wrap;gap:4px;margin-top:5px}
@@ -2165,6 +2167,17 @@ button.sxw-ib{cursor:pointer;font-family:inherit}
 .sx5-log>summary{list-style:none}
 .sx5-log>summary::-webkit-details-marker{display:none}
 .sx5-log[open]{display:block;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+/* O-08 (owner, 26 Nov 2026): "Log a call" ran off the right edge on a phone. The form
+   sits in the last table cell, which is white-space:nowrap — the labels, button and help
+   line inherited it. The form wraps normally; on a phone it opens as a panel above the
+   bottom bar (z-index 45) instead of inside the sideways-scrolling table. */
+.sx5-log form{min-width:240px;white-space:normal}
+@media (max-width:640px){
+  .sx5-log[open]{position:fixed;left:12px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom,0px));
+    z-index:60;max-height:70vh;overflow:auto;box-shadow:0 8px 28px rgba(0,0,0,.25)}
+  .sx5-log[open] form{min-width:0}
+  .sx5-log[open] .form-control,.sx5-log[open] .sxw-bt,.sx5-log[open] label{width:100%;min-width:0;max-width:100%;box-sizing:border-box}
+}
 .sx5-tg th[scope=row]{white-space:nowrap;min-width:120px}
 .sx5-tg td.n{min-width:92px}
 .sx5-tg .sxnum{min-height:36px;text-align:right}

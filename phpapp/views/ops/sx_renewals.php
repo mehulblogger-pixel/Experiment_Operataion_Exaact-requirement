@@ -8,7 +8,14 @@
 //   Q3     — "Log a call": written on the client's own timeline, naming the contract.
 require __DIR__ . '/_sxw_ui.php';
 $t = strtotime(date('Y-m-d')); $c = ['late' => 0, 'm' => 0, 'later' => 0, 'v' => 0.0];
-foreach ($rows as $r) { $left = (int) round((strtotime($r['end_date']) - $t) / 86400); $c[$left < 0 ? 'late' : ($left <= 30 ? 'm' : 'later')]++; $c['v'] += (float) $r['value']; }
+$bandOf = function ($r) use ($t) { $left = (int) round((strtotime($r['end_date']) - $t) / 86400); return $left < 0 ? 'late' : ($left <= 30 ? 'm' : 'later'); };
+foreach ($rows as $r) { $c[$bandOf($r)]++; $c['v'] += (float) $r['value']; }
+//  R-03 (owner, 26 Nov 2026): each card opens its own band of the list; the counts above
+//  are of the whole window, so a card's number is exactly the rows its band shows.
+$band = (string) ($band ?? '');
+$bandWords = ['late' => 'contracts that ended in the last 30 days', 'm' => 'contracts ending in 30 days', 'later' => 'contracts ending later in the window'];
+if (isset($bandWords[$band])) $rows = array_values(array_filter($rows, fn($r) => $bandOf($r) === $band)); else $band = '';
+$bandHref = fn($b) => '/sales-renewals?' . http_build_query(array_filter(['d' => (int) $days, 'band' => $b]));
 $seg = '<span class="lab">Look ahead:</span><nav class="sxw-seg" aria-label="Look ahead">';
 foreach ($opts as $d) $seg .= '<a href="/sales-renewals?d=' . (int) $d . '"' . ($days === $d ? ' class="on" aria-current="true"' : '') . '>' . (int) $d . ' days</a>';
 $seg .= '</nav>';
@@ -20,11 +27,14 @@ $seg .= '</nav>';
   <p class="muted" style="margin:6px 0 0;font-size:12.5px"><?= (int) $def ?> days is the starting window set in Sales settings<?= $example ? ' <span class="sxw-due p-warn">example value</span>' : '' ?> — Today and Sales home look the same distance ahead.</p>
 
   <div class="sxw-kp" style="--n:4">
-    <?php sxw_kpi('bad', 'alert', 'Ended (last 30 days)', 'Ended · last 30 days', (string) $c['late'], 'call now');
-          sxw_kpi('warn', 'hour', 'Ending in 30 days', 'Ending in 30 days', (string) $c['m'], 'renewal ' . Tl('quote'));
-          sxw_kpi('info', 'cal', 'Later', 'Later', (string) $c['later'], 'within ' . $days . ' days');
-          if ($money) sxw_kpi('ok', 'rupee', 'Their value', 'Their value', sx_short($c['v']), 'contract values'); ?>
+    <?php sxw_kpi('bad', 'alert', 'Ended (last 30 days)', 'Ended · last 30 days', (string) $c['late'], 'call now', $bandHref('late'));
+          sxw_kpi('warn', 'hour', 'Ending in 30 days', 'Ending in 30 days', (string) $c['m'], 'renewal ' . Tl('quote'), $bandHref('m'));
+          sxw_kpi('info', 'cal', 'Later', 'Later', (string) $c['later'], 'within ' . $days . ' days', $bandHref('later'));
+          if ($money) sxw_kpi('ok', 'rupee', 'Their value', 'Their value', sx_short($c['v']), 'contract values', $bandHref('')); ?>
   </div>
+  <?php if ($band !== ''): ?>
+  <p class="sxl-show" role="status">Showing: <b><?= count($rows) ?></b> · <?= e($bandWords[$band]) ?> · <a href="<?= e($bandHref('')) ?>">Show all</a></p>
+  <?php endif; ?>
 
   <?php rec_card_open('Contracts', 'file'); ?>
     <?php if (!$rows): ?><p class="sxw-empty">Nothing ends in the next <?= (int) $days ?> days.</p><?php else: ?>
@@ -33,7 +43,7 @@ $seg .= '</nav>';
       <tbody>
       <?php foreach ($rows as $r): $left = (int) round((strtotime($r['end_date']) - $t) / 86400); $no = $r['contract_number'] ?: $r['title']; ?>
         <tr><td><?= $canContract ? '<a href="/contract?id=' . (int) $r['id'] . '"><b>' . e($no) . '</b></a>' : '<b>' . e($no) . '</b>' ?><?= ($r['title'] ?? '') !== '' && $r['contract_number'] ? '<br><span class="muted" style="font-size:12px">' . e($r['title']) . '</span>' : '' ?></td>
-          <td><?= $r['partner_id'] ? '<a href="/partner?id=' . (int) $r['partner_id'] . '">' . e($r['client_name'] ?? '') . '</a>' : '—' ?></td>
+          <td><?= $r['partner_id'] ? '<a href="/partner?id=' . (int) $r['partner_id'] . '&amp;from=sales">' . e($r['client_name'] ?? '') . '</a>' : '—' ?></td>
           <td class="nw"><?= e(fdate($r['end_date'])) ?></td>
           <td><span class="sxw-due <?= $left < 0 ? 'p-bad' : ($left <= 30 ? 'p-warn' : ($left <= 60 ? 'p-week' : 'p-mut')) ?>"><?= $left < 0 ? 'ended ' . -$left . ' d ago' : ($left === 0 ? 'ends today' : $left . ' days') ?></span></td>
           <?php if ($money): ?><td class="n"><?= (float) $r['value'] > 0 ? e(sx_money($r['value'])) : '—' ?></td><?php endif; ?>
@@ -41,7 +51,7 @@ $seg .= '</nav>';
             <?php if ($r['partner_id'] && $canQuote): ?><a class="sxw-bt" href="/quote-new?client=<?= (int) $r['partner_id'] ?>"><?= rec_icon('file', 's') ?>Renewal <?= e(Tl('quote')) ?></a><?php endif; ?>
             <?php if ($r['partner_id'] && $canLog): ?>
               <details class="sx5-log"><summary class="sxw-bt"><?= rec_icon('note', 's') ?>Log a call</summary>
-                <form method="post" action="/sales-renewals" style="margin-top:8px;display:grid;gap:6px;min-width:240px">
+                <form method="post" action="/sales-renewals" style="margin-top:8px;display:grid;gap:6px">
                   <input type="hidden" name="do" value="log"><input type="hidden" name="contract_id" value="<?= (int) $r['id'] ?>"><input type="hidden" name="d" value="<?= (int) $days ?>">
                   <label class="muted" style="font-size:12px">How
                     <select class="form-control" name="method"><option value="CALL">Telephone call</option><option value="MEETING">Meeting</option><option value="VISIT">Site visit</option><option value="EMAIL">E-mail</option><option value="WHATSAPP">WhatsApp</option></select></label>

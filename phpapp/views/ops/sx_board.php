@@ -40,7 +40,7 @@ if (count($pipes) > 1) {
     foreach ($pipes as $p) $right .= '<a href="/sales-board?pipeline=' . (int) $p['id'] . e($q) . '"' . ((int) $p['id'] === (int) ($board['pipeline'] ?? 0) ? ' class="on" aria-current="true"' : '') . '>' . e($p['name']) . '</a>';
     $right .= '</div></details>';
 }
-$right .= sxw_person('sales-board', $whoKey, $people, $seeAll, $pipeQ) . '</div>';
+$right .= sxw_person('sales-board', $whoKey, $people, $seeAll, $pipeQ) . (function_exists('sx_branch_select') ? sx_branch_select('sales-board') : '') . '</div>';   // R-05
 ?>
 <div class="rec sxw has-bn">
   <?php sxw_nav('/sales-board'); ?>

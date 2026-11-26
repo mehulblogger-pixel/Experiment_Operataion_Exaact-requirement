@@ -4028,6 +4028,8 @@ function ops_access($method) {
 
 function ops_dispatch($route, $method) {
     ops_module_gate($route);
+    //  R-05 (owner, 26 Nov 2026): the Branch picked on a Sales screen, for this one GET only.
+    if (function_exists('sx_branch_begin')) sx_branch_begin($route, $method);
     // ----- Generic masters: /m/<entity>, /m/<entity>/new, /m/<entity>/edit
     if (preg_match('#^m/([a-z-]+)(?:/(new|edit|delete|cert-file))?$#', $route, $mm)) {
         $key = $mm[1]; $action = $mm[2] ?? 'list';

@@ -1952,10 +1952,24 @@ function scope_sales_clause($alias) {
     $units = scope_sales_unit_list();
     //  Q10 — whose records (own / team), inside the branch and unit limits above.
     $own = sales_owner_sql("$alias.owner_user_id");
+    //  R-05 — the one branch picked on this Sales screen (narrows only).
+    $bn = sales_branch_sql("$alias.office_id");
+    if ($own === '1=1') $own = $bn; elseif ($bn !== '1=1') $own = "$own AND $bn";
     if ($units === null) return [$own === '1=1' ? $w : "($w) AND $own", $a];
     $q = implode(',', array_map(fn($u) => db()->quote($u), $units));
     return ["($w) AND (COALESCE($alias.sbu,'') = '' OR $alias.sbu IN ($q))" . ($own === '1=1' ? '' : " AND $own"), $a];
 }
+
+// ---- R-05 (owner, 26 Nov 2026) — "for Director or person having central data access
+//  … they shall have filter branch wise also." --------------------------------------
+//  A person who sees more than one branch picks ONE branch on a Sales screen (Leads,
+//  Deals, Enquiries, Pipeline board, Sales dashboard, Sales home, Today). The pick is
+//  set for that one request by sx_branch_begin() (lib/sales_simple.php), only on a
+//  GET of those screens (their CSV downloads included), and only to a branch the
+//  person already sees — so it can only NARROW what the branch / unit / whose-records
+//  rules above allow, never widen it, and never touches a save. 0 = no pick.
+function sales_branch_narrow() { return (int) ($GLOBALS['__sales_branch'] ?? 0); }
+function sales_branch_sql($col) { $b = sales_branch_narrow(); return $b > 0 ? "$col = " . $b : '1=1'; }
 //  $ownerId: the record's owner (leads / deals), or false when the caller has no
 //  owner to ask about — then only branch and unit decide, as before Q10.
 function scope_sales_allows($officeId, $sbu, $ownerId = false) {
@@ -2066,6 +2080,8 @@ function sales_quote_owner_sql($a = 'q') {
 function scope_quote_clause($officeCol = 'q.office_id', $sbuCol = 'q.sbu', $a = 'q') {
     [$w, $args] = scope_clause($officeCol, $sbuCol);
     $o = sales_quote_owner_sql($a);
+    $bn = sales_branch_sql($officeCol);   // R-05 — the branch picked on a Sales screen (narrows only)
+    if ($bn !== '1=1') $o = $o === '1=1' ? $bn : "$o AND $bn";
     return [$o === '1=1' ? $w : "($w) AND $o", $args];
 }
 

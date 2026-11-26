@@ -66,7 +66,7 @@ $listRows = array_values(array_filter($rows, function ($o) use ($stSel) {
             //  Settled = received + credit notes (what is no longer owed on the billed amount).
             $st = $b <= 0.005 ? ['Not billed yet', 'p-warn'] : ($r + $cn + 0.5 >= $b ? ($b + 0.5 >= $vg ? ['Fully paid', 'p-ok'] : ['Paid so far', 'p-ok']) : ['Payment due', 'p-bad']); ?>
         <tr><td><a href="/quote?id=<?= (int) $o['id'] ?>"><b><?= e($o['quote_no']) ?></b><?= (int) $o['rev'] ? ' R' . (int) $o['rev'] : '' ?></a></td>
-          <td><?= $o['client_id'] ? '<a href="/partner?id=' . (int) $o['client_id'] . '">' . e($o['cname']) . '</a>' : e($o['cname']) ?></td>
+          <td><?= $o['client_id'] ? '<a href="/partner?id=' . (int) $o['client_id'] . '&amp;from=sales">' . e($o['cname']) . '</a>' : e($o['cname']) ?></td>
           <td class="nw"><?= e(trim((string) ($o['po_number'] ?? '')) ?: '—') ?><?= ($o['po_date'] ?? '') !== '' ? '<br><span class="muted" style="font-size:12px">' . e(fdate($o['po_date'])) . '</span>' : '' ?></td>
           <td class="nw"><?= e(fdate(substr((string) ($o['accepted_date'] ?: $o['updated_at']), 0, 10))) ?></td>
           <td class="n"><b><?= e(sx_money($v)) ?></b><?php if (abs($vg - $v) > 0.5): ?><br><span class="muted" style="font-size:12px"><?= e(sx_money($vg)) ?> incl. GST</span><?php endif; ?></td>

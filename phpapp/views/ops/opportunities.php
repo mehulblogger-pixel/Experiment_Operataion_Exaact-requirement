@@ -19,14 +19,20 @@ $right = '<div class="sxw-ctl">' . ($canEdit ? '<a class="sxw-bt p" href="/oppor
   <?php sxw_nav('/opportunities'); ?>
   <?php sxw_head(THP('opportunity'), 'Pieces of business you are trying to win, with a value and a stage. Kept apart from ' . Tlp('quote') . ' on purpose: one deal often carries three ' . Tlp('quote') . ', and counting ' . Tlp('quote') . ' makes the forecast three times too big. A deal can also be lost before anyone quotes — that loss is the one worth recording.', 'brief', $right); ?>
 
+  <?php //  R-03 (owner, 26 Nov 2026): every card opens the list of exactly the deals it
+        //  counted (lib/opportunities.php opp_tile_filter()). ?>
+  <?php $tileHref = fn($t) => '/opportunities?' . http_build_query(['v' => 'list', 'tile' => $t]); ?>
   <div class="sxw-kp" style="--n:6">
-    <?php sxw_kpi('teal', 'brief', 'Open', 'Open', (string)(int)$c['open'], 'right now');
-          sxw_kpi('info', 'rupee', 'Pipeline estimate', 'Pipeline estimate', fmoney_short($c['value']), 'open ' . Tlp('opportunity'));
-          sxw_kpi('info', 'chart', 'Weighted forecast', 'Weighted forecast', fmoney_short($c['weighted']), 'value × stage win %');
-          sxw_kpi($c['stalled'] ? 'warn' : 'grey', 'hour', "Past their stage's service level", 'Past stage time', (string)(int)$c['stalled'], 'stalled');
-          sxw_kpi('ok', 'target', 'Win rate, 12 months', 'Win rate', $win['rate'] === null ? '—' : (int)$win['rate'] . '%', 'last 12 months');
-          sxw_kpi('grey', 'trophy', 'Won · Lost, 12 months', 'Won · Lost', (int)$win['won'] . ' · ' . (int)$win['lost'], 'last 12 months'); ?>
+    <?php sxw_kpi('teal', 'brief', 'Open', 'Open', (string)(int)$c['open'], 'right now', $tileHref('open'));
+          sxw_kpi('info', 'rupee', 'Pipeline estimate', 'Pipeline estimate', fmoney_short($c['value']), 'open ' . Tlp('opportunity'), $tileHref('open'));
+          sxw_kpi('info', 'chart', 'Weighted forecast', 'Weighted forecast', fmoney_short($c['weighted']), 'value × stage win %', $tileHref('open'));
+          sxw_kpi($c['stalled'] ? 'warn' : 'grey', 'hour', "Past their stage's service level", 'Past stage time', (string)(int)$c['stalled'], 'stalled', $tileHref('stalled'));
+          sxw_kpi('ok', 'target', 'Win rate, 12 months', 'Win rate', $win['rate'] === null ? '—' : (int)$win['rate'] . '%', 'last 12 months', $tileHref('closed'));
+          sxw_kpi('grey', 'trophy', 'Won · Lost, 12 months', 'Won · Lost', (int)$win['won'] . ' · ' . (int)$win['lost'], 'last 12 months', $tileHref('closed')); ?>
   </div>
+  <?php if (($tile ?? '') !== ''): ?>
+  <p class="sxl-show" role="status">Showing: <b><?= (int)$total ?></b> · <?= e($tileWords) ?><?= $tile === 'closed' ? ' (' . (int)$win['won'] . ' won · ' . (int)$win['lost'] . ' lost)' : '' ?> · <a href="/opportunities?v=list">Show all</a></p>
+  <?php endif; ?>
 
   <div class="sxl-ctl">
     <nav class="sxw-seg" aria-label="Board or list">
@@ -45,6 +51,7 @@ $right = '<div class="sxw-ctl">' . ($canEdit ? '<a class="sxw-bt p" href="/oppor
         <noscript><button class="btn small secondary">Show</button></noscript>
       </form>
     <?php endif; ?>
+    <?= function_exists('sx_branch_select') ? sx_branch_select('opportunities') : '' //  R-05 — only for a person who sees more than one branch ?>
     <?php // Year filter for the List (the Board shows the live pipeline regardless). ?>
     <?php if ($view === 'list'): ?>
     <form method="get" action="/opportunities" class="sxl-f">

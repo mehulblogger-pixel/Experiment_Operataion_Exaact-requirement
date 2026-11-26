@@ -47,16 +47,16 @@
         $g = clean_gstin((string) ($p['gstin'] ?? '')); $gOk = $g === '' ? null : (function_exists('commercial_gstin_problem') ? commercial_gstin_problem($g) === '' : is_valid_gstin($g));
         $idle = $sc['touch'] !== '' ? sx_days_since($sc['touch']) : null; ?>
   <tr>
-    <td><a href="/partner?id=<?= (int)$p['id'] ?>"><b><?= e(partner_name($p)) ?></b></a><br><span class="muted" style="font-size:12px"><?= e($p['code']) ?> · <?= e(roles_label($p)) ?></span></td>
+    <td><a href="/partner?id=<?= (int)$p['id'] ?>&amp;from=sales"><b><?= e(partner_name($p)) ?></b></a><br><span class="muted" style="font-size:12px"><?= e($p['code']) ?> · <?= e(roles_label($p)) ?></span></td>
     <td><?= e(($p['state'] ?? '') ?: '—') ?></td>
     <td><?= $gOk === null ? '<span class="muted">—</span>' : ('<span style="font-family:var(--mono,monospace);white-space:nowrap">' . e($g) . '</span> ' . ($gOk ? '<span class="badge GREEN" title="Its check character is right">✓</span>' : '<span class="badge RED" title="Its last character does not match the rest — check it against the GST certificate">check</span>')) ?></td>
-    <td class="n"><?= $sc['deals'] ? '<a href="/customer?id=' . (int) $p['id'] . '" title="Open the customer 360">' . (int) $sc['deals'] . '</a>' : '—' ?></td>
+    <td class="n"><?= $sc['deals'] ? '<a href="/customer?id=' . (int) $p['id'] . '&amp;from=sales" title="Open the customer 360">' . (int) $sc['deals'] . '</a>' : '—' ?></td>
     <td class="n"><?= $sc['pipe'] > 0 ? e(sx_short($sc['pipe'])) : '—' ?></td>
     <td class="n"><?= $sc['won'] > 0 ? '<span class="badge GREEN">' . e(sx_short($sc['won'])) . '</span>' : '—' ?></td>
-    <?php if ($owedOn): ?><td class="n"><?= $sc['owed'] !== null && $sc['owed'] > 0.005 ? '<a href="/customer?id=' . (int) $p['id'] . '" title="Open the customer 360">' . e(sx_money($sc['owed'])) . '</a>' : '—' ?></td><?php endif; ?>
+    <?php if ($owedOn): ?><td class="n"><?= $sc['owed'] !== null && $sc['owed'] > 0.005 ? '<a href="/customer?id=' . (int) $p['id'] . '&amp;from=sales" title="Open the customer 360">' . e(sx_money($sc['owed'])) . '</a>' : '—' ?></td><?php endif; ?>
     <td><?= $idle === null ? '<span class="badge AMBER">never</span>' : ($idle > sx_stale_days() ? '<span class="badge AMBER">' . (int) $idle . ' days ago</span>' : e($idle === 0 ? 'today' : $idle . ' days ago')) ?></td>
     <td><?= e($sc['contact'] ?: '—') ?><?php if ($sc['phone'] !== '' && function_exists('sx_contact_btns_plain')): ?> <span style="white-space:nowrap"><?= sx_contact_btns_plain($sc['phone'], $sc['contact'] ?: partner_name($p)) ?></span><?php endif; ?></td>
-    <td><a class="btn small secondary" href="/customer?id=<?= (int)$p['id'] ?>" title="Everything about this <?= e(Tl('client')) ?> on one page">360</a></td>
+    <td><a class="btn small secondary" href="/customer?id=<?= (int)$p['id'] ?>&amp;from=sales" title="Everything about this <?= e(Tl('client')) ?> on one page">360</a></td>
   </tr>
   <?php endforeach; ?>
   <?php if (!$rows): ?><tr><td colspan="10">No records found. <a href="/partner-new?role=is_client">Add one</a>.</td></tr><?php endif; ?>
