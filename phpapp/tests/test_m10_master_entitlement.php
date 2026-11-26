@@ -240,6 +240,11 @@ $BASELINE = [
     // asked only inside that handler and on the deal page, Sales routes the M5 gate refuses
     // without Sales (Category B). Same answer for a master as before (is_admin_level()).
     'opp_can_delete',
+    // Owner, 26 Nov 2026 (O-06, contract links). contract_can_view() is the /contract page's
+    // own inline check lifted unchanged into a function, so every contract-number link asks
+    // the same question as the page it opens. Contracts belong to clients and vendors, which
+    // are CORE (section E), so a master keeps it on any plan. Same answer for a master as before.
+    'contract_can_view',
 ];
 $unclassified = array_values(array_diff($open, $BASELINE));
 t_ok(!$unclassified,
