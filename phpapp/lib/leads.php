@@ -350,6 +350,9 @@ function lead_change_owner($leadId, $toUserId, $reason = '') {
     if (!$to) return ['err' => 'Choose an active person to give it to.'];
     $from = (int)($l['owner_user_id'] ?? 0);
     if ($from === (int)$to['id']) return ['ok' => 'same'];
+    //  Owner, 26 Nov 2026 (LP-20): never to someone who could not open it afterwards.
+    if (function_exists('sales_handover_problem') && ($hp = sales_handover_problem($to, (int)($l['office_id'] ?? 0), (string)($l['sbu'] ?? ''), 'lead')) !== '')
+        return ['err' => $hp];
     $me = current_user(); $reason = trim((string)$reason);
     $apply = function () use ($l, $to, $reason, $me, $from) {
         db()->prepare("UPDATE leads SET owner_user_id=?, owner_name=?, updated_at=? WHERE id=?")
@@ -409,6 +412,11 @@ function lead_reassign_decide($reqId, $approve, $note = '') {
     }
     $to = ops_one("SELECT * FROM users WHERE id=? AND is_active=1", [(int)$r['to_user_id']]);
     if (!$to) { $close('CANCELLED', 'The person it was to go to is no longer active'); return ['err' => 'That person is no longer active, so the request is closed.']; }
+    //  Owner, 26 Nov 2026 (LP-20): a request asked before this rule still cannot hand the
+    //  lead to someone who could not open it.
+    if (function_exists('sales_handover_problem') && ($hp = sales_handover_problem($to, (int)($l['office_id'] ?? 0), (string)($l['sbu'] ?? ''), 'lead')) !== '') {
+        $close('CANCELLED', $hp); return ['err' => $hp . ' The request is closed.'];
+    }
     db()->prepare("UPDATE leads SET owner_user_id=?, owner_name=?, updated_at=? WHERE id=?")
         ->execute([(int)$to['id'], substr(user_name($to), 0, 150), date('c'), (int)$l['id']]);
     $close('APPROVED', $note);
@@ -776,6 +784,12 @@ function lead_create(array $b) {
         $ou = ops_one("SELECT * FROM users WHERE id=? AND is_active=1", [$ownerId]);
         if ($ou) $ownerNm = user_name($ou);
         else { $ownerId = (int)($u['id'] ?? 0); $ownerNm = $u ? user_name($u) : ''; }
+        //  Owner, 26 Nov 2026 (LP-20): a lead given to someone else at once must go to a
+        //  person who can open that branch's (and unit's) leads.
+        $leadOffice = ($b['office_id'] ?? '') !== '' ? (int)$b['office_id'] : (int)($u['home_office_id'] ?? 0);
+        if ($ou && $u && $ownerId !== (int)($u['id'] ?? 0) && function_exists('sales_handover_problem')
+            && ($hp = sales_handover_problem($ou, $leadOffice, trim((string)($b['sbu'] ?? '')), 'lead')) !== '')
+            return ['err' => $hp];
     }
     db()->prepare("INSERT INTO leads
         (ref,pipeline_id,stage_id,company_name,partner_id,contact_name,contact_email,contact_phone,
@@ -1745,8 +1759,14 @@ function ops_leads($route, $method) {
             'clients' => ops_all("SELECT id, display_name, legal_name FROM business_partners WHERE is_client=1 AND " . partner_office_sql() . " ORDER BY COALESCE(display_name, legal_name) LIMIT 500"),
             // Who a lead can be allocated to. Active logins only — allocating
             // work to somebody who cannot sign in is the same as not allocating it.
-            'users' => ops_all("SELECT id, first_name, last_name, username, role FROM users
-                                WHERE is_active=1 ORDER BY first_name, last_name"),
+            //  Owner, 26 Nov 2026 (LP-20): only people who could open this lead (its branch and
+            //  unit), plus whoever holds it now.
+            'users' => (function () use ($l) {
+                $all = ops_all("SELECT id, first_name, last_name, username, role FROM users
+                                WHERE is_active=1 ORDER BY first_name, last_name");
+                return function_exists('sales_people_covering')
+                    ? sales_people_covering($all, (int)($l['office_id'] ?? 0), (string)($l['sbu'] ?? ''), (int)($l['owner_user_id'] ?? 0)) : $all;
+            })(),
         ]);
         return true;
     }
@@ -2022,7 +2042,7 @@ function ops_leads($route, $method) {
                 . 'Mark it lost if it should not be chased, but it cannot be deleted.', 'error');
             redirect('/lead?id=' . $id);
         }
-        if (function_exists('act_log')) act_log('LEAD', $id, 'DELETED', 'Lead ' . $l['ref'] . ' deleted — ' . $l['company_name']);
+        if (function_exists('act_log')) act_log('LEAD', $id, 'DELETED', 'Lead ' . $l['ref'] . ' deleted — ' . $l['company_name'] . ' (by ' . user_name(current_user()) . ')', ['office_id' => (int)($l['office_id'] ?? 0) ?: '', 'sbu' => (string)($l['sbu'] ?? '')]);
         db()->prepare("DELETE FROM leads WHERE id=?")->execute([$id]);
         flash('Lead ' . $l['ref'] . ' deleted.');
         redirect('/leads');

@@ -54,7 +54,25 @@ if (!empty($done)):
         <div class="ff-help">Type to search. Leave it on “create a new one” to make a new <?= e(Tl('client')) ?> from the name below.</div></div>
       <div class="ff ff-wide"><label for="cv-name">…or the name for the new one</label>
         <input class="form-control" id="cv-name" name="company_name" value="<?= e($l['company_name']) ?>" maxlength="200"></div>
-      <div class="ff ff-wide" style="min-width:0"><?php $cidVals = ['state' => '']; $cidId = 'cv-cid'; $cidNote = 'Needed when this lead becomes a new ' . Tl('client') . ' — not when you attach it to one already on file above.'; include __DIR__ . '/_custid_fields.php'; ?></div>
+      <?php //  Owner, 26 Nov 2026 (J1-05): the GSTIN / PAN boxes belong to a NEW client only. When
+            //  a client already on file is chosen (or the lead is already linked to one), they are
+            //  hidden and one line says where the GSTIN comes from — the save ignores them then.
+            $cvAttached = (int) ($l['partner_id'] ?? 0) > 0; ?>
+      <div class="ff ff-wide" id="cv-cid-wrap" style="min-width:0"<?= $cvAttached ? ' hidden' : '' ?>><?php $cidVals = ['state' => '']; $cidId = 'cv-cid'; $cidNote = 'Needed when this lead becomes a new ' . Tl('client') . ' — not when you attach it to one already on file above.'; include __DIR__ . '/_custid_fields.php'; ?></div>
+      <div class="ff ff-wide ff-help" id="cv-cid-onfile"<?= $cvAttached ? '' : ' hidden' ?>>GSTIN is taken from the <?= e(Tl('client')) ?> already on file — nothing to type here.</div>
+      <script>
+      (function () {
+        var sel = document.getElementById('cv-partner'), wrap = document.getElementById('cv-cid-wrap'), note = document.getElementById('cv-cid-onfile');
+        if (!sel || !wrap || !note) return;
+        function sync() {
+          var onFile = sel.value !== '';
+          wrap.hidden = onFile; note.hidden = !onFile;
+          //  Hidden boxes must not stop the form with a "required" message the person cannot see.
+          wrap.querySelectorAll('input,select,textarea').forEach(function (el) { el.disabled = onFile; });
+        }
+        sel.addEventListener('change', sync); sync();
+      })();
+      </script>
       <?php if ((int) ($_GET['loc'] ?? 0) > 0 && ($locRow = ops_one("SELECT id, code, legal_name FROM business_partners WHERE id=?", [(int) $_GET['loc']]))): ?>
         <label class="ff ff-wide" style="display:flex;gap:8px;align-items:flex-start;font-weight:600"><input type="checkbox" name="add_location_to" value="<?= (int) $locRow['id'] ?>" style="margin-top:3px"> Yes — it is <?= e($locRow['code'] . ' — ' . $locRow['legal_name']) ?> (same PAN): add this GSTIN as its billing location and convert the lead to that <?= e(Tl('client')) ?></label>
       <?php endif; ?>

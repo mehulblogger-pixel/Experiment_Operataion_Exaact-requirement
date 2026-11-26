@@ -603,7 +603,11 @@ function ops_sales_more($route, $method) {
     if (function_exists('nav_under')) nav_under($route, 'sales');
     switch ($route) {
         case 'sales-lead':
-            ops_require(leads_can_edit(), 'Adding a lead needs the right to edit leads.');
+            //  Owner, 26 Nov 2026 (R-04 / R-06): the same rule as "+ New lead" on the Leads
+            //  register — the Branch Manager and the SBU Head read and download leads but never
+            //  add them (owner, 21 Nov 2026), so this quick form refuses them too.
+            ops_require(leads_can_edit() && (!function_exists('leads_works_leads') || leads_works_leads()),
+                'Adding a lead needs the right to add leads. You can open and download the leads of your branch, but not add one.');
             $old = []; $dupes = []; $err = '';
             if ($method === 'POST') {
                 $r = sx_lead_save($_POST, !empty($_POST['confirm']));

@@ -101,7 +101,7 @@ function ops_area_def($area) {
             $t($sxOk, '⏰', 'Today', '/sales-today', 'Every follow-up, stale deal, payment and renewal due — worked top to bottom.');
             $t($sxOk, '🧭', 'Pipeline board', '/sales-board', 'Every open lead and deal by stage.');
             $t($sxOk && (!$fx('crmdash_can') || crmdash_can()), '📊', 'Sales dashboard', '/sales-dashboard', 'Leads, wins, win rate, forecast, targets, sources, losses and collections.');
-            $t($sxOk && $fx('leads_can_edit') && leads_can_edit(), '➕', 'New lead', '/sales-lead', 'Company, mobile, source — saved in seconds.');
+            $t($sxOk && $fx('leads_can_edit') && leads_can_edit() && (!$fx('leads_works_leads') || leads_works_leads()), '➕', 'New lead', '/sales-lead', 'Company, mobile, source — saved in seconds.');
             $t($sxOk, '💰', 'Orders & payments', '/sales-orders', 'Orders won, billed, received and overdue.');
             $t($sxOk, '🔁', 'Renewals', '/sales-renewals', 'Contracts ending soon, by days left.');
             $t($sxOk, '🎯', 'Targets', '/sales-targets', 'Monthly target per person and what was won.');

@@ -679,6 +679,13 @@ function opp_update($oppId, array $b) {
     $newOff = (int)($b['office_id'] ?? $o['office_id']);
     if ($newOff && $newOff !== (int)$o['office_id'] && function_exists('scope_office_allows') && !scope_office_allows($newOff))
         return 'You can move ' . Tla('opportunity') . ' only to an office / branch you work for.';
+    //  Owner, 26 Nov 2026 (LP-20): the person it is with must be able to open it in its
+    //  (new) branch and unit — asked when the person, the branch or the unit changes.
+    $newSbu = (string)($b['sbu'] ?? $o['sbu']);
+    if ($ownerId && !empty($ou) && function_exists('sales_handover_problem')
+        && ($ownerId !== (int)($o['owner_user_id'] ?? 0) || $newOff !== (int)($o['office_id'] ?? 0) || $newSbu !== (string)($o['sbu'] ?? ''))
+        && ($hp = sales_handover_problem($ou, $newOff, $newSbu, Tl('opportunity'))) !== '')
+        return $hp;
     db()->prepare("UPDATE opportunities SET name=?, value=?, expected_close=?, requirement=?, competitor=?,
                    contact_name=?, contact_email=?, contact_phone=?, owner_user_id=?, owner_name=?, office_id=?, sbu=?,
                    next_action_on=?, next_action=?, updated_at=? WHERE id=?")
@@ -1301,7 +1308,7 @@ function ops_opportunities($route, $method) {
                 . ', so it is part of the record and cannot be deleted. Mark it lost instead if it should not be chased.', 'error');
             redirect('/opportunity?id=' . $id);
         }
-        if (function_exists('act_log')) act_log('OPPORTUNITY', $id, 'DELETED', T('opportunity') . ' ' . $o['ref'] . ' deleted — ' . $o['name']);
+        if (function_exists('act_log')) act_log('OPPORTUNITY', $id, 'DELETED', T('opportunity') . ' ' . $o['ref'] . ' deleted — ' . $o['name'] . ' (by ' . user_name(current_user()) . ')', ['office_id' => (int)($o['office_id'] ?? 0) ?: '', 'sbu' => (string)($o['sbu'] ?? '')]);
         try { db()->prepare("DELETE FROM opportunity_stage_history WHERE opportunity_id=?")->execute([$id]); } catch (Throwable $e) {}
         db()->prepare("DELETE FROM opportunities WHERE id=?")->execute([$id]);
         flash(T('opportunity') . ' ' . $o['ref'] . ' deleted.');
@@ -1324,8 +1331,14 @@ function ops_opportunities($route, $method) {
             'costingUnlinked' => function_exists('pc_unlinked') ? pc_unlinked(100, 'opportunity', (int)($o['client_id'] ?? 0)) : [],
             'costingCan' => function_exists('pc_can') && pc_can(),
             // Who a deal can be allocated to, and which pipeline it can be put on.
-            'users' => ops_all("SELECT id, first_name, last_name, username FROM users
-                                WHERE is_active=1 ORDER BY first_name, last_name"),
+            //  Owner, 26 Nov 2026 (LP-20): only people who could open this deal in its branch
+            //  and unit, plus whoever holds it now.
+            'users' => (function () use ($o) {
+                $all = ops_all("SELECT id, first_name, last_name, username FROM users
+                                WHERE is_active=1 ORDER BY first_name, last_name");
+                return function_exists('sales_people_covering')
+                    ? sales_people_covering($all, (int)($o['office_id'] ?? 0), (string)($o['sbu'] ?? ''), (int)($o['owner_user_id'] ?? 0)) : $all;
+            })(),
             // OPPORTUNITY pipelines only. pipe_all() returns lead pipelines too, and
             // putting a deal on a lead pipeline would give it stages that no funnel,
             // board or forecast expects to find there.

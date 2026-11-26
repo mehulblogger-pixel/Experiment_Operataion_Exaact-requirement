@@ -69,13 +69,14 @@
       <select class="form-control searchable" name="role" id="u_role"><?php foreach ($roleList as $k=>$v): ?><option value="<?= $k ?>" <?= $curRole===$k?'selected':'' ?>><?= e($v) ?></option><?php endforeach; ?><?php if ($globalMgr): ?><option value="__new__">+ Add a role not on this list…</option><?php endif; ?></select></div>
     <?php // A company can name its own role. It is never a blank cheque: it copies
           //  an existing role's permissions (its "base"), so it always means
-          //  something definite, and is fine-tuned later under Roles & access. Added
+          //  something definite, and its switches stay those of the base role (owner,
+          //  26 Nov 2026: the old words promised fine-tuning that never applied). Added
           //  inline, like a new office, so nothing typed on this form is lost. ?>
     <?php if ($globalMgr): ?>
     <div class="ff ff-wide" id="u_role_new" style="display:none">
       <div class="panel" style="margin:0;padding:12px;background:var(--field)">
         <b style="font-size:13px">New role</b>
-        <div class="muted" style="font-size:12.5px;margin:2px 0 8px">Give it a name and choose the role it should behave like. You can fine-tune exactly what it can do afterwards under <a href="/access">Roles &amp; access</a>.</div>
+        <div class="muted" style="font-size:12.5px;margin:2px 0 8px">Give it a name and choose the role it should behave like. It always has exactly that role's switches — to change what it can do, change the base role under <a href="/who-can">Who can do what</a>, or give one person their own exceptions there (People tab).</div>
         <div class="form-grid" style="margin:0">
           <div class="ff"><label>Role name *</label><input class="form-control" name="new_role_label" placeholder="e.g. Sourcing Lead"></div>
           <div class="ff"><label>Same permissions as</label>

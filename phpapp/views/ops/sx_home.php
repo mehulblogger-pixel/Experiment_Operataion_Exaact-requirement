@@ -56,11 +56,22 @@ $fixN = count(array_filter($health, fn($h) => (int) $h[1] > 0));
     <?php endif; ?>
   </div>
 
-  <?php $qtQuote = !function_exists('crm_quote_can_create') || crm_quote_can_create(); ?>
-  <div class="sxw-qt" style="--n:<?= $qtQuote ? 6 : 5 ?>">
-    <a class="p" href="/sales-lead"><?= rec_icon('plus') ?>New lead</a>
-    <a href="/sales-today"><?= rec_icon('note') ?>Log activity</a>
-    <a href="/opportunity-new"><?= rec_icon('brief') ?>New deal</a>
+  <?php
+  //  Owner, 26 Nov 2026 (R-04 / R-06): each shortcut is shown only to someone the server lets
+  //  do it — the same rules as "+ New lead" / "+ New deal" on the registers. The Branch Manager
+  //  and the SBU Head read and download leads and deals (owner, 21 Nov 2026) but add or log
+  //  on none, so they see only the reading shortcuts.
+  $qtQuote = !function_exists('crm_quote_can_create') || crm_quote_can_create();
+  $qtWorks = !function_exists('leads_works_leads') || leads_works_leads();
+  $qtLead  = $qtWorks && function_exists('leads_can_edit') && leads_can_edit();
+  $qtDeal  = $qtWorks && function_exists('opp_can_edit') && opp_can_edit();
+  $qtLog   = $qtLead || $qtDeal;
+  $qtN = 2 + ($qtQuote ? 1 : 0) + ($qtLead ? 1 : 0) + ($qtDeal ? 1 : 0) + ($qtLog ? 1 : 0);
+  ?>
+  <div class="sxw-qt" style="--n:<?= $qtN ?>">
+    <?php if ($qtLead): ?><a class="p" href="/sales-lead"><?= rec_icon('plus') ?>New lead</a><?php endif; ?>
+    <?php if ($qtLog): ?><a href="/sales-today"><?= rec_icon('note') ?>Log activity</a><?php endif; ?>
+    <?php if ($qtDeal): ?><a href="/opportunity-new"><?= rec_icon('brief') ?>New deal</a><?php endif; ?>
     <?php if ($qtQuote): ?><a href="/quote-new"><?= rec_icon('file') ?>New <?= e(function_exists('Tl') ? Tl('quote') : 'quote') ?></a><?php endif; ?>
     <a href="/sales-orders"><?= rec_icon('trophy') ?>Orders won</a>
     <a href="/quotes?print=1"><?= rec_icon('copy') ?>Print a <?= e(function_exists('Tl') ? Tl('quote') : 'quote') ?></a>
