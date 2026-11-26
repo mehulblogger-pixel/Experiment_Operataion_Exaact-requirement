@@ -814,6 +814,21 @@ function product_cat_label($v) {
 }
 
 // ---- Terms & conditions (§xviii) -------------------------------------------
+// The terms as they read: line breaks made uniform, spaces at line ends and blank lines at
+// either end removed. Used to tell a real change of terms from a re-save of the same text.
+function crm_terms_norm($t) {
+    $t = str_replace(["\r\n", "\r"], "\n", (string)$t);
+    $t = implode("\n", array_map('rtrim', explode("\n", $t)));
+    return trim($t);
+}
+// A quotation made somewhere other than the quote form (from a project costing, from a deal)
+// starts with the company's standard terms, exactly as one made on the form does.
+function crm_quote_seed_terms($qid) {
+    try {
+        db()->prepare("UPDATE quotations SET terms_conditions=? WHERE id=? AND COALESCE(terms_conditions,'')=''")
+            ->execute([crm_default_terms(), (int)$qid]);
+    } catch (Throwable $e) { /* the column is created by the quotations migration; nothing to seed without it */ }
+}
 // One company default, carried onto every new quote and editable there.
 function crm_default_terms() {
     $t = setting_get('quote_terms', '');
@@ -1633,12 +1648,37 @@ function crm_quote_doc_cleared($q) {
     if (in_array($st, ['LOST', 'EXPIRED'], true)) return crm_quote_chain_satisfied((int)($q['id'] ?? 0));
     return false;                                             // PENDING_APPROVAL
 }
+// An earlier revision that a later one has replaced (owner, 26 Nov 2026). Its copies say so
+// on every page — "SUPERSEDED — see Rev 01" — so an old approved PDF is never mistaken for
+// the offer that stands; its Word copy and sending are refused.
+function crm_quote_superseded($q) {
+    //  An older row with no flag at all counts as current, as everywhere else (COALESCE(is_current,1)).
+    return $q && isset($q['is_current']) && $q['is_current'] !== '' && (int)$q['is_current'] === 0;
+}
+// The revision that replaced it (its number), or null when none is found.
+function crm_quote_current_rev($q) {
+    if (!$q || empty($q['quote_no'])) return null;
+    $r = ops_val("SELECT rev FROM quotations WHERE quote_no=? AND is_current=1 ORDER BY id DESC LIMIT 1", [(string)$q['quote_no']]);
+    return ($r === false || $r === null) ? null : (int)$r;
+}
+function crm_quote_superseded_mark($q) {
+    $cur = crm_quote_current_rev($q);
+    return 'SUPERSEDED' . ($cur !== null ? ' — see Rev ' . sprintf('%02d', $cur) : '');
+}
+// Why an earlier revision cannot go out, in words.
+function crm_quote_superseded_words($q) {
+    $cur = crm_quote_current_rev($q);
+    return 'This is an earlier revision (Rev ' . sprintf('%02d', (int)($q['rev'] ?? 0)) . ')'
+        . ($cur !== null ? ' — Rev ' . sprintf('%02d', $cur) . ' has replaced it' : ' — a later revision has replaced it')
+        . '. Open the current revision to download its Word copy or send it.';
+}
 // The editable Word copy: only once cleared, and only for those who send quotations.
 function crm_quote_word_allowed($q) {
-    return crm_quote_doc_cleared($q) && (can('crm.quote.send') || is_master());
+    return !crm_quote_superseded($q) && crm_quote_doc_cleared($q) && (can('crm.quote.send') || is_master());
 }
 // Why the Word copy is not offered to this person, in words ('' when it is).
 function crm_quote_word_problem($q) {
+    if (crm_quote_superseded($q)) return crm_quote_superseded_words($q);
     if (!crm_quote_doc_cleared($q)) return 'The editable Word copy is ready once this ' . Tl('quote') . ' is approved. Until then, download the PDF — it is marked "' . QUOTE_DRAFT_MARK . '".';
     if (!(can('crm.quote.send') || is_master())) return 'The editable Word copy is for the people who send ' . Tlp('quote') . '. Download the PDF instead.';
     return '';
@@ -1648,7 +1688,8 @@ function crm_quote_word_problem($q) {
 function crm_quote_log_download($q, $format) {
     $cleared = crm_quote_doc_cleared($q);
     $who = user_name(current_user());
-    $line = $format . ' downloaded by ' . $who . ' — ' . ($cleared ? 'approved copy' : 'draft copy, marked "' . QUOTE_DRAFT_MARK . '"') . '.';
+    $line = $format . ' downloaded by ' . $who . ' — ' . (crm_quote_superseded($q) ? 'earlier revision, marked "' . crm_quote_superseded_mark($q) . '"'
+        : ($cleared ? 'approved copy' : 'draft copy, marked "' . QUOTE_DRAFT_MARK . '"')) . '.';
     crm_log_change((int)$q['id'], $line);
     if (function_exists('act_log')) act_log('QUOTE', (int)$q['id'], 'SYSTEM', quote_label($q) . ' — ' . $line);
 }
@@ -1797,6 +1838,9 @@ function crm_quote_commercial_print($qid) {
     $q = ops_one("SELECT * FROM quotations WHERE id=?", [(int)$qid]); if (!$q) return '';
     $h = [];
     foreach (QUOTE_COMMERCIAL_FIELDS as $f) $h[$f] = trim((string)($q[$f] ?? ''));
+    // Terms compare as text, not as bytes: Windows and Unix line breaks, and spaces at the end of a
+    // line, are the same terms (owner, 26 Nov 2026 — an unchanged Save must not cancel an approval).
+    $h['terms_conditions'] = crm_terms_norm($q['terms_conditions'] ?? '');
     foreach (['validity_days', 'advance_pct', 'gst_pct', 'subtotal', 'total_amount'] as $f) $h[$f] = round((float)$h[$f], 2);
     $lines = array_map(fn($l) => [(string)$l['sbu'], (string)$l['service_type'], (string)$l['subtypes'], trim((string)$l['description']),
         (string)$l['order_type'], round((float)$l['qty'], 2), (string)$l['unit'], round((float)$l['rate'], 2), round((float)$l['amount'], 2),
@@ -3407,7 +3451,8 @@ function ops_crm_quotes($route, $method) {
         $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
         $tpl = ops_one("SELECT * FROM crm_templates WHERE kind='QUOTE_DOC' ORDER BY is_default DESC, id DESC");   // for doc/format numbers
         $pdf = quote_pdf_build($q, crm_quote_lines($q["id"]), $tpl ?: [], quote_signature($q), quote_letterhead($q['office_id'] ?? null));
-        $fname = 'Quote-' . preg_replace('/[^A-Za-z0-9_.-]/', '', $q['quote_no'] . ($q['rev'] > 0 ? '-R' . $q['rev'] : '')) . (!crm_quote_doc_cleared($q) ? '-DRAFT' : '') . '.pdf';
+        $fname = 'Quote-' . preg_replace('/[^A-Za-z0-9_.-]/', '', $q['quote_no'] . ($q['rev'] > 0 ? '-R' . $q['rev'] : ''))
+               . (crm_quote_superseded($q) ? '-SUPERSEDED' : (!crm_quote_doc_cleared($q) ? '-DRAFT' : '')) . '.pdf';
         crm_quote_log_download($q, 'PDF');
         header('Content-Type: application/pdf');
         header('Content-Disposition: attachment; filename="' . $fname . '"');
@@ -3798,6 +3843,8 @@ function ops_crm_quotes($route, $method) {
         //  Q-05 — "send from my mailbox" is sending too: not before the quotation has
         //  cleared its approval (the page only drew these buttons once APPROVED or SENT;
         //  a typed address could still make the e-mail of a draft).
+        //  An earlier revision never goes out, however it was approved (owner, 26 Nov 2026).
+        if (crm_quote_superseded($q)) { flash(crm_quote_superseded_words($q), 'error'); redirect('/quote?id=' . $q['id']); }
         if (!crm_quote_doc_cleared($q)) { flash(crm_quote_transition_problem($q, 'SENT') ?: 'This ' . Tl('quote') . ' needs approval before it goes to the ' . Tl('client') . '.', 'error'); redirect('/quote?id=' . $q['id']); }
         [$subject, $body] = crm_quote_message($q);
         [$fromEmail, $fromName] = compose_from();

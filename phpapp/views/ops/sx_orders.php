@@ -59,7 +59,7 @@ $listRows = array_values(array_filter($rows, function ($o) use ($stSel) {
     <?php if ($stSel !== ''): ?><p class="muted" style="margin:0 0 8px;font-size:12.5px">Showing <?= count($listRows) ?> of <?= count($rows) ?> orders <?= e($stF[$stSel]) ?>. <a href="<?= e($stHref('')) ?>">Show all</a></p><?php endif; ?>
     <?php if (!$rows): ?><p class="sxw-empty">No accepted <?= e(Tlp('quote')) ?> in this period.</p><?php else: ?>
     <div class="rec-scroll"><table class="rec-tbl">
-      <thead><tr><th><?= e(T('quote')) ?></th><th><?= e(T('client')) ?></th><th>PO</th><th>Won on</th><th class="n">Order · before GST</th>
+      <thead><tr><th><?= e(T('quote')) ?></th><th><?= e(T('client')) ?></th><th>PO</th><th>Contract</th><th>Won on</th><th class="n">Order · before GST</th>
         <?php if ($ar): ?><th class="n">Billed</th><th class="n">Received</th><th class="n">Credit notes</th><th class="n">To bill</th><th>Status</th><th>Invoices</th><?php endif; ?></tr></thead>
       <tbody>
       <?php foreach ($listRows as $o): $v = (float) ($o['_value'] ?? $o['total_amount']); $vg = (float) $o['total_amount']; $b = (float) ($o['_billed'] ?? 0); $r = (float) ($o['_recv'] ?? 0); $cn = (float) ($o['_credit'] ?? 0);
@@ -68,6 +68,7 @@ $listRows = array_values(array_filter($rows, function ($o) use ($stSel) {
         <tr><td><a href="/quote?id=<?= (int) $o['id'] ?>"><b><?= e($o['quote_no']) ?></b><?= (int) $o['rev'] ? ' R' . (int) $o['rev'] : '' ?></a></td>
           <td><?= $o['client_id'] ? '<a href="/partner?id=' . (int) $o['client_id'] . '">' . e($o['cname']) . '</a>' : e($o['cname']) ?></td>
           <td class="nw"><?= e(trim((string) ($o['po_number'] ?? '')) ?: '—') ?><?= ($o['po_date'] ?? '') !== '' ? '<br><span class="muted" style="font-size:12px">' . e(fdate($o['po_date'])) . '</span>' : '' ?></td>
+          <td class="nw"><?php $cnum = trim((string) ($o['contract_number'] ?? '')); ?><?= $cnum !== '' ? (function_exists('contract_link_html') ? contract_link_html($cnum, (int) ($o['contract_id'] ?? 0)) : e($cnum)) : '<span class="muted">—</span>' ?></td>
           <td class="nw"><?= e(fdate(substr((string) ($o['accepted_date'] ?: $o['updated_at']), 0, 10))) ?></td>
           <td class="n"><b><?= e(sx_money($v)) ?></b><?php if (abs($vg - $v) > 0.5): ?><br><span class="muted" style="font-size:12px"><?= e(sx_money($vg)) ?> incl. GST</span><?php endif; ?></td>
           <?php if ($ar): ?><td class="n"><?= $b > 0 ? e(sx_money($b)) : '—' ?></td>

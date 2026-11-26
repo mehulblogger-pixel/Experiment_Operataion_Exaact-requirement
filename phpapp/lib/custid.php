@@ -83,7 +83,7 @@ function custid_gstin_problem($g) {
 // so only the length, the state code and the check digit are asked of it.
 function custid_govt_gstin_problem($g) {
     $g = clean_gstin($g);
-    if (!preg_match('/^[0-9]{2}[0-9A-Z]{13}$/', $g)) return 'A GSTIN is 15 characters, like 07DELM12345D1DX — please check it.';
+    if (!preg_match('/^[0-9]{2}[0-9A-Z]{13}$/', $g)) return 'A GSTIN is 15 characters, like 07DELM12345D1DL — please check it.';
     if (defined('GST_STATES') && !isset(GST_STATES[substr($g, 0, 2)])) return 'The GSTIN\'s first two digits are not an Indian state code.';
     if (function_exists('commercial_gstin_check_char') && commercial_gstin_check_char(substr($g, 0, 14)) !== $g[14])
         return 'That GSTIN has a typing mistake (its last character does not match the rest) — please copy it again from the GST certificate.';

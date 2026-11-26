@@ -822,6 +822,7 @@ function pc_make_quote($roll) {
                 (int)$h['office_id'] ?: null, (string)$h['title'], (string)$h['site'],
                 $sub, $gstPct, $gst, $total, (int)(current_user()['id'] ?? 0) ?: null, user_name(current_user()), date('c')]);
         $qid = (int)db()->lastInsertId();
+        if (function_exists('crm_quote_seed_terms')) crm_quote_seed_terms($qid);
         $n = 0;
         foreach (pc_quote_line_rows($h, $lines) as $r) {
             $n++;

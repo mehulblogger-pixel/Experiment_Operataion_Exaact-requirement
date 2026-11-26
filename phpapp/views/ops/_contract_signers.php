@@ -1,14 +1,16 @@
 <?php
 //  WHO GIVES EACH SIGNATURE ON A CONTRACT (owner, 13 Nov 2026: "This all approvals
 //  shall be set by individual organisation … it shall be easy to access").
-//  Small boxes — "First signature", the ones in between (with three to five,
-//  Q-08) and "Final approval" — each a tick-list of
+//  Small boxes — "First signature", the ones in between (three or more —
+//  Q-08, any number from 26 Nov 2026) and "Final approval" — each a tick-list of
 //  the company's roles plus, optionally, one named person. Only the boxes that
 //  apply to the number of approvals chosen above are shown.
 $CS = setupqa_contract_signers_data(); $rule = $CS['rule']; if (!$rule) return;
 $csBox = function ($i, $title, $help) use ($CS, $rule) {
-    $s = $rule['sig'][$i]; $dis = $CS['can'] ? '' : ' disabled'; ?>
-  <fieldset class="csig" data-only-when="contract_open_signatures" data-only-value="<?= e(['1' => '2|3|4|5', '2' => '2|1|3|4|5', '3' => '3|4|5', '4' => '4|5', '5' => '5'][(string)$i]) ?>" style="border:1px solid var(--line,#ddd);border-radius:10px;padding:12px;margin:14px 0 0">
+    $s = $rule['sig'][$i] ?? ['roles' => [], 'user' => 0, 'standard' => true]; $dis = $CS['can'] ? '' : ' disabled'; ?>
+  <?php //  Shown when the company asks for at least this many: the first signature with two or more,
+        //  the final approval with one or more, the box for slot $i (signature $i-1) with $i or more. ?>
+  <fieldset class="csig" data-only-when="contract_open_signatures" data-only-value="<?= $i === 1 ? '2+' : ($i === 2 ? '1+' : $i . '+') ?>" style="border:1px solid var(--line,#ddd);border-radius:10px;padding:12px;margin:14px 0 0">
     <legend style="font-weight:600;font-size:15px;padding:0 6px"><?= e($title) ?></legend>
     <p class="muted" style="margin:0 0 8px;font-size:13px"><?= e($help) ?></p>
     <input type="hidden" name="contract_sig<?= $i ?>_sent" value="1">
@@ -36,8 +38,12 @@ $csBox = function ($i, $title, $help) use ($CS, $rule) {
   </fieldset>
 <?php };
 $csBox(1, 'Who gives the first signature?', 'Usually the manager who confirms the contract is genuinely needed.');
-//  Q-08 — with three to five, the signatures in between, in order (slots 3–5).
-$csBox(3, 'Who gives signature 2?', 'With three or more: after the first signature, before the next one.');
-$csBox(4, 'Who gives signature 3?', 'With four or more: after signature 2.');
-$csBox(5, 'Who gives signature 4?', 'With five: after signature 3, just before the final approval.');
-$csBox(2, 'Who gives the final approval?', 'The person who agrees the company will carry the contract. With one approval, this is the only one.');
+//  The signatures in between, in order (slot 3 = signature 2, slot 4 = signature 3, …). Five boxes
+//  are always there (24 Nov); with more signatures (owner, 26 Nov 2026: "as many as needed") a box
+//  for each, plus a few spare ones that appear as soon as a larger number is typed above.
+$csTop = min(defined('CONTRACT_SIG_HARD_LIMIT') ? CONTRACT_SIG_HARD_LIMIT : 50, max(CONTRACT_SIG_MAX, (int)$rule['signatures']) + 5);
+for ($i = 3; $i <= $csTop; $i++)
+    $csBox($i, 'Who gives signature ' . ($i - 1) . '?', 'With ' . $i . ' or more: after ' . ($i === 3 ? 'the first signature' : 'signature ' . ($i - 2)) . ', before the next one.');
+$csBox(2, 'Who gives the final approval?', 'The person who agrees the company will carry the contract. With one approval, this is the only one.'); ?>
+<p class="muted" style="margin:10px 0 0;font-size:12.5px">Need more signatures than there are boxes? Type the number above and press Save — a box for each appears.</p>
+<?php

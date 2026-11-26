@@ -30,7 +30,7 @@ $dt['columns']['value']['render'] = function ($r) use ($money) {
 //  can invoice: "pending" is said on a WON quotation only (an approved one is not an order yet).
 $dt['columns']['contract']['render'] = function ($r) {
     $cn = trim((string)($r['contract_number'] ?? ''));
-    if ($cn !== '') return e($cn);
+    if ($cn !== '') return function_exists('contract_link_html') ? contract_link_html($cn, (int)($r['contract_id'] ?? 0)) : e($cn);
     if ($r['status'] === 'ACCEPTED') return '<span class="pill p-warn">pending</span>';
     return '<span class="muted">—</span>';
 };

@@ -209,7 +209,7 @@ elseif ($qSplit && ($qSplit['mode'] ?? '') === 'UNKNOWN') $qSplitWords = 'CGST +
 <?php //  HOW TO SEND (owner, 14 Nov 2026: "Send to customer button not found why? and when send from my
       //  mail box it downloaded .eml file why? what is use of it"). Shown only to someone who may send —
       //  the matrix gives sending to crm.quote.send — and in plain words, with the three real ways. ?>
-<?php if (in_array($st, ['APPROVED','SENT'], true) && !empty($q['contact_email']) && !empty($canSend)): ?>
+<?php if (in_array($st, ['APPROVED','SENT'], true) && !empty($q['contact_email']) && !empty($canSend) && !crm_quote_superseded($q)): ?>
 <details class="panel sxqd-how" id="how-to-send" style="background:var(--soft)">
   <summary><b><?= $st === 'SENT' ? 'Send it again, or chase it' : 'Three ways to send this' ?></b> <span class="muted">— tap to read</span></summary>
   <div class="muted" style="margin-top:4px;line-height:1.55">
@@ -379,7 +379,7 @@ elseif ($qSplit && ($qSplit['mode'] ?? '') === 'UNKNOWN') $qSplitWords = 'CGST +
     <?php else: ?><span class="muted" style="font-size:12.5px"><?= e($assignedName !== '' ? $assignedName . ', who is assigned to this ' . Tl('quote') . ',' : 'The person assigned to this ' . Tl('quote')) ?> records the <?= e(Tl('client')) ?>'s answer.</span><?php endif; ?>
     <?php if (crm_quote_word_allowed($q)): ?><a class="btn small secondary" href="/quote-doc?id=<?= (int)$q['id'] ?>">Re-download Word</a><?php endif; ?>
   <?php endif; ?>
-  <?php if (in_array($st, ['APPROVED','SENT'], true) && !empty($q['contact_email']) && !empty($canSend)): ?>
+  <?php if (in_array($st, ['APPROVED','SENT'], true) && !empty($q['contact_email']) && !empty($canSend) && !crm_quote_superseded($q)): ?>
     <span style="width:1px;height:22px;background:var(--line)"></span>
     <a class="btn small secondary" href="/quote-compose?id=<?= (int)$q['id'] ?>&amp;mode=gmail" target="_blank" rel="noopener"
        onclick="var d=document.createElement('a');d.href='/quote-pdf?id=<?= (int)$q['id'] ?>';d.download='';document.body.appendChild(d);d.click();d.remove();"
@@ -480,8 +480,9 @@ elseif ($qSplit && ($qSplit['mode'] ?? '') === 'UNKNOWN') $qSplitWords = 'CGST +
     <?php if (!empty($costingCan)): ?><a class="q2-chip" href="#costing">🧮 Costing<?= !empty($costing) ? ' <span class="n ok">' . e($costing['code'] ?? '') . '</span>' : '' ?></a><?php endif; ?>
     <?php //  Q-05 (owner, 24 Nov 2026) — before approval the PDF is a marked draft, and the editable
           //  Word copy waits for approval and is for those who send quotations. ?>
-    <?php if (crm_quote_doc_cleared($q)): ?><a class="q2-chip" href="/quote-pdf?id=<?= (int)$q['id'] ?>">⬇ PDF (for client)</a>
-    <?php else: ?><a class="q2-chip" href="/quote-pdf?id=<?= (int)$q['id'] ?>" title="Every page is marked “<?= e(QUOTE_DRAFT_MARK) ?>” until it is approved">⬇ PDF (draft)</a><?php endif; ?>
+    <?php if (crm_quote_superseded($q)): ?><a class="q2-chip" href="/quote-pdf?id=<?= (int)$q['id'] ?>" title="Every page is marked “<?= e(crm_quote_superseded_mark($q)) ?>”">⬇ PDF (earlier revision)</a>
+    <?php elseif (crm_quote_doc_cleared($q)): ?><a class="q2-chip" href="/quote-pdf?id=<?= (int)$q['id'] ?>">⬇ PDF (for client)</a>
+    <?php else: ?><a class="q2-chip" href="/quote-pdf?id=<?= (int)$q['id'] ?>" title="Every page is marked “<?= e(QUOTE_DRAFT_MARK) ?>” and it is unsigned until it is approved">⬇ PDF (draft)</a><?php endif; ?>
     <?php if ($canEdit && (in_array($st, ['DRAFT','PENDING_APPROVAL','REJECTED','APPROVED'], true) || $reEdit)): ?><a class="q2-chip" href="/quote-edit?id=<?= (int)$q['id'] ?>">✎ <?= $reEdit ? 'Edit (re-opened until ' . e(fdate(substr((string)$q['unlocked_until'], 0, 10))) . ')' : 'Edit' ?></a><?php endif; ?>
     <details class="q2-more">
       <summary class="q2-chip">More ▾</summary>
@@ -842,7 +843,7 @@ elseif ($qSplit && ($qSplit['mode'] ?? '') === 'UNKNOWN') $qSplitWords = 'CGST +
   <?php if ($q['contract_number']): ?>
     <table class="kv">
       <tr><td class="muted">Registered client</td><td><?= $clientReg ? e($clientReg['legal_name']).' <span class="muted">('.e($clientReg['code']).')</span>' : e($q['client_name']) ?></td></tr>
-      <tr><td class="muted">Contract number</td><td><b><?= e($q['contract_number']) ?></b>
+      <tr><td class="muted">Contract number</td><td><b><?= function_exists('contract_link_html') ? contract_link_html($q['contract_number'], (int)($cr['id'] ?? ($q['contract_id'] ?? 0))) : e($q['contract_number']) ?></b>
         <?php if ($cr): ?> <span class="pill" style="background:<?= $osColors[$os] ?? '#64748b' ?>;color:#fff"><?= e($osLabel) ?></span><?php endif; ?></td></tr>
       <?php if ($cr && trim((string)$cr['requested_by'])!==''): ?><tr><td class="muted">Requested</td><td><?= e($cr['requested_by']) ?><?= $cr['requested_at']?' · '.e(substr($cr['requested_at'],0,10)):'' ?></td></tr><?php endif; ?>
       <?php if ($cr && trim((string)$cr['mgr_endorsed_at'])!==''): ?><tr><td class="muted">First signature</td><td><?= e($cr['mgr_endorsed_by']) ?> · <?= e(substr($cr['mgr_endorsed_at'],0,10)) ?></td></tr><?php endif; ?>

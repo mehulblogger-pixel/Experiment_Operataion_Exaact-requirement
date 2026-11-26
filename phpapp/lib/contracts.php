@@ -741,12 +741,12 @@ const CONTRACT_OPEN_STATES = [
 //  company gets until it says otherwise — nothing changes for a company that
 //  never opens the setting. What a company may now decide, under Admin →
 //  Approvals → Sales → Contract:
-//      · how many signatures: up to five (Q-08, owner 24 Nov 2026), two, one, or
+//      · how many signatures: any number (owner 26 Nov 2026; five from 24 Nov), two, one, or
 //        none (the contract opens when it is registered);
 //      · who gives each: any of its roles (its own custom roles included), and/or
 //        one named person;
 //      · whether one person may give both.
-//  Stored in settings: contract_open_signatures ('0'…'5'),
+//  Stored in settings: contract_open_signatures ('0', '1', '2', … any number),
 //  contract_sig1_roles / contract_sig2_roles (comma list), contract_sig1_user /
 //  contract_sig2_user (a user id), contract_same_person ('yes'|'no').
 //  "Signature 2" is always the FINAL approval; "signature 1" exists only when
@@ -764,15 +764,28 @@ const CONTRACT_SIG_STANDARD = [
     2 => ['BRANCH_MANAGER', 'BRANCH_APP_MANAGER'],
     3 => [], 4 => [], 5 => [],
 ];
+//  How many signature boxes the settings screen always offers (the slots 1…5 of 24 Nov).
 const CONTRACT_SIG_MAX = 5;
+//  "As many as needed" (owner, 26 Nov 2026, Q-08 follow-up): a company may ask for any number
+//  of signatures. This is only a technical safety limit so a typing slip (e.g. 500) cannot make
+//  every contract screen ask for hundreds of signatures — it is not a business rule.
+const CONTRACT_SIG_HARD_LIMIT = 50;
+//  The number of signatures the company asked for, from the stored setting (2 when unset).
+function contract_sig_count_setting() {
+    $raw = function_exists('setting_get') ? trim((string)setting_get('contract_open_signatures', '')) : '';
+    if ($raw === '' || !ctype_digit($raw)) return 2;
+    return min(CONTRACT_SIG_HARD_LIMIT, (int)$raw);
+}
+//  The slots that exist for $n signatures: 1 and 2, and 3…$n in between (at least 1…5).
+function contract_sig_slot_ids($n) { return range(1, max(CONTRACT_SIG_MAX, (int)$n)); }
 
 //  The slots, in signing order, for $n signatures: 1 → [2]; 2 → [1, 2];
-//  3 → [1, 3, 2]; 5 → [1, 3, 4, 5, 2]. The last is always the final approval.
+//  3 → [1, 3, 2]; 5 → [1, 3, 4, 5, 2]; 7 → [1, 3, 4, 5, 6, 7, 2]. The last is always the final approval.
 function contract_sig_order($n) {
-    $n = (int)$n;
+    $n = min(CONTRACT_SIG_HARD_LIMIT, (int)$n);
     if ($n <= 0) return [];
     if ($n === 1) return [2];
-    return array_merge([1], $n >= 3 ? range(3, min(CONTRACT_SIG_MAX, $n)) : [], [2]);
+    return array_merge([1], $n >= 3 ? range(3, $n) : [], [2]);
 }
 //  A slot's name for people: "first signature", "signature 3 of 5", "final approval".
 function contract_sig_slot_name($slot, $n) {
@@ -783,11 +796,10 @@ function contract_sig_slot_name($slot, $n) {
 }
 
 function contract_open_rule() {
-    $n = function_exists('setting_get') ? (string)setting_get('contract_open_signatures', '') : '';
-    $n = in_array($n, ['0', '1', '2', '3', '4', '5'], true) ? (int)$n : 2;
+    $n = contract_sig_count_setting();
     $all = function_exists('roles_all') ? roles_all() : ORG_ROLES;
     $sig = [];
-    foreach (range(1, CONTRACT_SIG_MAX) as $i) {
+    foreach (contract_sig_slot_ids($n) as $i) {
         $roles = [];
         foreach (explode(',', (string)setting_get('contract_sig' . $i . '_roles', '')) as $r) {
             $r = strtoupper(trim($r));
@@ -796,7 +808,7 @@ function contract_open_rule() {
         $uid = (int)setting_get('contract_sig' . $i . '_user', 0);
         if ($uid && !ops_one("SELECT id FROM users WHERE id=? AND is_active=1", [$uid])) $uid = 0;   // a person who has left signs nothing
         $own = (bool)($roles || $uid);
-        $sig[$i] = ['roles' => $own ? $roles : CONTRACT_SIG_STANDARD[$i], 'user' => $uid, 'standard' => !$own];
+        $sig[$i] = ['roles' => $own ? $roles : (CONTRACT_SIG_STANDARD[$i] ?? []), 'user' => $uid, 'standard' => !$own];
     }
     return ['signatures' => $n, 'same_person' => (string)setting_get('contract_same_person', 'no') === 'yes', 'sig' => $sig];
 }
@@ -880,7 +892,7 @@ function contract_sig_people($i, $c = null, $exceptId = 0, $rule = null) {
 }
 //  Who a signature is addressed to, in words: "Branch Manager or Branch Application Manager".
 function contract_sig_label($i, $rule = null) {
-    $rule = $rule ?: contract_open_rule(); $s = $rule['sig'][$i]; $bits = [];
+    $rule = $rule ?: contract_open_rule(); $s = $rule['sig'][$i] ?? ['roles' => [], 'user' => 0, 'standard' => true]; $bits = [];
     foreach ($s['roles'] as $r) $bits[] = function_exists('role_name') ? role_name($r) : $r;
     if ($s['user']) { $u = ops_one("SELECT * FROM users WHERE id=?", [(int)$s['user']]); if ($u) $bits[] = user_name($u); }
     if ($i === 1 && $s['standard']) $bits[] = 'anyone who manages a branch\'s users';
@@ -1095,13 +1107,16 @@ function contract_rule_editable() { return is_master() || can('settings.manage')
 function contract_rule_save(array $post) {
     if (!contract_rule_editable()) return [];
     $before = contract_open_rule(); $changed = []; $all = function_exists('roles_all') ? roles_all() : ORG_ROLES;
-    foreach (range(1, CONTRACT_SIG_MAX) as $i) {
+    //  Every box that was on the screen, however many signatures the company uses.
+    $top = CONTRACT_SIG_MAX;
+    foreach (array_keys($post) as $k) if (preg_match('/^contract_sig(\d+)_sent$/', (string)$k, $m)) $top = max($top, min(CONTRACT_SIG_HARD_LIMIT, (int)$m[1]));
+    foreach (range(1, $top) as $i) {
         if (!array_key_exists('contract_sig' . $i . '_sent', $post)) continue;
         $roles = [];
         foreach ((array)($post['contract_sig' . $i . '_roles'] ?? []) as $r) { $r = strtoupper(trim((string)$r)); if (isset($all[$r]) && $r !== 'MASTER_ADMIN' && !in_array($r, $roles, true)) $roles[] = $r; }
         $uid = (int)($post['contract_sig' . $i . '_user'] ?? 0);
         if ($uid && !ops_one("SELECT id FROM users WHERE id=? AND is_active=1", [$uid])) $uid = 0;
-        $was = $before['sig'][$i];
+        $was = $before['sig'][$i] ?? ['roles' => [], 'user' => 0, 'standard' => true];
         $sameRoles = !array_diff($roles, $was['roles']) && !array_diff($was['roles'], $roles);
         if ($sameRoles && $uid === (int)$was['user']) continue;                 // untouched — the standard rule stays the standard rule
         setting_set('contract_sig' . $i . '_roles', implode(',', $roles));
@@ -1586,11 +1601,28 @@ function ops_contract_overrides($route, $method) {
 //  reports produced, and the money (invoiced / received / outstanding). Reachable
 //  from search and the client's Contracts tab; drill in and use Back to step out.
 // ---------------------------------------------------------------------------
-function ops_contract_360() {
-    ops_require(is_master()
+// Who may open a contract page — one rule, used by the page itself and by every link to it.
+function contract_can_view() {
+    return is_master()
         || (function_exists('can') && (can('mod.clients.view') || can('mod.vendors.view') || can('crm.contract.register') || can('data.credit') || can('finance.reconcile')))
-        || (function_exists('is_coordinator_level') && is_coordinator_level()),
-        'You do not have permission to view contracts.');
+        || (function_exists('is_coordinator_level') && is_coordinator_level());
+}
+// A contract number as a link to its contract page, for those who may open it; plain text
+// for everyone else, or when no contract row carries that number (owner, 26 Nov 2026, O-06:
+// "there is no option to access the contract number that has already been generated").
+function contract_link_html($number, $contractId = 0) {
+    $number = trim((string)$number);
+    if ($number === '') return '';
+    $id = (int)$contractId;
+    if ($id <= 0) {
+        try { $id = (int)(ops_val("SELECT id FROM partner_contracts WHERE contract_number=? ORDER BY id DESC LIMIT 1", [$number]) ?: 0); }
+        catch (Throwable $e) { $id = 0; }
+    }
+    if ($id <= 0 || !contract_can_view()) return e($number);
+    return '<a href="/contract?id=' . $id . '" title="Open the contract">' . e($number) . '</a>';
+}
+function ops_contract_360() {
+    ops_require(contract_can_view(), 'You do not have permission to view contracts.');
     $id = (int)($_GET['id'] ?? 0);
     $c = ops_one("SELECT pc.*, b.legal_name, b.display_name, o.name branch_name
                   FROM partner_contracts pc

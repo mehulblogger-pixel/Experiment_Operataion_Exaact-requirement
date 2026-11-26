@@ -25,7 +25,21 @@ function setupqa_sets() {
 // choices, otherwise the question's default (which is what the code does today).
 function setupqa_value(array $q) {
     $v = function_exists('setting_get') ? (string) setting_get($q['key'], '') : '';
+    if (($q['type'] ?? '') === 'number') return setupqa_number_ok($q, $v) ? (string)(int) $v : (string) $q['default'];
     return array_key_exists($v, $q['options']) ? $v : (string) $q['default'];
+}
+// A question answered with a whole number (e.g. "how many signatures") — any whole number from
+// its minimum up to its technical limit (owner, 26 Nov 2026: "as many as needed").
+function setupqa_number_ok(array $q, $v) {
+    $v = trim((string) $v);
+    if ($v === '' || !ctype_digit($v)) return false;
+    $n = (int) $v;
+    return $n >= (int) ($q['min'] ?? 0) && (!isset($q['max']) || $n <= (int) $q['max']);
+}
+// The words for an answer, for the history line ("3 — one after another…").
+function setupqa_answer_words(array $q, $v) {
+    if (($q['type'] ?? '') === 'number') return isset($q['words']) ? ($q['words'])((int) $v) : (string)(int) $v;
+    return (string) ($q['options'][$v] ?? $v);
 }
 
 // Save one set's answers. Only a value that is one of the offered choices is
@@ -40,11 +54,12 @@ function setupqa_save(array $set, array $post) {
         if (!empty($sec['save'])) foreach (($sec['save'])($post) as $line) $changed[] = $line;
         foreach ($sec['questions'] ?? [] as $q) {
             if (!array_key_exists($q['key'], $post)) continue;
-            $v = (string) $post[$q['key']];
-            if (!array_key_exists($v, $q['options'])) continue;
+            $v = trim((string) $post[$q['key']]);
+            if (($q['type'] ?? '') === 'number') { if (!setupqa_number_ok($q, $v)) continue; $v = (string)(int) $v; }
+            elseif (!array_key_exists($v, $q['options'])) continue;
             if ($v === setupqa_value($q)) continue;
             setting_set($q['key'], $v);
-            $changed[] = $q['ask'] . ' → ' . $q['options'][$v];
+            $changed[] = $q['ask'] . ' → ' . setupqa_answer_words($q, $v);
         }
     }
     if ($changed && function_exists('act_log'))
@@ -182,8 +197,12 @@ function setupqa_sales_set() {
                         'key' => 'contract_open_signatures',
                         'ask' => 'How many approvals does a new contract need before it opens?',
                         'why' => 'Until a contract is open, no work can be raised against it. A later change to an open contract (value, dates, quantities, billing terms) follows the same answer.',
-                        'options' => ['5' => 'Five — one after another, the last is the final approval', '4' => 'Four — one after another, the last is the final approval', '3' => 'Three — one after another, the last is the final approval',
-                                      '2' => 'Two — a first signature, then a final approval', '1' => 'One — a single approval', '0' => 'None — it opens as soon as it is registered'],
+                        //  Any number (owner, 26 Nov 2026: "as many as needed"; up to five from 24 Nov).
+                        'type' => 'number', 'min' => 0, 'max' => defined('CONTRACT_SIG_HARD_LIMIT') ? CONTRACT_SIG_HARD_LIMIT : 50,
+                        'hint' => '0 = none, it opens as soon as it is registered · 1 = a single approval · 2 = a first signature, then a final approval · 3 or more = one after another, the last is always the final approval.',
+                        'words' => fn($n) => $n === 0 ? 'None — it opens as soon as it is registered' : ($n === 1 ? 'One — a single approval'
+                                     : ($n === 2 ? 'Two — a first signature, then a final approval' : $n . ' — one after another, the last is the final approval')),
+                        'options' => [],
                         'default' => '2',
                     ],
                     [
@@ -192,7 +211,7 @@ function setupqa_sales_set() {
                         'why' => 'Different people is the safer answer. A very small company, where one person holds several jobs, may need "yes".',
                         'options' => ['no' => 'No — each from a different person', 'yes' => 'Yes — one person may give more than one'],
                         'default' => 'no',
-                        'only_when' => ['contract_open_signatures', '2|3|4|5'],
+                        'only_when' => ['contract_open_signatures', '2+'],
                     ],
                 ],
                 'editor' => 'contract_signers',

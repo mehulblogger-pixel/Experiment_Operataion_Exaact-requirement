@@ -421,6 +421,18 @@ writes one line in the quotation's history (who, what, why).
   `crm.quote.send`. Every PDF and Word download writes one line to the quotation's History and its
   activity record (who, when, format, draft or approved copy). "Send from my mailbox"
   (`quote-compose`) is refused before it has cleared, like `quote-status → SENT`.
+- **Unsigned drafts, superseded revisions, and an unchanged Save (owner, 26 Nov 2026 — "go ahead
+  and fix everything as recommended").** No status or move is added.
+  - A copy that has not cleared prints **"Unsigned draft"** where the authorised signatory's
+    signature goes; the signature image is printed only on a cleared copy.
+  - An earlier revision (`is_current = 0`, `crm_quote_superseded()`) prints **"SUPERSEDED — see
+    Rev NN"** on every page (NN = the current revision) and its file name ends "-SUPERSEDED"; its
+    Word copy and "Send from my mailbox" are refused (status moves on it were already refused).
+  - **D-07 unchanged, made exact:** saving the edit form cancels an approval only when the commercial
+    terms really change. The terms compare as text (line breaks and spaces at line ends do not count),
+    the edit form no longer fills the company's standard terms into a quotation saved with none, and a
+    quotation made from a project costing or a deal starts with the standard terms like one made on
+    the form. Before this, an unchanged Save on such a quotation put an APPROVED one back to DRAFT.
 
 ## Project costing (`project_costings.status`)
 
@@ -736,7 +748,7 @@ stateDiagram-v2
   [*] --> OPEN : re-use existing OPEN number (rate-contract draw-down) · crm.php:1861-1863
   [*] --> OPEN : registered by a company whose rule asks for NO approval · contract_after_register (owner, 13 Nov 2026)
   PENDING --> PENDING : first signature (only when the company asks for two or more) · can_endorse_contract_open
-  PENDING --> PENDING : signature 2…4 of 3–5, one after another (only when the company asks for three or more) · contract_sig_user_holds(slot) · the one before it given (owner, 24 Nov 2026, Q-08)
+  PENDING --> PENDING : signature 2…N−1 of N, one after another (only when the company asks for three or more) · contract_sig_user_holds(slot) · the one before it given (owner, 24 Nov 2026, Q-08)
   PENDING --> OPEN : final approval · can_approve_contract_open; with two or more signatures: every earlier one given, and a different person unless the company allows one person to give more than one
   PENDING --> REJECTED : reject · endorse OR approve rights (contracts.php:679-683)
   OPEN --> CLOSED : idle auto-close cron (≥ idle days) · system, no user (contracts.php:543-546)
@@ -775,14 +787,15 @@ stateDiagram-v2
   person for each; whether one person may give both. No status was added. The only new entry is
   "registered straight to OPEN" for a company that asks for no approval, which the owner approved
   ("none, one or two — Yes").
-- **Up to five signatures, one after another (owner, 24 Nov 2026, Q-08 — "Yes").** The same
-  screen offers three, four or five as well as none, one and two. The first signature and the final
+- **Any number of signatures, one after another (owner, 24 Nov 2026, Q-08 — "Yes"; from 26 Nov
+  2026 "as many as needed").** The same screen asks for the number (0, 1, 2, 3 … — a technical safety
+  limit of 50, `CONTRACT_SIG_HARD_LIMIT`, stops a typing slip; it is not a business rule). The first signature and the final
   approval keep their places and their columns (`mgr_endorsed_*`, `bm_approved_*`; on an amendment
   `endorsed_*` and the decision); the signatures in between are rows in `contract_signatures`
   (contract, amendment, slot, who, when). Order (`contract_sig_order()`): first → signature 2 →
-  signature 3 → signature 4 → final approval; each waits for the one before it, and a signature
+  … → final approval; each waits for the one before it, and a signature
   posted out of turn is refused. Each is given by the roles and/or one named person the company
-  sets (settings `contract_sig3…5_roles` / `_user`); until one is set, only the Master Admin can
+  sets (settings `contract_sig3…N_roles` / `_user`); until one is set, only the Master Admin can
   give it, and the settings say so. "May one person give more than one" still applies across all of
   them. A re-opening, or a change to the figures, billing terms or billing schedule before approval,
   voids the signatures in between (`voided_at` — kept, never deleted), as it withdraws the first.
@@ -820,7 +833,7 @@ re-works out what is due on the contract's jobs. One amendment waits at a time. 
 stateDiagram-v2
   [*] --> PENDING : contract-edit on an OPEN contract with commercial changes + a reason · crm.contract.register/master
   PENDING --> PENDING : first signature (only when the company's rule asks for two or more) · can_endorse_contract_open
-  PENDING --> PENDING : signature 2…4 of 3–5, in order (Q-08, 24 Nov 2026) · contract_sig_user_holds(slot) · kept apart from the opening's signatures (contract_signatures.amendment_id)
+  PENDING --> PENDING : signature 2…N−1 of N, in order (Q-08, 24 Nov 2026; any number from 26 Nov 2026) · contract_sig_user_holds(slot) · kept apart from the opening's signatures (contract_signatures.amendment_id)
   PENDING --> APPROVED : final approval · can_approve_contract_open; with two or more: every earlier signature given, a different person unless the company allows one (or master) — the new figures replace the old, in one transaction
   PENDING --> REJECTED : reject, with a reason · endorse OR approve rights — the contract keeps its figures
   APPROVED --> [*]

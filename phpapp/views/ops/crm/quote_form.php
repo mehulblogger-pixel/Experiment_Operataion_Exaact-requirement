@@ -29,7 +29,10 @@ $__sxq4 = !(function_exists('is_embed') && is_embed());   // never inside the in
   $curOffs  = array_filter(explode(',', (string)$g('exec_office_ids')));
   $terms    = $posted && array_key_exists('terms_conditions', $posted) ? (string)$posted['terms_conditions']
             : ($isEdit ? (string)($q['terms_conditions'] ?? '') : '');
-  if (trim($terms) === '' && !$posted) $terms = $defaultTerms;
+  //  The company's standard terms are offered on a NEW quotation only. On an edit the box shows
+  //  exactly what is saved (and printed) — filling the default in there made an unchanged Save
+  //  look like a change of terms and cancelled an approval (owner, 26 Nov 2026, DEF-02).
+  if (trim($terms) === '' && !$posted && !$isEdit) $terms = $defaultTerms;
 ?>
 <div class="master-head">
   <div><h1><?= $isEdit ? 'Edit — ' . e(quote_label($q)) : ucfirst(T_NEW('quote')) ?></h1>

@@ -23,6 +23,13 @@ foreach ($sections as $sec):
         <fieldset style="border:0;padding:0;margin:14px 0 0"<?= !empty($q['only_when']) ? ' data-only-when="' . e($q['only_when'][0]) . '" data-only-value="' . e($q['only_when'][1]) . '"' : '' ?>>
           <legend style="font-weight:600;font-size:15px;margin-bottom:4px"><?= e($q['ask']) ?></legend>
           <?php if (!empty($q['why'])): ?><p class="muted" style="margin:0 0 8px;font-size:13px"><?= e($q['why']) ?></p><?php endif; ?>
+          <?php if (($q['type'] ?? '') === 'number'): ?>
+            <label style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+              <input class="form-control" type="number" inputmode="numeric" name="<?= e($q['key']) ?>" value="<?= e($cur) ?>" min="<?= (int)($q['min'] ?? 0) ?>"<?= isset($q['max']) ? ' max="' . (int)$q['max'] . '"' : '' ?> step="1" style="max-width:110px" <?= $secCan ? '' : 'disabled' ?>>
+              <span class="muted" style="font-size:13px"><?= e(setupqa_answer_words($q, $cur)) ?> (now)</span>
+            </label>
+            <?php if (!empty($q['hint'])): ?><p class="muted" style="margin:6px 0 0;font-size:12.5px"><?= e($q['hint']) ?></p><?php endif; ?>
+          <?php else: ?>
           <div style="display:grid;gap:6px">
             <?php foreach ($q['options'] as $val => $label): ?>
               <label style="display:flex;gap:8px;align-items:flex-start;padding:8px 10px;border:1px solid var(--line,#ddd);border-radius:8px;cursor:pointer">
@@ -31,6 +38,7 @@ foreach ($sections as $sec):
               </label>
             <?php endforeach; ?>
           </div>
+          <?php endif; ?>
         </fieldset>
       <?php endforeach; ?>
       <?php if (($sec['editor'] ?? '') === 'contract_signers') include __DIR__ . '/_contract_signers.php'; ?>
@@ -45,12 +53,16 @@ foreach ($sections as $sec):
 (function(){
   function sync(){
     [].forEach.call(document.querySelectorAll('[data-only-when]'),function(el){
-      var on=document.querySelector('input[name="'+el.getAttribute('data-only-when')+'"]:checked');
-      var vals=(el.getAttribute('data-only-value')||'').split('|');
-      el.hidden=!(on && vals.indexOf(on.value)>=0);
+      var nm=el.getAttribute('data-only-when');
+      var on=document.querySelector('input[name="'+nm+'"]:checked')||document.querySelector('input[type="number"][name="'+nm+'"]');
+      var want=el.getAttribute('data-only-value')||'';
+      //  "2+" means two or more (a number answer); otherwise a list of answers "a|b".
+      if (/^\d+\+$/.test(want)) { var v=on?parseInt(on.value,10):NaN; el.hidden=!(v>=parseInt(want,10)); return; }
+      el.hidden=!(on && want.split('|').indexOf(on.value)>=0);
     });
   }
-  document.addEventListener('change',function(ev){ if(ev.target && ev.target.type==='radio') sync(); });
+  document.addEventListener('change',function(ev){ if(ev.target && (ev.target.type==='radio'||ev.target.type==='number')) sync(); });
+  document.addEventListener('input',function(ev){ if(ev.target && ev.target.type==='number') sync(); });
   sync();
 })();
 </script>

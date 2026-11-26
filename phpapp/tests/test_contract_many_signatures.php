@@ -13,7 +13,7 @@
 //   5. An amendment with three signatures follows the same order.
 //   6. No new status: the contract stays PENDING until the final approval.
 // ============================================================================
-t_section('Q-08 — up to five ordered contract signatures');
+t_section('Q-08 — ordered contract signatures (five on 24 Nov; any number from 26 Nov)');
 
 $root   = dirname(__DIR__);
 $engine = $GLOBALS['__test_engine'] ?? 'sqlite';
@@ -80,8 +80,12 @@ try {
     t_ok(strpos($said($r), 'no middle signature') !== false && $midCount($c0) === 0, 'a "middle signature" posted on a two-signature company is refused: ' . $said($r));
     $drive($BM, 'contract-open', 'POST', [], ['id' => $c0, 'do' => 'approve']);
     t_eq((string) $C($c0)['open_status'], 'OPEN', 'a two-signature contract opens exactly as before');
+    //  Owner, 26 Nov 2026 ("as many as needed"): any whole number is a number of signatures;
+    //  something that is not a whole number is not trusted — the standard two applies.
     setting_set('contract_open_signatures', '9');
-    t_eq(contract_open_rule()['signatures'], 2, 'a number outside 0–5 is not trusted — the standard two applies');
+    t_eq(contract_open_rule()['signatures'], 9, 'nine signatures is a number the company may now ask for');
+    setting_set('contract_open_signatures', 'nine');
+    t_eq(contract_open_rule()['signatures'], 2, 'a value that is not a whole number is not trusted — the standard two applies');
 
     // ---- 2. three signatures, in order -----------------------------------------------------------
     t_section('Q-08 — three signatures, one after another');
@@ -195,10 +199,11 @@ try {
     t_section('Q-08 — the settings screen');
     $sec = array_values(array_filter(setupqa_sales_set()['sections'] ?? [], fn($s) => ($s['tab'] ?? '') === 'contract'))[0] ?? ['questions' => []];
     $qs = array_column($sec['questions'], null, 'key');
-    t_eq(array_map('strval', array_keys($qs['contract_open_signatures']['options'])), ['5', '4', '3', '2', '1', '0'], 'the number of signatures offers up to five');
-    t_eq($qs['contract_same_person']['only_when'][1], '2|3|4|5', '"may one person give more than one" is asked whenever there are two or more');
-    $signers = (string) file_get_contents($root . '/views/ops/_contract_signers.php');
-    t_ok(strpos($signers, "\$csBox(3, 'Who gives signature 2?'") !== false && strpos($signers, "\$csBox(5, 'Who gives signature 4?'") !== false, 'a box for each signature in between');
+    //  From 26 Nov 2026 the number is typed (any number; tests/test_owner26_quotes.php proves seven).
+    t_eq([$qs['contract_open_signatures']['type'] ?? '', (int) ($qs['contract_open_signatures']['min'] ?? -1)], ['number', 0], 'the number of signatures is any whole number from 0');
+    t_eq($qs['contract_same_person']['only_when'][1], '2+', '"may one person give more than one" is asked whenever there are two or more');
+    ob_start(); $sections = [$sec]; include $root . '/views/ops/_setup_sections.php'; $signers = (string) ob_get_clean();
+    t_ok(strpos($signers, 'Who gives signature 2?') !== false && strpos($signers, 'Who gives signature 4?') !== false, 'a box for each signature in between');
     $as($MA);
     $saved = contract_rule_save(['contract_sig4_sent' => '1', 'contract_sig4_roles' => ['FINANCE']]);
     t_ok(contract_open_rule()['sig'][4]['roles'] === ['FINANCE'] && strpos(implode(' ', $saved), 'Signature 3') !== false, 'the box for signature 3 saves: ' . implode(' ', $saved));

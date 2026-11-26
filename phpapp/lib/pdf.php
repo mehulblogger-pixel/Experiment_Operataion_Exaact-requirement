@@ -322,7 +322,10 @@ function quote_pdf_build($q, $lines, $tpl, $sig = [], $lh = []) {
     $p = new SimplePDF();
     //  Q-05 (owner, 24 Nov 2026) — until a quotation has cleared its approval, every
     //  copy says so across each page. The approved copy is unchanged.
-    if (function_exists('crm_quote_doc_cleared') && !crm_quote_doc_cleared($q)) $p->watermark = QUOTE_DRAFT_MARK;
+    $cleared = !function_exists('crm_quote_doc_cleared') || crm_quote_doc_cleared($q);
+    if (!$cleared) $p->watermark = QUOTE_DRAFT_MARK;
+    //  An earlier revision says so on every page, whatever it was (owner, 26 Nov 2026).
+    if (function_exists('crm_quote_superseded') && crm_quote_superseded($q)) $p->watermark = crm_quote_superseded_mark($q);
     $ml = $p->ml; $right = $p->right();
     // ---- customisable letterhead ----
     $band = !empty($lh['band']) && is_array($lh['band']) ? $lh['band'] : [30, 64, 175];
@@ -446,7 +449,11 @@ function quote_pdf_build($q, $lines, $tpl, $sig = [], $lh = []) {
     $p->gap(18); $p->needSpace(90);
     $sy = $p->y;
     $p->text($ml, 'For ' . (($lh['name'] ?? '') ?: app_name()), 10, true);
-    if (!empty($sig['img'])) {
+    //  A draft is never signed (owner, 26 Nov 2026): the signature image is printed only once
+    //  the quotation has cleared its approval; until then the words "Unsigned draft" stand there.
+    if (!$cleared) {
+        $p->y = $sy + 30; $p->text($ml, 'Unsigned draft', 11, true, [170, 40, 40]);
+    } elseif (!empty($sig['img'])) {
         $name = $p->addJpeg($sig['img']);
         if ($name) { [$iw, $ih] = $p->imgDim($name); $dw = 120; $dh = $ih > 0 ? min(55, $dw * $ih / max(1, $iw)) : 40; $p->drawImage($name, $ml, $sy + 6, $dw, $dh); }
     }
