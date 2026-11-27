@@ -331,11 +331,43 @@ function office_gst_registration($officeId) {
     }
     return null;
 }
+//  Owner, 27 Nov 2026 (BL-09 / GD-04, "our state is not set — we have already set our state under
+//  company profile"): our state is looked for in this order — the billing branch's own GSTIN (or its
+//  parent's), the Company-profile GSTIN (its first two digits), the Company-profile state, and last
+//  the Tally "Our state". Before this the Company profile was never read, so a company that filled
+//  only its profile was always charged CGST+SGST, even on a bill to another state.
 function books_our_state($officeId = null) {
     if ($officeId && ($reg = office_gst_registration($officeId))) return (string)$reg['state_code'];
+    $sg = function_exists('setting_get') ? 'setting_get' : null;
+    if ($sg && function_exists('tally_gstin_state')) {
+        $g = strtoupper(trim((string)$sg('company_gstin', '')));
+        if ($g !== '' && ($st = tally_gstin_state($g)) !== '') return $st;
+    }
+    if ($sg && function_exists('tally_state_code')) {
+        $st = tally_state_code((string)$sg('company_state', ''));
+        if ($st !== '') return $st;
+    }
     if (!function_exists('tally_settings')) return '';
     $cfg = tally_settings();
     return (string)($cfg['state_code'] ?? '');
+}
+//  Re-reads our state for a DRAFT and, when it differs from what the draft holds, re-decides
+//  CGST+SGST against IGST and recomputes the lines. Never touches an issued invoice.
+function books_refresh_our_state(array $inv) {
+    if (($inv['status'] ?? '') !== 'DRAFT') return;
+    $off = !empty($inv['office_id']) ? (int)$inv['office_id'] : null;
+    $ours = books_our_state($off);
+    if ($ours === (string)($inv['supplier_state'] ?? '')) return;
+    $locId = function_exists('custid_location_id_for') ? custid_location_id_for((int)$inv['partner_id'], (int)($inv['billing_address_id'] ?? 0)) : 0;
+    $igst = books_is_igst((int)$inv['partner_id'], $off, $locId);
+    db()->prepare("UPDATE invoices SET supplier_state=?, is_igst=?, updated_at=? WHERE id=? AND status='DRAFT'")
+       ->execute([$ours, $igst, date('c'), (int)$inv['id']]);
+    books_recalc((int)$inv['id']);
+}
+//  Where to set our state, in the words of the screens (used when an invoice cannot be issued).
+function books_our_state_where($officeId = null) {
+    $name = $officeId ? (string)(books_try(fn() => ops_val("SELECT name FROM offices WHERE id=?", [(int)$officeId]), '') ?: '') : '';
+    return "Set your company's state in Admin → Company profile" . ($name !== '' ? ', or give the ' . $name . ' branch its GSTIN' : '') . '.';
 }
 //  The GSTIN printed as ours on a document of this office.
 function books_our_gstin($officeId = null) {
@@ -509,6 +541,25 @@ function books_restatus($invoiceId) {
 //  on it. Three jobs quoting three different contract numbers is a real fact
 //  about the month, and silently picking the first would be a lie.
 // ---------------------------------------------------------------------------
+//  The branch a new invoice starts on (owner, 27 Nov 2026, GD-04): the client's own billing
+//  branch, else the branch of the person raising it. Only a starting choice — it can be changed.
+function books_default_office_for($partnerId) {
+    $pid = (int)$partnerId;
+    $active = fn($id) => $id > 0 && (int)books_try(fn() => ops_val("SELECT id FROM offices WHERE id=? AND is_active=1", [(int)$id]), 0) > 0;
+    if ($pid) {
+        $cb = (int)books_try(fn() => ops_val("SELECT home_branch_id FROM business_partners WHERE id=?", [$pid]), 0);
+        if ($active($cb)) return $cb;
+    }
+    $mine = (int)(current_user()['home_office_id'] ?? 0);
+    return $active($mine) ? $mine : 0;
+}
+//  This client's contracts, newest first, for the invoice's contract drop-down (GD-05).
+function books_partner_contracts($partnerId) {
+    return books_try(fn() => ops_all(
+        "SELECT id, contract_number, title, value, start_date, end_date, is_active FROM partner_contracts
+         WHERE partner_id=? AND COALESCE(contract_number,'')<>'' ORDER BY is_active DESC, id DESC", [(int)$partnerId]), []) ?: [];
+}
+
 function books_carry_for($partnerId, array $jobIds = []) {
     books_migrate();
     $out = ['contract_number'=>'', 'po_number'=>'', 'payment_terms'=>'', 'credit_days'=>'',
@@ -757,7 +808,7 @@ function books_line_add($invoiceId, array $b) {
                    VALUES (?,?,?,?,?,?,?,?,?,?,?)")
        ->execute([(int)$invoiceId, $seq, $job, $callId, $desc,
                   trim((string)($b['hsn_sac'] ?? '')) ?: books_default_sac(), $qty,
-                  (string)($b['unit'] ?? ''), $rate, $gst, $lineContract]);
+                  mb_substr(trim((string)($b['unit'] ?? '')), 0, 20), $rate, $gst, $lineContract]);
     books_recalc($invoiceId);
     return '';
 }
@@ -812,6 +863,10 @@ function books_issue_missing(array $inv) {
         if ($cp && !custid_complete($cp)) $why[] = custid_missing_words($cp);
     }
     if (!$inv['office_id']) $why[] = 'No branch is set, so it has no numbering series.';
+    //  Owner, 27 Nov 2026: with our own state unknown, CGST+SGST against IGST would be a guess — the
+    //  comment on books_is_igst() always promised this refusal; now it is made.
+    if (books_our_state(!empty($inv['office_id']) ? (int)$inv['office_id'] : null) === '')
+        $why[] = 'Our own state is not known, so CGST+SGST against IGST would be a guess. ' . books_our_state_where(!empty($inv['office_id']) ? (int)$inv['office_id'] : null);
     return $why;
 }
 
@@ -819,6 +874,9 @@ function books_issue($invoiceId) {
     books_migrate();
     $inv = books_invoice($invoiceId);
     if (!$inv) return 'That invoice no longer exists.';
+    //  A draft started while our state was still unknown (or before it changed) takes the state as it
+    //  is now, at the moment it is issued — the issued copy then never changes (owner, 27 Nov 2026).
+    if ($inv['status'] === 'DRAFT') { books_refresh_our_state($inv); $inv = books_invoice($invoiceId); }
     $why = books_issue_missing($inv);
     if ($why) return implode(' ', $why);
     //  The copy of who it is made out to is taken once more as it is issued; from
@@ -965,15 +1023,25 @@ function books_receipt_create(array $b) {
 
 // Spread a receipt across invoices. Refuses to allocate more than arrived and
 // more than the invoice owes — both are how a ledger stops balancing.
+// Returns '' when everything asked for was matched, else the words for what was not
+// (kept as a string for every existing caller; the screen uses books_allocate_report()).
 function books_allocate($receiptId, array $rows) {
+    $rep = books_allocate_report($receiptId, $rows);
+    return $rep['tone'] === 'ok' ? '' : $rep['text'];
+}
+
+//  Owner, 27 Nov 2026 (GD-05): "it showed error at the top but also two in the list" — one press
+//  can match some lines and refuse others, so the answer names, per invoice, what WAS matched (cash
+//  and TDS) and what was NOT and why. tone: ok = all matched, part = some, none = nothing.
+function books_allocate_report($receiptId, array $rows) {
     books_migrate();
     $r = books_try(fn() => ops_one("SELECT * FROM receipts WHERE id=?", [(int)$receiptId]), null);
-    if (!$r) return 'That receipt no longer exists.';
+    if (!$r) return ['tone' => 'none', 'text' => 'That receipt no longer exists.', 'matched' => [], 'refused' => []];
     $u = current_user(); $now = date('c');
 
     $freeCash = round((float)$r['amount'] - books_allocated($receiptId, 'CASH'), 2);
     $freeTds  = round((float)$r['tds_amount'] - books_allocated($receiptId, 'TDS'), 2);
-    $done = 0; $msg = [];
+    $matched = []; $refused = [];
 
     foreach ($rows as $invId => $vals) {
         $invId = (int)$invId;
@@ -981,29 +1049,94 @@ function books_allocate($receiptId, array $rows) {
             $amt = round((float)($vals[strtolower($kind)] ?? 0), 2);
             if ($amt <= 0) continue;
             $inv = books_invoice($invId);
-            if (!$inv) { $msg[] = 'One invoice had gone.'; continue; }
-            if ($inv['status'] === 'CANCELLED') { $msg[] = $inv['invoice_no'] . ' is cancelled.'; continue; }
-            if ($inv['status'] === 'DRAFT')     { $msg[] = 'A draft invoice cannot take a payment.'; continue; }
-            if ((int)$inv['partner_id'] !== (int)$r['partner_id']) { $msg[] = $inv['invoice_no'] . ' belongs to another customer.'; continue; }
+            $what = ($kind === 'TDS' ? 'TDS ' : '') . fmoney($amt);
+            if (!$inv) { $refused[] = 'Not matched: ' . $what . ' — that invoice no longer exists.'; continue; }
+            $no = (string)($inv['invoice_no'] !== '' ? $inv['invoice_no'] : 'draft #' . $invId);
+            $not = 'Not matched: ' . $what . ' to ' . $no . ' — ';
+            if ($inv['status'] === 'CANCELLED') { $refused[] = $not . 'it is cancelled.'; continue; }
+            if ($inv['status'] === 'DRAFT')     { $refused[] = $not . 'a draft invoice cannot take a payment; issue it first.'; continue; }
+            if ((int)$inv['partner_id'] !== (int)$r['partner_id']) { $refused[] = $not . 'it belongs to another customer.'; continue; }
 
             $free = $kind === 'CASH' ? $freeCash : $freeTds;
-            if ($amt > $free + 0.01) { $msg[] = 'More was allocated than arrived on the receipt.'; continue; }
+            if ($amt > $free + 0.01) {
+                $refused[] = $not . ($kind === 'CASH'
+                    ? 'this receipt has ' . fmoney(max(0, $free)) . ' cash left; record the rest as its own receipt (Money in → + Record money received).'
+                    : 'this receipt has ' . fmoney(max(0, $free)) . ' TDS left; if the customer withheld more, record a receipt with that TDS.');
+                continue;
+            }
             $owed = books_settled($invId)['outstanding'];
-            if ($amt > $owed + 0.01) { $msg[] = $inv['invoice_no'] . ' only owes ' . fmoney($owed) . '.'; continue; }
+            if ($amt > $owed + 0.01) { $refused[] = $not . 'it only owes ' . fmoney($owed) . '.'; continue; }
 
             if (books_alloc_insert((int)$receiptId, $invId, $kind, $amt, $u ? user_name($u) : '', $now) < 1) {
                 // The checks above passed a moment ago; the database says no now --
                 // another allocation landed in between. Say so rather than overdraw.
-                $msg[] = 'Someone else allocated against ' . $inv['invoice_no'] . ' or this receipt a moment ago. Refresh and check what is still free.';
+                $refused[] = $not . 'someone else matched against it or this receipt a moment ago. Refresh and check what is still free.';
                 continue;
             }
             if ($kind === 'CASH') $freeCash = round($freeCash - $amt, 2); else $freeTds = round($freeTds - $amt, 2);
             books_restatus($invId);
-            $done++;
+            if (!isset($matched[$invId])) $matched[$invId] = ['no' => $no, 'cash' => 0.0, 'tds' => 0.0];
+            $matched[$invId][$kind === 'CASH' ? 'cash' : 'tds'] += $amt;
         }
     }
-    if (!$done) return $msg ? implode(' ', array_unique($msg)) : 'Nothing was allocated — every figure was blank or zero.';
-    return $msg ? implode(' ', array_unique($msg)) : '';
+    $lines = [];
+    foreach ($matched as $m)
+        $lines[] = 'Matched ' . ($m['cash'] > 0 ? fmoney($m['cash']) : '') . ($m['cash'] > 0 && $m['tds'] > 0 ? ' + ' : '')
+                 . ($m['tds'] > 0 ? 'TDS ' . fmoney($m['tds']) : '') . ' to ' . $m['no'] . '.';
+    $refused = array_values(array_unique($refused));
+    if (!$matched && !$refused) return ['tone' => 'none', 'text' => 'Nothing was allocated — every figure was blank or zero.', 'matched' => [], 'refused' => []];
+    $tone = !$refused ? 'ok' : ($matched ? 'part' : 'none');
+    return ['tone' => $tone, 'text' => implode(' ', array_merge($lines, $refused)), 'matched' => $lines, 'refused' => $refused];
+}
+
+//  Owner, 27 Nov 2026 (GD-05, "list of invoices with record payment details to directly feed the
+//  payment"): record a payment against ONE invoice and match it in the same step. The receipt is
+//  written by books_receipt_create() and matched by books_allocate_report() — the same code as Money
+//  in, nothing copied. More than the invoice still owes is refused here (before any receipt is made);
+//  such a payment goes through Money in, where the extra stays on the receipt to match later.
+function books_invoice_pay($invoiceId, array $b) {
+    books_migrate();
+    $inv = books_invoice($invoiceId);
+    if (!$inv) return ['err' => 'That invoice no longer exists.'];
+    $no = (string)($inv['invoice_no'] !== '' ? $inv['invoice_no'] : 'draft #' . (int)$inv['id']);
+    if (!in_array($inv['status'], ['ISSUED', 'PART_PAID'], true))
+        return ['err' => $inv['status'] === 'DRAFT' ? 'A draft invoice cannot take a payment; issue it first.' : $no . ' is ' . strtolower(INV_STATUS[$inv['status']] ?? $inv['status']) . ' — there is nothing to pay on it.'];
+    [$amt, $e] = books_figure($b, 'amount', 'The amount', 0, null, 0.0); if ($e !== '') return ['err' => $e];
+    [$tds, $e] = books_figure($b, 'tds_amount', 'TDS', 0, null, 0.0);   if ($e !== '') return ['err' => $e];
+    if ($amt <= 0 && $tds <= 0) return ['err' => 'Type the amount received.'];
+    $owed = books_settled((int)$inv['id'])['outstanding'];
+    if ($amt + $tds > $owed + 0.01)
+        return ['err' => fmoney($amt) . ($tds > 0 ? ' + TDS ' . fmoney($tds) : '') . ' is more than ' . $no . ' still owes (' . fmoney($owed) . '). '
+                       . 'To record more than this invoice owes, use Money in → + Record money received; the extra stays on the receipt to match later.'];
+    $r = books_receipt_create([
+        'partner_id' => (int)$inv['partner_id'], 'office_id' => (int)($inv['office_id'] ?? 0),
+        'amount' => $amt, 'tds_amount' => $tds, 'receipt_date' => (string)($b['receipt_date'] ?? ''),
+        'mode' => isset(RECEIPT_MODES[(string)($b['mode'] ?? '')]) ? (string)$b['mode'] : 'NEFT',
+        'reference' => substr(trim((string)($b['reference'] ?? '')), 0, 120),
+        'notes' => 'Recorded against ' . $no . '.',
+    ]);
+    if (!empty($r['err'])) return ['err' => $r['err']];
+    $rep = books_allocate_report((int)$r['id'], [(int)$inv['id'] => ['cash' => $amt, 'tds' => $tds]]);
+    $now = books_invoice((int)$inv['id']);
+    $state = strtolower(INV_STATUS[$now['status'] ?? ''] ?? (string)($now['status'] ?? ''));
+    if ($rep['tone'] !== 'ok')
+        return ['id' => (int)$r['id'], 'no' => $r['no'], 'tone' => 'part',
+                'text' => 'Receipt ' . $r['no'] . ' recorded, but not all of it could be matched: ' . $rep['text'] . ' Open the receipt to match the rest.'];
+    return ['id' => (int)$r['id'], 'no' => $r['no'], 'tone' => 'ok',
+            'text' => 'Receipt ' . $r['no'] . ' recorded. ' . implode(' ', $rep['matched']) . ' ' . $no . ' is now ' . $state . '.'];
+}
+
+//  Suggested figures for the match form, oldest invoice first: the receipt's free cash, then its
+//  free TDS, each up to what the invoice still owes (owner, 27 Nov 2026 — TDS was easy to miss).
+function books_allocate_suggest(array $open, $leftCash, $leftTds) {
+    $out = []; $c = round((float)$leftCash, 2); $t = round((float)$leftTds, 2);
+    foreach ($open as $o) {
+        $owe = round((float)$o['outstanding'], 2);
+        $cash = max(0, min($c, $owe)); $c = round($c - $cash, 2);
+        $tds = max(0, min($t, round($owe - $cash, 2))); $t = round($t - $tds, 2);
+        $out[(int)$o['id']] = ['cash' => (float)$cash, 'tds' => (float)$tds];
+    }
+    return $out;
 }
 
 // The allocation row is written by an INSERT that re-checks both ceilings --
@@ -1232,6 +1365,8 @@ function books_invoice_where(array $f) {
     if (!empty($f['status'])) { $wh[] = 'i.status = ?'; $a[] = $f['status']; }
     if (!empty($f['open']))   { $wh[] = "i.status IN ('ISSUED','PART_PAID')"; }
     if (!empty($f['partner'])) { $wh[] = 'i.partner_id = ?'; $a[] = (int)$f['partner']; }
+    if (!empty($f['from'])) { $wh[] = 'i.invoice_date >= ?'; $a[] = (string)$f['from']; }
+    if (!empty($f['to']))   { $wh[] = 'i.invoice_date <= ?'; $a[] = (string)$f['to']; }
     if (!empty($f['q'])) {
         $wh[] = '(i.invoice_no LIKE ? OR i.partner_name LIKE ? OR i.po_number LIKE ? OR i.contract_number LIKE ?)';
         $like = '%' . $f['q'] . '%'; array_push($a, $like, $like, $like, $like);

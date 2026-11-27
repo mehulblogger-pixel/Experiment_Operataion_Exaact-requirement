@@ -7,7 +7,7 @@
 // changed. The old page is kept in tests/fixtures/pre_stage1/.
 require __DIR__ . '/_sxw_ui.php';
 $who2 = (int) $who;
-$q = $whoKey !== 'me' ? '&who=' . rawurlencode((string) $whoKey) : '';
+$q = sx_who_carry($whoKey) ? '&who=' . rawurlencode((string) $whoKey) : '';
 $cardTone = function ($r) { $st = sx_due_state($r['next_action_on'] ?? ''); return $st === 'overdue' || $st === 'none' ? 'r' : ($st === 'today' ? 'o' : ($st === 'week' ? 'y' : '')); };
 $cardNote = function ($r) { $st = sx_due_state($r['next_action_on'] ?? ''); return $st === 'none' ? 'no next step' : ($st === 'overdue' ? 'overdue' : ($st === 'today' ? 'today' : '')); };
 //  The deal columns exactly as before: the pipeline's OPEN stages, open deals, this person's when one is chosen.

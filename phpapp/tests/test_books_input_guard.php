@@ -10,6 +10,11 @@
 //  (t_eq is t_eq($got, $want).)
 // ============================================================================
 t_section('books — figures off a form are validated; credit is bounded');
+
+//  An invoice is issued only once our own state is known (owner, 27 Nov 2026 — books_issue_missing()):
+//  this file's invoices are raised by a company whose profile says Gujarat; restored at the end.
+$__ourStateKeep = (string) setting_get('company_state', '');
+if (books_our_state(null) === '') setting_set('company_state', 'Gujarat');
 $own = !db()->inTransaction(); if ($own) db()->beginTransaction();
 try {
     books_migrate();
@@ -86,3 +91,5 @@ try {
          'the invoice screen flags a negative outstanding in words instead of calling it "Paid in full"');
     t_ok(strpos($view, '$ivOut < -1.0') < strpos($view, "=== 'PAID'"), '...and checks it BEFORE the PAID branch that would hide it');
 } finally { if ($own && db()->inTransaction()) db()->rollBack(); }
+
+setting_set('company_state', $__ourStateKeep);   // owner 27 Nov 2026 — put back what the run had

@@ -6,7 +6,7 @@
 // Lead, in the same order as before (overdue, no next step, today, this week).
 // The old page is kept in tests/fixtures/pre_stage1/.
 require __DIR__ . '/_sxw_ui.php';
-$c = $d['counts']; $q = $whoKey !== 'me' ? '?who=' . rawurlencode((string) $whoKey) : '';
+$c = $d['counts']; $q = sx_who_carry($whoKey) ? '?who=' . rawurlencode((string) $whoKey) : '';
 //  One follow-up list: the deal rows and the lead rows as sx_today_data() gives them,
 //  merged with the same ordering rule each list already used.
 $order = ['overdue' => 0, 'none' => 1, 'today' => 2, 'week' => 3];

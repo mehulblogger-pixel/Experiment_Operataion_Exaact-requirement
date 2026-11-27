@@ -3627,6 +3627,7 @@ function ops_route_module_map() {
         'invoice-set-branch'=>'invoicing','invoice-bill-to'=>'invoicing',
         'to-bill'=>'invoicing','receipts'=>'invoicing','receipt'=>'invoicing','receipt-new'=>'invoicing',
         'receipt-allocate'=>'invoicing','receipt-unallocate'=>'invoicing','credit-note-new'=>'invoicing',
+        'invoice-pay'=>'invoicing',
         'ledger'=>'invoicing',
         'customer'=>'clients','customer-parent'=>'clients',
         // 'trace' and 'flow-gaps' are deliberately ungated: they show only records
@@ -4507,7 +4508,7 @@ function ops_dispatch($route, $method) {
         // The books: invoices, money in, credit notes, the customer ledger.
         case in_array($route, ['invoices','invoice','invoice-print','invoice-new','invoice-line-add','invoice-line-delete',
                                'invoice-issue','invoice-cancel','invoice-set-branch','invoice-bill-to','to-bill','receipts','receipt','receipt-new',
-                               'receipt-allocate','receipt-unallocate','credit-note-new','ledger'], true):
+                               'receipt-allocate','receipt-unallocate','credit-note-new','ledger','invoice-pay'], true):
             return ops_books($route, $method);
         case $route === 'pipelines' || strncmp($route, 'pipeline', 8) === 0:
             return ops_pipelines($route, $method);
@@ -9550,7 +9551,13 @@ function ops_jobs($route, $method) {
             }
         }
         if ($existingInv) {
-            flash('This ' . Tl('job') . ' is already billed on invoice #' . $existingInv . ' — opened it here. Add a line or raise a credit note to bill anything more.', 'info');
+            //  Owner, 27 Nov 2026 (BL-10): the real invoice number, and only the action that is possible —
+            //  a draft can take another line; an issued invoice never changes (GST).
+            $ex = books_try(fn() => ops_one("SELECT invoice_no, status FROM invoices WHERE id=?", [$existingInv]), null) ?: [];
+            $exNo = trim((string)($ex['invoice_no'] ?? '')) !== '' ? (string)$ex['invoice_no'] : 'a draft invoice';
+            flash(($ex['status'] ?? '') === 'DRAFT'
+                ? 'This ' . Tl('job') . ' is already on ' . $exNo . ' (not issued yet) — opened it here. Add a line to it to bill anything more.'
+                : 'This ' . Tl('job') . ' is already billed on invoice ' . $exNo . ' — opened it here. To charge more, start a + New invoice for the extra; to reduce it, raise a credit note.', 'info');
             redirect('/invoice?id=' . $existingInv);
         }
         $call = ops_one("SELECT * FROM calls WHERE id=?", [$job['call_id']]);

@@ -24,7 +24,12 @@
     </p>
   </div>
   <div style="display:flex;gap:6px;flex-wrap:wrap">
-    <a class="btn secondary" href="/invoice-print?id=<?= (int)$inv['id'] ?>" target="_blank" rel="noopener">🖨 Print / PDF</a>
+    <?php // Owner, 27 Nov 2026 (BL-09: "no option to download the invoice when I created a draft") —
+          // the same print page, named for what it does; a draft prints with a DRAFT band. ?>
+    <a class="btn secondary" href="/invoice-print?id=<?= (int)$inv['id'] ?>" target="_blank" rel="noopener">⬇ PDF / Print<?= $isDraft ? ' (draft)' : '' ?></a>
+    <?php if (in_array($inv['status'], ['ISSUED','PART_PAID'], true) && (float)$settled['outstanding'] > 1): ?>
+      <a class="btn" href="/invoice-pay?id=<?= (int)$inv['id'] ?>">₹ Record payment</a>
+    <?php endif; ?>
   </div>
 </div>
 
@@ -265,7 +270,13 @@
       <span class="muted" style="font-size:12px">Picking one takes its rate and quantity, so the figure is not typed twice.</span></div>
     <div><label>Description</label><input class="form-control" name="description" maxlength="500" placeholder="e.g. Third-party inspection — May 2026"></div>
     <div><label>SAC</label><input class="form-control" name="hsn_sac" maxlength="20" value="<?= e(books_default_sac()) ?>"></div>
-    <div><label>Unit</label><input class="form-control" name="unit" maxlength="20" placeholder="e.g. manday, visit"></div>
+    <?php // Owner, 27 Nov 2026 (GD-04): the same unit list as the quotation (Masters → charge_unit). ?>
+    <div><label for="inv-unit">Unit</label>
+      <?php if (!empty($unitOpts)): ?>
+        <select class="form-control" id="inv-unit" name="unit"><option value="">—</option>
+          <?php foreach ($unitOpts as $uk => $ul): ?><option value="<?= e($ul) ?>"><?= e($ul) ?></option><?php endforeach; ?>
+        </select>
+      <?php else: ?><input class="form-control" id="inv-unit" name="unit" maxlength="20" placeholder="e.g. Man-day, Per visit"><?php endif; ?></div>
     <div><label>Quantity</label><input class="form-control" name="qty" type="number" step="0.001" value="1"></div>
     <div><label>Rate</label><input class="form-control" name="rate" type="number" step="0.01" placeholder="0.00"></div>
     <div><label>GST %</label><input class="form-control" name="gst_pct" type="number" step="0.01" value="<?= e(books_default_gst()) ?>"></div>
@@ -279,6 +290,7 @@
   <h3 style="margin-top:0">Issue it</h3>
   <p class="muted" style="font-size:13px;margin:0 0 10px">Issuing allocates the next number in the branch's series. A draft that is never issued burns no number, and an issued invoice is never deleted — that is what keeps the series whole.</p>
   <button class="btn" <?= $missing ? 'disabled' : '' ?> onclick="return confirm('Issue this invoice for <?= e(fmoney($inv['total'])) ?>?')">Issue this invoice</button>
+  <a class="btn secondary" href="/invoice-print?id=<?= (int)$inv['id'] ?>" target="_blank" rel="noopener" style="margin-left:6px">⬇ PDF / Print (draft)</a>
   <?php if ($missing): ?><span class="muted" style="font-size:12.5px;margin-left:8px">Fix the points above first.</span><?php endif; ?>
 </form>
 <?php endif; ?>
@@ -308,7 +320,10 @@
       </table>
     </div>
     <div style="padding:12px 16px;border-top:1px solid var(--line);display:flex;gap:8px;flex-wrap:wrap">
-      <a class="btn small secondary" href="/receipt-new?partner=<?= (int)$inv['partner_id'] ?>">Record money received</a>
+      <?php if ($settled['outstanding'] > 1 && $inv['status'] !== 'CANCELLED'): ?>
+        <a class="btn small" href="/invoice-pay?id=<?= (int)$inv['id'] ?>">₹ Record payment for this invoice</a>
+      <?php endif; ?>
+      <a class="btn small secondary" href="/receipt-new?partner=<?= (int)$inv['partner_id'] ?>">One payment for several invoices</a>
       <a class="btn small secondary" href="/ledger?id=<?= (int)$inv['partner_id'] ?>">Customer ledger</a>
     </div>
   </div>

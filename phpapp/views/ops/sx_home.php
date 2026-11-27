@@ -11,7 +11,7 @@ require __DIR__ . '/_sxw_ui.php';
 $u = current_user(); $c = $d['counts'];
 $company = function_exists('company_name') ? company_name() : (string) (setting_get('company_name', '') ?? '');
 $hour = (int) date('G'); $greet = $hour < 12 ? 'Good morning' : ($hour < 17 ? 'Good afternoon' : 'Good evening');
-$q = $whoKey !== 'me' ? '?who=' . rawurlencode((string) $whoKey) : '';
+$q = sx_who_carry($whoKey) ? '?who=' . rawurlencode((string) $whoKey) : '';
 $openV = array_sum(array_map(fn($o) => (float) $o['value'], $d['open_deals']));
 //  The eleven "where to go" tiles, as before (shown unless their feature is switched off).
 $tiles = [

@@ -3,6 +3,11 @@
 // charges, partial billing and the reconciliation (owner's acceptance tests 7–10).
 t_section('termination, suspension and partial billing never lose or double-bill work');
 
+//  An invoice is issued only once our own state is known (owner, 27 Nov 2026 — books_issue_missing()):
+//  this file's invoices are raised by a company whose profile says Gujarat; restored at the end.
+$__ourStateKeep = (string) setting_get('company_state', '');
+if (books_our_state(null) === '') setting_set('company_state', 'Gujarat');
+
 $pdo = db();
 billunit_migrate();
 
@@ -105,3 +110,5 @@ db()->prepare("DELETE FROM invoice_lines WHERE invoice_id > ?")->execute([$__bu_
 db()->prepare("DELETE FROM invoices WHERE id > ?")->execute([$__bu_inv0]);
 db()->prepare("DELETE FROM billable_bills WHERE id > ?")->execute([$__bu_bb0]);
 db()->prepare("DELETE FROM billable_events WHERE id > ?")->execute([$__bu_ev0]);
+
+setting_set('company_state', $__ourStateKeep);   // owner 27 Nov 2026 — put back what the run had

@@ -89,6 +89,12 @@ try {
                 if ($keep) bbv_as($keep);
                 return !$may;
             }
+            //  Owner, 27 Nov 2026 (GD-05, docs/02 19ac): someone who may see everyone opens the Sales
+            //  screens on Everyone, so their links name the view (/sales-today?who=all); the same
+            //  screen is still linked. (The bare "Log activity" shortcut is hidden from those who can
+            //  log nothing — 26 Nov, 19ab.)
+            if ($href === '/sales-today')
+                return (bool) array_filter($n['hrefs'], fn($h) => strncmp((string) $h, '/sales-today?who=', 17) === 0);
             if ($href !== '/quote-edit') return false;
             $keep = $_SESSION['uid'] ?? null; bbv_as($uid); $mayWrite = crm_quote_can_create(); if ($keep) bbv_as($keep);
             return $mayWrite ? in_array('/quote-new', $n['hrefs'], true) : !in_array('/quote-new', $n['hrefs'], true);

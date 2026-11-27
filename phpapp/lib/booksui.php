@@ -76,6 +76,12 @@ function books_dt_invoice_columns($today) {
             return '<span class="' . ($late ? 'pill p-bad' : 'muted') . '" style="font-size:12px">'
                  . e(fdate($r['due_date'])) . ($late ? ' — late' : '') . '</span>';
         }],
+        //  Owner, 27 Nov 2026: record the payment straight from the list.
+        'pay' => ['label' => '', 'render' => function ($r) {
+            $out = round((float)$r['total'] - (float)$r['settled_cash'] - (float)$r['credited'], 2);
+            if (!in_array($r['status'], ['ISSUED', 'PART_PAID'], true) || $out <= 1) return '';
+            return '<a class="btn small secondary" href="/invoice-pay?id=' . (int)$r['id'] . '" style="white-space:nowrap">₹ Record payment</a>';
+        }],
         'status' => ['label' => 'Status', 'sort' => 'i.status', 'render' => fn($r) =>
             '<span class="pill ' . ($r['status'] === 'PAID' ? 'p-ok'
                 : ($r['status'] === 'CANCELLED' ? 'p-mut' : ($r['status'] === 'DRAFT' ? 'p-mut' : 'p-warn')))
@@ -99,6 +105,10 @@ function ops_books($route, $method) {
         if ($f === 'paid')    $filter['status'] = 'PAID';
         if ($f === 'cancelled') $filter['status'] = 'CANCELLED';
         if ($f === 'overcredited') $filter['overcredited'] = 1;
+        //  Owner, 27 Nov 2026: a financial-year filter (by invoice date). The Open view starts on All
+        //  years, so nothing still owed from last year is ever hidden; the others start on this year.
+        $fyF = fy_filter($f === 'open' || $f === 'overcredited' ? 'ALL' : null);
+        if (!$fyF['all']) { $filter['from'] = $fyF['from']; $filter['to'] = $fyF['to']; }
 
         if (wants_csv()) {
             $csv = [['Invoice','Date','Due','Customer','Branch','PO','Contract','Taxable','CGST','SGST','IGST','Round off','Total','Settled','Outstanding','Status']];
@@ -116,7 +126,7 @@ function ops_books($route, $method) {
         $rows  = books_invoices($filter, dt_sql_tail($dt, $cols,
                     "(i.status IN ('ISSUED','PART_PAID')) DESC, i.invoice_date DESC, i.id DESC"));
         view('ops/invoices', ['rows' => $rows, 'total' => $total, 'dt' => $dt, 'cols' => $cols,
-                              'f' => $f, 'counts' => books_counts(), 'canIssue' => $canIssue]);
+                              'f' => $f, 'counts' => books_counts(), 'canIssue' => $canIssue, 'fy' => $fyF['fy']]);
         return true;
     }
 
@@ -206,6 +216,8 @@ function ops_books($route, $method) {
             'missing' => books_issue_missing($inv),
             'billable' => $inv['status'] === 'DRAFT' ? books_billable_jobs((int)$inv['partner_id'], 60) : [],
             'canIssue' => $canIssue, 'canCancel' => books_can_cancel(),
+            //  The same unit list the quotation uses (Masters → charge_unit), so a line reads alike on both.
+            'unitOpts' => function_exists('lk_options_or') && defined('CHARGE_UNITS') ? lk_options_or('charge_unit', CHARGE_UNITS) : [],
             'reasons' => CN_REASONS, 'today' => date('Y-m-d'),
             // For the "set branch" fixer on a draft with no branch.
             'offices' => ($inv['status'] === 'DRAFT' && empty($inv['office_id']))
@@ -296,6 +308,10 @@ function ops_books($route, $method) {
             // the work being billed, so nobody re-types a PO number that is
             // already in the system and gets it wrong.
             'carry' => $pid ? books_carry_for($pid) : [],
+            //  Owner, 27 Nov 2026 (GD-04 / GD-05): our branch filled in by itself, and the contract a
+            //  choice from this client's own contracts.
+            'officeDefault' => books_default_office_for($pid),
+            'contracts' => $pid ? books_partner_contracts($pid) : [],
         ]);
         return true;
     }
@@ -384,6 +400,28 @@ function ops_books($route, $method) {
         return true;
     }
 
+    //  Record a payment against one invoice and match it at once (owner, 27 Nov 2026). Same gate as
+    //  Money in → + Record money received (books_can(), checked above), plus the invoice's branch.
+    if ($route === 'invoice-pay') {
+        $id = (int)($_GET['id'] ?? $_POST['id'] ?? 0);
+        $inv = books_invoice($id);
+        if (!$inv) { http_response_code(404); view('notfound'); return true; }
+        if (function_exists('scope_allows') && !empty($inv['office_id']))
+            ops_require(scope_allows((int)$inv['office_id']), 'This invoice is outside your office / branch scope.');
+        if ($method === 'POST') {
+            $r = books_invoice_pay($id, $_POST);
+            if (!empty($r['err'])) { flash($r['err'], 'error'); redirect('/invoice-pay?id=' . $id); }
+            flash($r['text'], $r['tone'] === 'ok' ? 'success' : 'warning');
+            redirect($r['tone'] === 'ok' ? '/invoice?id=' . $id : '/receipt?id=' . (int)$r['id']);
+        }
+        $st = books_settled($id);
+        if (!in_array($inv['status'], ['ISSUED', 'PART_PAID'], true) || $st['outstanding'] <= 0.01) {
+            flash(($inv['invoice_no'] ?: 'This invoice') . ' has nothing left to pay.', 'warning'); redirect('/invoice?id=' . $id);
+        }
+        view('ops/invoice_pay', ['inv' => $inv, 'settled' => $st]);
+        return true;
+    }
+
     if ($route === 'receipt-allocate' && $method === 'POST') {
         $id = (int)($_POST['receipt_id'] ?? 0);
         // The form posts cash[invoiceId] and tds[invoiceId]; they are folded into
@@ -392,8 +430,9 @@ function ops_books($route, $method) {
         foreach (['cash', 'tds'] as $k)
             foreach ((array)($_POST[$k] ?? []) as $invId => $amt)
                 if (trim((string)$amt) !== '') $rows[(int)$invId][$k] = $amt;
-        $e = books_allocate($id, $rows);
-        flash($e !== '' ? $e : 'Allocated.', $e !== '' ? 'error' : 'success');
+        //  One line per invoice: green when all matched, amber when part, red when none (owner, 27 Nov 2026).
+        $rep = books_allocate_report($id, $rows);
+        flash($rep['text'], ['ok' => 'success', 'part' => 'warning', 'none' => 'error'][$rep['tone']]);
         redirect('/receipt?id=' . $id);
     }
 
