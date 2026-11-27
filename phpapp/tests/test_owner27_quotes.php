@@ -183,6 +183,11 @@ try {
     t_ok(!in_array($SBU, $people, true), 'a costing level named to the SBU Head, who signed level 1, goes to someone else who may approve');
     t_ok(in_array($SBU, array_map(fn($u) => (int) $u['id'], pc_step_people(['level' => 1, 'approver_role' => '', 'approver_user_id' => $SBU, 'status' => 'APPROVED'], $h)), true),
         'his own signed level still shows him');
+    //  The fallback never pulls in someone who holds another waiting level (a "free person", as on quotes).
+    $ins->execute([$pc, 3, '', $BD, 'PENDING', '', null]);
+    $fb = array_map(fn($u) => (int) $u['id'], pc_step_people(['level' => 2, 'approver_role' => '', 'approver_user_id' => $SBU, 'status' => 'PENDING'], $h));
+    t_ok(!in_array($BD, $fb, true), 'the fallback for level 2 leaves out the Business Director, who holds waiting level 3');
+    t_ok($fb !== [], 'someone else may still sign level 2: ' . count($fb) . ' person(s)');
     $pdo->prepare("INSERT INTO recruit_approval_requests (entity, entity_id, status, current_seq) VALUES ('REQUISITION', 0, 'PENDING', 2)")->execute();
     $rq = (int) $pdo->lastInsertId(); $rqIds[] = $rq;
     $pdo->prepare("INSERT INTO recruit_approval_steps (request_id, seq, approver_user_id, status, acted_by, acted_by_id) VALUES (?,1,?,'APPROVED','Sunil O27',?)")->execute([$rq, $SBU, $SBU]);

@@ -274,6 +274,20 @@ function pc_step_people($step, $h) {
     if (strtoupper((string)($step['status'] ?? 'PENDING')) === 'PENDING' && !empty($h['id'])) {
         $signedOther = pc_signed_other_levels((int)$h['id'], (int)($step['level'] ?? 0));
         if ($signedOther) $out = array_values(array_filter($out, fn($u) => !in_array((int)$u['id'], $signedOther, true)));
+        //  The fallback ("anyone else who may approve") never pulls in a person who holds another
+        //  waiting level of this costing — signing here would lock them out of their own level
+        //  (same "free person" idea as the quotation). If that leaves nobody, keep the list as it was.
+        if (trim((string)($step['approver_role'] ?? '')) === '' && empty($step['approver_user_id']) && $out) {
+            $busy = [];
+            foreach (pc_steps((int)$h['id']) as $o) {
+                if ((int)($o['level'] ?? 0) === (int)($step['level'] ?? 0)) continue;
+                if (strtoupper((string)($o['status'] ?? 'PENDING')) !== 'PENDING') continue;
+                if (trim((string)($o['approver_role'] ?? '')) === '' && empty($o['approver_user_id'])) continue;
+                foreach (pc_step_people($o, $h) as $p) $busy[] = (int)$p['id'];
+            }
+            $free = array_values(array_filter($out, fn($u) => !in_array((int)$u['id'], $busy, true)));
+            if ($free) $out = $free;
+        }
     }
     //  The author is the only person holding this level (a Marketing Manager who
     //  prepared it, at a "Marketing Manager" level): it may not wait forever on
