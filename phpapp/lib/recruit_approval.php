@@ -85,6 +85,8 @@ function appr_migrate() {
         try { ensure_column('recruit_approval_steps', 'sla_days', 'INT DEFAULT 0'); } catch (Throwable $e) {}
         try { ensure_column('recruit_approval_steps', 'reminder_days', 'INT DEFAULT 0'); } catch (Throwable $e) {}
         try { ensure_column('recruit_approval_steps', 'activated_at', "VARCHAR(30) DEFAULT ''"); } catch (Throwable $e) {}
+        // Who signed, by id as well as by name — "one person, one level" (owner, 27 Nov 2026).
+        try { ensure_column('recruit_approval_steps', 'acted_by_id', 'INT NULL'); } catch (Throwable $e) {}
         // M3 CORRECTION #3 · D1 — ONE additive, nullable column: the canonical
         // identity of the person who raised this chain, captured from the
         // authenticated session at appr_start(). The audit's own question ("can
@@ -215,6 +217,7 @@ function appr_self_migrate() {
 }
 
 function _appr_now() { return function_exists('now_iso') ? now_iso() : date('c'); }
+function _appr_actor_id() { $u = function_exists('current_user') ? current_user() : null; return (int)($u['id'] ?? 0) ?: null; }
 function _appr_actor() { return function_exists('user_name') && function_exists('current_user') ? user_name(current_user()) : 'system'; }
 
 //  Phase 3 · M3 §9 — a WORKING-day clock, not a calendar one.
@@ -1673,6 +1676,21 @@ function appr_visible($step, $req, $user = null) {
     return appr_guard($req) === '';
 }
 
+//  The other level (seq) this person already signed on the step's request — 0 when none. Matched
+//  by id; a signature given before the id was kept is matched by the name it was signed under.
+function appr_signed_other_step($step, $user) {
+    $rid = (int)($step['request_id'] ?? 0); $uid = (int)($user['id'] ?? 0);
+    if ($rid <= 0 || $uid <= 0) return 0;
+    $nm = function_exists('user_name') ? user_name($user) : '';
+    try { $rows = ops_all("SELECT seq, acted_by, acted_by_id FROM recruit_approval_steps WHERE request_id=? AND status='APPROVED'", [$rid]) ?: []; }
+    catch (Throwable $e) { return 0; }
+    foreach ($rows as $r) {
+        if ((int)$r['seq'] === (int)($step['seq'] ?? -1)) continue;
+        $hit = !empty($r['acted_by_id']) ? (int)$r['acted_by_id'] === $uid : ($nm !== '' && (string)($r['acted_by'] ?? '') === $nm);
+        if ($hit) return (int)$r['seq'];
+    }
+    return 0;
+}
 function appr_can_act($step, $user = null) {
     $user = $user ?: (function_exists('current_user') ? current_user() : null);
     if (!$user) return false;
@@ -1682,6 +1700,10 @@ function appr_can_act($step, $user = null) {
     // is the existing licence-aware master helper — master, but only for a module
     // this installation actually has. Same rule the rest of the app already uses.
     if (function_exists('is_master_of') ? is_master_of('hiring') : (function_exists('is_master') && is_master())) return true;
+    //  One person, one level (owner, 27 Nov 2026, decision 1): who already signed another level of
+    //  this request cannot sign this one — named, by role, or acting for someone. The level then waits
+    //  for its other approvers, its escalation, or the Master Admin (above), who is not held by it.
+    if (appr_signed_other_step($step, $user)) return false;
     if ((int)($step['approver_user_id'] ?? 0) > 0) {
         if ((int)$step['approver_user_id'] === (int)$user['id']) return true;
         // M2 — or this person is currently acting for that named approver.
@@ -1770,14 +1792,14 @@ function appr_act($stepId, $decision, $remarks = '') {
 
     $now = _appr_now(); $actor = _appr_actor();
     if ($decision === 'reject') {
-        db()->prepare("UPDATE recruit_approval_steps SET status='REJECTED', acted_by=?, acted_at=?, remarks=? WHERE id=?")->execute([$actor,$now,substr((string)$remarks,0,400),(int)$stepId]);
+        db()->prepare("UPDATE recruit_approval_steps SET status='REJECTED', acted_by=?, acted_by_id=?, acted_at=?, remarks=? WHERE id=?")->execute([$actor,_appr_actor_id(),$now,substr((string)$remarks,0,400),(int)$stepId]);
         db()->prepare("UPDATE recruit_approval_requests SET status='REJECTED', closed_at=? WHERE id=?")->execute([$now,(int)$req['id']]);
         $cb = appr_callback($req['entity'], (int)$req['entity_id'], 'REJECTED', $req);
         if ($cb !== true) return appr_undo_step($stepId, $req, $cb);
         appr_email_requester($req, 'rejected', $remarks);
         return [true, 'Rejected.'];
     }
-    db()->prepare("UPDATE recruit_approval_steps SET status='APPROVED', acted_by=?, acted_at=?, remarks=? WHERE id=?")->execute([$actor,$now,substr((string)$remarks,0,400),(int)$stepId]);
+    db()->prepare("UPDATE recruit_approval_steps SET status='APPROVED', acted_by=?, acted_by_id=?, acted_at=?, remarks=? WHERE id=?")->execute([$actor,_appr_actor_id(),$now,substr((string)$remarks,0,400),(int)$stepId]);
     // Next pending step?
     $next = ops_one("SELECT * FROM recruit_approval_steps WHERE request_id=? AND status='PENDING' AND seq>? ORDER BY seq LIMIT 1", [(int)$req['id'], (int)$step['seq']]);
     if ($next) {
@@ -1807,7 +1829,7 @@ function appr_act($stepId, $decision, $remarks = '') {
 //  so nothing about it is left behind.
 function appr_undo_step($stepId, $req, $why) {
     try {
-        db()->prepare("UPDATE recruit_approval_steps SET status='PENDING', acted_by='', acted_at='', remarks='' WHERE id=?")
+        db()->prepare("UPDATE recruit_approval_steps SET status='PENDING', acted_by='', acted_by_id=NULL, acted_at='', remarks='' WHERE id=?")
             ->execute([(int) $stepId]);
         db()->prepare("UPDATE recruit_approval_requests SET status='PENDING', closed_at='' WHERE id=?")
             ->execute([(int) $req['id']]);

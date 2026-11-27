@@ -329,6 +329,13 @@ writes one line in the quotation's history (who, what, why).
   still needs a draft or a sent quotation, so "withdraw it to draft first, then mark it lost" now
   has its button. `crm_quote_withdraw_problem()`, route `/quote-withdraw`, guard rail
   `tests/test_sales_stage4.php`.
+- **One person, one level (owner, 27 Nov 2026, decision 1).** Inside PENDING_APPROVAL, whoever has already
+  signed one level cannot sign another level of the same quotation — named, by role, as a cover or by
+  escalation; a level left with nobody is opened at once to the level above (the D-11a escalation, reused)
+  or, with nobody above, to the Master Admin. The same holds for a project costing's levels and for a
+  recruitment approval request's levels (docs/02 19ac). No status or transition is added.
+- **Send again (owner, 27 Nov 2026, QP-10).** A SENT quotation can be e-mailed to the client again from the
+  company mailbox. It is not a move: the status stays SENT and History records who sent it again, to whom.
 - **APPROVED → SENT by hand (14 Nov 2026).** Someone with `crm.quote.send` who sends the quotation from
   their own mailbox ("Open in Gmail" or the Outlook .eml) presses "✓ I have sent it — mark sent": the
   same APPROVED → SENT move, follow-ups start, and the client is not e-mailed again by the system. Not

@@ -83,6 +83,21 @@ $__sxq4 = !(function_exists('is_embed') && is_embed());   // never inside the in
   </div>
 </div>
 
+<?php // The system's own Word format, or the company's (owner, 27 Nov 2026). ?>
+<?php $wf = (string) ($wordFormat ?? 'company'); $wfs = (array) ($wordFormats ?? []); ?>
+<div class="panel" id="word-format" style="scroll-margin-top:70px">
+  <h3 class="tab-sub" style="margin-top:0">Word format for the editable <?= e(Tl('quote')) ?></h3>
+  <p class="sub">EXAACT has its own Word format — the same content and layout as the <?= e(Tl('client')) ?> PDF, on your letterhead. If a <?= e(Tl('client')) ?> needs your own format, upload it below as a template; it can then be chosen.</p>
+  <form method="post" action="/crm-templates" style="display:flex;flex-direction:column;gap:6px">
+    <label style="display:flex;gap:8px;align-items:flex-start"><input type="radio" name="word_format" value="company" <?= $wf !== 'system' ? 'checked' : '' ?> style="margin-top:3px">
+      <span><b>Our uploaded format</b> — <?= $wfs ? 'the default one (' . e((string) ($wfs[0]['name'] ?? '')) . ')' : '<span class="muted">none uploaded yet, so the system format is used</span>' ?></span></label>
+    <label style="display:flex;gap:8px;align-items:flex-start"><input type="radio" name="word_format" value="system" <?= $wf === 'system' ? 'checked' : '' ?> style="margin-top:3px">
+      <span><b>System format</b> — always the built-in one</span></label>
+    <div><button class="btn small" type="submit">Save</button>
+      <span class="muted" style="font-size:12.5px">On a <?= e(Tl('quote')) ?>, More ▾ still offers every format, so one <?= e(Tl('client')) ?> can get another.</span></div>
+  </form>
+</div>
+
 <div class="panel" style="padding:0;overflow:hidden">
   <div class="tbl-scroll" style="overflow-x:auto">
   <table class="dt">
