@@ -1016,7 +1016,21 @@ function ops_report_obligations(array $job, $today = null, $ev = null) {
         if ($end === '' && $visits) $end = array_key_last($visits);
         if ($end === '' || $end < $start) $end = $start;
         if ($stop !== '' && $stop < $end) $end = max($start, $stop);
+        $openEnded = substr(trim((string)($job['inspection_end_date'] ?? '')), 0, 10) === '' && !$visits;
         $periods = report_periods($freq, $start, $end, (int)($job['report_custom_days'] ?? 0), $office, $noInsp);
+        //  An open-ended job (no end date, no visit days yet) owes its first day's report. When that
+        //  first day is a day off (e.g. a Sunday), the first WORKING day on or after it is owed — not
+        //  nothing (found 27 Nov 2026: a daily job starting on a Sunday never showed in Reports to write).
+        if (!$periods && $openEnded && $end === $start && function_exists('is_working_day')) {
+            for ($k = 1, $d = $start; $k <= 14; $k++) {
+                $d = date('Y-m-d', strtotime($start . " +$k day"));
+                if ($d > $today) break;
+                if (!isset($noInsp[$d]) && is_working_day($d, $office)) {
+                    $periods = report_periods($freq, $d, $d, (int)($job['report_custom_days'] ?? 0), $office, $noInsp);
+                    break;
+                }
+            }
+        }
         foreach ($periods as [$from, $to]) {
             // A period whose every planned visit day was "No inspection" owes no report.
             $hasV = false; $hasNo = false;

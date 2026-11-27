@@ -213,6 +213,18 @@ try {
     bbv_route('lead-delete', 'POST', $f['master'], 0, ['id' => (int) $l['id']]);
     $a = ops_one("SELECT * FROM activities WHERE entity_kind='LEAD' AND entity_id=? ORDER BY id DESC LIMIT 1", [$l['id']]);
     t_ok($a && (int) $a['partner_id'] === $pid, 'O4 · a lead linked to a client is filed on it, as before');
+    t_section('Reports to write — an open-ended daily job that starts on a day off (found 27 Nov)');
+    $sun = ['id' => 0, 'reporting_frequency' => 'DAILY', 'scheduled_date' => '2026-11-22', 'inspection_end_date' => '', 'closed_flag' => 0, 'stage' => '', 'report_upload_date' => ''];
+    if (is_working_day('2026-11-22', null)) t_ok(true, 'Sunday is a working day here — nothing to check');
+    else {
+        $o = ops_report_obligations($sun, '2026-11-27', ['reports' => [], 'visits' => []]);
+        t_eq((int) $o['missing'], 1, 'a daily job starting on Sunday 22 Nov still owes one report (before: none)');
+        t_eq((string) $o['oldest_missing'], '2026-11-23', 'the owed day is the first working day, Monday 23 Nov');
+        $mon = ops_report_obligations(['scheduled_date' => '2026-11-23'] + $sun, '2026-11-27', ['reports' => [], 'visits' => []]);
+        t_eq((string) $mon['oldest_missing'], '2026-11-23', 'a Monday start is unchanged');
+        $early = ops_report_obligations($sun, '2026-11-22', ['reports' => [], 'visits' => []]);
+        t_eq((int) $early['missing'], 0, 'on the Sunday itself nothing is owed yet');
+    }
 } finally {
     putenv('BBV_RAW');
     $pdo = db();
