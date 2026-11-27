@@ -8,7 +8,7 @@
 //   item 15 — the same list as a CSV.
 // Billing and payment figures only for people who may see receivables (ar_can), as before.
 require __DIR__ . '/_sxw_ui.php';
-$q = $whoKey !== 'me' ? '&who=' . rawurlencode((string) $whoKey) : '';
+$q = sx_who_carry($whoKey) ? '&who=' . rawurlencode((string) $whoKey) : '';
 $tot = ['v' => 0.0, 'vg' => 0.0, 'b' => 0.0, 'r' => 0.0, 'cn' => 0.0, 'tds' => 0.0];
 foreach ($rows as $o) {
     $tot['v'] += (float) ($o['_value'] ?? $o['total_amount']); $tot['vg'] += (float) $o['total_amount'];
@@ -46,7 +46,7 @@ $listRows = array_values(array_filter($rows, function ($o) use ($stSel) {
               sxw_kpi('warn', 'file', 'Still to bill', 'Still to bill', sx_short(max(0, $tot['vg'] - $tot['b'])), 'order in hand · with GST', $stHref('tobill'));
               sxw_kpi('teal', 'checkc', 'Received', 'Received', sx_short($tot['r']), 'payments + TDS deducted' . ($tot['tds'] > 0 ? ' (TDS ' . sx_short($tot['tds']) . ')' : ''), $stHref('received'));
               sxw_kpi('grey', 'swap', 'Reduced by credit note', 'Reduced by credit note', sx_short($tot['cn']), 'shown apart — not money in', $stHref('credit'));
-              if ($recvMonth !== null) sxw_kpi('info', 'cal', 'Received this month', 'Received this month', sx_short($recvMonth), 'payments · ' . ($collectHint ?? 'all customers'), '/receivables');
+              if ($recvMonth !== null) sxw_kpi('info', 'cal', 'Received this month', 'Received this month', sx_short($recvMonth), 'payments + TDS deducted · ' . ($collectHint ?? 'all customers'), '/receivables');
               sxw_kpi('bad', 'alert', 'Overdue', 'Overdue', sx_short($overAmt), $overN . ' invoice' . ($overN === 1 ? '' : 's'), '/receivables');
               sxw_kpi('grey', 'hour', 'Days to get paid', 'Days to get paid', $avgPay !== null ? $avgPay . ' d' : '—', 'average · last 6 months · ' . ($collectHint ?? 'all customers'), '/receivables');
           } ?>

@@ -1283,8 +1283,11 @@ if (function_exists('hwp_for_job')):
       Inter-office credit received: <b><?= !empty($job['credit_received']) ? 'yes' : 'no' ?></b>.
       Finance records these.</p>
   <?php else: ?>
-  <details<?= $bInv ? '' : ' open' ?> style="margin-top:4px">
-    <summary class="muted" style="cursor:pointer;font-size:13px">Manual invoice / payment entry<?= $bInv ? ' (the real invoice is shown above)' : '' ?></summary>
+  <?php // Owner, 27 Nov 2026 (BL-09: "a tick box of invoice generated followed by the form … what is
+        // this for"): always folded, and named for the one case it is for. ?>
+  <details style="margin-top:4px">
+    <summary class="muted" style="cursor:pointer;font-size:13px">Only if the invoice was raised outside EXAACT — record it by hand<?= $bInv ? ' (the real invoice is shown above)' : '' ?></summary>
+    <p class="muted" style="font-size:12.5px;margin:8px 0 0">For a bill made in another system or on paper. To bill this <?= e(Tl('job')) ?> in EXAACT, use <b>Raise GST invoice</b> instead — it fills all of this by itself.</p>
   <form method="post" action="/job-invoice?id=<?= (int)$job['id'] ?>" style="margin-top:10px">
     <div class="form-grid">
       <div class="ff ff-check"><input type="checkbox" name="invoice_raised" <?= !empty($job['invoice_raised'])?'checked':'' ?>><label>Invoice raised</label></div>

@@ -96,7 +96,7 @@ $money = ['invoices', 'invoice', 'invoice-new', 'invoice-issue', 'invoice-cancel
           'invoice-line-add', 'invoice-line-delete', 'invoice-print',
           'invoice-set-branch', 'receipts', 'receipt', 'receipt-new',
           'receipt-allocate', 'receipt-unallocate', 'credit-note-new',
-          'to-bill', 'ledger'];
+          'to-bill', 'ledger', 'invoice-pay'];
 $map = ops_route_module_map();
 foreach ($money as $r) {
     $mod = $map[$r] ?? null;

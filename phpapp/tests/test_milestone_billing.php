@@ -6,6 +6,11 @@
 // manager (ops.job.close) marks it reached; retention is held from each bill
 // and payable at a chosen milestone — never aged as overdue before that.
 t_section('Milestones — the schedule on a quotation');
+
+//  An invoice is issued only once our own state is known (owner, 27 Nov 2026 — books_issue_missing()):
+//  this file's invoices are raised by a company whose profile says Gujarat; restored at the end.
+$__ourStateKeep = (string) setting_get('company_state', '');
+if (books_our_state(null) === '') setting_set('company_state', 'Gujarat');
 $pdo = db(); $own = !$pdo->inTransaction(); if ($own) $pdo->beginTransaction();
 try {
     t_as_admin();
@@ -129,3 +134,5 @@ try {
     if ($own && $pdo->inTransaction()) $pdo->rollBack();
     t_as_nobody();
 }
+
+setting_set('company_state', $__ourStateKeep);   // owner 27 Nov 2026 — put back what the run had

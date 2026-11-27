@@ -578,8 +578,11 @@ function custid_invoice_set_location($invoiceId, $locId) {
     if ($locId && !custid_location_id_for($pid, $locId)) return 'That billing location is not one of this ' . Tl('client') . '\'s.';
     $loc = custid_location($pid, $locId);
     $igst = function_exists('books_is_igst') ? books_is_igst($pid, $inv['office_id'] ? (int) $inv['office_id'] : null, $locId) : (int) $inv['is_igst'];
-    db()->prepare("UPDATE invoices SET billing_address_id=?, place_of_supply=?, gstin=?, is_igst=?, updated_at=? WHERE id=?")
-        ->execute([$locId, (string) ($loc['state_code'] ?? ''), (string) ($loc['gstin'] ?? ''), $igst, date('c'), (int) $invoiceId]);
+    //  Our own state is refreshed with it (owner, 27 Nov 2026), so a draft started before the Company
+    //  profile state was filled reads the right state the next time "Billed to" is chosen.
+    $ours = function_exists('books_our_state') ? books_our_state($inv['office_id'] ? (int) $inv['office_id'] : null) : (string) ($inv['supplier_state'] ?? '');
+    db()->prepare("UPDATE invoices SET billing_address_id=?, place_of_supply=?, gstin=?, is_igst=?, supplier_state=?, updated_at=? WHERE id=?")
+        ->execute([$locId, (string) ($loc['state_code'] ?? ''), (string) ($loc['gstin'] ?? ''), $igst, $ours, date('c'), (int) $invoiceId]);
     custid_invoice_snapshot((int) $invoiceId);
     if (function_exists('books_recalc')) books_recalc((int) $invoiceId);
     if (function_exists('act_log')) act_log('INVOICE', (int) $invoiceId, 'BILL_TO', 'Billed to ' . ($loc['label'] ?? 'Main') . ($loc['gstin'] ? ' (GSTIN ' . $loc['gstin'] . ')' : ''));

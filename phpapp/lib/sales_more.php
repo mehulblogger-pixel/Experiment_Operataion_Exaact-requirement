@@ -685,7 +685,7 @@ function ops_sales_more($route, $method) {
                 csv_download('orders-and-payments-' . date('Y-m-d') . '.csv', $csv);
             }
             view('ops/sx_orders', ['rows' => $orders, 'p' => $p, 'plab' => $plab, 'ar' => $ar,
-                'avgPay' => sx_avg_days_to_pay($invIds), 'who' => $who, 'whoKey' => $_GET['who'] ?? 'me', 'people' => sx_can_see_all() ? sx_people() : [], 'seeAll' => sx_can_see_all(),
+                'avgPay' => sx_avg_days_to_pay($invIds), 'who' => $who, 'whoKey' => sx_who_key(), 'people' => sx_can_see_all() ? sx_people() : [], 'seeAll' => sx_can_see_all(),
                 'recvMonth' => sx_received_this_month($invIds), 'collectHint' => $who ? 'these orders' : (sx_scope_is_all() ? 'all customers' : 'your branches'),
                 //  "Overdue" follows the person picked too (owner, 21 Nov 2026): only the
                 //  invoices of the orders on screen. Everyone → the person's branches, as before.
@@ -798,9 +798,12 @@ function ops_sales_more($route, $method) {
     return false;
 }
 //  DEF-08 (21 Nov 2026): was every receipt in the company. Now $invIds (a person
-//  picked) = cash received this month against the invoices of that person's
+//  picked) = money received this month against the invoices of that person's
 //  orders; null = receipts of the person's branches, by the receipt register's
 //  own rule (scope_office_clause on the receipt's office).
+//  Owner, 27 Nov 2026 (OK to decision 2): it now counts the TDS the customer deducted on
+//  those receipts too, so it means the same as the "Received" column (DEF-07: payments
+//  received PLUS the TDS actually deducted; no rate is ever assumed).
 function sx_received_this_month($invIds = null) {
     if (!function_exists('ar_can') || !ar_can()) return null;
     $from = date('Y-m-01'); $to = date('Y-m-d');
@@ -809,10 +812,10 @@ function sx_received_this_month($invIds = null) {
             $ids = array_values(array_unique(array_filter(array_map('intval', $invIds))));
             if (!$ids) return 0.0;
             return (float) ops_val("SELECT COALESCE(SUM(a.amount),0) FROM receipt_allocations a JOIN receipts r ON r.id=a.receipt_id
-                                    WHERE a.kind='CASH' AND a.invoice_id IN (" . implode(',', $ids) . ") AND r.receipt_date>=? AND r.receipt_date<=?", [$from, $to]);
+                                    WHERE a.kind IN ('CASH','TDS') AND a.invoice_id IN (" . implode(',', $ids) . ") AND r.receipt_date>=? AND r.receipt_date<=?", [$from, $to]);
         }
         [$sw, $sa] = scope_office_clause('r.office_id');
-        return (float) ops_val("SELECT COALESCE(SUM(r.amount),0) FROM receipts r WHERE r.receipt_date>=? AND r.receipt_date<=? AND $sw", array_merge([$from, $to], $sa));
+        return (float) ops_val("SELECT COALESCE(SUM(r.amount + COALESCE(r.tds_amount,0)),0) FROM receipts r WHERE r.receipt_date>=? AND r.receipt_date<=? AND $sw", array_merge([$from, $to], $sa));
     } catch (Throwable $e) { return null; }
 }
 //  Does the signed-in person see every branch? (Only changes a hint's wording.)

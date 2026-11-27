@@ -81,22 +81,24 @@
       <thead><tr><th scope="col">Invoice</th><th scope="col">Due</th><th scope="col" class="num">Outstanding</th>
         <th scope="col" class="num">Cash</th><th scope="col" class="num">TDS</th></tr></thead>
       <tbody>
-      <?php foreach ($open as $o): ?>
+      <?php $sug = books_allocate_suggest($open, $leftCash, $leftTds);
+            $fmt = fn($v) => $v > 0 ? number_format((float)$v, 2, '.', '') : ''; ?>
+      <?php foreach ($open as $o): $sg = $sug[(int)$o['id']] ?? ['cash' => 0, 'tds' => 0]; ?>
         <tr>
           <td><a href="/invoice?id=<?= (int)$o['id'] ?>"><?= e($o['invoice_no']) ?></a></td>
           <td><?= $o['due_date'] ? e(fdate($o['due_date'])) : '—' ?></td>
           <td class="num"><?= e(fmoney($o['outstanding'])) ?></td>
           <td class="num"><label class="sr-only" for="c-<?= (int)$o['id'] ?>">Cash against <?= e($o['invoice_no']) ?></label>
-            <input class="form-control" id="c-<?= (int)$o['id'] ?>" name="cash[<?= (int)$o['id'] ?>]" type="number" step="0.01" min="0" style="width:110px;text-align:right" placeholder="0.00"></td>
+            <input class="form-control" id="c-<?= (int)$o['id'] ?>" name="cash[<?= (int)$o['id'] ?>]" type="number" step="0.01" min="0" style="width:110px;text-align:right" placeholder="0.00" value="<?= e($fmt($sg['cash'])) ?>"></td>
           <td class="num"><label class="sr-only" for="t-<?= (int)$o['id'] ?>">TDS against <?= e($o['invoice_no']) ?></label>
-            <input class="form-control" id="t-<?= (int)$o['id'] ?>" name="tds[<?= (int)$o['id'] ?>]" type="number" step="0.01" min="0" style="width:110px;text-align:right" placeholder="0.00"></td>
+            <input class="form-control" id="t-<?= (int)$o['id'] ?>" name="tds[<?= (int)$o['id'] ?>]" type="number" step="0.01" min="0" style="width:110px;text-align:right" placeholder="0.00" value="<?= e($fmt($sg['tds'])) ?>"></td>
         </tr>
       <?php endforeach; ?>
       </tbody>
     </table></div>
     <div style="padding:12px 16px;border-top:1px solid var(--line)">
       <button class="btn">Match it</button>
-      <span class="muted" style="font-size:12.5px;margin-left:10px">Nothing can be matched beyond what arrived, or beyond what an invoice still owes — both are refused rather than rounded away.</span>
+      <span class="muted" style="font-size:12.5px;margin-left:10px">Filled in for you, oldest invoice first (cash, then TDS) — change any figure before pressing. Nothing can be matched beyond what arrived, or beyond what an invoice still owes — both are refused rather than rounded away.</span>
     </div>
   </form>
   <?php endif; ?>

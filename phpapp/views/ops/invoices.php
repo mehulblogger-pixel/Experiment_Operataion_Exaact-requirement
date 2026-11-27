@@ -64,6 +64,13 @@
 <?php endif; ?>
 <div class="panel" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
   <b style="font-size:13.5px"><?= e($f === 'overcredited' ? 'Credited beyond their value' : ($cards[$f]['l'] ?? ucfirst($f))) ?></b>
+  <?php // Owner, 27 Nov 2026 — financial year (by invoice date); the other filters are kept. ?>
+  <form method="get" action="/invoices" style="display:flex;gap:6px;align-items:center;margin:0">
+    <input type="hidden" name="f" value="<?= e($f) ?>">
+    <?php if (trim((string)($_GET['q'] ?? '')) !== ''): ?><input type="hidden" name="q" value="<?= e((string)$_GET['q']) ?>"><?php endif; ?>
+    <label class="sr-only" for="inv-fy">Financial year</label>
+    <?= str_replace('<select ', '<select id="inv-fy" style="width:auto" ', fy_select_html($fy ?? 'ALL')) ?>
+  </form>
   <span style="margin-left:auto">
     <?php foreach (['open'=>'Open','paid'=>'Paid','draft'=>'Draft','cancelled'=>'Cancelled','all'=>'All'] as $k=>$lbl): ?>
       <a href="/invoices?f=<?= e($k) ?>" style="margin-left:10px<?= $f===$k?';font-weight:700':'' ?>"><?= e($lbl) ?></a>

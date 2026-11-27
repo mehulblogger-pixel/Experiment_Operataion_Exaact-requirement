@@ -49,11 +49,22 @@ function sx_person() {
         if ($p !== '' && ctype_digit($p) && in_array((int) $p, sx_my_reportees(), true)) return (int) $p;
         return $me;
     }
-    $p = $_GET['who'] ?? 'me';
+    $p = sx_who_key();
     if ($p === 'all') return 0;
     if ($p === 'me' || $p === '') return $me;
     return (int) $p;
 }
+//  Owner, 27 Nov 2026 (GD-05: "Director under Orders & payments is shown 0 received"): a person who
+//  may see everyone opens the Sales screens on Everyone — their own list is usually empty. Anyone
+//  else opens on Me, as before. Only the starting view changes, never what a person may see.
+function sx_who_default() { return sx_can_see_all() ? 'all' : 'me'; }
+function sx_who_key() {
+    $p = (string) ($_GET['who'] ?? '');
+    return $p !== '' ? $p : sx_who_default();
+}
+//  Whether a screen's links must carry ?who= to keep the chosen view: as before for anyone who
+//  opens on Me; always for someone who opens on Everyone (so "Me" stays Me from link to link).
+function sx_who_carry($whoKey) { return (string) $whoKey !== 'me' || sx_who_default() !== 'me'; }
 //  The people who report to me (the whole line below), for the "My team" picker.
 //  None for a person set to "own records" (Q10): they would see nothing of them.
 function sx_my_reportees() {
@@ -500,7 +511,7 @@ function ops_sales_simple($route, $method) {
     $who = sx_person();
     //  seeAll: true = Me / Everyone / anyone; 'team' = Me / the people who report to me.
     $team = sx_can_see_all() ? [] : sx_team_people();
-    $base = ['who' => $who, 'whoKey' => $_GET['who'] ?? 'me', 'people' => sx_can_see_all() ? sx_people() : $team,
+    $base = ['who' => $who, 'whoKey' => sx_who_key(), 'people' => sx_can_see_all() ? sx_people() : $team,
              'seeAll' => sx_can_see_all() ? true : ($team ? 'team' : false)];
     switch ($route) {
         case 'sales-today':

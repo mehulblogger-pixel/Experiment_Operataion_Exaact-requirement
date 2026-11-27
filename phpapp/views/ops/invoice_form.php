@@ -32,11 +32,12 @@ $src = function ($k) use ($from) {
       <div class="ff-help">Choosing one reloads this form with everything already known about them.</div></div>
 
     <div class="ff ff-req"><label>Branch</label>
+      <?php $offDef = (int)($officeDefault ?? 0); ?>
       <select name="office_id" required class="form-control">
         <option value="">— choose —</option>
-        <?php foreach ($offices as $o): ?><option value="<?= (int)$o['id'] ?>"><?= e($o['name']) ?></option><?php endforeach; ?>
+        <?php foreach ($offices as $o): ?><option value="<?= (int)$o['id'] ?>" <?= $offDef === (int)$o['id'] ? 'selected' : '' ?>><?= e($o['name']) ?></option><?php endforeach; ?>
       </select>
-      <div class="ff-help">Decides the numbering series.</div></div>
+      <div class="ff-help"><?= $offDef ? 'Filled in from ' . ($partner && (int)($partner['home_branch_id'] ?? 0) === $offDef ? 'this customer\'s billing branch' : 'your own branch') . ' — change it if another branch bills this. ' : '' ?>Decides the numbering series.</div></div>
 
     <div class="ff"><label>Invoice date</label>
       <input type="date" class="form-control" name="invoice_date" value="<?= e(date('Y-m-d')) ?>"></div>
@@ -75,7 +76,31 @@ $src = function ($k) use ($from) {
       <?php else: ?><?= $src('po_number') ?><?php endif; ?></div>
 
     <div class="ff"><label>Contract number</label>
-      <input name="contract_number" class="form-control" maxlength="80" value="<?= e((string)($carry['contract_number'] ?? '')) ?>">
+      <?php
+        //  Owner, 27 Nov 2026 (GD-05): a choice from this client's contracts. The contract of the work
+        //  being billed is chosen by itself; with only one contract on file, that one. A number that the
+        //  work carries but the client's contract list does not is still offered, so nothing is lost.
+        //  With no contract on file the plain box stays (older clients keep contract numbers on calls).
+        $cnPick = (string)($carry['contract_number'] ?? '');
+        $cList = $contracts ?? [];
+        $activeC = array_values(array_filter($cList, fn($c) => (int)$c['is_active'] === 1));
+        if ($cnPick === '' && !isset($clash['contract_number']) && count($activeC) === 1) $cnPick = (string)$activeC[0]['contract_number'];
+        $inList = false; foreach ($cList as $c) if ((string)$c['contract_number'] === $cnPick) $inList = true;
+      ?>
+      <?php if ($cList): ?>
+        <select name="contract_number" class="form-control">
+          <option value="">— no contract —</option>
+          <?php if ($cnPick !== '' && !$inList): ?><option value="<?= e($cnPick) ?>" selected><?= e($cnPick) ?> (from the work)</option><?php endif; ?>
+          <?php foreach ($cList as $c):
+                  $bits = array_filter([(string)$c['title'], $c['value'] !== null && (float)$c['value'] > 0 ? fmoney($c['value']) : '',
+                                        trim(fdate($c['start_date']) . ($c['end_date'] ? ' – ' . fdate($c['end_date']) : '')), (int)$c['is_active'] ? '' : 'closed']); ?>
+            <option value="<?= e($c['contract_number']) ?>" <?= (string)$c['contract_number'] === $cnPick ? 'selected' : '' ?>><?= e($c['contract_number'] . ($bits ? ' — ' . implode(' — ', $bits) : '')) ?></option>
+          <?php endforeach; ?>
+        </select>
+        <?php if ($cnPick !== '' && empty($from['contract_number']) && count($activeC) === 1): ?><div class="ff-help">The customer's only open contract — chosen for you.</div><?php endif; ?>
+      <?php else: ?>
+      <input name="contract_number" class="form-control" maxlength="80" value="<?= e($cnPick) ?>">
+      <?php endif; ?>
       <?php if (isset($clash['contract_number'])): ?>
         <div class="ff-err">The ticked work spans <?= (int)count($clash['contract_number']) ?> contracts
           (<?= e(implode(', ', array_slice($clash['contract_number'], 0, 4))) ?>). Nothing has been filled in —
