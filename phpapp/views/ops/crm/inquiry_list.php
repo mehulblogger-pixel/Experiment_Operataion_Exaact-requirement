@@ -10,8 +10,9 @@ require_once __DIR__ . '/../_sxw_ui.php';
 $stPill = ['OPEN' => 'p-warn', 'QUOTED' => 'p-info', 'WON' => 'p-ok', 'LOST' => 'p-bad', 'DROPPED' => 'p-mut'];
 $stOpts = function_exists('crm_inquiry_status_opts') ? crm_inquiry_status_opts() : INQUIRY_STATUS;
 $funnel = $funnel ?? []; $dueCount = (int)($dueCount ?? 0); $sla = (int)($sla ?? 7); $total = (int)($total ?? count($rows));
-$canAdd = can('mod.inquiries.edit');
-$canDel = is_admin_level() || is_master();
+//  Owner, 27 Nov 2026 (decision 4a): the Branch Manager and SBU Head read and download; they do not change.
+$canAdd = can('mod.inquiries.edit') && crm_inquiry_can_write();
+$canDel = (is_admin_level() || is_master()) && crm_inquiry_can_write();
 
 //  Each inquiry's own current quotation (the accepted one first, then the newest) — for its button.
 $inqQuotes = [];

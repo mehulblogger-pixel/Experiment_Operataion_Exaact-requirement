@@ -104,17 +104,18 @@ try {
     t_ok(!$err, 'B2 · it can be given to a Mumbai person');
     $r = bbv_route('opportunity', 'GET', $f['master'], (int) $o['id']);
     t_ok(strpos($html($r), 'Mexahm') === false && strpos($html($r), 'Mexmum') !== false, 'B2 · the deal\'s people list offers Mumbai people only');
-    //  Enquiries (the Branch Manager's enquiry rights are unchanged — owner has not decided).
+    //  Enquiries — recorded by the Mumbai BDM: since 27 Nov 2026 (decision 4a, docs/02 19ac) the
+    //  Branch Manager reads enquiries only (tests/test_owner27_ops.php), so it no longer records them.
     $subj = 'B2 enquiry ' . uniqid();
     $post = ['client_name' => 'B2 Enquiry Co', 'contact_name' => 'Ravi', 'contact_mobile' => '9825088888', 'sbu' => 'IND', 'subject' => $subj, 'source' => 'EMAIL', 'assigned_to' => $meAhm];
-    $r = bbv_route('inquiry-new', 'POST', $f['kiran'], 0, $post);
+    $r = bbv_route('inquiry-new', 'POST', $bdmMum, 0, $post);
     t_eq((int) ops_val("SELECT COUNT(*) FROM crm_inquiries WHERE subject=?", [$subj]), 0, 'B2 · an enquiry of Mumbai is not saved assigned to an Ahmedabad person');
     t_ok(strpos((string) ($r['out'] ?? ''), 'does not work for the Mumbai') !== false, 'B2 · the enquiry form says why');
-    $r = bbv_route('inquiry-new', 'POST', $f['kiran'], 0, ['assigned_to' => $meMum] + $post);
+    $r = bbv_route('inquiry-new', 'POST', $bdmMum, 0, ['assigned_to' => $meMum] + $post);
     $iid = (int) ops_val("SELECT id FROM crm_inquiries WHERE subject=?", [$subj]);
     if ($iid) $made['i'][] = $iid;
-    t_ok($iid > 0, 'B2 · assigned to a Mumbai person it is saved (the Branch Manager still records enquiries)');
-    $r = bbv_route('inquiry-new', 'GET', $f['kiran'], 0);
+    t_ok($iid > 0, 'B2 · assigned to a Mumbai person it is saved');
+    $r = bbv_route('inquiry-new', 'GET', $bdmMum, 0);
     t_ok(strpos($html($r), 'Mexmum') !== false && strpos($html($r), 'Mexahm') === false, 'B2 · the enquiry form\'s "Assigned to" offers Mumbai people only');
 
     // ---- B3 · My team = people who do sales work ------------------------------------------

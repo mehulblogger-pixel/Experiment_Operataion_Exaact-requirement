@@ -56,10 +56,22 @@
     <small class="muted">A ticked item needs no bill; the decision is recorded on the job. An unticked item still needs its bill uploaded before closing.</small>
   </div>
   <?php endif; ?>
+  <?php // Owner, 27 Nov 2026 (decision 3, step one): no report on file → warn, and ask why.
+        if (function_exists('job_noreport_migrate')) job_noreport_migrate();
+        $noRepNeed = function_exists('job_close_needs_report_reason') && job_close_needs_report_reason($job); ?>
+  <?php if ($noRepNeed): ?>
+  <div class="ff ff-wide" id="noreport-box" style="margin-bottom:12px;border:1px solid var(--warn);border-radius:8px;padding:12px;background:color-mix(in srgb,var(--warn) 7%,transparent)">
+    <label for="no_report_reason" style="color:var(--warn)">⚠ No report is on file for this <?= e(Tl('job')) ?></label>
+    <p class="muted" style="margin:4px 0 8px">No report has been written or uploaded on it. If the report exists, paste its link below.
+      To close it without one, say why — the reason is kept in its History, and a report added later is recorded and the Operations Manager is told.</p>
+    <textarea class="form-control" id="no_report_reason" name="no_report_reason" rows="2" minlength="<?= (int)JOB_NOREPORT_REASON_MIN ?>"
+      placeholder="e.g. Client cancelled the inspection on site — no report to issue"><?= e((string)($_POST['no_report_reason'] ?? '')) ?></textarea>
+  </div>
+  <?php endif; ?>
   <div class="form-grid">
-    <div class="ff"><label>Report upload date<?= $job['reporting_frequency']!=='NOREPORT'?' *':'' ?></label>
-      <input class="form-control" type="date" name="report_upload_date" value="<?= e(date('Y-m-d')) ?>" <?= $job['reporting_frequency']!=='NOREPORT'?'required':'' ?>></div>
-    <div class="ff ff-wide"><label>Report link (optional)</label><input class="form-control" name="report_link" placeholder="Link to the uploaded report"></div>
+    <div class="ff"><label>Report upload date<?= $job['reporting_frequency']!=='NOREPORT' && !$noRepNeed ?' *':'' ?></label>
+      <input class="form-control" type="date" name="report_upload_date" value="<?= e(date('Y-m-d')) ?>" <?= $job['reporting_frequency']!=='NOREPORT' && !$noRepNeed ?'required':'' ?>></div>
+    <div class="ff ff-wide"><label>Report link (optional)</label><input class="form-control" name="report_link" placeholder="Link to the uploaded report" value="<?= e((string)($_POST['report_link'] ?? '')) ?>"></div>
   </div>
   <?php if ($expMine): ?>
     <h3 class="tab-sub" style="margin:14px 0 6px"><?= $expDate === date('Y-m-d') ? 'Today\'s expenses' : 'Expenses for ' . e(fdate($expDate)) ?></h3>

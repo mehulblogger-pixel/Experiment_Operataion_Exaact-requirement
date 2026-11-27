@@ -93,6 +93,18 @@ stateDiagram-v2
   `job_final_docs_missing()`) does not apply to a job whose early end is **TERMINATED**
   (`jobs.billing_stop_kind`); closing it records `CLOSED_TERMINATED` in the job's activity.
   Completed-early and demobilised jobs still need both — **when ticked** (next point).
+- **Closing without a report on file** (owner, 27 Nov 2026, decision 3 — step one). When no report
+  is on file for a job — no report document written on it, no report link on the job or on a closed
+  visit day, and none pasted on the close form — the close form warns *"No report is on file"* and
+  the close is refused until a reason is given (at least 10 characters; `job_close_needs_report_reason()`).
+  A job agreed with *No report* (NOREPORT) or one ended as TERMINATED is not asked. The job then closes
+  as usual (`closed_flag=1` — **no new status**), with `closed_no_report_reason / _by / _at` kept on the
+  job, *"Closed without a report — by …"* in its History, and no report date, TAT or report sign-off
+  (there is no report to sign off). A report written on the job **afterwards** is accepted (as for any
+  closed job), recorded in its History as *"Report … uploaded after closing without a report — by …"*,
+  and the branch's Operations Manager is e-mailed (`job_report_added_after_noreport_close()`; docs/02 19ac).
+  Blocking a late upload until a manager approves it (a new approval and a *Closed – report waived*
+  state) is **not** built — a later step only if real use shows the need.
 - **Final documents only when ticked** (TPIA Phase 1 / D7, owner 25 Nov 2026). The
   Final Inspection Report is asked for only when "Final Report" (`FINAL_REP`, or the
   `FIR` type) is ticked in the job's "Types of report required" (else its call's); the

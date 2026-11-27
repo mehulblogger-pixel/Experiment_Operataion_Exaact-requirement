@@ -955,6 +955,13 @@ function perm_split_rules() {
 //  App Manager and the Operation Manager, though all four are management roles. It starts
 //  with the Admin and the Business Director (and the Master Admin, who holds everything).
 const ACCESS_DEAL_DELETE_NARROWED = ['SBU_HEAD', 'BRANCH_MANAGER', 'BRANCH_APP_MANAGER', 'OPERATION_MANAGER'];
+//  Owner, 27 Nov 2026 (decision 4a, "A ok"): the Branch Manager and the SBU Head READ
+//  enquiries (open and download their branch / unit's) but never change them — the same
+//  rule as their leads and deals (21 Nov, docs/02 19x). Their Enquiries edit comes from a
+//  job-title Delete (perm_legacy_role_grants), not from working enquiries, so the enquiry
+//  screens ask crm_inquiry_can_write() (lib/crm.php). An administrator who ticks "Add" on
+//  Enquiries for one of these roles on "Who can do what" lets that role work them again.
+const ACCESS_INQUIRY_READ_ONLY = ['BRANCH_MANAGER', 'SBU_HEAD'];
 const PERM_SPLIT_NOT_FOR = ['crm.deal.view' => ['FINANCE'], 'crm.deal.delete' => ACCESS_DEAL_DELETE_NARROWED];
 function perm_upgrade_split(array $perms, $role) {
     if (in_array(PERM_SPLIT_TAG, $perms, true)) return $perms;

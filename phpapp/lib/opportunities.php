@@ -1335,7 +1335,7 @@ function ops_opportunities($route, $method) {
                 . ', so it is part of the record and cannot be deleted. Mark it lost instead if it should not be chased.', 'error');
             redirect('/opportunity?id=' . $id);
         }
-        if (function_exists('act_log')) act_log('OPPORTUNITY', $id, 'DELETED', T('opportunity') . ' ' . $o['ref'] . ' deleted — ' . $o['name'] . ' (by ' . user_name(current_user()) . ')', ['office_id' => (int)($o['office_id'] ?? 0) ?: '', 'sbu' => (string)($o['sbu'] ?? '')]);
+        if (function_exists('act_log')) act_log('OPPORTUNITY', $id, 'DELETED', T('opportunity') . ' ' . $o['ref'] . ' deleted — ' . $o['name'] . ' (by ' . user_name(current_user()) . ')', ['office_id' => (int)($o['office_id'] ?? 0) ?: '', 'sbu' => (string)($o['sbu'] ?? ''), 'match_name' => trim((string)($o['partner_name'] ?? '')) !== '' ? (string)$o['partner_name'] : (string)((int)($o['lead_id'] ?? 0) ? (ops_val("SELECT company_name FROM leads WHERE id=?", [(int)$o['lead_id']]) ?: '') : '')]);
         try { db()->prepare("DELETE FROM opportunity_stage_history WHERE opportunity_id=?")->execute([$id]); } catch (Throwable $e) {}
         db()->prepare("DELETE FROM opportunities WHERE id=?")->execute([$id]);
         flash(T('opportunity') . ' ' . $o['ref'] . ' deleted.');

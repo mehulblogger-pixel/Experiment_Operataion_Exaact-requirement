@@ -9623,7 +9623,14 @@ function ops_jobs($route, $method) {
             if (($why = job_lock_block($job)) !== '') { flash($why, 'error'); redirect('/job?id=' . $job['id']); }
             // (the already-closed guard above the POST branch covers the double-close / double-expense case)
             $reportDate = $b['report_upload_date'] ?? '';
-            if ($job['reporting_frequency'] !== 'NOREPORT' && $reportDate === '') {
+            //  Owner, 27 Nov 2026 (decision 3, step one): no report on file → a reason is
+            //  required (checked below, after the blocks that are stronger than it), and
+            //  there is no report date, TAT or report sign-off to record.
+            if (function_exists('job_noreport_migrate')) job_noreport_migrate();
+            $noRep = function_exists('job_close_needs_report_reason') && job_close_needs_report_reason($job, (string)($b['report_link'] ?? ''));
+            $noRepWhy = trim((string)($b['no_report_reason'] ?? ''));
+            if ($noRep) $reportDate = '';
+            if ($job['reporting_frequency'] !== 'NOREPORT' && $reportDate === '' && !$noRep) {
                 view('ops/job_close', ['job'=>$job,'error'=>'A report upload date is required before closing this job.']); return;
             }
             // Heads the coordinator declares were not incurred on this job (e.g.
@@ -9697,6 +9704,11 @@ function ops_jobs($route, $method) {
                     return;
                 }
             }
+            if ($noRep && mb_strlen($noRepWhy) < JOB_NOREPORT_REASON_MIN) {
+                view('ops/job_close', ['job' => $job, 'error' => 'No report is on file for this ' . Tl('job') . '. To close it without one, say why'
+                    . ' (at least ' . JOB_NOREPORT_REASON_MIN . ' characters) — the reason is kept in its History. If the report exists, paste its link instead.']);
+                return;
+            }
             // Expenses Phase 1 (owner, 17 Nov 2026) — "Close the day": the claimant
             // confirms the day's expenses here, on his own job, and they land in his
             // claim for the period. They are written ONLY to the claim's lines
@@ -9723,6 +9735,12 @@ function ops_jobs($route, $method) {
             $needsApproval = ($job['reporting_frequency'] !== 'NOREPORT' && $reportDate !== '') ? 'PENDING' : '';
             $pdo->prepare("UPDATE jobs SET closed_flag=1, closed_at=?, report_upload_date=?, report_link=?, tat_days=?, report_approval=? WHERE id=?")
                 ->execute([date('c'), $reportDate, $b['report_link'] ?? '', $tat, $needsApproval, $job['id']]);
+            if ($noRep) {
+                $pdo->prepare("UPDATE jobs SET closed_no_report_reason=?, closed_no_report_by=?, closed_no_report_at=? WHERE id=?")
+                    ->execute([mb_substr($noRepWhy, 0, 500), user_name(current_user()), date('c'), $job['id']]);
+                if (function_exists('act_log'))
+                    try { act_log('JOB', (int)$job['id'], 'SYSTEM', 'Closed without a report — by ' . user_name(current_user()), ['auto' => 1, 'body' => 'Reason: ' . $noRepWhy]); } catch (Throwable $e) {}
+            }
             if (strtoupper((string)($job['billing_stop_kind'] ?? '')) === 'TERMINATED' && function_exists('act_log'))
                 try { act_log('JOB', (int)$job['id'], 'CLOSED_TERMINATED', 'Closed as terminated (ended ' . ($job['billing_stop_on'] ?? '') . ') — no Final Inspection Report or Release Note needed.'); } catch (Throwable $e) {}
             // Phase 2 §30 — freeze this job's cost basis at close so its profit is reproducible.
@@ -9734,10 +9752,10 @@ function ops_jobs($route, $method) {
             if ($needsApproval === 'PENDING') report_approval_notify($job['id']);
             if ($expMine && $expNote === '') {
                 [$eok, $emsg, $ecv] = exp_day_confirm($expIns, (int)$job['id'], $expDate, $b, true);
-                flash("Job {$job['job_code']} closed. " . $emsg, $eok ? 'success' : 'warning');
+                flash("Job {$job['job_code']} closed" . ($noRep ? ' without a report (reason kept in its History)' : '') . ". " . $emsg, $eok ? 'success' : 'warning');
                 redirect($eok && $ecv ? '/voucher?id=' . (int)$ecv['id'] : '/job?id=' . $job['id']);
             }
-            flash("Job {$job['job_code']} closed. TAT " . ($tat === null ? '—' : $tat) . " day(s). Closure email sent."
+            flash("Job {$job['job_code']} closed" . ($noRep ? ' without a report — the reason is kept in its History; a report added later is recorded and the Operations Manager is told.' : '. TAT ' . ($tat === null ? '—' : $tat) . ' day(s).') . " Closure email sent."
                 . ($expMine ? $expNote : ' The ' . Tl('engineer') . ' confirms the day\'s expenses on their own claim.'));
             redirect('/job?id=' . $job['id']);
         }
