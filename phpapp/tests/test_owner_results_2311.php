@@ -58,7 +58,10 @@ foreach (array_merge(glob($root . '/lib/*.php'), glob($root . '/views/*.php'), g
         foreach ($m[1] as $g) if (commercial_gstin_problem($g) !== '') $bad[] = basename($file) . ': ' . $g;
 }
 t_eq($bad, [], 'Q-15 · no on-screen example GSTIN fails the check (the old ones all did)');
-$bl = (string) file_get_contents($root . '/views/ops/_billing_locations.php');
+//  27 Nov 2026 (A3): the add form moved into the shared _billing_location_form.php, so the
+//  box and the Addresses tab use one form — read both.
+$bl = (string) file_get_contents($root . '/views/ops/_billing_locations.php')
+    . (is_file($root . '/views/ops/_billing_location_form.php') ? (string) file_get_contents($root . '/views/ops/_billing_location_form.php') : '');
 t_ok(strpos($bl, 'data-gstin-check') !== false && strpos($bl, 'name="gstin" maxlength="20"') !== false && strpos($bl, '1ZX') === false,
      'Q-15 · the billing-location box no longer cuts a pasted space into a lost last character, and no longer shows an invalid example');
 

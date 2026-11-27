@@ -132,8 +132,9 @@ t_eq(partner_view_level(ops_one("SELECT * FROM business_partners WHERE id=?", [$
 t_section('Every door, not just the reported one');
 
 $idx = (string) @file_get_contents(dirname(__DIR__) . '/index.php');
-t_eq(substr_count($idx, "ops_require(!function_exists('partner_can_write') || partner_can_write"), 3,
-    'every index.php door asks — the edit form, every sub-form behind it, and the new-contract pop-up (9 Nov 2026)');
+//  27 Nov 2026: a fourth door — "Mark as head office" (owner test BL-03) — asks it too.
+t_eq(substr_count($idx, "ops_require(!function_exists('partner_can_write') || partner_can_write"), 4,
+    'every index.php door asks — the edit form, every sub-form behind it, the new-contract pop-up (9 Nov 2026) and Mark as head office (27 Nov 2026)');
 t_ok(strpos($idx, "\$viewLevel = function_exists('partner_view_level')") !== false,
     'the client screen decides the level before it loads anything');
 foreach ([['contacts', 'contact details'], ['addresses', 'site addresses'], ['contracts', 'contracts'],

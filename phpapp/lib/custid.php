@@ -306,7 +306,11 @@ function custid_locations($partnerId) {
     custid_migrate();
     $p = ops_one("SELECT * FROM business_partners WHERE id=?", [(int) $partnerId]);
     if (!$p) return [];
-    $main = function_exists('partner_primary_address') ? partner_primary_address((int) $partnerId) : null;
+    //  The Main row is the record's own head-office address — never the address of one of
+    //  its billing locations (owner test BL-03 / BL-05, 27 Nov 2026: a client converted from
+    //  a lead had no address, so "Main" borrowed the Mumbai plant's). None on file = empty,
+    //  and the box says so.
+    $main = custid_head_office_address((int) $partnerId);
     $mg = clean_gstin($p['gstin'] ?? '');
     $msc = $mg !== '' ? substr($mg, 0, 2) : custid_state_code_of($p['state'] ?? '');
     $out = [[
@@ -323,6 +327,76 @@ function custid_locations($partnerId) {
     }
     return $out;
 }
+/**
+ * The customer's head-office address: one of its OWN addresses, never a billing
+ * location (is_billing=1) or a stopped one (it still carries its GSTIN). The one
+ * marked "head office" wins; else a registered / corporate office; else any other
+ * office address; an Addresses-tab "Billing Address" typed without a GSTIN only when
+ * nothing else is on file (it was the main GSTIN's billing address). null = none.
+ */
+function custid_head_office_address($partnerId) {
+    custid_migrate();
+    try {
+        return ops_one("SELECT * FROM partner_addresses
+                         WHERE partner_id=? AND COALESCE(is_billing,0)=0 AND COALESCE(gstin,'')=''
+                         ORDER BY is_primary DESC, CASE WHEN COALESCE(address_type,'')='BILLING' THEN 1 ELSE 0 END,
+                                  CASE COALESCE(address_type,'') WHEN 'REGISTERED' THEN 0 WHEN 'CORPORATE' THEN 1 ELSE 2 END, id
+                         LIMIT 1", [(int) $partnerId]) ?: null;
+    } catch (Throwable $e) { return null; }
+}
+/** May this address be the head office? One of the customer's own, not a billing location. */
+function custid_can_be_head_office(array $a) {
+    return (int) ($a['is_billing'] ?? 0) === 0 && clean_gstin($a['gstin'] ?? '') === '';
+}
+/** Mark one address as the head office (one per customer). '' = done, else why not. */
+function custid_mark_head_office($partnerId, $addrId) {
+    custid_migrate();
+    $a = ops_one("SELECT * FROM partner_addresses WHERE id=? AND partner_id=?", [(int) $addrId, (int) $partnerId]);
+    if (!$a) return 'That address is not on this ' . Tl('client') . '.';
+    if (!custid_can_be_head_office($a))
+        return 'A billing address with its own GSTIN cannot be the head office. Mark one of the ' . Tl('client') . '\'s own addresses instead.';
+    db()->prepare("UPDATE partner_addresses SET is_primary=0 WHERE partner_id=? AND id<>?")->execute([(int) $partnerId, (int) $addrId]);
+    db()->prepare("UPDATE partner_addresses SET is_primary=1 WHERE id=?")->execute([(int) $addrId]);
+    $txt = substr(trim(($a['label'] ?? '') . ' ' . custid_address_text($a)), 0, 200);
+    if (function_exists('act_log')) act_log('PARTNER', (int) $partnerId, 'HEAD_OFFICE', 'Head-office address set: ' . $txt, ['partner_id' => (int) $partnerId]);
+    if (function_exists('idems_log')) idems_log('partner', (int) $partnerId, 'HEAD_OFFICE_SET', ['field' => 'address', 'new' => $txt]);
+    return '';
+}
+
+/**
+ * Who may ask "who already has this GSTIN?" while typing (owner BL-07, 27 Nov 2026):
+ * exactly the people who would be told on Save — those who may add or edit a client
+ * or a billing address, and those who may turn a lead, a deal or a won quotation into
+ * a customer. No new right.
+ */
+function custid_lookup_can() {
+    if (!function_exists('current_user') || !current_user()) return false;
+    if (is_master() || can('mod.clients.edit') || can('mod.vendors.edit')) return true;
+    if (function_exists('is_coordinator_level') && is_coordinator_level()) return true;
+    if (function_exists('leads_can_edit') && leads_can_edit()) return true;
+    if (function_exists('opp_can_add_customer') && opp_can_add_customer()) return true;
+    if (function_exists('crm_quote_can_create') && crm_quote_can_create()) return true;
+    return false;
+}
+/**
+ * The answer, as you type — no more than the Save refusal already names (the code and
+ * the name). ['kind' => 'GSTIN' | 'PAN' | 'NONE' | 'BAD', 'text' => …]. $excludeId is
+ * the record being edited (its own GSTIN and PAN are no clash).
+ */
+function custid_gstin_who($gstin, $excludeId = 0) {
+    $g = clean_gstin($gstin);
+    if (strlen($g) !== 15 || custid_gstin_problem($g) !== '') return ['kind' => 'BAD', 'text' => ''];
+    $m = custid_match('', $g, pan_from_gstin($g), (int) $excludeId);
+    $r = $m['row'] ?? null;
+    if (!$r || !in_array($m['kind'], ['GSTIN', 'PAN'], true)) return ['kind' => 'NONE', 'text' => ''];
+    $who = trim((string) ($r['code'] ?? '') . ' — ' . (string) ($r['legal_name'] ?? ''));
+    $out = ['kind' => $m['kind'], 'code' => (string) ($r['code'] ?? ''), 'name' => (string) ($r['legal_name'] ?? '')];
+    $out['text'] = $m['kind'] === 'GSTIN'
+        ? 'Already belongs to ' . $who . '. Open that ' . Tl('client') . ' instead of adding it again.'
+        : 'Its PAN ' . pan_from_gstin($g) . ' belongs to ' . $who . ' — the same company. Add this GSTIN there as a billing address instead.';
+    return $out;
+}
+
 /** One location of this customer; an unknown id is the main one. */
 function custid_location($partnerId, $locId = 0) {
     $all = custid_locations($partnerId);
@@ -395,7 +469,11 @@ function custid_add_location($partnerId, array $b, $excludeOwnerId = 0) {
  * Only these two; anything else posted is ignored (never a free address).
  */
 function custid_back_url(array $post, $partnerId) {
-    $base = (string) ($post['back'] ?? '') === 'customer' ? '/customer?id=' : '/partner?id=';
+    $back = (string) ($post['back'] ?? '');
+    //  The Addresses tab offers the same form (owner, 27 Nov 2026: "both shall have same
+    //  form … so we don't have duplicate screens") — and goes back to that tab.
+    if ($back === 'addresses') return '/partner?id=' . (int) $partnerId . '&tab=addresses';
+    $base = $back === 'customer' ? '/customer?id=' : '/partner?id=';
     return $base . (int) $partnerId . '#billing-locations';
 }
 

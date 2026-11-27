@@ -1629,6 +1629,34 @@ if ($route === 'partner-billing-location' && $method === 'POST') {
     redirect(custid_back_url($_POST, (int) $p['id']));
 }
 
+// Owner test BL-03 (27 Nov 2026) — mark one of the record's own addresses as its head
+// office. The /partner-add gate and its office boundary; no new right.
+if ($route === 'partner-address-head-office' && $method === 'POST') {
+    $p = find_partner((int)($_GET['id'] ?? 0));
+    if (!$p) { http_response_code(404); return view('notfound'); }
+    ops_require(is_master() || can('mod.clients.edit') || can('mod.vendors.edit')
+        || (function_exists('is_coordinator_level') && is_coordinator_level()),
+        'You do not have permission to change ' . Tl('client') . ' / ' . Tl('vendor') . ' records.');
+    ops_require(!function_exists('partner_can_write') || partner_can_write($p),
+        function_exists('partner_write_denied_msg') ? partner_write_denied_msg($p) : 'That record belongs to another office.');
+    $e = custid_mark_head_office((int) $p['id'], (int) ($_POST['addr'] ?? 0));
+    flash($e !== '' ? $e : 'Head-office address set. The Main billing line now uses it.', $e !== '' ? 'error' : 'success');
+    redirect('/partner?id=' . (int) $p['id'] . '&tab=addresses');
+}
+
+// Owner test BL-07 (27 Nov 2026) — "who already has this GSTIN?", asked as it is typed
+// or pasted, before Save. Read-only; POST with the page's token; only for people who
+// would get the same answer as a refusal on Save; returns the code and name, no more.
+if ($route === 'gstin-who') {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    if ($method !== 'POST' || !function_exists('custid_lookup_can') || !custid_lookup_can()) {
+        http_response_code(403); echo json_encode(['kind' => 'DENIED', 'text' => '']); exit;
+    }
+    echo json_encode(custid_gstin_who((string) ($_POST['gstin'] ?? ''), (int) ($_POST['exclude'] ?? 0)), JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 // D1 — move an existing branch company (same PAN) under its main customer as a
 // billing location. Preview on GET; only a person pressing the button, with a
 // reason, does it. The same people who may merge duplicate records.
@@ -1862,6 +1890,13 @@ if ($route === 'partner-add' && $method === 'POST') {
         }
         flash($poNo . ' added. It has no line items yet — add them here, then use "← Purchase orders" to go back to ' . partner_name($p) . '.');
         redirect('/po?id=' . $poId);
+    }
+    //  Owner, 27 Nov 2026 (A3): a client's billing address has ONE form — with its GSTIN —
+    //  and one save path (custid_add_location). A "Billing Address" posted to the plain
+    //  address form of a client is not saved as a second, GSTIN-less kind of billing address.
+    if ($kind === 'address' && !empty($p['is_client']) && strtoupper((string) ($b['address_type'] ?? '')) === 'BILLING') {
+        flash('A billing address is added with its GSTIN — use "+ Add a billing address / GSTIN" on this tab. Nothing was saved.', 'error');
+        redirect("/partner?id={$p['id']}&tab=addresses");
     }
     if (isset($map[$kind])) {
         [$table, $fields, $tab] = $map[$kind];

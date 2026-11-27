@@ -3,6 +3,8 @@
 
   // ---- Live GSTIN -> PAN + State autofill on the partner form ----
   var STATES = {"01":"Jammu & Kashmir","02":"Himachal Pradesh","03":"Punjab","04":"Chandigarh","05":"Uttarakhand","06":"Haryana","07":"Delhi","08":"Rajasthan","09":"Uttar Pradesh","10":"Bihar","11":"Sikkim","12":"Arunachal Pradesh","13":"Nagaland","14":"Manipur","15":"Mizoram","16":"Tripura","17":"Meghalaya","18":"Assam","19":"West Bengal","20":"Jharkhand","21":"Odisha","22":"Chhattisgarh","23":"Madhya Pradesh","24":"Gujarat","25":"Daman & Diu","26":"Dadra & Nagar Haveli","27":"Maharashtra","28":"Andhra Pradesh (Old)","29":"Karnataka","30":"Goa","31":"Lakshadweep","32":"Kerala","33":"Tamil Nadu","34":"Puducherry","35":"Andaman & Nicobar","36":"Telangana","37":"Andhra Pradesh","38":"Ladakh"};
+  //  One state list for every GSTIN box (the billing-address form reads it too).
+  window.EXAACT_GST_STATES = STATES;
 
   function gstAutofill() {
     var gstin = document.querySelector('input[name="gstin"]');
@@ -2337,12 +2339,45 @@
     for (var i = 0; i < 14; i++) { var c = CS.indexOf(f.charAt(i)); if (c < 0) return ''; var p = c * (i % 2 ? 2 : 1); sum += Math.floor(p / 36) + p % 36; }
     return CS.charAt((36 - sum % 36) % 36);
   }
+  //  Owner test BL-07 (27 Nov 2026): "who already has this GSTIN?" is asked the moment a
+  //  complete, valid GSTIN is typed or pasted — not only after the whole form is saved.
+  //  Read-only; the server answers only those who would be told the same on Save.
+  var whoTimer = null, whoSeq = 0;
+  window.exaactGstinWho = function (gstin, exclude, cb) {
+    if (whoTimer) clearTimeout(whoTimer);
+    var seq = ++whoSeq;
+    whoTimer = setTimeout(function () {
+      if (!window.fetch) return;
+      var body = new URLSearchParams(); body.append('gstin', gstin); body.append('exclude', String(exclude || 0));
+      var m = document.querySelector('meta[name="csrf-token"]'); if (m) body.append('_csrf', m.getAttribute('content') || '');
+      fetch('/gstin-who', { method: 'POST', body: body, credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (j) { if (seq === whoSeq && j) cb(j); })
+        .catch(function () { /* the check on Save still runs */ });
+    }, 350);
+  };
   document.addEventListener('input', function (ev) {
     var g = ev.target; if (!g || !g.hasAttribute || !g.hasAttribute('data-gstin-check')) return;
     var raw = g.value || '', v = raw.toUpperCase().replace(/[^0-9A-Z]/g, '').substr(0, 15); if (v !== raw) g.value = v;
-    var hint = g.parentNode ? g.parentNode.querySelector('.gstin-hint') : null; if (!hint) return;
-    hint.textContent = !v.length ? '' : (v.length !== 15 ? 'A GSTIN is 15 characters (' + v.length + ' typed).'
-      : (checkChar(v.substr(0, 14)) === v.charAt(14) ? 'Its check character is right.'
+    var box = g.parentNode; if (!box) return;
+    var hint = box.querySelector('.gstin-hint'), stOut = box.querySelector('.gstin-state'), who = box.querySelector('.gstin-who');
+    var ok = v.length === 15 && checkChar(v.substr(0, 14)) === v.charAt(14);
+    //  BL-03: the state is read from the GSTIN — show it, read-only, as soon as it is known.
+    var states = window.EXAACT_GST_STATES || {};
+    if (stOut) stOut.textContent = v.length >= 2 && states[v.substr(0, 2)] ? 'State: ' + states[v.substr(0, 2)] + ' (from the GSTIN)' : '';
+    if (hint) hint.textContent = !v.length ? '' : (v.length !== 15 ? 'A GSTIN is 15 characters (' + v.length + ' typed).'
+      : (ok ? 'Its check character is right.'
         : 'The last character does not match the rest — a typing mistake, or a made-up number. Copy it again from the GST certificate.'));
+    if (!who) return;
+    who.textContent = '';
+    if (!ok) return;
+    var pan = (g.getAttribute('data-gstin-pan') || '').toUpperCase();
+    if (pan && v.substr(2, 10) !== pan) {
+      who.textContent = 'This GSTIN carries the PAN ' + v.substr(2, 10) + ', but this record’s PAN is ' + pan + ' — a different PAN is a different company.';
+      return;
+    }
+    if (g.hasAttribute('data-gstin-who')) window.exaactGstinWho(v, g.getAttribute('data-gstin-who'), function (j) {
+      if ((g.value || '').toUpperCase().replace(/[^0-9A-Z]/g, '') === v) who.textContent = j.text || '';
+    });
   });
 })();

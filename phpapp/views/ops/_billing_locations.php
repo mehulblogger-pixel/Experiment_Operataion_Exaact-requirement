@@ -26,47 +26,51 @@ $blBackIn = '<input type="hidden" name="back" value="' . $blBack . '">';
   <div class="dt-scroll"><table class="grid">
     <thead><tr><th scope="col">Location</th><th scope="col">State</th><th scope="col">GSTIN</th><th scope="col">Billing address</th><?php if ($canLoc): ?><th scope="col"><span class="sr-only">Actions</span></th><?php endif; ?></tr></thead>
     <tbody>
-    <?php foreach ($locs as $l): ?>
+    <?php $blEdits = [];
+          foreach ($locs as $l): ?>
       <tr>
         <td><b><?= e($l['label']) ?></b><?= $l['is_main'] ? ' <span class="pill p-ok">main</span>' : '' ?></td>
         <td><?= e($l['state'] ?: '—') ?></td>
         <td><?= e($l['gstin'] ?: '—') ?></td>
-        <td class="muted"><?= e($l['address'] ?: '—') ?></td>
+        <td class="muted"><?php if ($l['address'] !== ''): ?><?= e($l['address']) ?><?php elseif ($l['is_main']): ?>
+            <?php //  Owner test BL-03 (27 Nov 2026): the Main line never borrows another office's address. ?>
+            <span class="bl-no-ho">Head-office address not on file<?php if ($canLoc && $blBack === 'partner'): ?> — <a href="/partner?id=<?= (int) $pp['id'] ?>&amp;tab=addresses">add it</a><?php elseif ($canLoc): ?> — <a href="/partner?id=<?= (int) $pp['id'] ?>&amp;tab=addresses">add it on the master record</a><?php endif; ?></span>
+          <?php else: ?>—<?php endif; ?></td>
         <?php if ($canLoc): ?><td>
-          <?php if (!$l['is_main']): ?>
-            <details><summary class="btn small secondary" style="display:inline-flex">Change</summary>
-              <form method="post" action="/partner-billing-location?id=<?= (int) $pp['id'] ?>" class="inline-add" style="margin-top:6px">
-                <input type="hidden" name="do" value="update"><?= $blBackIn ?><input type="hidden" name="loc" value="<?= (int) $l['id'] ?>">
-                <div class="ff"><label>Name</label><input class="form-control" name="label" value="<?= e($l['label']) ?>" maxlength="150"></div>
-                <div class="ff"><label>Address line</label><input class="form-control" name="line1" value="<?= e($l['addr']['line1'] ?? '') ?>" maxlength="255"></div>
-                <div class="ff"><label>City</label><input class="form-control" name="city" value="<?= e($l['addr']['city'] ?? '') ?>" maxlength="120"></div>
-                <div class="ff"><label>PIN</label><input class="form-control" name="pincode" value="<?= e($l['addr']['pincode'] ?? '') ?>" maxlength="15"></div>
-                <button class="btn small" type="submit">Save</button>
-              </form>
-              <form method="post" action="/partner-billing-location?id=<?= (int) $pp['id'] ?>" style="margin-top:6px" onsubmit="return confirm('Stop billing at this location? Bills already raised keep it.')">
-                <input type="hidden" name="do" value="stop"><?= $blBackIn ?><input type="hidden" name="loc" value="<?= (int) $l['id'] ?>">
-                <button class="btn small secondary" type="submit">Stop using for new bills</button>
-              </form>
-            </details>
+          <?php if (!$l['is_main']): $blEdits[] = $l; ?>
+            <a class="btn small secondary" href="#bl-edit-<?= (int) $l['id'] ?>" onclick="var d=document.getElementById('bl-edit-<?= (int) $l['id'] ?>');if(d){d.open=true;}">✎ Change</a>
+          <?php elseif ($l['addr']): ?>
+            <a class="btn small secondary" href="/partner?id=<?= (int) $pp['id'] ?>&amp;tab=addresses" title="The head-office address is kept on the master record's Addresses tab">✎ Change head office</a>
           <?php endif; ?>
         </td><?php endif; ?>
       </tr>
     <?php endforeach; ?>
     </tbody>
   </table></div>
+  <?php // Change / Stop of each extra billing address — full width under the list, opened by
+        // the "✎ Change" button on its row, so it is never squeezed into a table cell or off a
+        // phone screen (owner test BL-03, 27 Nov 2026: "no option to edit"). The GSTIN stays. ?>
+  <?php foreach ($blEdits as $l): ?>
+    <details class="bl-edit" id="bl-edit-<?= (int) $l['id'] ?>" style="margin-top:8px"><summary class="btn small secondary">✎ Change <?= e($l['label']) ?> (<?= e($l['gstin']) ?>)</summary>
+      <form method="post" action="/partner-billing-location?id=<?= (int) $pp['id'] ?>" class="inline-add" style="margin-top:6px">
+        <input type="hidden" name="do" value="update"><?= $blBackIn ?><input type="hidden" name="loc" value="<?= (int) $l['id'] ?>">
+        <div class="ff"><label>GSTIN <span class="muted">(stays — it is what this address is)</span></label><input class="form-control" value="<?= e($l['gstin']) ?> · <?= e($l['state']) ?>" readonly></div>
+        <div class="ff"><label>Name</label><input class="form-control" name="label" value="<?= e($l['label']) ?>" maxlength="150"></div>
+        <div class="ff"><label>Address line</label><input class="form-control" name="line1" value="<?= e($l['addr']['line1'] ?? '') ?>" maxlength="255"></div>
+        <div class="ff"><label>City</label><input class="form-control" name="city" value="<?= e($l['addr']['city'] ?? '') ?>" maxlength="120"></div>
+        <div class="ff"><label>PIN</label><input class="form-control" name="pincode" value="<?= e($l['addr']['pincode'] ?? '') ?>" maxlength="15"></div>
+        <button class="btn small" type="submit">Save</button>
+      </form>
+      <form method="post" action="/partner-billing-location?id=<?= (int) $pp['id'] ?>" style="margin-top:6px" onsubmit="return confirm('Stop billing at this location? Bills already raised keep it.')">
+        <input type="hidden" name="do" value="stop"><?= $blBackIn ?><input type="hidden" name="loc" value="<?= (int) $l['id'] ?>">
+        <button class="btn small secondary" type="submit">Stop using for new bills</button>
+      </form>
+      <p class="muted" style="margin:4px 0 0;font-size:12px">Bills already issued keep the address they were made out to.</p>
+    </details>
+  <?php endforeach; ?>
   <?php if ($canLoc && trim((string) $pp['gstin']) !== ''): ?>
     <details style="margin-top:10px"><summary class="btn small">+ Add a billing address / GSTIN</summary>
-      <p class="muted" style="margin:8px 0 0;font-size:12.5px"><b>Office in another state</b> — type that state's own GSTIN. <b>Another office in the same state</b> — type the same GSTIN (<?= e($pp['gstin']) ?>) and that office's address.</p>
-      <form method="post" action="/partner-billing-location?id=<?= (int) $pp['id'] ?>" class="inline-add" style="margin-top:8px">
-        <input type="hidden" name="do" value="add"><?= $blBackIn ?>
-        <div class="ff"><label for="bl-gstin">GSTIN</label><input class="form-control" id="bl-gstin" name="gstin" maxlength="20" required data-gstin-check autocomplete="off" placeholder="e.g. <?= e($pp['gstin']) ?>" title="Copy it from that state's GST certificate (state code + <?= e($pp['pan'] ?: 'the PAN') ?> + 3 characters) — the last character is a check, so a made-up number is refused" style="text-transform:uppercase"><span class="ff-help gstin-hint" aria-live="polite"></span></div>
-        <div class="ff"><label for="bl-label">Name</label><input class="form-control" id="bl-label" name="label" maxlength="150" placeholder="e.g. Mumbai plant"></div>
-        <div class="ff"><label for="bl-line1">Billing address</label><input class="form-control" id="bl-line1" name="line1" maxlength="255"></div>
-        <div class="ff"><label for="bl-city">City</label><input class="form-control" id="bl-city" name="city" maxlength="120"></div>
-        <div class="ff"><label for="bl-pin">PIN</label><input class="form-control" id="bl-pin" name="pincode" maxlength="15"></div>
-        <button class="btn small" type="submit">Add billing address</button>
-      </form>
-      <p class="muted" style="margin:6px 0 0;font-size:12.5px">The GSTIN must carry this <?= e(Tl('client')) ?>'s PAN (<?= e($pp['pan'] ?: '—') ?>). Its state is read from the GSTIN. With the same GSTIN as one already listed, the address and city are needed so the two offices can be told apart. <?= e(Tlp('quote')) ?>, contracts and invoices then choose which address they are billed to.</p>
+      <?php $blFid = 'bl-' . $blBack; include __DIR__ . '/_billing_location_form.php'; ?>
     </details>
   <?php endif; ?>
   <?php if ($mv && empty($mv['err']) && $canLoc && (is_master() || can('mod.clients.edit'))): ?>

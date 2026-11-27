@@ -36,6 +36,8 @@ $g = (string) ($cv['gstin'] ?? '');
       <input class="form-control" id="<?= e($px) ?>-ftax" name="foreign_tax_id" value="<?= e((string) ($cv['foreign_tax_id'] ?? '')) ?>" maxlength="60"></div>
   </div>
   <p class="muted cid-hint" aria-live="polite" style="margin:6px 0 0;font-size:12.5px"></p>
+  <?php // Owner test BL-07 (27 Nov 2026): who already has this GSTIN — told as it is pasted. ?>
+  <p class="cid-who" aria-live="polite" style="margin:4px 0 0;font-size:12.5px;color:var(--danger)"></p>
 </fieldset>
 <script>(function(){
   var box = document.getElementById(<?= json_encode($px) ?>); if (!box) return;
@@ -66,7 +68,16 @@ $g = (string) ($cv['gstin'] ?? '');
     for (var i = 0; i < 14; i++) { var c = cs.indexOf(f.charAt(i)); if (c < 0) return ''; var p = c * (i % 2 ? 2 : 1); sum += Math.floor(p / 36) + p % 36; }
     return cs.charAt((36 - sum % 36) % 36);
   }
+  //  Owner test BL-07 (27 Nov 2026): a complete, valid GSTIN is looked up at once — "Already
+  //  belongs to CL-0012 — …" — so nobody fills the whole form to be refused on Save.
+  var who = box.querySelector('.cid-who'), exclude = <?= (int) ($cv['id'] ?? 0) ?>;
+  function ask(){
+    if (!who) return; who.textContent = '';
+    var v = g ? (g.value || '') : '';
+    if (status() !== 'REGISTERED' || v.length !== 15 || checkChar(v.substr(0, 14)) !== v.charAt(14) || typeof window.exaactGstinWho !== 'function') return;
+    window.exaactGstinWho(v, exclude, function(j){ if ((g.value || '') === v) who.textContent = j.text || ''; });
+  }
   box.querySelectorAll('[name=tax_status]').forEach(function(r){ r.addEventListener('change', sync); });
-  if (g) g.addEventListener('input', fill);
+  if (g) { g.addEventListener('input', fill); g.addEventListener('input', ask); }
   sync();
 })();</script>

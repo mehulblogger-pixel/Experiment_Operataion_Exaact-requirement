@@ -26,11 +26,24 @@ if (!$pBasic) $tabs += ['notes'=>'Notes','timeline'=>'Timeline'];
 if (!isset($tabs[$tab])) $tab = 'overview';
 // Cross-tab data flow: primary contact/address and links between them.
 $primaryContact = null; foreach ($contacts as $c) { if ($c['is_primary']) { $primaryContact = $c; break; } } if (!$primaryContact && $contacts) $primaryContact = $contacts[0];
-$primaryAddress = null; foreach ($addresses as $a) { if ($a['is_primary']) { $primaryAddress = $a; break; } } if (!$primaryAddress && $addresses) $primaryAddress = $addresses[0];
+//  The head office is one of the record's OWN addresses — never a billing location's
+//  (owner test BL-03, 27 Nov 2026), chosen by the same rule as the Billing addresses box.
+$primaryAddress = null;
+if (function_exists('custid_head_office_address')) {
+    $hoRow = $addresses ? custid_head_office_address($id) : null;
+    if ($hoRow) foreach ($addresses as $a) if ((int) $a['id'] === (int) $hoRow['id']) { $primaryAddress = $a; break; }
+} else {
+    foreach ($addresses as $a) { if ($a['is_primary']) { $primaryAddress = $a; break; } } if (!$primaryAddress && $addresses) $primaryAddress = $addresses[0];
+}
+$hoId = $primaryAddress ? (int) $primaryAddress['id'] : 0;
+//  Who may change this record's addresses — the /partner-add gate and its office boundary.
+$canAddr = !$pBasic && (is_master() || can('mod.clients.edit') || can('mod.vendors.edit') || (function_exists('is_coordinator_level') && is_coordinator_level()))
+        && (!function_exists('partner_can_write') || partner_can_write($p));
 $addrById = []; foreach ($addresses as $a) $addrById[$a['id']] = $a;
 $contactsByAddr = []; foreach ($contacts as $c) { $contactsByAddr[$c['address_id'] ?: 0][] = $c; }
-function addr_line($a) { return implode(', ', array_filter([$a['line1'] ?? '',$a['line2'] ?? '',$a['town_village'] ?? '',$a['district'] ?? '',$a['city'] ?? '',$a['state'] ?? '',$a['pincode'] ?? ''])); }
-function addr_name($a) { return (lk_options_or('address_type', ADDRESS_TYPES)[$a['address_type']] ?? $a['address_type']) . ($a['label'] ? ' — '.$a['label'] : ''); }
+//  Declared once even if the view is drawn twice in one run (tests render each tab).
+if (!function_exists('addr_line')) { function addr_line($a) { return implode(', ', array_filter([$a['line1'] ?? '',$a['line2'] ?? '',$a['town_village'] ?? '',$a['district'] ?? '',$a['city'] ?? '',$a['state'] ?? '',$a['pincode'] ?? ''])); } }
+if (!function_exists('addr_name')) { function addr_name($a) { return (lk_options_or('address_type', ADDRESS_TYPES)[$a['address_type']] ?? $a['address_type']) . ($a['label'] ? ' — '.$a['label'] : ''); } }
 ?>
 <?php // Say plainly why this record is showing less than usual, and who to ask.
       // A screen that silently shows less looks broken; one that explains is a
@@ -96,6 +109,20 @@ function addr_name($a) { return (lk_options_or('address_type', ADDRESS_TYPES)[$a
   <?php if (!$pBasic): ?><a class="btn secondary" href="/partner-edit?id=<?= $id ?>">Edit details</a><?php endif; ?>
 
 <?php elseif ($tab === 'registration'): ?>
+  <?php // The client's GSTINs, read straight from its Billing addresses (owner test BL-03,
+        // 27 Nov 2026: "not updated in registration tab") — shown here, never stored twice.
+        if (!empty($p['is_client']) && function_exists('custid_locations')):
+          $regLocs = array_values(array_filter(custid_locations($id), fn($l) => $l['gstin'] !== ''));
+          if ($regLocs): ?>
+    <h3 class="tab-sub" style="margin-top:0">GSTINs on file <span class="muted" style="font-weight:400;font-size:12.5px">— from Billing addresses; add or change them there (Overview tab)</span></h3>
+    <table class="grid" id="reg-gstins"><thead><tr><th scope="col">Billing address</th><th scope="col">State</th><th scope="col">GSTIN</th><th scope="col">Address</th></tr></thead><tbody>
+      <?php foreach ($regLocs as $l): ?><tr>
+        <td><?= e($l['label']) ?><?= $l['is_main'] ? ' <span class="pill p-ok">main</span>' : '' ?></td>
+        <td><?= e($l['state'] ?: '—') ?></td><td><?= e($l['gstin']) ?></td><td class="muted"><?= e($l['address'] ?: '—') ?></td>
+      </tr><?php endforeach; ?>
+    </tbody></table>
+    <h3 class="tab-sub">Registration documents</h3>
+  <?php endif; endif; ?>
   <table class="grid"><tr><th>Document</th><th>Number</th><th>Valid till</th><th>File</th></tr>
     <?php foreach ($registrations as $r): ?><tr>
       <td><?= e(lk_options_or('registration_type', REG_TYPES)[$r['doc_type']] ?? $r['doc_type']) ?></td>
@@ -124,9 +151,25 @@ function addr_name($a) { return (lk_options_or('address_type', ADDRESS_TYPES)[$a
   </form>
 
 <?php elseif ($tab === 'addresses'): ?>
-  <?php foreach ($addresses as $a): ?>
-    <div class="addr-card"><div><span class="badge GREEN"><?= e(lk_options_or('address_type', ADDRESS_TYPES)[$a['address_type']] ?? $a['address_type']) ?></span> <strong><?= e($a['label']) ?></strong><?php if ($a['is_primary']): ?> <span class="badge AMBER">head office</span><?php endif; ?></div>
+  <?php foreach ($addresses as $a):
+        $aIsBill = (int) ($a['is_billing'] ?? 0) === 1;
+        $aGst = function_exists('clean_gstin') ? clean_gstin($a['gstin'] ?? '') : (string) ($a['gstin'] ?? '');
+        $aLegacyBill = !$aIsBill && $aGst === '' && (string) $a['address_type'] === 'BILLING'; ?>
+    <div class="addr-card"><div><span class="badge GREEN"><?= e(lk_options_or('address_type', ADDRESS_TYPES)[$a['address_type']] ?? $a['address_type']) ?></span> <strong><?= e($a['label']) ?></strong><?php if ($hoId && (int) $a['id'] === $hoId): ?> <span class="badge AMBER">head office</span><?php endif; ?>
+      <?php if ($aIsBill): ?> <span class="pill p-ok">billing address · GSTIN <?= e($aGst) ?></span><?php endif; ?></div>
     <div class="muted"><?= e(addr_line($a)) ?></div>
+    <?php // Owner, 27 Nov 2026 (A3): a billing address lives in ONE place — Billing addresses.
+          if ($aIsBill): ?>
+      <div class="muted" style="font-size:12.5px">Changed or stopped in <a href="/partner?id=<?= $id ?>#billing-locations">Billing addresses</a> (Overview tab).</div>
+    <?php elseif ($aLegacyBill): ?>
+      <div class="msg msg-warning" style="margin:6px 0 0;font-size:12.5px">Billing address without its own GSTIN — bills use it only under the main GSTIN<?= !empty($p['gstin']) ? ' (' . e($p['gstin']) . ')' : '' ?>. For an office with its own GSTIN, add it with the form below.</div>
+    <?php endif; ?>
+    <?php if ($canAddr && !$aIsBill && $aGst === '' && (!$hoId || (int) $a['id'] !== $hoId)): ?>
+      <form method="post" action="/partner-address-head-office?id=<?= $id ?>" style="margin:6px 0 0">
+        <input type="hidden" name="addr" value="<?= (int) $a['id'] ?>">
+        <button class="btn small secondary" type="submit">Mark as head office</button>
+      </form>
+    <?php endif; ?>
     <?php foreach (($contactsByAddr[$a['id']] ?? []) as $ct): ?><div class="muted">· <?= e($ct['name']) ?> <?= e($ct['designation']) ?> — <?= e(trim($ct['mobile'].' '.$ct['email'])) ?></div><?php endforeach; ?>
     <?php // Per-site coordinates — a multi-site client's distinct sites each carry their
           //  own location, set once here and inherited by every inspection at this site.
@@ -142,9 +185,25 @@ function addr_name($a) { return (lk_options_or('address_type', ADDRESS_TYPES)[$a
     </div>
   <?php endforeach; ?>
   <?php if (!$addresses): ?><p>No addresses yet.</p><?php endif; ?>
-  <h3 class="tab-sub">Add an address</h3>
+  <?php // One form for a billing address, wherever it is added (owner, 27 Nov 2026: A3 — "both
+        // shall have same form and have GSTIN value input so we don't have duplicate screens").
+        // A client's billing address is added with its GSTIN through the Billing addresses form;
+        // this form keeps the other kinds of address (office, plant, site …).
+        $blIsClient = !empty($p['is_client']) && function_exists('custid_can_edit');
+        $blCan = $blIsClient && custid_can_edit($p) && trim((string) ($p['gstin'] ?? '')) !== ''; ?>
+  <?php if ($blIsClient): ?>
+    <h3 class="tab-sub">Add a billing address (with its GSTIN)</h3>
+    <?php if ($blCan): ?>
+      <details id="addr-billing-add"><summary class="btn small">+ Add a billing address / GSTIN</summary>
+        <?php $pp = $p; $blBack = 'addresses'; $blFid = 'bl-addr'; include __DIR__ . '/ops/_billing_location_form.php'; ?>
+      </details>
+    <?php elseif ($canAddr): ?>
+      <p class="muted" style="font-size:12.5px">Enter this <?= e(Tl('client')) ?>'s main GSTIN and PAN first (<a href="/partner-edit?id=<?= $id ?>">Edit details</a>); billing addresses are added under them.</p>
+    <?php endif; ?>
+  <?php endif; ?>
+  <h3 class="tab-sub">Add an address<?= $blIsClient ? ' <span class="muted" style="font-weight:400;font-size:12.5px">— office, plant, site …</span>' : '' ?></h3>
   <form method="post" action="/partner-add?id=<?= $id ?>&kind=address" class="inline-add">
-    <div class="ff"><label>Type</label><select class="form-control" name="address_type"><?php foreach (lk_options_or('address_type', ADDRESS_TYPES) as $k=>$v): ?><option value="<?= $k ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
+    <div class="ff"><label>Type</label><select class="form-control" name="address_type"><?php foreach (lk_options_or('address_type', ADDRESS_TYPES) as $k=>$v): if ($blIsClient && $k === 'BILLING') continue; ?><option value="<?= $k ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
     <div class="ff"><label>Label</label><input class="form-control" name="label"></div>
     <div class="ff"><label>Address line</label><input class="form-control" name="line1"></div>
     <div class="ff"><label>Town / Village / City</label><input class="form-control" name="town_village"></div>

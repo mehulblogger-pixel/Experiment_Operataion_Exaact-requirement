@@ -245,6 +245,11 @@ $BASELINE = [
     // the same question as the page it opens. Contracts belong to clients and vendors, which
     // are CORE (section E), so a master keeps it on any plan. Same answer for a master as before.
     'contract_can_view',
+    // Owner, 27 Nov 2026 (BL-07). custid_lookup_can() answers "who already has this GSTIN?"
+    // as it is typed, for exactly the people a Save refusal would tell — who may add or edit
+    // a client (CORE, section E) or turn a lead / deal / won quotation into a customer. The
+    // answer names no more than that refusal. Same answer for a master as custid_can_edit().
+    'custid_lookup_can',
 ];
 $unclassified = array_values(array_diff($open, $BASELINE));
 t_ok(!$unclassified,
