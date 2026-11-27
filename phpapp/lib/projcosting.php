@@ -255,6 +255,11 @@ function pc_current_level($id) {
 function pc_step_people($step, $h) {
     if (!empty($step['approver_user_id'])) {
         $u = ops_one("SELECT id, username, first_name, last_name, email, role FROM users WHERE id=? AND is_active=1", [(int)$step['approver_user_id']]);
+        //  One person, one level (27 Nov 2026): the named approver already signed another level of
+        //  this costing — anyone else who may approve signs this one (the fallback below).
+        if ($u && strtoupper((string)($step['status'] ?? 'PENDING')) === 'PENDING' && !empty($h['id'])
+            && in_array((int)$u['id'], pc_signed_other_levels((int)$h['id'], (int)($step['level'] ?? 0)), true))
+            return pc_step_people(['approver_role' => '', 'approver_user_id' => null] + $step, $h);
         return $u ? [$u] : [];
     }
     $roles = [];
@@ -263,12 +268,32 @@ function pc_step_people($step, $h) {
     $people = function_exists('crm_role_approvers_for') ? crm_role_approvers_for($roles, pc_as_quote($h)) : [];
     $author = (int)($h['created_by_user_id'] ?? 0);
     $out = array_values(array_filter($people, fn($u) => (int)$u['id'] !== $author));
+    //  One person, one level (owner, 27 Nov 2026, decision 1): on a waiting level, whoever already
+    //  signed another level of this costing is left out. When that leaves nobody, the fallback just
+    //  below (anyone else who may approve) applies, and the Master Admin can always sign.
+    if (strtoupper((string)($step['status'] ?? 'PENDING')) === 'PENDING' && !empty($h['id'])) {
+        $signedOther = pc_signed_other_levels((int)$h['id'], (int)($step['level'] ?? 0));
+        if ($signedOther) $out = array_values(array_filter($out, fn($u) => !in_array((int)$u['id'], $signedOther, true)));
+    }
     //  The author is the only person holding this level (a Marketing Manager who
     //  prepared it, at a "Marketing Manager" level): it may not wait forever on
     //  someone who can never sign it — anyone else who may approve signs instead.
     if (!$out && $roles && ($step['approver_role'] ?? '') !== '')
         return pc_step_people(['approver_role' => '', 'approver_user_id' => null] + $step, $h);
     return $out;
+}
+//  The people who signed a level of this costing other than $level (by id; older rows by name).
+function pc_signed_other_levels($costingId, $level) {
+    $ids = [];
+    try {
+        foreach (ops_all("SELECT level, acted_by, acted_by_id FROM project_costing_approvals WHERE costing_id=? AND status='APPROVED'", [(int)$costingId]) ?: [] as $r) {
+            if ((int)$r['level'] === (int)$level) continue;
+            if (!empty($r['acted_by_id'])) { $ids[] = (int)$r['acted_by_id']; continue; }
+            $nm = trim((string)($r['acted_by'] ?? '')); if ($nm === '') continue;
+            foreach (ops_all("SELECT id, username, first_name, last_name FROM users") ?: [] as $u) if (user_name($u) === $nm) $ids[] = (int)$u['id'];
+        }
+    } catch (Throwable $e) {}
+    return array_values(array_unique($ids));
 }
 // The levels that may sign now: the lowest waiting one, or — when the company
 // chose that all levels sign at the same time (Set up Sales) — every waiting one.

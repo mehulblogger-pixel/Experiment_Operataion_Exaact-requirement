@@ -342,6 +342,8 @@ function crm_migrate() {
         ensure_column('quote_approvals', 'escalated_at', "VARCHAR(30) DEFAULT ''");
         ensure_column('quote_approvals', 'escalate_role', "VARCHAR(40) DEFAULT ''");
         ensure_column('quote_approvals', 'escalate_user_id', 'INT NULL');
+        // Who signed, by id as well as by name — "one person, one level" (owner, 27 Nov 2026).
+        ensure_column('quote_approvals', 'acted_by_id', 'INT NULL');
         // Per-line: which office executes, which site, and the activity under the Business Unit.
         ensure_column('quote_lines', 'office_id', 'INT NULL');
         ensure_column('quote_lines', 'location_id', 'INT NULL');
@@ -712,6 +714,38 @@ function crm_quote_figures_problem(array $b) {
     return '';
 }
 
+//  RETIRED SERVICE TYPES (owner, 27 Nov 2026, decision 4b). A type removed from the Service list
+//  after a quotation was made cannot be drawn on its form, so a Save posts it blank — on a line and
+//  in the header's ticked types — and the approval was cancelled though nothing was changed. The
+//  stored type is kept where the form could not show it: a line whose posted Service is blank and
+//  whose description is unchanged keeps its stored type; the header keeps ticked types that are no
+//  longer on the list. Any real change (a new type, a changed description, price, quantity) still
+//  counts as a change.
+function crm_quote_keep_retired_services($qid, array $b) {
+    $list = lk_options_or('inspection_type', INSPECTION_TYPES);
+    $retired = fn($code) => $code !== '' && !isset($list[$code]);
+    $q = ops_one("SELECT inspection_types FROM quotations WHERE id=?", [(int)$qid]);
+    if ($q) {
+        $keep = array_filter(array_map('trim', explode(',', (string)$q['inspection_types'])), $retired);
+        if ($keep) {
+            $posted = array_values(array_filter((array)($b['inspection_types'] ?? [])));
+            foreach ($keep as $c) if (!in_array($c, $posted, true)) $posted[] = $c;
+            $b['inspection_types'] = $posted;
+        }
+    }
+    $old = ops_all("SELECT service_type, description FROM quote_lines WHERE quote_id=? ORDER BY line_no, id", [(int)$qid]) ?: [];
+    if (!$old || !isset($b['l_desc'])) return $b;
+    $svc = (array)($b['l_service'] ?? []); $desc = (array)$b['l_desc'];
+    $i = 0;
+    foreach ($desc as $k => $d) {
+        if (!isset($old[$i])) break;
+        $o = $old[$i++];
+        if (trim((string)($svc[$k] ?? '')) === '' && $retired((string)$o['service_type'])
+            && trim((string)$d) === trim((string)$o['description'])) $svc[$k] = (string)$o['service_type'];
+    }
+    $b['l_service'] = $svc;
+    return $b;
+}
 // Replace all line items from the posted arrays (parallel field arrays per row).
 function crm_save_lines($qid, $b) {
     db()->prepare("DELETE FROM quote_lines WHERE quote_id=?")->execute([(int)$qid]);
@@ -1838,6 +1872,11 @@ function crm_quote_commercial_print($qid) {
     $q = ops_one("SELECT * FROM quotations WHERE id=?", [(int)$qid]); if (!$q) return '';
     $h = [];
     foreach (QUOTE_COMMERCIAL_FIELDS as $f) $h[$f] = trim((string)($q[$f] ?? ''));
+    //  For a client on file the name is the client master's — renaming the client there (e.g. adding
+    //  "Pvt Ltd") is not a change to the offer (owner, 27 Nov 2026, decision 4b). The client itself is.
+    if ((int)($q['client_id'] ?? 0) > 0) $h['client_name'] = '';
+    //  The order of the ticked types is not part of the offer.
+    $it = array_values(array_filter(array_map('trim', explode(',', $h['inspection_types'])))); sort($it); $h['inspection_types'] = implode(',', $it);
     // Terms compare as text, not as bytes: Windows and Unix line breaks, and spaces at the end of a
     // line, are the same terms (owner, 26 Nov 2026 — an unchanged Save must not cancel an approval).
     $h['terms_conditions'] = crm_terms_norm($q['terms_conditions'] ?? '');
@@ -2837,6 +2876,9 @@ function ops_crm_quotes($route, $method) {
         $refused = null;   // a refused save draws the form again from what was posted
         if ($method === 'POST') {
             $b = $_POST;
+            //  A service type taken off the list after this quotation was made is not "unticked" by the
+            //  person saving it — the form simply cannot show it (owner, 27 Nov 2026, decision 4b).
+            if ($q) $b = crm_quote_keep_retired_services((int)$q['id'], $b);
             // A double click, or the same form sent twice, saves once (SA-26): the
             // form carries a one-time key, and a key already used opens the
             // quotation it created instead of making a second one.
@@ -3139,6 +3181,22 @@ function ops_crm_quotes($route, $method) {
     if ($route === 'quote-status' && $method === 'POST') {
         $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
         $to = $_POST['to'] ?? '';
+        //  SEND AGAIN (owner, 27 Nov 2026, QP-10): a quotation already with the client is e-mailed
+        //  again from the company mailbox. The same send action and the same right as "Send to client";
+        //  it stays Sent (no new status), and History says who sent it again and to whom.
+        if (!empty($_POST['resend'])) {
+            if ((string)($q['status'] ?? '') !== 'SENT' || empty($q['is_current']) || crm_quote_superseded($q)) {
+                flash('Only the current revision of a sent ' . Tl('quote') . ' can be sent again.', 'error'); redirect('/quote?id=' . $q['id']);
+            }
+            ops_require(can('crm.quote.send') || is_master(), 'You cannot send quotations.');
+            if (!crm_quote_can_work($q)) { flash(crm_assignee_words((int)crm_quote_owner_user_id($q), Tl('quote')), 'error'); redirect('/quote?id=' . $q['id']); }
+            if (trim((string)($q['contact_email'] ?? '')) === '') { flash('There is no ' . Tl('client') . ' e-mail on this ' . Tl('quote') . ' to send it to.', 'error'); redirect('/quote?id=' . $q['id']); }
+            [$sent, $msg] = crm_send_quote_email($q);
+            if (!$sent) { flash('Not sent again: ' . $msg, 'error'); redirect('/quote?id=' . $q['id']); }
+            crm_log_change($q['id'], 'Sent again by ' . user_name(current_user()) . ' to ' . $q['contact_email'] . '.');
+            flash('Sent again to ' . $q['contact_email'] . '. It stays “Sent”; History records it.');
+            redirect('/quote?id=' . $q['id']);
+        }
         if (!isset(lk_options_or('quote_status', QUOTE_STATUS)[$to])) { flash('Unknown status.', 'error'); redirect('/quote?id=' . $q['id']); }
         // The lifecycle, enforced here and not only by which buttons are drawn:
         // a move the table does not allow is refused, with the reason.
@@ -3450,14 +3508,20 @@ function ops_crm_quotes($route, $method) {
         $q = crm_quote_get((int)($_GET['id'] ?? 0)); if (!$q) { http_response_code(404); view('notfound'); return; }
         //  Q-05 — the editable copy only once approved, and only for those who send quotations.
         if (($wp = crm_quote_word_problem($q)) !== '') { flash($wp, 'error'); redirect('/quote?id=' . $q['id']); }
-        $tplId = (int)($_GET['tpl'] ?? 0);
-        $tpl = $tplId ? ops_one("SELECT * FROM crm_templates WHERE id=? AND kind='QUOTE_DOC'", [$tplId])
-                      : ops_one("SELECT * FROM crm_templates WHERE kind='QUOTE_DOC' AND active=1 ORDER BY is_default DESC, id DESC");
-        if (!$tpl || ($tpl['file_data'] ?? '') === '') { flash('No quotation Word template is uploaded yet. Add one under CRM → Quote templates.', 'error'); redirect('/quote?id=' . $q['id']); }
-        [$bin, $err] = docx_fill(base64_decode($tpl['file_data']), quote_doc_map($q, $tpl), crm_quote_lines($q['id']));
+        //  The company's own uploaded format when that is its choice; otherwise — or when it has
+        //  none — the system's own Word format (owner, 27 Nov 2026). ?tpl=system / ?tpl=<id> picks one.
+        $pick = (string)($_GET['tpl'] ?? '');
+        if ((int)$pick > 0 && !quote_word_template($pick)) { flash('That Word format has no file on it — choose another, or the system format.', 'error'); redirect('/quote?id=' . $q['id']); }
+        $tpl = quote_word_template($pick);
+        if ($tpl) {
+            [$bin, $err] = docx_fill(base64_decode($tpl['file_data']), quote_doc_map($q, $tpl), crm_quote_lines($q['id']));
+        } else {
+            $idTpl = ops_one("SELECT * FROM crm_templates WHERE kind='QUOTE_DOC' ORDER BY is_default DESC, id DESC");   // doc / format numbers, as the PDF
+            [$bin, $err] = quote_docx_system_build($q, crm_quote_lines($q['id']), $idTpl ?: [], quote_signature($q), quote_letterhead($q['office_id'] ?? null));
+        }
         if ($err) { flash('Could not generate the Word file: ' . $err, 'error'); redirect('/quote?id=' . $q['id']); }
         $fname = 'Quote-' . preg_replace('/[^A-Za-z0-9_.-]/', '', $q['quote_no'] . ($q['rev'] > 0 ? '-R' . $q['rev'] : '')) . '.docx';
-        crm_quote_log_download($q, 'Word');
+        crm_quote_log_download($q, $tpl ? 'Word' : 'Word (system format)');   // the company's own format stays "Word", as before
         header('Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document');
         header('Content-Disposition: attachment; filename="' . $fname . '"');
         header('Content-Length: ' . strlen($bin));
@@ -3567,8 +3631,8 @@ function ops_crm_quotes($route, $method) {
         if (($_POST['decision'] ?? '') === 'reject') {
             // §xiii — a rejection must carry a reason.
             if ($remarks === '') { flash('Enter a comment saying why you are rejecting it.', 'error'); redirect(crm_quote_back($q)); }
-            $pdo->prepare("UPDATE quote_approvals SET status='REJECTED', acted_by=?, acted_at=?, remarks=? WHERE id=?")
-                ->execute([$me, date('c'), $remarks, $step['id']]);
+            $pdo->prepare("UPDATE quote_approvals SET status='REJECTED', acted_by=?, acted_by_id=?, acted_at=?, remarks=? WHERE id=?")
+                ->execute([$me, (int)(current_user()['id'] ?? 0) ?: null, date('c'), $remarks, $step['id']]);
             // §xvi — the quote itself shows as rejected, by whom and why, rather than
             // quietly reverting to draft with no trace.
             $pdo->prepare("UPDATE quotations SET status='REJECTED', rejected_by=?, rejected_at=?, reject_remarks=? WHERE id=?")
@@ -3577,8 +3641,8 @@ function ops_crm_quotes($route, $method) {
             crm_notify_owner($q, 'rejected by ' . $me, $remarks);
             flash('Rejected. The ' . Tl('quote') . ' now shows as rejected by you, with your comment.');
         } else {
-            $pdo->prepare("UPDATE quote_approvals SET status='APPROVED', acted_by=?, acted_at=?, remarks=? WHERE id=?")
-                ->execute([$me, date('c'), $remarks, $step['id']]);
+            $pdo->prepare("UPDATE quote_approvals SET status='APPROVED', acted_by=?, acted_by_id=?, acted_at=?, remarks=? WHERE id=?")
+                ->execute([$me, (int)(current_user()['id'] ?? 0) ?: null, date('c'), $remarks, $step['id']]);
             $pending = (int)ops_val("SELECT COUNT(*) FROM quote_approvals WHERE quote_id=? AND status='PENDING'", [$q['id']]);
             if ($pending === 0) {
                 $pdo->prepare("UPDATE quotations SET status='APPROVED' WHERE id=?")->execute([$q['id']]);
@@ -3588,6 +3652,8 @@ function ops_crm_quotes($route, $method) {
                 flash('All approvals complete — ' . Tl('quote') . ' approved and ready to send.');
             } else {
                 crm_log_change($q['id'], 'Approved at level ' . (int)$step['level'] . ' by ' . $me);
+                //  One person, one level: a level now open whose only approvers have already signed goes up.
+                crm_quote_reroute_signed_levels($q['id']);
                 //  Tell whoever this signature has just let in (the next level, or top management last).
                 $nowOpen = array_diff(crm_quote_open_levels($q['id']), $openBefore);
                 if ($nowOpen) { $told = [];
@@ -3651,7 +3717,7 @@ function ops_crm_quotes($route, $method) {
         }
         $why = trim((string)($_POST['reason'] ?? ''));
         $me = user_name(current_user());
-        $pdo->prepare("UPDATE quote_approvals SET status='PENDING', acted_by='', acted_at='', remarks=? WHERE id=?")
+        $pdo->prepare("UPDATE quote_approvals SET status='PENDING', acted_by='', acted_by_id=NULL, acted_at='', remarks=? WHERE id=?")
             ->execute([$why, $step['id']]);
         // Any level approved AFTER this one is void too — an approval given on
         // the strength of a withdrawn one cannot stand on its own.
@@ -3666,7 +3732,7 @@ function ops_crm_quotes($route, $method) {
                 if (in_array((int)$a['level'], $lastL, true) && !isset($seenA[(int)$a['id']]) && (int)$a['id'] !== (int)$step['id']) $after[] = $a;
         }
         foreach ($after as $a)
-            $pdo->prepare("UPDATE quote_approvals SET status='PENDING', acted_by='', acted_at='', remarks=? WHERE id=?")
+            $pdo->prepare("UPDATE quote_approvals SET status='PENDING', acted_by='', acted_by_id=NULL, acted_at='', remarks=? WHERE id=?")
                 ->execute(['Reset — level ' . (int)$step['level'] . ' was taken back by ' . $me, $a['id']]);
         $pdo->prepare("UPDATE quotations SET status='PENDING_APPROVAL' WHERE id=?")->execute([$q['id']]);
         crm_log_change($q['id'], 'Approval at level ' . (int)$step['level'] . ' taken back by ' . $me
@@ -4724,20 +4790,117 @@ function crm_quote_owner_user_id($q) {
 // screen can say "waiting on <name>" instead of "pending".
 // The people a step waits for, plus anyone currently covering for them (a live
 // quotation delegation) — so the person who can act is the person who is told.
+//  A cover person carries '_cover' => true, so the words can say "(cover: …)" (owner, 27 Nov 2026).
+//  ONE PERSON, ONE LEVEL (owner, 27 Nov 2026, decision 1 "Yes"): on a waiting step, anyone who has
+//  already signed another level of the same quotation is left out — as an approver and as a cover.
 function crm_step_approvers($step) {
     $direct = crm_step_approvers_direct($step);
-    if (!function_exists('appr_delegates_of') || !$direct) return $direct;
-    $seen = []; foreach ($direct as $u) $seen[(int)$u['id']] = true;
-    $q = !empty($step['quote_id']) ? crm_quote_get((int)$step['quote_id']) : null;
-    $office = $q && !empty($q['office_id']) ? (int)$q['office_id'] : null;
-    foreach ($direct as $u) {
-        foreach (appr_delegates_of((int)$u['id'], 'QUOTE', $office) as $did) {
-            if (isset($seen[(int)$did])) continue;
-            $d = ops_one("SELECT id, username, first_name, last_name, email, role FROM users WHERE id=? AND is_active=1", [(int)$did]);
-            if ($d) { $direct[] = $d; $seen[(int)$did] = true; }
+    if (function_exists('appr_delegates_of') && $direct) {
+        $seen = []; foreach ($direct as $u) $seen[(int)$u['id']] = true;
+        $q = !empty($step['quote_id']) ? crm_quote_get((int)$step['quote_id']) : null;
+        $office = $q && !empty($q['office_id']) ? (int)$q['office_id'] : null;
+        foreach ($direct as $u) {
+            foreach (appr_delegates_of((int)$u['id'], 'QUOTE', $office) as $did) {
+                if (isset($seen[(int)$did])) continue;
+                $d = ops_one("SELECT id, username, first_name, last_name, email, role FROM users WHERE id=? AND is_active=1", [(int)$did]);
+                if ($d) { $d['_cover'] = true; $direct[] = $d; $seen[(int)$did] = true; }
+            }
         }
     }
+    if (!empty($step['quote_id']) && strtoupper((string)($step['status'] ?? 'PENDING')) === 'PENDING') {
+        $signed = crm_quote_signer_rows((int)$step['quote_id']);
+        if ($signed) $direct = array_values(array_filter($direct, fn($u) => !crm_user_signed_other_level((int)$step['quote_id'], $u, (int)($step['level'] ?? 0), $signed)));
+    }
     return $direct;
+}
+//  The signatures on a quotation so far (this round): level, name and — since 27 Nov 2026 — user id.
+function crm_quote_signer_rows($qid) {
+    try { return ops_all("SELECT level, acted_by, acted_by_id FROM quote_approvals WHERE quote_id=? AND status='APPROVED'", [(int)$qid]) ?: []; }
+    catch (Throwable $e) { return []; }
+}
+//  The other level this person already signed on the quotation (0 = none). Matched by id; a signature
+//  given before the id was kept is matched by the name it was signed under.
+function crm_user_signed_other_level($qid, $u, $level, $signed = null) {
+    if (!is_array($u) || empty($u['id']) || (int)$qid <= 0) return 0;
+    $signed = $signed ?? crm_quote_signer_rows($qid);
+    $uid = (int)$u['id']; $nm = user_name($u);
+    foreach ($signed as $s) {
+        if ((int)$s['level'] === (int)$level) continue;
+        $hit = !empty($s['acted_by_id']) ? (int)$s['acted_by_id'] === $uid
+                                         : (trim((string)($s['acted_by'] ?? '')) !== '' && (string)$s['acted_by'] === $nm);
+        if ($hit) return (int)$s['level'];
+    }
+    return 0;
+}
+//  The level above a level of this quotation — the next level in its own chain, else the next level
+//  in the rules. The one answer for escalation (D-11a) and for "one person, one level". null = none.
+function crm_quote_level_above($qid, $lvl) {
+    $up = ops_one("SELECT approver_role, approver_user_id FROM quote_approvals WHERE quote_id=? AND level>? ORDER BY level, id LIMIT 1", [(int)$qid, (int)$lvl])
+       ?: ops_one("SELECT approver_role, approver_user_id FROM quote_approval_rules WHERE active=1 AND level>? AND approver_role<>'REPORTS_TO' ORDER BY level, id LIMIT 1", [(int)$lvl]);
+    if (!$up || (empty($up['approver_user_id']) && trim((string)$up['approver_role']) === '')) return null;
+    return $up;
+}
+//  ONE PERSON, ONE LEVEL — the fallback. A level that may sign now whose every approver (and cover)
+//  has already signed another level of this quotation would wait forever. It is opened at once to one
+//  more person through the escalation a level gets when it has waited too long (D-11a — the same
+//  escalated_at / escalate_user_id on the step, the same "may act" path): the first of the people at
+//  the level above (crm_quote_level_above, the escalation's own choice) and then the reporting line
+//  of the level's own approvers, who has not signed this quotation and does not sign another level
+//  still waiting on it — so nobody is pulled into signing two levels. With nobody like that, the
+//  Master Admin (who may always sign) is the one left. Every opening is recorded in History.
+function crm_quote_reroute_signed_levels($qid) {
+    $qid = (int)$qid; $q = crm_quote_get($qid); if (!$q) return 0;
+    $open = crm_quote_open_levels($qid); $n = 0; $done = [];
+    $all = ops_all("SELECT * FROM quote_approvals WHERE quote_id=? ORDER BY level, id", [$qid]) ?: [];
+    $signed = crm_quote_signer_rows($qid);
+    foreach ($all as $st) {
+        $lvl = (int)$st['level'];
+        if ($st['status'] !== 'PENDING' || !in_array($lvl, $open, true) || isset($done[$lvl])) continue;
+        if (trim((string)($st['escalated_at'] ?? '')) !== '') continue;            // already opened to someone
+        $direct = crm_step_approvers_direct($st);
+        if (crm_step_approvers($st) || !$direct) continue;                         // someone can sign, or nobody ever could
+        $done[$lvl] = true; $n++;
+        //  Who else is still to sign another level of it (they keep their own level).
+        $busy = [];
+        foreach ($all as $o) if ($o['status'] === 'PENDING' && (int)$o['level'] !== $lvl) foreach (crm_step_approvers_direct($o) as $u) $busy[(int)$u['id']] = true;
+        //  Free = active, not signed, not signing another waiting level, and able to open quotations.
+        $free = function ($u) use ($busy, $qid, $signed) {
+            if (!is_array($u) || empty($u['id']) || isset($busy[(int)$u['id']]) || crm_user_signed_other_level($qid, $u, -1, $signed)) return false;
+            $r = ops_one("SELECT role, COALESCE(is_active,1) act FROM users WHERE id=?", [(int)$u['id']]);
+            if (!$r || (int)$r['act'] !== 1) return false;
+            $perms = role_perms((string)$r['role']) ?: [];
+            return in_array('mod.quotes.view', $perms, true) || in_array('crm.quote.approve', $perms, true);
+        };
+        $cands = [];
+        $up = crm_quote_level_above($qid, $lvl);
+        if ($up) foreach (crm_step_approvers_direct(['approver_role' => (string)$up['approver_role'], 'approver_user_id' => $up['approver_user_id'] ?? null, 'quote_id' => $qid, 'level' => $lvl]) as $u) $cands[] = $u;
+        if (function_exists('reporting_chain')) foreach ($direct as $d) foreach (reporting_chain((int)$d['id']) as $m)
+            if (!empty($m['user_id']) && ($mu = ops_one("SELECT id, username, first_name, last_name, email, role FROM users WHERE id=?", [(int)$m['user_id']]))) $cands[] = $mu;
+        $pick = null; foreach ($cands as $c) if ($free($c)) { $pick = $c; break; }
+        $why = 'Level ' . $lvl . ': everyone who signs it has already signed another level, and nobody signs two levels of one ' . Tl('quote');
+        if ($pick) {
+            db()->prepare("UPDATE quote_approvals SET escalated_at=?, escalate_role='', escalate_user_id=? WHERE quote_id=? AND level=? AND status='PENDING'")
+                ->execute([date('c'), (int)$pick['id'], $qid, $lvl]);
+            crm_log_change($qid, $why . ' — opened to ' . crm_person_label($pick) . '.');
+            if (trim((string)($pick['email'] ?? '')) !== '')
+                ops_mail($pick['email'], 'Approval needed: ' . quote_label($q),
+                    "Hello,\n\n" . quote_label($q) . " ({$q['client_name']}) needs a signature at level $lvl. The people at that level have already signed another level, "
+                    . "and nobody signs two levels of one quotation, so it is now open to you.\n\nOpen it in " . app_name() . " to approve or reject it with a comment.\n", '', 'QUOTE_APPROVAL');
+        } else {
+            crm_log_change($qid, $why . ' — nobody else is free to sign it, so the Master Admin signs it.');
+        }
+    }
+    return $n;
+}
+//  "Test Director (Business Director) (cover: Test SBU Head)" — the people of a step, in words.
+function crm_people_words(array $people, $max = 3) {
+    $direct = array_values(array_filter($people, fn($u) => empty($u['_cover'])));
+    $cover  = array_values(array_filter($people, fn($u) => !empty($u['_cover'])));
+    if (!$direct) return implode(', ', array_map(fn($u) => user_name($u) . ' (covering)', array_slice($cover, 0, $max)));
+    $names = array_map('crm_person_label', array_slice($direct, 0, $max));
+    $more = count($direct) - count($names);
+    return implode(', ', $names) . ($more > 0 ? " and $more other(s)" : '')
+        . ($cover ? ' (cover: ' . implode(', ', array_map('user_name', array_slice($cover, 0, $max))) . ')' : '');
 }
 function crm_step_approvers_direct($step) {
     if (!empty($step['approver_user_id'])) {
@@ -4818,9 +4981,8 @@ function crm_escalate_quote_approvals($now = null) {
         $since = (string) ops_val("SELECT MAX(acted_at) FROM quote_approvals WHERE quote_id=? AND level<? AND status='APPROVED'", [$qid, $lvl]);
         if ($since === '') $since = (string)($q['submitted_at'] ?? '');
         if ($since === '' || strtotime($since) > $now - $days * 86400) continue;
-        $up = ops_one("SELECT approver_role, approver_user_id FROM quote_approvals WHERE quote_id=? AND level>? ORDER BY level, id LIMIT 1", [$qid, $lvl])
-           ?: ops_one("SELECT approver_role, approver_user_id FROM quote_approval_rules WHERE active=1 AND level>? AND approver_role<>'REPORTS_TO' ORDER BY level, id LIMIT 1", [$lvl]);
-        if (!$up || (empty($up['approver_user_id']) && trim((string)$up['approver_role']) === '')) continue;
+        $up = crm_quote_level_above($qid, $lvl);
+        if (!$up) continue;
         db()->prepare("UPDATE quote_approvals SET escalated_at=?, escalate_role=?, escalate_user_id=? WHERE quote_id=? AND level=? AND status='PENDING'")
             ->execute([date('c', $now), (string)$up['approver_role'], ($up['approver_user_id'] ?? null) ?: null, $qid, $lvl]);
         $who = crm_step_approvers(['approver_role' => (string)$up['approver_role'], 'approver_user_id' => $up['approver_user_id'] ?? null, 'quote_id' => $qid]);
@@ -4893,10 +5055,15 @@ function crm_person_label($u) {
 // the real problem: nobody could sign it but an administrator.
 function crm_step_who($step, $max = 3) {
     $people = crm_step_approvers($step);
-    if ($people) {
-        $names = array_map('crm_person_label', array_slice($people, 0, $max));
-        $more = count($people) - count($names);
-        return implode(', ', $names) . ($more > 0 ? " and $more other(s)" : '');
+    if ($people) return crm_people_words($people, $max);
+    //  Everyone at this level already signed another level (one person, one level — 27 Nov 2026).
+    if (!empty($step['quote_id']) && strtoupper((string)($step['status'] ?? 'PENDING')) === 'PENDING' && crm_step_approvers_direct($step)) {
+        if (trim((string)($step['escalated_at'] ?? '')) !== '') {
+            $up = crm_step_approvers(['approver_role' => (string)($step['escalate_role'] ?? ''), 'approver_user_id' => $step['escalate_user_id'] ?? null,
+                                      'quote_id' => $step['quote_id'], 'level' => $step['level'] ?? 0, 'status' => 'PENDING']);
+            if ($up) return crm_people_words($up, $max) . ' (the level above — its own approver already signed another level)';
+        }
+        return 'the Master Admin (its approver already signed another level — nobody signs two)';
     }
     $role = (string)($step['approver_role'] ?? '');
     if ($role !== '') return (function_exists('role_name') ? role_name($role) : (ORG_ROLES[$role] ?? $role)) . ' — nobody active holds this role yet (give it to someone under People)';
@@ -4995,6 +5162,10 @@ function crm_can_act_approval($step) {
     // on it, even one addressed to their role (owner's rule D-06).
     if (!crm_quote_self_approval_allowed() && ($sq = crm_quote_get((int)($step['quote_id'] ?? 0))) && crm_quote_is_mine($sq)) return false;
     $u = current_user();
+    //  One person, one level (owner, 27 Nov 2026): who already signed another level of this quotation
+    //  cannot sign this one — by name, by role, as a cover or by escalation. The Master Admin, who is
+    //  the last resort, is not held by it (checked above).
+    if (crm_user_signed_other_level((int)($step['quote_id'] ?? 0), $u, (int)($step['level'] ?? 0))) return false;
     // Being named on the step IS the authority to act on it: the approval matrix
     // routed this quote here on purpose, so a person addressed by name — or by
     // their role — may approve it even if their role does not carry the blanket
@@ -5307,6 +5478,210 @@ function docx_fill($binary, $map, $lines) {
     return [$out, null];
 }
 // Header token map from a quotation + the template's control numbers.
+// ---------------------------------------------------------------------------
+//  THE SYSTEM'S OWN WORD FORMAT (owner, 27 Nov 2026: "There must be a system own template for
+//  quotation … However if client required their own format they can use it.")
+//  A built-in editable .docx of the quotation — the same content, in the same order, as the
+//  client PDF (quote_pdf_build, lib/pdf.php): letterhead, title, number / date / validity, the
+//  client and its billing address, the lines, totals, milestones, terms and the signature block,
+//  under the same draft / SUPERSEDED rules. Used when the company has no Word format of its own;
+//  an uploaded format still wins when it is the company's choice. Built with ZipArchive, as the
+//  inspection-report Word copy is (report_docx_build, lib/idems.php) — no outside library.
+// ---------------------------------------------------------------------------
+function quote_docx_system_build($q, $lines, $tpl = [], $sig = [], $lh = []) {
+    if (!class_exists('ZipArchive')) return [null, 'The "zip" PHP extension is not enabled on this server.'];
+    $esc = fn($s) => docx_escape($s);
+    $cleared = !function_exists('crm_quote_doc_cleared') || crm_quote_doc_cleared($q);
+    $mark = (function_exists('crm_quote_superseded') && crm_quote_superseded($q)) ? crm_quote_superseded_mark($q) : (!$cleared ? QUOTE_DRAFT_MARK : '');
+    $band = !empty($lh['band']) && is_array($lh['band']) ? $lh['band'] : [30, 64, 175];
+    $BRAND = sprintf('%02X%02X%02X', (int)$band[0], (int)$band[1], (int)$band[2]);
+    $coName = (($lh['name'] ?? '') ?: app_name());
+    $cur = $q['currency'] ?: 'INR';
+    $num = fn($v) => nf((float)$v, 2);
+    $pct = fn($v) => rtrim(rtrim(nf((float)$v, 2), '0'), '.');
+
+    // ---- building blocks --------------------------------------------------
+    $run = function ($t, $o = []) use ($esc) {
+        $rp = (!empty($o['b']) ? '<w:b/>' : '') . (!empty($o['i']) ? '<w:i/>' : '')
+            . (!empty($o['color']) ? '<w:color w:val="' . $o['color'] . '"/>' : '')
+            . '<w:sz w:val="' . (int)($o['sz'] ?? 19) . '"/>';
+        return '<w:r><w:rPr>' . $rp . '</w:rPr><w:t xml:space="preserve">' . $esc($t) . '</w:t></w:r>';
+    };
+    $para = function ($runs, $o = []) {
+        $pp = '<w:spacing w:before="' . (int)($o['before'] ?? 0) . '" w:after="' . (int)($o['after'] ?? 60) . '"/>'
+            . (!empty($o['jc']) ? '<w:jc w:val="' . $o['jc'] . '"/>' : '')
+            . (!empty($o['rule']) ? '<w:pBdr><w:bottom w:val="single" w:sz="6" w:space="1" w:color="CCCCCC"/></w:pBdr>' : '');
+        return '<w:p><w:pPr>' . $pp . '</w:pPr>' . (is_array($runs) ? implode('', $runs) : $runs) . '</w:p>';
+    };
+    $media = []; $imgSeq = 0;
+    $image = function ($bin, $maxWpt, $maxHpt) use (&$media, &$imgSeq) {
+        if (!is_string($bin) || $bin === '') return '';
+        $info = @getimagesizefromstring($bin);
+        if (!$info || empty($info[0]) || empty($info[1])) return '';
+        $ext = ($info[2] ?? 0) === IMAGETYPE_PNG ? 'png' : (($info[2] ?? 0) === IMAGETYPE_JPEG ? 'jpeg' : '');
+        if ($ext === '') return '';
+        $w = $maxWpt; $h = $w * $info[1] / max(1, $info[0]);
+        if ($h > $maxHpt) { $h = $maxHpt; $w = $h * $info[0] / max(1, $info[1]); }
+        $imgSeq++; $rid = 'rIdImg' . $imgSeq; $media[] = ['rid' => $rid, 'file' => 'image' . $imgSeq . '.' . $ext, 'bin' => $bin, 'ext' => $ext];
+        $cx = (int)round($w * 12700); $cy = (int)round($h * 12700);
+        return '<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="' . $cx . '" cy="' . $cy . '"/>'
+            . '<wp:docPr id="' . $imgSeq . '" name="Picture ' . $imgSeq . '"/>'
+            . '<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">'
+            . '<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="' . $imgSeq . '" name="image' . $imgSeq . '"/><pic:cNvPicPr/></pic:nvPicPr>'
+            . '<pic:blipFill><a:blip r:embed="' . $rid . '"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>'
+            . '<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' . $cx . '" cy="' . $cy . '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic>'
+            . '</a:graphicData></a:graphic></wp:inline></w:drawing></w:r>';
+    };
+    $cell = function ($content, $wTw, $o = []) use ($run, $para) {
+        $tc = '<w:tcW w:w="' . (int)$wTw . '" w:type="dxa"/>' . (!empty($o['fill']) ? '<w:shd w:val="clear" w:color="auto" w:fill="' . $o['fill'] . '"/>' : '');
+        return '<w:tc><w:tcPr>' . $tc . '</w:tcPr>' . $para($run((string)$content, $o), ['after' => 0, 'jc' => $o['jc'] ?? '']) . '</w:tc>';
+    };
+
+    $body = '';
+    // ---- the draft / earlier-revision mark (the PDF prints it across every page) ----
+    if ($mark !== '') $body .= $para($run($mark, ['b' => true, 'sz' => 28, 'color' => 'AA2828']), ['jc' => 'center', 'after' => 120]);
+    // ---- letterhead ----
+    $logo = !empty($lh['logo']) ? $image($lh['logo'], 70, 40) : '';
+    if ($logo !== '') $body .= $para($logo, ['after' => 40]);
+    $body .= $para($run($coName, ['b' => true, 'sz' => 32, 'color' => $BRAND]), ['after' => 20]);
+    foreach (preg_split('/\r?\n/', (string)($lh['address'] ?? '')) as $al) { $al = trim($al); if ($al !== '') $body .= $para($run($al, ['sz' => 17, 'color' => '5A5A5A']), ['after' => 0]); }
+    if (!empty($lh['contact'])) $body .= $para($run((string)$lh['contact'], ['sz' => 17, 'color' => '5A5A5A']), ['after' => 0]);
+    if (!empty($lh['gstin'])) $body .= $para($run((string)$lh['gstin'], ['sz' => 17, 'color' => '5A5A5A']), ['after' => 0]);
+    $docIds = array_filter([($tpl['document_number'] ?? '') !== '' ? 'Doc: ' . $tpl['document_number'] : '',
+                            ($tpl['format_number'] ?? '') !== '' ? 'Format: ' . $tpl['format_number'] : '', (string)($tpl['doc_revision'] ?? '')]);
+    if ($docIds) $body .= $para($run(implode('   ·   ', $docIds), ['sz' => 16, 'color' => '6E6E6E']), ['jc' => 'right', 'after' => 0]);
+    $body .= $para('', ['rule' => true, 'after' => 160]);
+    // ---- title + meta ----
+    $body .= $para($run(function_exists('quote_print_title') ? mb_strtoupper(quote_print_title()) : 'QUOTATION', ['b' => true, 'sz' => 28]), ['after' => 60]);
+    $body .= $para($run(quote_label($q) . '     Date: ' . date('d M Y', strtotime($q['created_at'] ?: 'now')) . '     Validity: ' . (int)$q['validity_days'] . ' days', ['sz' => 18, 'color' => '5A5A5A']), ['after' => 160]);
+    // ---- customer block ----
+    $body .= $para($run('To,', ['b' => true, 'sz' => 20]), ['after' => 20]);
+    $body .= $para($run($q['client_name'] ?: '—', ['b' => true, 'sz' => 22]), ['after' => 20]);
+    if (!empty($q['client_id']) && function_exists('custid_location')) {
+        $loc = custid_location((int)$q['client_id'], (int)($q['billing_address_id'] ?? 0));
+        if ($loc && (trim((string)$loc['address']) !== '' || (string)$loc['gstin'] !== ''))
+            $body .= $para($run('Billing address: ' . trim(($loc['label'] !== 'Main' ? $loc['label'] . ' — ' : '') . (string)$loc['address'])
+                . ((string)$loc['gstin'] !== '' ? '   ·   GSTIN ' . $loc['gstin'] : ''), ['sz' => 18, 'color' => '505050']), ['after' => 20]);
+    }
+    if ($q['contact_name'] || $q['contact_email'] || $q['contact_mobile'])
+        $body .= $para($run('Kind attn: ' . trim(($q['contact_name'] ?: '') . '   ' . ($q['contact_email'] ?: '') . '   ' . ($q['contact_mobile'] ?: '')), ['sz' => 18, 'color' => '505050']), ['after' => 20]);
+    if ($q['site_location']) $body .= $para($run('Location: ' . $q['site_location'] . ' (' . (lk_options_or('quote_location_type', QUOTE_LOCATION_TYPES)[$q['location_type']] ?? $q['location_type']) . ')', ['sz' => 18, 'color' => '505050']), ['after' => 20]);
+    if ($q['subject']) $body .= $para($run('Subject: ' . $q['subject'], ['b' => true, 'sz' => 20]), ['before' => 100, 'after' => 120]);
+    // ---- line-item table (Sr | Description | Qty | Unit | Rate | Amount — the PDF's columns) ----
+    $W = [500, 4300, 900, 1100, 1300, 1538];
+    $hdr = ['fill' => $BRAND, 'color' => 'FFFFFF', 'b' => true, 'sz' => 18];
+    $tbl = '<w:tbl><w:tblPr><w:tblW w:w="9638" w:type="dxa"/><w:tblBorders>'
+         . '<w:top w:val="single" w:sz="4" w:color="DDDDDD"/><w:bottom w:val="single" w:sz="4" w:color="DDDDDD"/>'
+         . '<w:insideH w:val="single" w:sz="4" w:color="E1E1E1"/></w:tblBorders><w:tblCellMar><w:left w:w="70" w:type="dxa"/><w:right w:w="70" w:type="dxa"/></w:tblCellMar></w:tblPr>'
+         . '<w:tblGrid>' . implode('', array_map(fn($w) => '<w:gridCol w:w="' . $w . '"/>', $W)) . '</w:tblGrid>'
+         . '<w:tr><w:trPr><w:tblHeader/></w:trPr>' . $cell('Sr', $W[0], $hdr) . $cell('Description', $W[1], $hdr) . $cell('Qty', $W[2], $hdr + ['jc' => 'right'])
+         . $cell('Unit', $W[3], $hdr) . $cell('Rate', $W[4], $hdr + ['jc' => 'right']) . $cell('Amount', $W[5], $hdr + ['jc' => 'right']) . '</w:tr>';
+    $sr = 0;
+    foreach ($lines as $l) {
+        $sr++;
+        $desc = trim(($l['description'] ?: (lk_options_or('inspection_type', INSPECTION_TYPES)[$l['service_type']] ?? $l['service_type'])) . (($l['order_type'] ?? '') === 'OPEN' ? '  [ARC / open order]' : ''));
+        $tbl .= '<w:tr>' . $cell((string)$sr, $W[0]) . $cell($desc, $W[1]) . $cell($pct($l['qty']), $W[2], ['jc' => 'right'])
+              . $cell(lk_options_or('charge_unit', CHARGE_UNITS)[$l['unit']] ?? $l['unit'], $W[3]) . $cell($num($l['rate']), $W[4], ['jc' => 'right'])
+              . $cell($num($l['amount']), $W[5], ['jc' => 'right']) . '</w:tr>';
+    }
+    $tbl .= '</w:tbl>';
+    $body .= $tbl;
+    // ---- totals ----
+    $tot = function ($lbl, $val, $b = false) use ($run, $para) { return $para([$run($lbl . '   ', ['b' => $b, 'sz' => $b ? 20 : 18]), $run($val, ['b' => $b, 'sz' => $b ? 20 : 18])], ['jc' => 'right', 'after' => 20]); };
+    $body .= $para('', ['after' => 60]);
+    $body .= $tot('Subtotal', $num($q['subtotal']));
+    $body .= $tot('GST (' . $pct($q['gst_pct']) . '%)', $num($q['gst_amount']));
+    $body .= $tot('Total (' . $cur . ')', $num($q['total_amount']), true);
+    $body .= $para($run('Amount in words: ' . amount_in_words_inr((float)$q['total_amount']), ['sz' => 18, 'color' => '464646']), ['before' => 60, 'after' => 120]);
+    // ---- billing by milestones ----
+    $msLines = function_exists('ms_pdf_lines') ? ms_pdf_lines($q) : [];
+    if ($msLines) {
+        $body .= $para($run('Payment milestones', ['b' => true, 'sz' => 20]), ['rule' => false, 'before' => 80, 'after' => 40]);
+        foreach ($msLines as $t) $body .= $para($run((string)$t, ['sz' => 18, 'color' => '464646']), ['after' => 20]);
+    }
+    // ---- terms ----
+    $body .= $para($run('Terms & Conditions', ['b' => true, 'sz' => 20]), ['before' => 120, 'after' => 40]);
+    $terms = [];
+    if ($q['payment_terms']) $terms[] = 'Payment: ' . $q['payment_terms'] . '.';
+    if ((float)$q['advance_pct'] > 0 || $q['advance_required']) $terms[] = 'Advance: ' . $pct($q['advance_pct']) . '%' . ($q['advance_required'] ? ' (to be received before scheduling).' : '.');
+    if ($q['report_vs_payment']) $terms[] = 'Deliverables / reports are released against payment.';
+    $terms[] = 'Validity: ' . (int)$q['validity_days'] . ' days from the date of this quotation.';
+    $terms[] = 'Taxes as applicable. Prices in ' . $cur . '.';
+    foreach ($terms as $i => $t) $body .= $para($run(($i + 1) . '. ' . $t, ['sz' => 18, 'color' => '464646']), ['after' => 20]);
+    $free = trim((string)($q['terms_conditions'] ?? ''));
+    if ($free !== '') {
+        $body .= $para('', ['after' => 40]);
+        foreach (preg_split('/\r\n|\r|\n/', $free) as $tl) $body .= $para(rtrim($tl) === '' ? '' : $run(rtrim($tl), ['sz' => 18, 'color' => '464646']), ['after' => 20]);
+    }
+    // ---- signature (a draft is never signed — the same rule as the PDF) ----
+    $body .= $para($run('For ' . $coName, ['b' => true, 'sz' => 20]), ['before' => 360, 'after' => 60]);
+    if (!$cleared) $body .= $para($run('Unsigned draft', ['b' => true, 'sz' => 22, 'color' => 'AA2828']), ['after' => 60]);
+    elseif (!empty($sig['img']) && ($si = $image($sig['img'], 120, 55)) !== '') $body .= $para($si, ['after' => 40]);
+    else $body .= $para('', ['after' => 400]);
+    $body .= $para($run('______________________________', ['sz' => 18, 'color' => '787878']), ['after' => 20]);
+    if (!empty($sig['name'])) $body .= $para($run((string)$sig['name'], ['b' => true, 'sz' => 18]), ['after' => 0]);
+    if (!empty($sig['desig'])) $body .= $para($run((string)$sig['desig'], ['sz' => 16, 'color' => '5A5A5A']), ['after' => 0]);
+    $body .= $para($run('Authorised Signatory', ['sz' => 16, 'color' => '5A5A5A']), ['after' => 0]);
+
+    // ---- header / footer ----
+    $ns = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+    $headerXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr ' . $ns . '>'
+        . $para([$run($coName, ['b' => true, 'sz' => 16, 'color' => $BRAND]), $run('   ' . quote_label($q) . ($mark !== '' ? '   ·   ' . $mark : ''), ['sz' => 15, 'color' => $mark !== '' ? 'AA2828' : '7D7D7D'])], ['after' => 0])
+        . '</w:hdr>';
+    $footerXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr ' . $ns . '>'
+        . $para($run((string)($lh['footer'] ?? ''), ['sz' => 15, 'color' => '787878']), ['after' => 0, 'jc' => 'center']) . '</w:ftr>';
+    $documentXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        . '<w:document ' . $ns . ' xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">'
+        . '<w:body>' . $body
+        . '<w:sectPr><w:headerReference w:type="default" r:id="rIdHdr1"/><w:footerReference w:type="default" r:id="rIdFtr1"/>'
+        . '<w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr>'
+        . '</w:body></w:document>';
+    $types = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        . '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>'
+        . '<Default Extension="jpeg" ContentType="image/jpeg"/><Default Extension="png" ContentType="image/png"/>'
+        . '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+        . '<Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>'
+        . '<Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/></Types>';
+    $rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        . '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>';
+    $docRels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        . '<Relationship Id="rIdHdr1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>'
+        . '<Relationship Id="rIdFtr1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>';
+    foreach ($media as $m) $docRels .= '<Relationship Id="' . $m['rid'] . '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/' . $m['file'] . '"/>';
+    $docRels .= '</Relationships>';
+    $tmp = tempnam(sys_get_temp_dir(), 'qdocx');
+    $zip = new ZipArchive();
+    if ($zip->open($tmp, ZipArchive::OVERWRITE) !== true) return [null, 'Could not create the Word document.'];
+    $zip->addFromString('[Content_Types].xml', $types);
+    $zip->addFromString('_rels/.rels', $rels);
+    $zip->addFromString('word/document.xml', $documentXml);
+    $zip->addFromString('word/header1.xml', $headerXml);
+    $zip->addFromString('word/footer1.xml', $footerXml);
+    $zip->addFromString('word/_rels/document.xml.rels', $docRels);
+    foreach ($media as $m) $zip->addFromString('word/media/' . $m['file'], $m['bin']);
+    $zip->close();
+    $bin = file_get_contents($tmp); @unlink($tmp);
+    return [$bin, null];
+}
+//  Which Word format a quotation's editable copy uses (owner, 27 Nov 2026). The company chooses
+//  under Quote templates: 'company' (its default uploaded format when one is active, else the
+//  system format) or 'system' (always the built-in one). Returns the template row, or null for
+//  the system format. $pick: '' = the company's choice, 'system', or a template id.
+function quote_word_template($pick = '') {
+    if ((string)$pick === 'system') return null;
+    if ((int)$pick > 0) {
+        $t = ops_one("SELECT * FROM crm_templates WHERE id=? AND kind='QUOTE_DOC'", [(int)$pick]);
+        return ($t && ($t['file_data'] ?? '') !== '') ? $t : null;
+    }
+    if (setting_get('quote_word_format', 'company') === 'system') return null;
+    $t = ops_one("SELECT * FROM crm_templates WHERE kind='QUOTE_DOC' AND active=1 AND COALESCE(file_data,'')<>'' ORDER BY is_default DESC, id DESC");
+    return $t ?: null;
+}
+//  The company's uploaded Word formats that can be chosen for a quotation (active, with a file).
+function quote_word_formats() {
+    try { return ops_all("SELECT id, name, is_default FROM crm_templates WHERE kind='QUOTE_DOC' AND active=1 AND COALESCE(file_data,'')<>'' ORDER BY is_default DESC, name") ?: []; }
+    catch (Throwable $e) { return []; }
+}
 function quote_doc_map($q, $tpl) {
     $off = $q['office_id'] ? ops_val("SELECT name FROM offices WHERE id=?", [$q['office_id']]) : '';
     return [
@@ -5415,6 +5790,14 @@ function ops_crm_templates($route, $method) {
         flash('Letterhead saved — see "Saved — this is what prints" below; it heads every quote PDF.');
         redirect('/crm-templates#letterhead');
     }
+    //  Which Word format the editable quotation copy uses (owner, 27 Nov 2026).
+    if ($route === 'crm-templates' && $method === 'POST' && isset($_POST['word_format'])) {
+        $wf = (string)$_POST['word_format'] === 'system' ? 'system' : 'company';
+        setting_set('quote_word_format', $wf);
+        flash($wf === 'system' ? 'Saved — the editable Word copy uses the system format.'
+                               : 'Saved — the editable Word copy uses your default uploaded format; with none, the system format.');
+        redirect('/crm-templates#word-format');
+    }
     if ($route === 'crm-templates') {
         $rows = ops_all("SELECT id, kind, name, document_number, format_number, doc_revision, issue_date, file_name, active, is_default FROM crm_templates ORDER BY kind, name");
         view('ops/crm/template_list', ['rows' => $rows,
@@ -5423,7 +5806,8 @@ function ops_crm_templates($route, $method) {
             'lhContact' => setting_get('quote_lh_contact', ''), 'lhFooter' => setting_get('quote_lh_footer', ''),
             // What is saved, to show as it prints (owner, 9 Nov 2026: "there is no list to verify").
             'lhLogoData' => (string) setting_get('quote_lh_logo', ''), 'sigImgData' => (string) setting_get('quote_sig_img', ''),
-            'lhSaved' => (string) setting_get('quote_lh_saved', ''), 'sigSaved' => (string) setting_get('quote_sig_saved', '')]);
+            'lhSaved' => (string) setting_get('quote_lh_saved', ''), 'sigSaved' => (string) setting_get('quote_sig_saved', ''),
+            'wordFormat' => (string) setting_get('quote_word_format', 'company'), 'wordFormats' => quote_word_formats()]);
         return;
     }
     if ($route === 'crm-template-download') {

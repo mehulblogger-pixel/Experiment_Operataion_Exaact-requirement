@@ -386,6 +386,11 @@ elseif ($qSplit && ($qSplit['mode'] ?? '') === 'UNKNOWN') $qSplitWords = 'CGST +
        title="Opens a new Gmail message in a new tab, addressed and written, and downloads the PDF to attach">✉️ Open in Gmail</a>
     <a class="btn small secondary" href="/quote-compose?id=<?= (int)$q['id'] ?>"
        title="Downloads a .eml e-mail file with the PDF inside — double-click it to open it in Outlook as a draft, then press Send">📨 Outlook (.eml)</a>
+    <?php if ($st === 'SENT' && !empty($q['is_current'])): //  QP-10 (owner, 27 Nov 2026): the same system e-mail again; it stays Sent ?>
+      <form method="post" action="/quote-status?id=<?= (int)$q['id'] ?>" style="display:inline">
+        <input type="hidden" name="resend" value="1">
+        <button class="btn small secondary" type="submit" title="E-mails the PDF to <?= e($q['contact_email']) ?> again from the company mailbox. It stays Sent; History records it.">✉ Send again from the company mailbox</button></form>
+    <?php endif; ?>
     <?php if ($st === 'APPROVED' && ($sendProblem ?? '') === ''): ?>
       <form method="post" action="/quote-status?id=<?= (int)$q['id'] ?>" style="display:inline" onsubmit="return confirm('Did you send it to the <?= e(Tl('client')) ?> from your own mailbox? It is marked sent and follow-ups start; no e-mail is sent from here.')">
         <input type="hidden" name="to" value="SENT"><input type="hidden" name="by_hand" value="1">
@@ -488,6 +493,11 @@ elseif ($qSplit && ($qSplit['mode'] ?? '') === 'UNKNOWN') $qSplitWords = 'CGST +
       <summary class="q2-chip">More ▾</summary>
       <div class="menu">
         <?php if (crm_quote_word_allowed($q)): ?><a href="/quote-doc?id=<?= (int)$q['id'] ?>">Word (editable)</a><?php endif; ?>
+        <?php //  Every format, so one client can have another (owner, 27 Nov 2026) — listed only when the company has its own.
+              $__wfs = function_exists('quote_word_formats') ? quote_word_formats() : [];
+              if ($__wfs): ?><?php if (crm_quote_word_allowed($q)): ?><a href="/quote-doc?id=<?= (int)$q['id'] ?>&amp;tpl=system">Word — system format</a><?php endif; ?>
+          <?php foreach ($__wfs as $__wf): ?><?php if (crm_quote_word_allowed($q)): ?><a href="/quote-doc?id=<?= (int)$q['id'] ?>&amp;tpl=<?= (int)$__wf['id'] ?>">Word — <?= e((string)($__wf['name'] ?: 'our format')) ?></a><?php endif; ?><?php endforeach; ?>
+        <?php endif; ?>
         <a href="#actions">Actions</a>
         <?php if (!empty($approvals)): ?><a href="#approval">Approval chain</a><?php endif; ?>
         <?php if ($st === 'ACCEPTED' || !empty($q['contract_number'])): ?><a href="#contract">Contract</a><?php endif; ?>
@@ -541,7 +551,7 @@ elseif ($qSplit && ($qSplit['mode'] ?? '') === 'UNKNOWN') $qSplitWords = 'CGST +
             if ((int)$na['id'] === (int)$pendingStep['id']) { $passed = true; continue; }
             if ($na['status'] !== 'PENDING' || !$passed || (int)$na['level'] === (int)$pendingStep['level']) continue;
             $np = $stepPeople[$ni] ?? [];
-            $nextNames[] = 'level ' . (int)$na['level'] . ' — ' . ($np ? implode(', ', array_map('crm_person_label', array_slice($np, 0, 2))) : (!empty($na['approver_role']) ? (ORG_ROLES[$na['approver_role']] ?? $na['approver_role']) : 'any approver'));
+            $nextNames[] = 'level ' . (int)$na['level'] . ' — ' . ($np ? crm_people_words($np, 2) : (!empty($na['approver_role']) ? (ORG_ROLES[$na['approver_role']] ?? $na['approver_role']) : 'any approver'));
           }
           if ($nextNames): ?><div class="muted" style="font-size:12.5px;margin-top:3px">Then: <?= e(implode(' → ', $nextNames)) ?></div><?php endif; endif; ?>
     </div>
@@ -551,7 +561,7 @@ elseif ($qSplit && ($qSplit['mode'] ?? '') === 'UNKNOWN') $qSplitWords = 'CGST +
     <tbody>
     <?php foreach ($approvals as $ai => $a):
       $people = $stepPeople[$ai] ?? [];
-      if ($people) { $names = array_map('crm_person_label', array_slice($people, 0, 4)); $more = count($people) - count($names); $who = implode(', ', $names) . ($more > 0 ? " and $more other(s)" : ''); }
+      if ($people) $who = crm_people_words($people, 4);
       else $who = ucfirst(crm_step_who($a));
     ?>
     <tr>
