@@ -73,6 +73,10 @@
   <?php if ($jClosed): ?>
     <div class="step">Done — this <?= e(Tl('job')) ?> is closed.</div>
     <p class="next">The report and photographs can still be uploaded if something was missed. Everything else is fixed.</p>
+    <?php if (trim((string)($job['closed_no_report_reason'] ?? '')) !== ''): // owner, 27 Nov 2026 — closed with no report on file ?>
+      <p class="next" style="color:var(--warn)">⚠ Closed without a report by <?= e((string)($job['closed_no_report_by'] ?? '')) ?> — “<?= e((string)$job['closed_no_report_reason']) ?>”.
+        A report added now is recorded in its History and the Operations Manager is told.</p>
+    <?php endif; ?>
   <?php elseif ($jLockedReport > 0): ?>
     <?php // Field #19 — the report is approved/issued and locked → close the job now. ?>
     <div class="step">🔒 The report is approved and issued.</div>

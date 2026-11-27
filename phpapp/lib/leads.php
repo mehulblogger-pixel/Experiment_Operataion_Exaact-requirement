@@ -2072,7 +2072,7 @@ function ops_leads($route, $method) {
                 . 'Mark it lost if it should not be chased, but it cannot be deleted.', 'error');
             redirect('/lead?id=' . $id);
         }
-        if (function_exists('act_log')) act_log('LEAD', $id, 'DELETED', 'Lead ' . $l['ref'] . ' deleted — ' . $l['company_name'] . ' (by ' . user_name(current_user()) . ')', ['office_id' => (int)($l['office_id'] ?? 0) ?: '', 'sbu' => (string)($l['sbu'] ?? '')]);
+        if (function_exists('act_log')) act_log('LEAD', $id, 'DELETED', 'Lead ' . $l['ref'] . ' deleted — ' . $l['company_name'] . ' (by ' . user_name(current_user()) . ')', ['office_id' => (int)($l['office_id'] ?? 0) ?: '', 'sbu' => (string)($l['sbu'] ?? ''), 'match_name' => (string)($l['company_name'] ?? '')]);
         db()->prepare("DELETE FROM leads WHERE id=?")->execute([$id]);
         flash('Lead ' . $l['ref'] . ' deleted.');
         redirect('/leads');

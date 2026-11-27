@@ -120,6 +120,89 @@ function job_final_docs_wanted($job) {
 }
 
 // ---------------------------------------------------------------------------
+//  Closing a job with no report on file (owner, 27 Nov 2026, decision 3 — step one).
+//  "When an inspection call is to be closed it must check if a report is uploaded; if
+//  not, warn and require a reason." Step one only: the reason is required and kept in
+//  the job's History; a report that arrives AFTER such a close is accepted, recorded,
+//  and the branch's Operations Manager is told. No new status and no new approval —
+//  blocking late uploads behind an approval is a later step, only if real use shows
+//  the need (docs/03 Job lifecycle).
+// ---------------------------------------------------------------------------
+//  Shortest reason accepted — a validation of the text, not a business limit.
+const JOB_NOREPORT_REASON_MIN = 10;
+function job_noreport_migrate() {
+    static $done = false; if ($done) return; $done = true;
+    if (!function_exists('ensure_column')) return;
+    ensure_column('jobs', 'closed_no_report_reason', "VARCHAR(500) DEFAULT ''");
+    ensure_column('jobs', 'closed_no_report_by', "VARCHAR(150) DEFAULT ''");
+    ensure_column('jobs', 'closed_no_report_at', "VARCHAR(30) DEFAULT ''");
+}
+//  Is a report on file for this job? Any report document written on it (not deleted),
+//  a report link on the job or on one of its closed visit days, or the link typed on
+//  the close form now. A job agreed with no report (NOREPORT) never needs one.
+function job_report_on_file($job, $typedLink = '') {
+    if (($job['reporting_frequency'] ?? '') === 'NOREPORT') return true;
+    if (trim((string)$typedLink) !== '' || trim((string)($job['report_link'] ?? '')) !== '') return true;
+    $id = (int)($job['id'] ?? 0); if (!$id) return true;
+    try {
+        if ((int)ops_val("SELECT COUNT(*) FROM report_docs WHERE job_id=? AND COALESCE(deleted,0)=0", [$id]) > 0) return true;
+    } catch (Throwable $e) { return true; }   // reports not in use on this install — nothing to check
+    try {
+        if ((int)ops_val("SELECT COUNT(*) FROM job_visits WHERE job_id=? AND status='DONE' AND (COALESCE(report_link,'')<>'' OR COALESCE(report_doc_id,0)>0)", [$id]) > 0) return true;
+    } catch (Throwable $e) {}
+    return false;
+}
+//  Must the person closing it say why there is no report? A terminated job already
+//  says why on its record (owner, 8 Nov 2026), so it is not asked again.
+function job_close_needs_report_reason($job, $typedLink = '') {
+    if (strtoupper((string)($job['billing_stop_kind'] ?? '')) === 'TERMINATED') return false;
+    return !job_report_on_file($job, $typedLink);
+}
+//  The Operations Manager(s) who cover the job's branch; else that branch's Branch
+//  Manager(s); else the managers' list used for other operations alerts.
+function job_branch_ops_manager_emails($job) {
+    $office = (int)($job['executing_office_id'] ?? 0);
+    $pick = function ($base) use ($office) {
+        $out = [];
+        foreach (ops_all("SELECT id, role, email FROM users WHERE is_active=1 AND COALESCE(email,'')<>''") ?: [] as $u) {
+            $rk = strtoupper((string)$u['role']);
+            if (function_exists('role_effective_key')) $rk = role_effective_key($rk);
+            if ($rk !== $base) continue;
+            if ($office && function_exists('sx_user_covers_office') && !sx_user_covers_office((int)$u['id'], $office)) continue;
+            $out[] = (string)$u['email'];
+        }
+        return $out;
+    };
+    $to = $pick('OPERATION_MANAGER');
+    if (!$to) $to = $pick('BRANCH_MANAGER');
+    if (!$to && function_exists('manager_emails')) return (string)manager_emails();
+    return implode(',', array_unique($to));
+}
+//  Called whenever a report document is written: if its job was closed without a report,
+//  record the late report on the job and tell the branch's Operations Manager.
+function job_report_added_after_noreport_close($docId) {
+    try {
+        job_noreport_migrate();
+        $d = ops_one("SELECT id, irn, job_id FROM report_docs WHERE id=?", [(int)$docId]);
+        if (!$d || !(int)$d['job_id']) return false;
+        $job = ops_one("SELECT * FROM jobs WHERE id=?", [(int)$d['job_id']]);
+        if (!$job || empty($job['closed_flag']) || trim((string)($job['closed_no_report_reason'] ?? '')) === '') return false;
+        $me = function_exists('user_name') && function_exists('current_user') && current_user() ? user_name(current_user()) : 'the system';
+        $words = 'Report ' . $d['irn'] . ' uploaded after closing without a report — by ' . $me;
+        if (function_exists('act_log')) act_log('JOB', (int)$job['id'], 'SYSTEM', $words, ['auto' => 1,
+            'body' => 'Closed on ' . substr((string)($job['closed_no_report_at'] ?: $job['closed_at']), 0, 10) . ' by ' . $job['closed_no_report_by'] . ' with the reason: ' . $job['closed_no_report_reason']]);
+        $to = job_branch_ops_manager_emails($job);
+        if ($to !== '' && function_exists('ops_mail'))
+            ops_mail($to, 'Report added after closing without one: ' . $job['job_code'],
+                ucfirst(Tl('job')) . ' ' . $job['job_code'] . " was closed without a report.\n"
+                . 'Reason given: ' . $job['closed_no_report_reason'] . ' (by ' . $job['closed_no_report_by'] . ")\n\n"
+                . $words . ".\n\nOpen it: Jobs → " . $job['job_code'] . "\n\n" . (function_exists('app_name') ? app_name() : ''),
+                '', 'report_after_noreport_close');
+        return true;
+    } catch (Throwable $e) { return false; }
+}
+
+// ---------------------------------------------------------------------------
 //  Schema
 // ---------------------------------------------------------------------------
 function idems_migrate() {
@@ -5097,6 +5180,7 @@ function ops_idems_documents($route, $method) {
                 $pdo->prepare("INSERT INTO report_docs (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
                 $id = (int)$pdo->lastInsertId();
                 idems_log('report_doc', $id, 'CREATE', ['irn'=>$irn]);
+                job_report_added_after_noreport_close($id);   // 27 Nov 2026 — late report after a no-report close
                 idems_log('report_doc', $id, 'IRN_GEN', ['irn'=>$irn, 'new'=>$irn]);
                 // Field #27 (stage b) — "continue from" a prior inspection: seed this new
                 // report's body from it and carry its QAPs forward. Guarded to a genuine
@@ -10590,6 +10674,7 @@ function idems_start_next_stage($src, $inspectorId, $jobId, $actorWords) {
         ->execute(array_values($row));
     $newId = (int)db()->lastInsertId();
     idems_log('report_doc', $newId, 'CREATE', ['irn' => $irn]);
+    job_report_added_after_noreport_close($newId);
     idems_log('report_doc', $newId, 'IRN_GEN', ['irn' => $irn, 'new' => $irn]);
     idems_log('report_doc', $newId, 'CONTINUES_FROM', ['irn' => $irn, 'field' => 'stage',
         'new' => 'Continues from ' . $src['irn'] . ' — next stage report for ' . ($insName ?: 'the inspector') . ', started by ' . $actorWords
@@ -10647,6 +10732,7 @@ function idems_revise_doc($src) {
     $newId = (int)db()->lastInsertId();
     db()->prepare("UPDATE report_docs SET revised_by_id=?, updated_at=? WHERE id=?")->execute([$newId, date('c'), (int)$src['id']]);
     idems_log('report_doc', $newId, 'REVISION_DRAFT', ['irn' => $irn, 'new' => 'Rev ' . $newRev . ' of ' . $base]);
+    job_report_added_after_noreport_close($newId);
     idems_log('report_doc', (int)$src['id'], 'REVISED', ['irn' => $base, 'new' => $irn]);
     return [$newId, ''];
 }
@@ -10880,6 +10966,7 @@ function ops_idems_release_note($method) {
     db()->prepare("INSERT INTO report_docs (" . implode(',', $cols) . ") VALUES ($ph)")->execute($vals);
     $id = (int)db()->lastInsertId();
     idems_log('report_doc', $id, 'RELEASE_NOTE_DRAFT', ['irn'=>$irn, 'new'=>'from ' . $src['irn']]);
+    job_report_added_after_noreport_close($id);
     idems_log('report_doc', $src['id'], 'RELEASE_NOTE_CREATED', ['irn'=>$src['irn'], 'new'=>$irn]);
     flash('Release Note ' . $irn . ' drafted from ' . $src['irn'] . '. Review the wording, then submit/issue it.');
     redirect('/document?id=' . $id);

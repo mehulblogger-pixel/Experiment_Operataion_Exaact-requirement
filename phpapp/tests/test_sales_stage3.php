@@ -153,7 +153,9 @@ try {
         $keep = $_SESSION['uid'] ?? null; bbv_as($uid); $mayAdd = partner_can_add(); if ($keep) bbv_as($keep);
         if (!$mayAdd && in_array($route, ['inquiry-new', 'inquiry-edit', 'opportunity-new', 'opportunity-edit', 'quote-new', 'quote-edit', 'lead-convert'], true))
             $lostL = array_values(array_diff($lostL, ['#']));
-        t_eq($lostL, [], "$label · $pg — every link of the old page is on the new one (moves listed above)");
+        $keep = $_SESSION['uid'] ?? null; bbv_as($uid); $roInq = function_exists('crm_inquiry_can_write') && !crm_inquiry_can_write(); if ($keep) bbv_as($keep);
+        if (!($route === 'inquiries' && $roInq))
+            t_eq($lostL, [], "$label · $pg — every link of the old page is on the new one (moves listed above)");
         //  A form keeps its address and every field it had (a new page may add one). A GET filter
         //  form may be split into several on the same page: every old field must be on one of them.
         $lost = [];
@@ -172,6 +174,15 @@ try {
         $keep = $_SESSION['uid'] ?? null; bbv_as($uid); $mayDelDeal = function_exists('opp_can_delete') && opp_can_delete(); if ($keep) bbv_as($keep);
         if ($route === 'opportunity' && !$mayDelDeal)
             $lost = array_values(array_filter($lost, fn($sig) => strpos($sig, 'post /opportunity-delete [') !== 0));
+        //  Owner, 27 Nov 2026 (decision 4a, docs/02 19ac): the Branch Manager and the SBU Head read
+        //  enquiries but no longer change them — the one intended difference: their register loses
+        //  "+ New enquiry" and the Delete forms, and only theirs.
+        $keep = $_SESSION['uid'] ?? null; bbv_as($uid); $mayWriteInq = !function_exists('crm_inquiry_can_write') || crm_inquiry_can_write(); if ($keep) bbv_as($keep);
+        if ($route === 'inquiries' && !$mayWriteInq) {
+            $lost = array_values(array_filter($lost, fn($sig) => strpos($sig, 'post /inquiry-delete [') !== 0));
+            $lostL = array_values(array_diff($lostL, ['/inquiry-new']));
+            t_eq($lostL, [], "$label · $pg — (read-only enquiries) every other link of the old page is still there");
+        }
         t_eq($lost, [], "$label · $pg — every form (same address, every field) is on the new one");
         t_eq(array_values(array_diff($o['money'], $nn['money'])), [], "$label · $pg — every amount of the old page is on the new one");
         return [$o, $n];

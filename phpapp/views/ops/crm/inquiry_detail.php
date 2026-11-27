@@ -21,7 +21,7 @@ $id = (int)$inq['id'];
 $iSt = (string)($inq['status'] ?: 'OPEN');
 $Q = Tl('quote');
 $canWork = !function_exists('crm_inquiry_can_work') || crm_inquiry_can_work($inq);
-$canEditInq = can('mod.inquiries.edit') && $canWork;
+$canEditInq = can('mod.inquiries.edit') && crm_inquiry_can_write() && $canWork;   // decision 4a (27 Nov): BM / SBU Head read only
 $mayQuote = can('mod.quotes.edit') && $canWork;
 $canCost = function_exists('pc_can_edit') && pc_can_edit();
 $quotes = $quotes ?? [];
@@ -83,7 +83,7 @@ $quoteBtns = function ($cls = 'rec-btn') use ($iSt, $iq, $mayQuote, $id, $Q) {
                   ['brief', ($inq['sbu'] ?? '') !== '' ? ($sbuL[$inq['sbu']] ?? $inq['sbu']) : '—', ucfirst(Tl('sbu'))]]); ?>
 </div>
 
-<?php if (!$canWork && can('mod.inquiries.edit')): ?>
+<?php if (!$canWork && can('mod.inquiries.edit') && crm_inquiry_can_write()): ?>
   <div class="rec-ban info" role="status"><p style="margin:0">🔒 <?= e(crm_assignee_words((int)$inq['assigned_to'], Tl('inquiry'))) ?></p></div>
 <?php endif; ?>
 

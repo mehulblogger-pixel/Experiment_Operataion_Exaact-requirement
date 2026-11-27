@@ -1188,6 +1188,23 @@ select.form-control{appearance:none;background-image:
 .tabcnt{font-size:10.5px;font-weight:700;background:var(--warn-bg,#fffbeb);color:var(--warn,#b45309);
   border-radius:20px;padding:1px 7px;line-height:1.7}
 .tabbtn.on .tabcnt{background:rgba(255,255,255,.22);color:#fff}
+/* Owner, 27 Nov 2026 (QP-16 / A6: "No sideways — fix in the rows only but duly aligned"):
+   on a phone the chips wrapped into rows of different widths with a ragged edge. Below
+   600px they form an even grid instead — equal cells, equal height, label centred and
+   allowed onto a second line, nothing scrolls sideways and nothing is cut off. Three
+   columns (six tabs = 3 × 2, five = 3 + 2 on the same grid); two or four tabs use two
+   columns so no row is left with one lonely cell. The card-style .rec-tabs bars keep
+   their own one-row grid. */
+@media (max-width:599.98px){
+  .tabbar:not(.rec-tabs){display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;align-items:stretch}
+  .tabbar:not(.rec-tabs):has(> .tabbtn:nth-child(2):last-child),
+  .tabbar:not(.rec-tabs):has(> .tabbtn:nth-child(4):last-child){grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tabbar:not(.rec-tabs):has(> .tabbtn:only-child){grid-template-columns:minmax(0,1fr)}
+  .tabbar:not(.rec-tabs) .tabbtn{width:100%;min-width:0;min-height:44px;padding:6px 6px;border-radius:12px;
+    white-space:normal;justify-content:center;text-align:center;line-height:1.2;font-size:12.5px;
+    overflow-wrap:anywhere;flex-wrap:wrap;gap:4px}
+  .tabbar:not(.rec-tabs) .tabbtn > span:first-of-type{min-width:0}
+}
 
 /* ── Wizard foot: Back · step · Next / Save on the last step ─────────────── */
 .fs-nav{display:flex;align-items:center;gap:12px;flex-wrap:wrap;

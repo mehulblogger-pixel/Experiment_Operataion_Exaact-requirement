@@ -2244,6 +2244,25 @@ function inq_dt_columns() {
     ];
 }
 
+//  Owner, 27 Nov 2026 (decision 4a) — who may CHANGE enquiries: create, edit, assign,
+//  drop / reopen, delete. Everyone who held Enquiries edit before, except the read-only
+//  roles (ACCESS_INQUIRY_READ_ONLY: Branch Manager, SBU Head), unless "Add" on Enquiries
+//  has been ticked for them on purpose. Viewing and downloading are unchanged.
+function crm_inquiry_read_only_role() {
+    if (is_master()) return false;
+    $r = function_exists('user_role') ? user_role() : '';
+    if (function_exists('role_effective_key')) $r = role_effective_key($r);
+    return in_array(strtoupper((string)$r), ACCESS_INQUIRY_READ_ONLY, true);
+}
+function crm_inquiry_can_write() {
+    if (is_master_of(['inquiries', 'leads'])) return true;
+    if (!can('mod.inquiries.edit')) return false;
+    return !crm_inquiry_read_only_role() || can_direct('mod.inquiries.add');
+}
+function crm_inquiry_read_only_words() {
+    return 'Your role reads ' . Tlp('inquiry') . ' but does not change them — ask the salesperson who handles it, or an administrator.';
+}
+
 function ops_crm_inquiries($route, $method) {
     $pdo = db();
     if ($route === 'inquiries') {
@@ -2325,6 +2344,7 @@ function ops_crm_inquiries($route, $method) {
     }
     if ($route === 'inquiry-new' || $route === 'inquiry-edit') {
         ops_require(can('mod.inquiries.edit'), 'You cannot add or edit inquiries.');
+        ops_require(crm_inquiry_can_write(), crm_inquiry_read_only_words());
         $inq = null;
         if ($route === 'inquiry-edit') { $inq = crm_inquiry_get((int)($_GET['id'] ?? 0)); if (!$inq) { http_response_code(404); view('notfound'); return; }
             //  Opened on its own (not from the register): bring its outcome up to date first.
@@ -2455,6 +2475,7 @@ function ops_crm_inquiries($route, $method) {
     //  exists: from then on the enquiry follows that quotation. REOPEN undoes a drop.
     if (in_array($route, ['inquiry-drop', 'inquiry-reopen'], true) && $method === 'POST') {
         ops_require(can('mod.inquiries.edit'), 'You cannot change inquiries.');
+        ops_require(crm_inquiry_can_write(), crm_inquiry_read_only_words());
         $inq = crm_inquiry_get((int)($_POST['id'] ?? 0));
         if (!$inq) { flash('That ' . Tl('inquiry') . ' no longer exists.', 'error'); redirect('/inquiries'); }
         ops_require(crm_inquiry_in_scope($inq), 'This ' . Tl('inquiry') . ' belongs to another branch.');
@@ -2483,6 +2504,7 @@ function ops_crm_inquiries($route, $method) {
     // been raised against it (that would orphan the quote and lose the trail).
     if ($route === 'inquiry-delete' && $method === 'POST') {
         ops_require(is_admin_level() || is_master(), 'Only an administrator can delete inquiries.');
+        ops_require(crm_inquiry_can_write(), crm_inquiry_read_only_words());
         $id  = (int)($_POST['id'] ?? 0);
         $inq = $id ? crm_inquiry_get($id) : null;
         if (!$inq) { flash('That inquiry no longer exists.', 'error'); redirect('/inquiries'); }
@@ -2492,7 +2514,7 @@ function ops_crm_inquiries($route, $method) {
             flash('A ' . Tl('quote') . ' has been raised against ' . $inq['inquiry_no'] . ', so it is part of the record and cannot be deleted. It follows that quotation; mark the quotation lost if the work is not coming.', 'error');
             redirect('/inquiries');
         }
-        if (function_exists('act_log')) act_log('INQUIRY', $id, 'DELETED', 'Inquiry ' . $inq['inquiry_no'] . ' deleted — ' . (string)($inq['client_name'] ?? '') . ' (by ' . user_name(current_user()) . ')', ['office_id' => (int)($inq['office_id'] ?? 0) ?: '', 'sbu' => (string)($inq['sbu'] ?? '')]);
+        if (function_exists('act_log')) act_log('INQUIRY', $id, 'DELETED', 'Inquiry ' . $inq['inquiry_no'] . ' deleted — ' . (string)($inq['client_name'] ?? '') . ' (by ' . user_name(current_user()) . ')', ['office_id' => (int)($inq['office_id'] ?? 0) ?: '', 'sbu' => (string)($inq['sbu'] ?? ''), 'match_name' => (string)($inq['client_name'] ?? '')]);
         db()->prepare("DELETE FROM crm_inquiries WHERE id=?")->execute([$id]);
         flash('Inquiry ' . $inq['inquiry_no'] . ' deleted.');
         redirect('/inquiries');

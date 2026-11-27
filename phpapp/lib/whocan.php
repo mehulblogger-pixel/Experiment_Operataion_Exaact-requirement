@@ -466,7 +466,9 @@ function whocan_preview_user($u) {
                    : [false, 'Leads'];
         $ov = $f('opp_can_view') && opp_can_view();
         $L[] = $ov ? [true, TP('opportunity') . ': view' . ($f('opp_can_edit') && opp_can_edit() ? ', add and edit' : '')] : [false, TP('opportunity')];
-        $L[] = can('mod.inquiries.view') ? [true, TP('inquiry') . ': view' . (can('mod.inquiries.add') ? ', add' : '') . (can('mod.inquiries.edit') ? ', edit' : '')] : [false, TP('inquiry')];
+        //  Decision 4a (27 Nov 2026): a Branch Manager / SBU Head reads enquiries only.
+        $iw = !$f('crm_inquiry_can_write') || crm_inquiry_can_write();
+        $L[] = can('mod.inquiries.view') ? [true, TP('inquiry') . ': view' . ($iw && can('mod.inquiries.add') ? ', add' : '') . ($iw && can('mod.inquiries.edit') ? ', edit' : '') . (!$iw ? ' (read only for this role)' : '')] : [false, TP('inquiry')];
         if (can('mod.quotes.view')) {
             $q = [];
             if (can('crm.quote.create')) $q[] = 'create';
@@ -518,7 +520,10 @@ function whocan_preview_role($role, array $set) {
                         : [false, 'The Sales workspace (Sales home, Today, Pipeline board)'];
     $L[] = $lv ? [true, 'Leads: view' . ($h('mod.leads.add') ? ', add' : '') . (($h('mod.leads.edit') || $h('mod.inquiries.edit')) ? ', edit' : '') . ($h('crm.lead.export') && $h('mod.leads.view') ? ', download' : '')] : [false, 'Leads'];
     $L[] = $ov ? [true, TP('opportunity') . ': view' . ($h('crm.deal.edit') ? ', add and edit' : '')] : [false, TP('opportunity')];
-    $L[] = $h('mod.inquiries.view') ? [true, TP('inquiry') . ': view' . ($h('mod.inquiries.add') ? ', add' : '') . ($h('mod.inquiries.edit') ? ', edit' : '')] : [false, TP('inquiry')];
+    //  Decision 4a (27 Nov 2026): the read-only roles change enquiries only when "Add" is ticked for them.
+    $rk = function_exists('role_effective_key') ? role_effective_key(strtoupper((string) $role)) : strtoupper((string) $role);
+    $iw = !(defined('ACCESS_INQUIRY_READ_ONLY') && in_array($rk, ACCESS_INQUIRY_READ_ONLY, true)) || in_array('mod.inquiries.add', $set, true);
+    $L[] = $h('mod.inquiries.view') ? [true, TP('inquiry') . ': view' . ($iw && $h('mod.inquiries.add') ? ', add' : '') . ($iw && $h('mod.inquiries.edit') ? ', edit' : '') . (!$iw ? ' (read only for this role)' : '')] : [false, TP('inquiry')];
     if ($h('mod.quotes.view')) {
         $q = [];
         if ($h('crm.quote.create')) $q[] = 'create';

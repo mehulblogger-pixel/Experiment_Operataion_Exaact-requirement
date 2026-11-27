@@ -479,6 +479,25 @@ function act_partner_for($entityKind, $entityId) {
     return null;
 }
 
+// The one client whose name is this name, compared the way duplicates are
+// (normalize_name: case, punctuation and Pvt Ltd / Ltd / LLP … left out). Null
+// when no client or more than one client carries it — never a guess.
+function act_partner_match_name($name) {
+    $n = function_exists('normalize_name') ? normalize_name($name) : strtolower(trim((string)$name));
+    if ($n === '') return null;
+    $hit = [];
+    try {
+        foreach (ops_all("SELECT id, legal_name, display_name FROM business_partners
+                          WHERE COALESCE(is_client,0)=1 AND COALESCE(status,'')<>'MERGED'") ?: [] as $r) {
+            if (normalize_name((string)$r['legal_name']) === $n
+                || (trim((string)($r['display_name'] ?? '')) !== '' && normalize_name((string)$r['display_name']) === $n))
+                $hit[(int)$r['id']] = true;
+            if (count($hit) > 1) return null;
+        }
+    } catch (Throwable $e) { return null; }
+    return count($hit) === 1 ? (int)array_key_first($hit) : null;
+}
+
 // ---- Writing ---------------------------------------------------------------
 // The one function everything calls. Wrapped, because a timeline is a record of
 // work and not a precondition for it: if this fails, the quote still goes out.
@@ -498,6 +517,11 @@ function act_log($entityKind, $entityId, $kind, $subject, array $opt = []) {
         $partner = array_key_exists('partner_id', $opt)
             ? ($opt['partner_id'] ? (int)$opt['partner_id'] : null)
             : act_partner_for($entityKind, $entityId);
+        //  Owner, 27 Nov 2026 (GD-03): a record typed by company name only (no client
+        //  chosen) still belongs on that client's timeline when the name matches exactly
+        //  one client on file. No match, or several: Directory → Activity only.
+        if (!$partner && trim((string)($opt['match_name'] ?? '')) !== '')
+            $partner = act_partner_match_name((string)$opt['match_name']);
         $u = function_exists('current_user') ? current_user() : null;
         db()->prepare("INSERT INTO activities
             (kind,entity_kind,entity_id,partner_id,subject,body,direction,occurred_at,
