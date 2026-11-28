@@ -666,6 +666,42 @@ if (!function_exists('current_tenant') || current_tenant() === ''): ?>
   <?php endif; ?>
 </div>
 
+<?php if (function_exists('tp_status') && is_master() && function_exists('app_is_test_copy') && app_is_test_copy()):
+  $tp = tp_status(); $tpMap = tp_map(); $tpN = array_sum($tp['counts'] ?? []); ?>
+<div class="panel settings-card" id="test-pack">
+  <h3 class="tab-sub" style="margin-top:0;">Test pack (Operations)</h3>
+  <p class="sub" style="margin-bottom:8px">Ready-made records for the Operations test book, so each check can be opened and tried without typing the set-up first. It uses the test logins that already exist (it makes no logins and no passwords). <strong>Only on this test copy</strong> — the live site refuses it.</p>
+  <?php if (!empty($tp['missing_logins'])): ?>
+    <p class="sub" style="margin:0 0 8px"><span class="pill p-warn">Missing logins</span> <?= e(implode(', ', $tp['missing_logins'])) ?> — create them in Users first; jobs for a missing engineer are left without one.</p>
+  <?php endif; ?>
+  <?php if (!empty($tp['loaded'])): ?>
+    <p class="sub" style="margin:0 0 8px"><span class="pill p-ok">Loaded</span> <?= (int)$tpN ?> records · <?= (int)$tp['tests'] ?> tests mapped · since <?= e(str_replace('T', ' ', substr((string)$tp['loaded_at'], 0, 16))) ?>. Records are tagged <code>TP-</code>.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <form method="post" action="/testpack-load" style="margin:0" onsubmit="return confirm('Start the test pack again from a clean set? The pack\'s records — and anything done on them since — are removed and made fresh.')"><input type="hidden" name="fresh" value="1"><button class="btn" type="submit">↻ Start again (fresh pack)</button></form>
+      <form method="post" action="/testpack-remove" style="margin:0" onsubmit="return confirm('Remove the test pack? Only its own records (and what was done on them) are deleted. Your other records are not touched.')"><button class="btn danger" type="submit">🗑 Remove test pack</button></form>
+    </div>
+    <?php if ($tpMap): ?>
+    <details style="margin-top:10px"><summary class="muted">What to open for each test (<?= count($tpMap) ?>)</summary>
+      <div class="table-wrap" style="margin-top:6px"><table class="table">
+        <thead><tr><th>Test</th><th>Kind</th><th>What to open</th></tr></thead>
+        <tbody>
+        <?php foreach ($tpMap as $id => $row): $k = (string)($row['kind'] ?? ''); ?>
+          <tr><td><strong><?= e($id) ?></strong></td>
+              <td><?= e(['record' => 'Ready-made record', 'none' => 'No record needed', 'type' => 'Type the value'][$k] ?? $k) ?></td>
+              <td><?= e($row['text'] ?? '') ?></td></tr>
+        <?php endforeach; ?>
+        </tbody></table></div>
+    </details>
+    <?php endif; ?>
+  <?php else: ?>
+    <form method="post" action="/testpack-load" onsubmit="return confirm('Load the Operations test pack now? It adds TP- tagged records and can be removed in one click.')">
+      <button class="btn" type="submit">Load test pack</button>
+    </form>
+  <?php endif; ?>
+  <p class="muted" style="margin-top:8px;font-size:12px">Groups: <?= e(implode(' · ', array_keys($tp['groups'] ?? []))) ?>. Command line: <code>php tools/seed-testpack.php</code> — <code>--status</code> / <code>--remove</code>.</p>
+</div>
+<?php endif; ?>
+
 <div class="panel settings-card">
   <?php $s01 = function_exists('seed_s01_status') ? seed_s01_status() : ['loaded'=>false]; ?>
   <h3 class="tab-sub" style="margin-top:0;">DEMO-S01 — marketplace scenario</h3>

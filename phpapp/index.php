@@ -341,6 +341,7 @@ require __DIR__ . '/lib/sales_more.php';   // plan 42 step C — Sales home, Tod
     require __DIR__ . '/lib/connect_reqtools.php'; // Connect K0+ — requirement reuse: duplicate + named templates
     require __DIR__ . '/lib/seed_scenario_s01.php'; // DEMO-S01 — scenario seed engine (CLI + admin button)
     require __DIR__ . '/lib/seed_scenario_s02.php'; // DEMO-S02 — agency bench scenario seed engine (CLI + admin button)
+    require __DIR__ . '/lib/seed_testpack.php';     // TEST PACK — ready-made test-book data, test copy + Master Admin only (groups: lib/seed_testpack_*.php)
     require __DIR__ . '/lib/connect_client_dash.php'; // Connect K0+ — role-based client-portal dashboard tiles (live-computed)
     require __DIR__ . '/lib/seed_scenario_s03.php'; // DEMO-S03 — client + client-portal foundation seed engine
     require __DIR__ . '/lib/seed_scenario_s04.php'; // DEMO-S04 — marketplace lifecycle (new engines) seed engine

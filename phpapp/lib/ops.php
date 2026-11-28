@@ -4257,6 +4257,31 @@ function ops_dispatch($route, $method) {
                 } catch (Throwable $e) { flash('Could not load DEMO-S01: ' . $e->getMessage(), 'error'); }
             }
             redirect('/settings'); return true;
+        // TEST PACK — the ready-made test-book data. Test copy only, Master Admin only:
+        // refused here, again in the engine (tp_refusal), and in the CLI.
+        case $route === 'testpack-load' || $route === 'testpack-remove':
+            ops_require(is_master(), 'Only the Master Admin can load or remove the test pack.');
+            ops_require(function_exists('app_is_test_copy') && app_is_test_copy(), 'The test pack is only for the test copy.');
+            if ($method === 'POST' && function_exists('tp_load')) {
+                try {
+                    if ($route === 'testpack-remove') {
+                        $r = tp_remove();
+                        if (empty($r['ok'])) flash('Test pack not removed: ' . ($r['error'] ?? 'unknown'), 'error');
+                        else flash('Test pack removed — ' . (int)$r['deleted'] . ' records deleted. Nothing else was touched.');
+                    } else {
+                        $r = tp_load(!empty($_POST['fresh']));
+                        if (!empty($r['error'])) flash('Test pack not loaded: ' . $r['error'], 'error');
+                        else {
+                            $miss = $r['missing_logins'] ?? [];
+                            flash((!empty($r['already']) ? 'The test pack is already loaded — nothing was added.' : 'Test pack loaded — ' . array_sum($r['counts'] ?? []) . ' records for ' . (int)$r['tests'] . ' tests.')
+                                . ($miss ? ' Missing logins (create them in Users, then load again): ' . implode(', ', $miss) . '.' : '')
+                                . (!empty($r['errors']) ? ' Some groups failed: ' . implode('; ', array_map(fn($k, $v) => "$k — $v", array_keys($r['errors']), $r['errors'])) : ''),
+                                (!empty($r['errors']) || $miss) ? 'warning' : 'success');
+                        }
+                    }
+                } catch (Throwable $e) { flash('Test pack: ' . $e->getMessage(), 'error'); }
+            }
+            redirect('/settings'); return true;
         case $route === 'seed-scenario-s01-remove':
             ops_require(is_master(), 'Only the Master Admin can remove the DEMO-S01 scenario.');
             if ($method === 'POST' && function_exists('seed_s01_remove')) {
