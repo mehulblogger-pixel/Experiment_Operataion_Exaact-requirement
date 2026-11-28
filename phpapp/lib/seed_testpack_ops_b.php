@@ -119,7 +119,10 @@ function tp_seed_ops_b(array $ctx) {
 
     //  OP-03 / OP-16 / OR-04 — a closed job with an ISSUED report (and a flagged
     //  photo in it), queued for billing the moment it closed.
-    $c703 = $call('TP-C-B703', $tbValves, ['date' => tp_d(-4), 'call_received_date' => tp_d(-6), 'billable_value' => 25000]);
+    //  OP-03 has its own example customer, so other groups' TB Valves reports never push this one
+    //  out of "Previous inspections" (that list shows only the most recent).
+    $repeatCo = tp_client('TP Repeat Customer Pvt Ltd (example)', ['home_branch_id' => $ahm]);
+    $c703 = $call('TP-C-B703', $repeatCo, ['date' => tp_d(-4), 'call_received_date' => tp_d(-6), 'billable_value' => 25000]);
     $j703 = tp_job('TP-J-B703', $c703, ['inspector_id' => $I ?: null, 'date' => tp_d(-4), 'invoice_value' => 25000]);
     $closedNow = (int) ops_val("SELECT COALESCE(closed_flag,0) FROM jobs WHERE id=?", [$j703]) === 0;
     if ($closedNow) {
@@ -140,7 +143,7 @@ function tp_seed_ops_b(array $ctx) {
     }
     //  OP-03 — the repeat inspection at the same customer / vendor / contract, where
     //  the coordinator forwards that report to the engineer.
-    $c704 = $call('TP-C-B704', $tbValves, ['date' => tp_d(2)]);
+    $c704 = $call('TP-C-B704', $repeatCo, ['date' => tp_d(2)]);
     tp_job('TP-J-B704', $c704, ['inspector_id' => $I ?: null, 'date' => tp_d(2)]);
 
     //  OP-04 — two closed jobs whose reports wait for the engineer's reporting manager.
