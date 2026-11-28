@@ -22,7 +22,7 @@
 
 // Bump on every release. Date-based: a support call quotes it and the date is
 // immediately meaningful, which "2.14.3" is not to the person reading it out.
-const APP_VERSION = '2026.11.8';
+const APP_VERSION = '2026.11.9';
 const APP_VERSION_DATE = '2026-11-28';
 
 // [key, label, required?, what you lose without it]

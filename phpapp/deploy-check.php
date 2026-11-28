@@ -24,14 +24,14 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'v2026.11.8 · 1f4f80ca · 2026-11-28 09:32 UTC · 755 files';
+$RELEASE = 'v2026.11.9 · 48a1c140 · 2026-11-28 11:45 UTC · 760 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
     'cron.php' => ['s'=>26511,'h'=>'db71262177e4a85a'],
     'cron_ads.php' => ['s'=>5306,'h'=>'4aad92eab174ea01'],
     'diagnose.php' => ['s'=>10005,'h'=>'791b255b31782ab7'],
-    'index.php' => ['s'=>157526,'h'=>'2a3c72a0618b1bc4'],
+    'index.php' => ['s'=>157686,'h'=>'1a6d671dfd877aac'],
     'lib/access.php' => ['s'=>174111,'h'=>'5aa791b75a373fc2'],
     'lib/access_state.php' => ['s'=>10685,'h'=>'4c7da7d6d793745e'],
     'lib/activity.php' => ['s'=>49333,'h'=>'45dfed9c545fa0ee'],
@@ -182,7 +182,7 @@ $EXPECT  = [
     'lib/numbering.php' => ['s'=>9566,'h'=>'a25fc05a5781006a'],
     'lib/onboarding.php' => ['s'=>4308,'h'=>'1c5b3e553b964601'],
     'lib/opportunities.php' => ['s'=>109287,'h'=>'ba468d50e385a004'],
-    'lib/ops.php' => ['s'=>837650,'h'=>'9a87d1ec0b882804'],
+    'lib/ops.php' => ['s'=>839680,'h'=>'c3c203abb19dc7f1'],
     'lib/opskpi.php' => ['s'=>14794,'h'=>'212b0bb7ed232a9e'],
     'lib/orgadmin.php' => ['s'=>80222,'h'=>'2d0099f01ed2b5ea'],
     'lib/organogram.php' => ['s'=>20449,'h'=>'b2f7eb7b0c9d4c4f'],
@@ -196,7 +196,7 @@ $EXPECT  = [
     'lib/platform_mail.php' => ['s'=>22419,'h'=>'95ffd0e9fea3845d'],
     'lib/portal.php' => ['s'=>132773,'h'=>'037527c042694ece'],
     'lib/position.php' => ['s'=>19441,'h'=>'a0a9d1a9e6a9b10c'],
-    'lib/preflight.php' => ['s'=>5451,'h'=>'d8e8a2deb3f54b3e'],
+    'lib/preflight.php' => ['s'=>5451,'h'=>'1069ba81e5a04503'],
     'lib/pricing_admin.php' => ['s'=>16307,'h'=>'d7af986c89fc5cfc'],
     'lib/projcosting.php' => ['s'=>152535,'h'=>'7bc5ef6b81df76da'],
     'lib/pwreset.php' => ['s'=>9509,'h'=>'50675e1d291df7b0'],
@@ -247,6 +247,10 @@ $EXPECT  = [
     'lib/seed_scenario_s04.php' => ['s'=>15797,'h'=>'afbaeeaef614756d'],
     'lib/seed_scenario_s05.php' => ['s'=>10982,'h'=>'77ae3daf8c427816'],
     'lib/seed_scenario_s06.php' => ['s'=>13472,'h'=>'7e7c02ab15233f58'],
+    'lib/seed_testpack.php' => ['s'=>17649,'h'=>'a65dbf6cdfaacf73'],
+    'lib/seed_testpack_ops_a.php' => ['s'=>19550,'h'=>'cd63f949157d7037'],
+    'lib/seed_testpack_ops_b.php' => ['s'=>25208,'h'=>'f277cc97eb6cedc3'],
+    'lib/seed_testpack_ops_c.php' => ['s'=>35845,'h'=>'b22c4dfde28e88a9'],
     'lib/selfserve.php' => ['s'=>76935,'h'=>'b201165c038e5a47'],
     'lib/services.php' => ['s'=>28431,'h'=>'6fc99ee80df3ff34'],
     'lib/settingmeta.php' => ['s'=>13132,'h'=>'b6974b55eac391fe'],
@@ -319,6 +323,7 @@ $EXPECT  = [
     'tools/seed-scenario-s04.php' => ['s'=>1412,'h'=>'9e0e6ea7ecea379d'],
     'tools/seed-scenario-s05.php' => ['s'=>1483,'h'=>'23b5f892caeda2d4'],
     'tools/seed-scenario-s06.php' => ['s'=>1921,'h'=>'8f8d70cf53e84b5b'],
+    'tools/seed-testpack.php' => ['s'=>3070,'h'=>'8b0d6baee402819f'],
     'tools/smoke-router.php' => ['s'=>636,'h'=>'098054abc53c9c16'],
     'tools/trace-audit.php' => ['s'=>2789,'h'=>'d95c97624d3d470e'],
     'tools/trace-thread.php' => ['s'=>4962,'h'=>'cb20d74d1a6eb46e'],
@@ -650,7 +655,7 @@ $EXPECT  = [
     'views/ops/search.php' => ['s'=>5963,'h'=>'dd6a5c4fca87e87c'],
     'views/ops/service_formats.php' => ['s'=>2923,'h'=>'0da7c4881ffb154c'],
     'views/ops/service_scope.php' => ['s'=>8596,'h'=>'580a7c044d31aa3c'],
-    'views/ops/settings.php' => ['s'=>76816,'h'=>'37b3d6c308b688c5'],
+    'views/ops/settings.php' => ['s'=>80052,'h'=>'9825f53bf3be8888'],
     'views/ops/setup.php' => ['s'=>5663,'h'=>'f9d9e1cef4975535'],
     'views/ops/setup_questions.php' => ['s'=>2595,'h'=>'324bf9f30effcc08'],
     'views/ops/site_docs.php' => ['s'=>4927,'h'=>'f03c1d9c89e53436'],
