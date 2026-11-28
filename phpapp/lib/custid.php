@@ -327,6 +327,21 @@ function custid_locations($partnerId) {
     }
     return $out;
 }
+//  Owner, 28 Nov 2026 (GSTIN display fix): the client's GSTINs, each ONCE, with the offices billed
+//  under it — read from custid_locations(), so Overview, Registration and Addresses always agree.
+//  [gstin => ['gstin', 'state', 'main' => bool, 'offices' => ['Main — Vadodara', 'Ankleshwar works — Ankleshwar']]]
+function custid_gstin_groups($partnerId) {
+    $out = [];
+    foreach (custid_locations((int) $partnerId) as $l) {
+        $g = (string) ($l['gstin'] ?? ''); if ($g === '') continue;
+        if (!isset($out[$g])) $out[$g] = ['gstin' => $g, 'state' => (string) ($l['state'] ?? ''), 'main' => false, 'offices' => []];
+        if (!empty($l['is_main'])) $out[$g]['main'] = true;
+        $city = trim((string) ($l['addr']['city'] ?? ''));
+        $out[$g]['offices'][] = (string) $l['label'] . ($city !== '' && strcasecmp($city, (string) $l['label']) !== 0 ? ' — ' . $city : '');
+    }
+    uasort($out, fn($a, $b) => ($b['main'] <=> $a['main']) ?: strcmp($a['gstin'], $b['gstin']));
+    return $out;
+}
 /**
  * The customer's head-office address: one of its OWN addresses, never a billing
  * location (is_billing=1) or a stopped one (it still carries its GSTIN). The one

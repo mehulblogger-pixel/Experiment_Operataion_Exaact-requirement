@@ -77,7 +77,12 @@ if (!function_exists('addr_name')) { function addr_name($a) { return (lk_options
     <dt>Client type</dt><dd><?= e(CLIENT_TYPES[$p['client_type']] ?? '—') ?></dd>
     <dt>Industry</dt><dd><?= e(INDUSTRIES[$p['industry']] ?? '—') ?></dd>
     <dt>Ownership</dt><dd><?= e(lk_options_or('ownership', OWNERSHIP)[$p['ownership_type']] ?? '—') ?></dd>
+    <?php $gGroups = (!empty($p['is_client']) && function_exists('custid_gstin_groups')) ? custid_gstin_groups($id) : []; ?>
+    <?php if (count($gGroups) > 1): // each GSTIN once (owner, 28 Nov 2026) ?>
+    <dt>GSTINs</dt><dd><?php $gi = 0; foreach ($gGroups as $g): ?><?= $gi++ ? ' · ' : '' ?><b><?= e($g['gstin']) ?></b> <span class="muted">(<?= e(trim($g['state'] . ($g['main'] ? ', main' : ''), ', ')) ?>)</span><?php endforeach; ?></dd>
+    <?php else: ?>
     <dt>GSTIN</dt><dd><?= e($p['gstin'] ?: '—') ?><?php if ($p['state']): ?> <span class="muted">(<?= e($p['state']) ?>)</span><?php endif; ?></dd>
+    <?php endif; ?>
     <dt>PAN</dt><dd><?= e($p['pan'] ?: '—') ?></dd>
     <dt>CIN</dt><dd><?= e($p['cin'] ?: '—') ?></dd>
     <dt>Website</dt><dd><?php if ($p['website']): ?><a href="<?= e($p['website']) ?>" target="_blank" rel="noopener"><?= e($p['website']) ?></a><?php else: ?>—<?php endif; ?></dd>
@@ -103,7 +108,8 @@ if (!function_exists('addr_name')) { function addr_name($a) { return (lk_options
     <dt>Display name</dt><dd><?= e($p['display_name'] ?: '—') ?></dd>
     <dt>Client code</dt><dd><?= e($p['code']) ?></dd>
     <dt>Roles</dt><dd><?= e(roles_label($p)) ?></dd>
-    <dt>GSTIN / PAN / CIN</dt><dd><?= e($p['gstin'] ?: '—') ?> · <?= e($p['pan'] ?: '—') ?> · <?= e($p['cin'] ?: '—') ?></dd>
+    <?php $gMore = (!empty($p['is_client']) && function_exists('custid_gstin_groups')) ? count(custid_gstin_groups($id)) - 1 : 0; ?>
+    <dt>GSTIN / PAN / CIN</dt><dd><?= e($p['gstin'] ?: '—') ?><?php if ($gMore > 0): ?> <span class="muted">(main; <?= $gMore ?> more GSTIN<?= $gMore > 1 ? 's' : '' ?> — <a href="/partner?id=<?= $id ?>&tab=registration">Registration</a>)</span><?php endif; ?> · <?= e($p['pan'] ?: '—') ?> · <?= e($p['cin'] ?: '—') ?></dd>
     <dt>TAN / MSME</dt><dd><?= e($p['tan'] ?: '—') ?> · <?= e($p['msme_udyam'] ?: '—') ?></dd>
   </dl>
   <?php if (!$pBasic): ?><a class="btn secondary" href="/partner-edit?id=<?= $id ?>">Edit details</a><?php endif; ?>
@@ -112,13 +118,14 @@ if (!function_exists('addr_name')) { function addr_name($a) { return (lk_options
   <?php // The client's GSTINs, read straight from its Billing addresses (owner test BL-03,
         // 27 Nov 2026: "not updated in registration tab") — shown here, never stored twice.
         if (!empty($p['is_client']) && function_exists('custid_locations')):
-          $regLocs = array_values(array_filter(custid_locations($id), fn($l) => $l['gstin'] !== ''));
+          $regLocs = function_exists('custid_gstin_groups') ? custid_gstin_groups($id) : [];
           if ($regLocs): ?>
-    <h3 class="tab-sub" style="margin-top:0">GSTINs on file <span class="muted" style="font-weight:400;font-size:12.5px">— from Billing addresses; add or change them there (Overview tab)</span></h3>
-    <table class="grid" id="reg-gstins"><thead><tr><th scope="col">Billing address</th><th scope="col">State</th><th scope="col">GSTIN</th><th scope="col">Address</th></tr></thead><tbody>
-      <?php foreach ($regLocs as $l): ?><tr>
-        <td><?= e($l['label']) ?><?= $l['is_main'] ? ' <span class="pill p-ok">main</span>' : '' ?></td>
-        <td><?= e($l['state'] ?: '—') ?></td><td><?= e($l['gstin']) ?></td><td class="muted"><?= e($l['address'] ?: '—') ?></td>
+    <h3 class="tab-sub" style="margin-top:0">GSTINs on file <span class="muted" style="font-weight:400;font-size:12.5px">— one line per GSTIN, with the offices billed under it; add or change them in Billing addresses (Overview tab)</span></h3>
+    <table class="grid" id="reg-gstins"><thead><tr><th scope="col">GSTIN</th><th scope="col">State</th><th scope="col">Offices billed under it</th></tr></thead><tbody>
+      <?php foreach ($regLocs as $g): ?><tr>
+        <td><b><?= e($g['gstin']) ?></b><?= $g['main'] ? ' <span class="pill p-ok">main</span>' : '' ?></td>
+        <td><?= e($g['state'] ?: '—') ?></td>
+        <td><?= count($g['offices']) ?> — <?= e(implode(', ', $g['offices'])) ?></td>
       </tr><?php endforeach; ?>
     </tbody></table>
     <h3 class="tab-sub">Registration documents</h3>
@@ -158,6 +165,14 @@ if (!function_exists('addr_name')) { function addr_name($a) { return (lk_options
     <div class="addr-card"><div><span class="badge GREEN"><?= e(lk_options_or('address_type', ADDRESS_TYPES)[$a['address_type']] ?? $a['address_type']) ?></span> <strong><?= e($a['label']) ?></strong><?php if ($hoId && (int) $a['id'] === $hoId): ?> <span class="badge AMBER">head office</span><?php endif; ?>
       <?php if ($aIsBill): ?> <span class="pill p-ok">billing address · GSTIN <?= e($aGst) ?></span><?php endif; ?></div>
     <div class="muted"><?= e(addr_line($a)) ?></div>
+    <?php // Owner, 28 Nov 2026 (GSTIN display fix): every address shows its State and GSTIN the same way.
+          $aIsHo = $hoId && (int) $a['id'] === $hoId;
+          $aShowG = $aGst !== '' ? $aGst : ($aIsHo ? clean_gstin($p['gstin'] ?? '') : '');
+          $aState = $aShowG !== '' && function_exists('state_from_gstin') ? state_from_gstin($aShowG) : trim((string) ($a['state'] ?? '')); ?>
+    <div style="font-size:12.5px;margin-top:2px">State: <b><?= e($aState !== '' ? $aState : '—') ?></b> · GSTIN:
+      <?php if ($aShowG !== ''): ?><b><?= e($aShowG) ?></b><?= $aIsHo && $aGst === '' ? ' <span class="muted">(main)</span>' : '' ?>
+      <?php elseif ($aLegacyBill): ?><span style="color:var(--danger,#b42318);font-weight:600">No GSTIN — add it</span>
+      <?php else: ?><span class="muted">not used for billing</span><?php endif; ?></div>
     <?php // Owner, 27 Nov 2026 (A3): a billing address lives in ONE place — Billing addresses.
           if ($aIsBill): ?>
       <div class="muted" style="font-size:12.5px">Changed or stopped in <a href="/partner?id=<?= $id ?>#billing-locations">Billing addresses</a> (Overview tab).</div>
