@@ -17,13 +17,21 @@ try {
         $pdo->prepare("INSERT INTO jobs (job_code, call_id, deliverables, reporting_frequency, created_at) VALUES (?,?,?,?,?)")->execute(['FDJ-' . mt_rand(1000, 999999), $callId, $del, $freq, 'x']);
         return ops_one("SELECT * FROM jobs WHERE id=?", [(int)$pdo->lastInsertId()]);
     };
+    //  Owner, 28 Nov 2026: a Release Note is owed only when the material was released — the jobs
+    //  that must still ask for one carry a released report (rules for hold / abortive / rejected:
+    //  tests/test_owner28_rn_exceptions.php).
+    $released = function ($j) use ($pdo) {
+        $pdo->prepare("INSERT INTO report_docs (job_id, type_code, status, result, release_status, deleted, data, created_at) VALUES (?,?,?,?,?,0,'[]',?)")
+            ->execute([(int)$j['id'], 'IR', 'ISSUED', 'ACCEPTED', 'RELEASED', 'x']);
+        return $j;
+    };
     $stage1 = $job($call('IR'), 'IR');
     t_eq(job_final_docs_missing($stage1), [], 'scenario 17: a stage-1 job with only the Inspection Report ticked closes without FIR or Release Note');
-    $withRn = $job($call('IR,RN'), 'IR,RN');
+    $withRn = $released($job($call('IR,RN'), 'IR,RN'));
     t_eq(job_final_docs_missing($withRn), ['a Release Note'], '… with "Release Note" ticked, the Release Note is still required (and only it)');
-    $withIrn = $job($call(''), 'IRN');
+    $withIrn = $released($job($call(''), 'IRN'));
     t_eq(job_final_docs_missing($withIrn), ['a Release Note'], '"Inspection Release Note" ticked also asks for it');
-    $both = $job($call(''), 'IR,FINAL_REP,RN');
+    $both = $released($job($call(''), 'IR,FINAL_REP,RN'));
     t_eq(count(job_final_docs_missing($both)), 2, 'both ticked: both required');
     $fromCall = $job($call('FINAL_REP'), '');
     t_eq(job_final_docs_missing($fromCall), ['a Final Inspection Report'], 'a job with nothing ticked reads its call\'s ticks');

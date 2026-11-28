@@ -7,11 +7,17 @@ setting_set('require_final_docs_on_close', '1');
 //  TPIA Phase 1 / D7 (owner, 25 Nov 2026): the two documents are required only
 //  when ticked in the job's "Types of report required" — so the job here ticks both.
 $base = ['id' => 987654321, 'reporting_frequency' => 'DAILY', 'deliverables' => 'IR,FINAL_REP,RN', 'call_id' => 0];
+//  Owner, 28 Nov 2026: a Release Note is owed only when the material was released — so the
+//  ordinary job here carries a released report (and no Final Inspection Report / Release Note yet).
+db()->prepare("DELETE FROM report_docs WHERE job_id=?")->execute([987654321]);
+db()->prepare("INSERT INTO report_docs (job_id, type_code, status, result, release_status, deleted, data, created_at) VALUES (?,?,?,?,?,0,'[]',?)")
+    ->execute([987654321, 'IR', 'ISSUED', 'ACCEPTED', 'RELEASED', 'x']);
 t_eq(count(job_final_docs_missing($base)), 2, 'an ordinary job that ticked both still needs a Final Inspection Report and a Release Note');
 t_eq(job_final_docs_missing($base + ['billing_stop_kind' => 'TERMINATED']), [], 'a terminated job does not');
 t_eq(count(job_final_docs_missing($base + ['billing_stop_kind' => 'COMPLETED_EARLY'])), 2, 'a job completed early still does');
 t_eq(count(job_final_docs_missing($base + ['billing_stop_kind' => 'DEMOBILIZED'])), 2, 'and so does a demobilised one');
 
+db()->prepare("DELETE FROM report_docs WHERE job_id=?")->execute([987654321]);
 t_section('Visit days after an early end do not hold the job open');
 if (function_exists('job_visits_migrate')) job_visits_migrate();
 $jid = 987654321;

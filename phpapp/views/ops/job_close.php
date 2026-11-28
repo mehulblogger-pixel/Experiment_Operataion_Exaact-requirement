@@ -68,6 +68,25 @@
       placeholder="e.g. Client cancelled the inspection on site — no report to issue"><?= e((string)($_POST['no_report_reason'] ?? '')) ?></textarea>
   </div>
   <?php endif; ?>
+  <?php // Owner, 28 Nov 2026: a Release Note only when the material was released; otherwise say why.
+        $fxC = (!$noRepNeed && function_exists('job_final_docs_exceptions')) ? job_final_docs_exceptions($job) : ['rn' => null, 'fir' => null];
+        if ($fxC['rn']): $rsnC = job_norn_reasons(); $autoC = (string)$fxC['rn']['auto'];
+          $pickC = strtoupper(trim((string)($_POST['no_rn_reason'] ?? ''))) ?: $autoC; ?>
+  <div class="ff ff-wide" id="norn-box" style="margin-bottom:12px;border:1px solid var(--warn);border-radius:8px;padding:12px;background:color-mix(in srgb,var(--warn) 7%,transparent)">
+    <label for="no_rn_reason" style="color:var(--warn)">Why no Release Note?</label>
+    <p class="muted" style="margin:4px 0 8px"><?= $fxC['rn']['detail'] !== '' ? e($fxC['rn']['detail']) . ' ' : '' ?>A Release Note is issued only when the material is released.
+      This <?= e(Tl('job')) ?> closes without one; the reason is kept in its History. The Release Note comes from the next visit or <?= e(Tl('job')) ?>.</p>
+    <select class="form-control" id="no_rn_reason" name="no_rn_reason" style="max-width:100%">
+      <?php if ($autoC === ''): ?><option value="">— choose —</option><?php endif; ?>
+      <?php foreach ($rsnC as $k => $v): ?><option value="<?= e($k) ?>" <?= $pickC === (string)$k ? 'selected' : '' ?>><?= e($v) ?></option><?php endforeach; ?>
+    </select>
+    <label for="no_rn_note" style="margin-top:8px">What is pending<?= $autoC === '' ? ' *' : ' (optional)' ?></label>
+    <textarea class="form-control" id="no_rn_note" name="no_rn_note" rows="2" placeholder="e.g. Hydro test of 3 valves pending — next visit"><?= e((string)($_POST['no_rn_note'] ?? '')) ?></textarea>
+  </div>
+  <?php endif; ?>
+  <?php if ($fxC['fir']): ?>
+  <p class="muted" style="margin:0 0 12px">No Final Inspection Report is needed — <?= e($fxC['fir']['detail'] !== '' ? $fxC['fir']['detail'] : 'the last visit was abortive.') ?> This is recorded in its History.</p>
+  <?php endif; ?>
   <div class="form-grid">
     <div class="ff"><label>Report upload date<?= $job['reporting_frequency']!=='NOREPORT' && !$noRepNeed ?' *':'' ?></label>
       <input class="form-control" type="date" name="report_upload_date" value="<?= e(date('Y-m-d')) ?>" <?= $job['reporting_frequency']!=='NOREPORT' && !$noRepNeed ?'required':'' ?>></div>

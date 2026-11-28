@@ -77,6 +77,13 @@
       <p class="next" style="color:var(--warn)">⚠ Closed without a report by <?= e((string)($job['closed_no_report_by'] ?? '')) ?> — “<?= e((string)$job['closed_no_report_reason']) ?>”.
         A report added now is recorded in its History and the Operations Manager is told.</p>
     <?php endif; ?>
+    <?php if (trim((string)($job['closed_no_rn_reason'] ?? '')) !== ''): // owner, 28 Nov 2026 — closed without a Release Note
+          $rsnJ = function_exists('job_norn_reasons') ? job_norn_reasons() : []; ?>
+      <p class="next" style="color:var(--warn)">Closed without Release Note — <?= e($rsnJ[$job['closed_no_rn_reason']] ?? $job['closed_no_rn_reason']) ?><?= trim((string)($job['closed_no_rn_note'] ?? '')) !== '' ? ': ' . e((string)$job['closed_no_rn_note']) : '' ?>.</p>
+    <?php endif; ?>
+    <?php if (!empty($job['closed_no_fir'])): ?>
+      <p class="next" style="color:var(--warn)">Closed without a Final Inspection Report — abortive visit.</p>
+    <?php endif; ?>
   <?php elseif ($jLockedReport > 0): ?>
     <?php // Field #19 — the report is approved/issued and locked → close the job now. ?>
     <div class="step">🔒 The report is approved and issued.</div>

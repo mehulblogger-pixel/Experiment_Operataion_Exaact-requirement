@@ -105,6 +105,21 @@ stateDiagram-v2
   and the branch's Operations Manager is e-mailed (`job_report_added_after_noreport_close()`; docs/02 19ac).
   Blocking a late upload until a manager approves it (a new approval and a *Closed – report waived*
   state) is **not** built — a later step only if real use shows the need.
+- **Release Note only when released; FIR except after an abortive visit** (owner, 28 Nov 2026,
+  "as recommended"). A ticked Release Note is required at close only when the material was actually
+  released — the latest report on the job (not a Release Note) says Accepted / Accepted with
+  observations, or Released / Released with observations. Otherwise the job closes **without** it and
+  the close form asks *"Why no Release Note?"* from the Masters list `job_no_rn_reason` (example labels:
+  Abortive visit · Hold point not cleared · Rejected — not released · Balance activity pending · Other).
+  The reason is chosen by itself when the record shows it: last visit day closed as *No inspection* →
+  Abortive visit (its No-inspection reason is shown); report result Hold → Hold point not cleared;
+  Rejected or release status Not released / Pending → Rejected — not released. Otherwise the person picks
+  one and writes what is pending (at least 10 characters). A ticked Final Inspection Report stays
+  required, except after an abortive visit. Kept on the job as `closed_no_rn_reason / closed_no_rn_note`
+  and `closed_no_fir`, with *"Closed without a Release Note — …"* (and *"Closed without a Final Inspection
+  Report — Abortive visit"*) in its History, and shown on the closed job page. **No new status**; who may
+  close is unchanged; the Release Note for that material comes from the next visit or job. When no report
+  at all is on file, the no-report reason above covers it (one reason, not two).
 - **Final documents only when ticked** (TPIA Phase 1 / D7, owner 25 Nov 2026). The
   Final Inspection Report is asked for only when "Final Report" (`FINAL_REP`, or the
   `FIR` type) is ticked in the job's "Types of report required" (else its call's); the

@@ -99,10 +99,79 @@ function job_final_docs_missing($job) {
         $fir = (int)ops_val("SELECT COUNT(*) FROM report_docs WHERE job_id=? AND COALESCE(deleted,0)=0 AND type_code='FIR'", [$jobId]);
         $rn  = (int)ops_val("SELECT COUNT(*) FROM report_docs WHERE job_id=? AND COALESCE(deleted,0)=0 AND type_code IN ('RN','IRN')", [$jobId]);
     } catch (Throwable $e) { return []; }   // reports not in use on this install
+    //  Owner, 28 Nov 2026 ("as recommended"): a Release Note is owed only when the material was
+    //  actually released (the latest report says Accepted / Released). After an abortive visit, a
+    //  hold point not cleared, a rejection or balance work none can honestly be issued — the job
+    //  closes without it and the close form records why (job_final_docs_exceptions()). The Final
+    //  Inspection Report stays required, except after an abortive visit (no inspection took place).
+    $st = job_release_state($job);
     $miss = [];
-    if ($wantFir && !$fir) $miss[] = 'a Final Inspection Report';
-    if ($wantRn && !$rn)   $miss[] = 'a Release Note';
+    if ($wantFir && !$fir && !$st['abortive']) $miss[] = 'a Final Inspection Report';
+    if ($wantRn && !$rn && $st['released'] && !$st['abortive']) $miss[] = 'a Release Note';
     return $miss;
+}
+
+//  Why no Release Note — the close form's list (owner, 28 Nov 2026). A Masters list with
+//  example labels the company may rename; the keys stay, so the automatic choice keeps working.
+const JOB_NORN_REASONS = ['ABORTIVE' => 'Abortive visit', 'HOLD' => 'Hold point not cleared',
+    'REJECTED' => 'Rejected — not released', 'BALANCE' => 'Balance activity pending', 'OTHER' => 'Other'];
+//  Shortest note accepted when the person picks the reason — a validation of the text, not a business limit.
+const JOB_NORN_NOTE_MIN = 10;
+function job_norn_reasons() {
+    return function_exists('lk_options_or') ? lk_options_or('job_no_rn_reason', JOB_NORN_REASONS) : JOB_NORN_REASONS;
+}
+//  What the record says about release: the latest report on the job (not a Release Note) and the
+//  last visit day. released = Accepted / Accepted with observations, or Released / Released with
+//  observations. abortive = the last visit day was closed as "No inspection".
+function job_release_state($job) {
+    $out = ['released' => false, 'abortive' => false, 'auto' => '', 'detail' => '', 'report' => null, 'visit' => null];
+    $jobId = (int)($job['id'] ?? 0); if (!$jobId) return $out;
+    try {
+        $v = ops_one("SELECT visit_date, status, reason_code, reason_note FROM job_visits WHERE job_id=? AND status IN ('DONE','NO_INSPECTION') ORDER BY visit_date DESC, id DESC LIMIT 1", [$jobId]);
+    } catch (Throwable $e) { $v = null; }
+    try {
+        $r = ops_one("SELECT id, irn, type_code, result, release_status FROM report_docs WHERE job_id=? AND COALESCE(deleted,0)=0 AND COALESCE(type_code,'') NOT IN ('RN','IRN') ORDER BY id DESC LIMIT 1", [$jobId]);
+    } catch (Throwable $e) { $r = null; }
+    $out['report'] = $r ?: null; $out['visit'] = $v ?: null;
+    if ($v && strtoupper((string)$v['status']) === 'NO_INSPECTION') {
+        $out['abortive'] = true; $out['auto'] = 'ABORTIVE';
+        $why = function_exists('visit_no_insp_reasons') ? (visit_no_insp_reasons()[$v['reason_code'] ?? ''] ?? (string)($v['reason_code'] ?? '')) : (string)($v['reason_code'] ?? '');
+        $out['detail'] = 'The last visit day (' . (function_exists('fdate') ? fdate($v['visit_date']) : $v['visit_date']) . ') was closed as No inspection'
+            . ($why !== '' ? ' — ' . $why : '') . (trim((string)($v['reason_note'] ?? '')) !== '' ? ' (' . trim((string)$v['reason_note']) . ')' : '') . '.';
+        return $out;
+    }
+    if (!$r) return $out;
+    $res = strtoupper(trim((string)($r['result'] ?? ''))); $rel = strtoupper(trim((string)($r['release_status'] ?? '')));
+    $out['released'] = in_array($res, ['ACCEPTED', 'ACCEPTED_COND'], true) || in_array($rel, ['RELEASED', 'RELEASED_COND'], true);
+    if ($out['released']) return $out;
+    $no = (string)($r['irn'] ?? '');
+    if ($res === 'HOLD') { $out['auto'] = 'HOLD'; $out['detail'] = 'Report ' . $no . ' says Hold.'; }
+    elseif ($res === 'REJECTED' || in_array($rel, ['NOT_RELEASED', 'PENDING'], true)) {
+        $out['auto'] = 'REJECTED';
+        $relWord = function_exists('lk_options_or') ? (lk_options_or('release_status', defined('IDEMS_RELEASE') ? IDEMS_RELEASE : [])[$rel] ?? $rel) : $rel;
+        $out['detail'] = 'Report ' . $no . ' says ' . ($res === 'REJECTED' ? 'Rejected' : $relWord) . '.';
+    }
+    return $out;
+}
+//  The final documents this job is NOT asked for at close although they are ticked and not on file —
+//  each with the reason to record. ['rn' => [auto key, detail] | null, 'fir' => [...] | null].
+function job_final_docs_exceptions($job) {
+    $none = ['rn' => null, 'fir' => null];
+    if (!require_final_docs_on_close()) return $none;
+    if (strtoupper((string)($job['billing_stop_kind'] ?? '')) === 'TERMINATED') return $none;
+    if (($job['reporting_frequency'] ?? 'NOREPORT') === 'NOREPORT') return $none;
+    $jobId = (int)($job['id'] ?? 0); if (!$jobId) return $none;
+    [$wantFir, $wantRn] = job_final_docs_wanted($job);
+    if (!$wantFir && !$wantRn) return $none;
+    try {
+        $fir = (int)ops_val("SELECT COUNT(*) FROM report_docs WHERE job_id=? AND COALESCE(deleted,0)=0 AND type_code='FIR'", [$jobId]);
+        $rn  = (int)ops_val("SELECT COUNT(*) FROM report_docs WHERE job_id=? AND COALESCE(deleted,0)=0 AND type_code IN ('RN','IRN')", [$jobId]);
+    } catch (Throwable $e) { return $none; }
+    $st = job_release_state($job);
+    return [
+        'rn'  => ($wantRn && !$rn && (!$st['released'] || $st['abortive'])) ? ['auto' => $st['auto'], 'detail' => $st['detail']] : null,
+        'fir' => ($wantFir && !$fir && $st['abortive']) ? ['auto' => 'ABORTIVE', 'detail' => $st['detail']] : null,
+    ];
 }
 // Which final documents this job's ticked report types ask for: [FIR?, Release Note?].
 // The job's own list wins; a job with none ticked reads its call's. "Final Report"
@@ -136,6 +205,11 @@ function job_noreport_migrate() {
     ensure_column('jobs', 'closed_no_report_reason', "VARCHAR(500) DEFAULT ''");
     ensure_column('jobs', 'closed_no_report_by', "VARCHAR(150) DEFAULT ''");
     ensure_column('jobs', 'closed_no_report_at', "VARCHAR(30) DEFAULT ''");
+    //  Owner, 28 Nov 2026 — closed without a Release Note / Final Inspection Report, and why.
+    ensure_column('jobs', 'closed_no_rn_reason', "VARCHAR(24) DEFAULT ''");
+    ensure_column('jobs', 'closed_no_rn_note', "VARCHAR(400) DEFAULT ''");
+    ensure_column('jobs', 'closed_no_fir', "INT DEFAULT 0");
+    if (function_exists('lk_ensure_type_map')) lk_ensure_type_map('job_no_rn_reason', 'Why no Release Note (job close)', JOB_NORN_REASONS, 'tosrm');
 }
 //  Is a report on file for this job? Any report document written on it (not deleted),
 //  a report link on the job or on one of its closed visit days, or the link typed on

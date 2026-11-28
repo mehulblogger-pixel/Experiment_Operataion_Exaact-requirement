@@ -9711,6 +9711,26 @@ function ops_jobs($route, $method) {
                     return;
                 }
             }
+            //  Owner, 28 Nov 2026: no Release Note owed (abortive visit, hold, rejected, balance work) —
+            //  say why. Automatic when the record shows it; else the person picks and writes what is
+            //  pending. When no report at all is on file, the no-report reason below covers it.
+            $noRn = null; $noFir = null; $noRnKey = ''; $noRnNote = '';
+            if (!$noRep && function_exists('job_final_docs_exceptions')) {
+                $fx = job_final_docs_exceptions($job); $noRn = $fx['rn']; $noFir = $fx['fir'];
+                if ($noRn) {
+                    $rsn = job_norn_reasons();
+                    $noRnKey = strtoupper(trim((string)($b['no_rn_reason'] ?? ''))) ?: (string)$noRn['auto'];
+                    $noRnNote = trim((string)($b['no_rn_note'] ?? ''));
+                    if ($noRnKey === '' || !isset($rsn[$noRnKey])) {
+                        view('ops/job_close', ['job' => $job, 'error' => 'No Release Note can be issued on this ' . Tl('job') . ' yet — say why (for example "Balance activity pending") and what is pending. The reason is kept in its History.']);
+                        return;
+                    }
+                    if (($noRn['auto'] === '' || in_array($noRnKey, ['BALANCE', 'OTHER'], true)) && mb_strlen($noRnNote) < JOB_NORN_NOTE_MIN) {
+                        view('ops/job_close', ['job' => $job, 'error' => 'Write what is pending (at least ' . JOB_NORN_NOTE_MIN . ' characters) — e.g. "Hydro test of 3 valves pending — next visit".']);
+                        return;
+                    }
+                }
+            }
             if ($noRep && mb_strlen($noRepWhy) < JOB_NOREPORT_REASON_MIN) {
                 view('ops/job_close', ['job' => $job, 'error' => 'No report is on file for this ' . Tl('job') . '. To close it without one, say why'
                     . ' (at least ' . JOB_NOREPORT_REASON_MIN . ' characters) — the reason is kept in its History. If the report exists, paste its link instead.']);
@@ -9747,6 +9767,20 @@ function ops_jobs($route, $method) {
                     ->execute([mb_substr($noRepWhy, 0, 500), user_name(current_user()), date('c'), $job['id']]);
                 if (function_exists('act_log'))
                     try { act_log('JOB', (int)$job['id'], 'SYSTEM', 'Closed without a report — by ' . user_name(current_user()), ['auto' => 1, 'body' => 'Reason: ' . $noRepWhy]); } catch (Throwable $e) {}
+            }
+            if ($noRn) {
+                $rsn = job_norn_reasons(); $lab = $rsn[$noRnKey] ?? $noRnKey;
+                $pdo->prepare("UPDATE jobs SET closed_no_rn_reason=?, closed_no_rn_note=? WHERE id=?")
+                    ->execute([$noRnKey, mb_substr($noRnNote !== '' ? $noRnNote : (string)$noRn['detail'], 0, 400), $job['id']]);
+                if (function_exists('act_log'))
+                    try { act_log('JOB', (int)$job['id'], 'SYSTEM', 'Closed without a Release Note — ' . $lab . ($noRnNote !== '' ? ': ' . $noRnNote : '') . ' — by ' . user_name(current_user()),
+                        ['auto' => 1, 'body' => trim((string)$noRn['detail'])]); } catch (Throwable $e) {}
+            }
+            if ($noFir) {
+                $pdo->prepare("UPDATE jobs SET closed_no_fir=1 WHERE id=?")->execute([$job['id']]);
+                if (function_exists('act_log'))
+                    try { act_log('JOB', (int)$job['id'], 'SYSTEM', 'Closed without a Final Inspection Report — Abortive visit — by ' . user_name(current_user()),
+                        ['auto' => 1, 'body' => trim((string)$noFir['detail'])]); } catch (Throwable $e) {}
             }
             if (strtoupper((string)($job['billing_stop_kind'] ?? '')) === 'TERMINATED' && function_exists('act_log'))
                 try { act_log('JOB', (int)$job['id'], 'CLOSED_TERMINATED', 'Closed as terminated (ended ' . ($job['billing_stop_on'] ?? '') . ') — no Final Inspection Report or Release Note needed.'); } catch (Throwable $e) {}
