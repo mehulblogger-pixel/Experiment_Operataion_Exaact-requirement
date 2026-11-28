@@ -4,16 +4,19 @@
 <form method="post" action="/receipt-new" class="panel" style="margin-top:16px;max-width:820px">
   <div class="form-grid" style="gap:12px 16px">
     <div><label>Customer * <a href="#" class="addlink" data-qa="client" data-target="select[name='partner_id']">+ Add new</a></label>
-      <select name="partner_id" required class="searchable">
+      <select name="partner_id" required class="searchable" id="rc-partner">
         <option value="">— choose —</option>
         <?php foreach ($clients as $c): ?>
           <option value="<?= (int)$c['id'] ?>" <?= ($partner && (int)$partner['id']===(int)$c['id'])?'selected':'' ?>><?= e($c['display_name'] ?: $c['legal_name']) ?></option>
         <?php endforeach; ?>
       </select></div>
+    <?php //  Owner, 28 Nov 2026: the branch starts on the one that invoiced this customer's unpaid bills.
+          [$rcOff, $rcWhy] = $officeDefault ?? [0, '']; ?>
     <div><label>Branch</label>
       <select class="form-control" name="office_id"><option value="">—</option>
-        <?php foreach ($offices as $o): ?><option value="<?= (int)$o['id'] ?>"><?= e($o['name']) ?></option><?php endforeach; ?>
-      </select></div>
+        <?php foreach ($offices as $o): ?><option value="<?= (int)$o['id'] ?>" <?= (int)$rcOff === (int)$o['id'] ? 'selected' : '' ?>><?= e($o['name']) ?></option><?php endforeach; ?>
+      </select>
+      <?php if ($rcOff): ?><span class="muted" style="font-size:12px"><?= $rcWhy === 'invoices' ? 'Filled in from the branch that raised this customer\'s unpaid invoices' : ($partner ? 'Filled in from this customer\'s billing branch (or yours)' : 'Your own branch') ?> — change it if another branch received the money.</span><?php endif; ?></div>
     <div><label>Date received</label><input class="form-control" type="date" name="receipt_date" value="<?= e(date('Y-m-d')) ?>"></div>
     <div><label>How it came</label>
       <select class="form-control" name="mode"><?php foreach (RECEIPT_MODES as $k=>$v): ?><option value="<?= e($k) ?>"><?= e($v) ?></option><?php endforeach; ?></select></div>
@@ -50,3 +53,6 @@
   <button class="btn" style="margin-top:14px">Record it</button>
   <a class="btn secondary" href="/receipts" style="margin-left:8px">Cancel</a>
 </form>
+<script>(function(){ var s=document.getElementById('rc-partner'); if(!s) return;
+  s.addEventListener('change', function(){ if (s.value) window.location = '/receipt-new?partner=' + encodeURIComponent(s.value); });
+})();</script>

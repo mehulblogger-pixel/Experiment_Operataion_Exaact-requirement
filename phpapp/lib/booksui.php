@@ -395,6 +395,7 @@ function ops_books($route, $method) {
             'partner' => $pid ? ops_one("SELECT * FROM business_partners WHERE id=?", [$pid]) : null,
             'clients' => ops_all("SELECT id, display_name, legal_name FROM business_partners WHERE is_client=1 AND " . partner_office_sql() . " ORDER BY COALESCE(display_name, legal_name) LIMIT 800"),
             'offices' => ops_all("SELECT id, name FROM offices WHERE is_active=1 ORDER BY name"),
+            'officeDefault' => books_receipt_default_office($pid),
             'open' => $pid ? books_open_invoices($pid) : [],
         ]);
         return true;

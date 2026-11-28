@@ -553,6 +553,22 @@ function books_default_office_for($partnerId) {
     $mine = (int)(current_user()['home_office_id'] ?? 0);
     return $active($mine) ? $mine : 0;
 }
+//  The branch money received from a customer starts on (owner, 28 Nov 2026: "let the default
+//  branch be selected that is used while invoicing"): the branch that raised this customer's
+//  unpaid invoices, when they all agree on one; else the new-invoice rule above (the customer's
+//  billing branch, else the person's own). Returns [office_id, why] — why: 'invoices' | 'default' | ''.
+function books_receipt_default_office($partnerId) {
+    $pid = (int)$partnerId;
+    if ($pid) {
+        $offs = array_values(array_unique(array_filter(array_map('intval', array_column(books_try(fn() => ops_all(
+            "SELECT office_id FROM invoices WHERE partner_id=? AND status IN ('ISSUED','PART_PAID') AND COALESCE(office_id,0)<>0",
+            [$pid]), []) ?: [], 'office_id')))));
+        if (count($offs) === 1 && (int)books_try(fn() => ops_val("SELECT id FROM offices WHERE id=? AND is_active=1", [$offs[0]]), 0) > 0)
+            return [$offs[0], 'invoices'];
+    }
+    $d = books_default_office_for($pid);
+    return [$d, $d ? 'default' : ''];
+}
 //  This client's contracts, newest first, for the invoice's contract drop-down (GD-05).
 function books_partner_contracts($partnerId) {
     return books_try(fn() => ops_all(
@@ -1008,7 +1024,7 @@ function books_receipt_create(array $b) {
     db()->prepare("INSERT INTO receipts (receipt_no,partner_id,partner_name,office_id,receipt_date,mode,reference,bank,
                    amount,tds_amount,bank_charges,notes,created_by,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
        ->execute([$no, $pid, (string)($p['display_name'] ?: $p['legal_name']),
-                  (int)($b['office_id'] ?? 0) ?: null,
+                  (int)($b['office_id'] ?? 0) ?: (books_receipt_default_office((int)($b['partner_id'] ?? 0))[0] ?: null),
                   trim((string)($b['receipt_date'] ?? '')) ?: date('Y-m-d'),
                   (string)($b['mode'] ?? 'NEFT'), (string)($b['reference'] ?? ''), (string)($b['bank'] ?? ''),
                   $amt, $tds, $chg, (string)($b['notes'] ?? ''),

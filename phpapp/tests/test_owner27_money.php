@@ -218,6 +218,21 @@ try {
     $jd = (string) file_get_contents(dirname(__DIR__) . '/views/ops/job_detail.php');
     t_ok(strpos($jd, 'Only if the invoice was raised outside EXAACT') !== false && strpos($jd, "<details<?= \$bInv ? '' : ' open' ?>") === false,
          'M7 · the manual form is always folded and says what it is for');
+    t_section('Money received — the branch starts on the one that invoiced (owner, 28 Nov)');
+    bbv_as($f['master']);
+    $pdo->prepare("INSERT INTO business_partners (code,legal_name,display_name,is_client,is_vendor,status,created_at,home_branch_id) VALUES (?,?,?,1,0,'ACTIVE',?,?)")
+        ->execute(['RB-' . $f['tag'], 'Receipt Branch Co ' . $f['tag'], 'Receipt Branch ' . $f['tag'], date('c'), $f['ahm']]);
+    $rb = (int) $pdo->lastInsertId(); $made['bp'][] = $rb;
+    t_eq(books_receipt_default_office($rb), [(int) $f['ahm'], 'default'], 'no unpaid invoice: the customer\'s billing branch (Ahmedabad)');
+    $pdo->prepare("INSERT INTO invoices (invoice_no, partner_id, office_id, status, total) VALUES (?,?,?,'ISSUED',59000)")->execute(['RBM/' . $f['tag'], $rb, $f['mum']]);
+    $made['inv'][] = (int) $pdo->lastInsertId();
+    t_eq(books_receipt_default_office($rb), [(int) $f['mum'], 'invoices'], 'its unpaid invoice was raised by Mumbai: the money starts on Mumbai');
+    $pdo->prepare("INSERT INTO invoices (invoice_no, partner_id, office_id, status, total) VALUES (?,?,?,'PART_PAID',11800)")->execute(['RBA/' . $f['tag'], $rb, $f['ahm']]);
+    $made['inv'][] = (int) $pdo->lastInsertId();
+    t_eq(books_receipt_default_office($rb), [(int) $f['ahm'], 'default'], 'unpaid invoices from two branches: back to the customer\'s billing branch (no guessing)');
+    $src = (string) file_get_contents(dirname(__DIR__) . '/views/ops/receipt_form.php');
+    t_ok(strpos($src, 'Filled in from the branch that raised this customer') !== false && strpos($src, "'/receipt-new?partner='") !== false,
+         'the form says where the branch came from, and choosing the customer fills it in');
 } finally {
     bbv_as($f['master']);
     putenv('BBV_RAW'); unset($_GET['who']);
