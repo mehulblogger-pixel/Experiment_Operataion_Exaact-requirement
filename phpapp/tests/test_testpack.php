@@ -69,7 +69,9 @@ try {
     $r = tp_load();
     t_ok(!empty($r['ok']) && empty($r['errors']), 'load succeeds with no group errors' . (!empty($r['errors']) ? ' (' . json_encode($r['errors']) . ')' : ''));
     $after = $snap();
-    t_ok($after['calls'] - $before['calls'] === 15 && $after['jobs'] - $before['jobs'] === 11, 'load makes 15 work orders and 11 jobs');
+    //  OPS-A's own codes are TP-C-0… / TP-J-0… (later groups use other numbers).
+    t_ok((int) ops_val("SELECT COUNT(*) FROM calls WHERE call_code LIKE 'TP-C-0%'") === 15 && (int) ops_val("SELECT COUNT(*) FROM jobs WHERE job_code LIKE 'TP-J-0%'") === 11,
+        'OPS-A makes 15 work orders and 11 jobs');
     t_eq((int) ops_val("SELECT COUNT(*) FROM users"), $before['users'], 'load makes no logins');
     t_eq((int) ops_val("SELECT COUNT(*) FROM business_partners WHERE legal_name='TB Valves Pvt Ltd'"), 1, 'the existing TB Valves customer is reused, not duplicated');
     t_ok(!in_array($ownClient, tp_tracked('business_partners'), true), 'a reused customer is not in the removal ledger');
@@ -118,7 +120,7 @@ try {
     t_ok((int) ops_val("SELECT COUNT(*) FROM calls WHERE id=? AND call_code='OWN-CALL-1'", [$ownCall]) === 1, 'the owner\'s own call is untouched');
     t_ok((int) ops_val("SELECT COUNT(*) FROM business_partners WHERE id=?", [$ownClient]) === 1, 'the reused TB Valves customer is untouched');
     t_ok(tp_ledger() === [] && tp_map() === [], 'the ledger and the map are cleared');
-    t_ok(!empty(tp_load()['ok']) && (int) ops_val("SELECT COUNT(*) FROM calls WHERE call_code LIKE 'TP-%'") === 15, 'it can be loaded again after removal');
+    t_ok(!empty(tp_load()['ok']) && (int) ops_val("SELECT COUNT(*) FROM calls WHERE call_code LIKE 'TP-C-0%'") === 15, 'it can be loaded again after removal');
     tp_remove();
 
     // ---- 8. The route and the screen ask the same questions ----
