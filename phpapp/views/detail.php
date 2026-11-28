@@ -412,10 +412,20 @@ if (!function_exists('addr_name')) { function addr_name($a) { return (lk_options
     foreach ($notes as $n) $tl[] = ['d'=>$n['created_at'],'i'=>'📝','t'=>'Note: '.substr($n['note'],0,70)];
     foreach ($contracts as $c) $tl[] = ['d'=>$c['start_date'],'i'=>'📄','t'=>'Contract '.$c['contract_number']];
     foreach ($pos as $o) $tl[] = ['d'=>$o['start_date'],'i'=>'🧾','t'=>'PO '.($o['po_number'] ?: '(open)')];
+    //  Owner, 28 Nov 2026: "registered in 360 view but it does not show under client registry — why
+    //  different information in different things". This tab now reads the SAME activity record as
+    //  Customer 360 → "What has happened" (c360_timeline: leads, deals, quotations, jobs, invoices,
+    //  deletions …), so both show the same events. Nothing is stored twice.
+    if (function_exists('c360_timeline'))
+        foreach (c360_timeline((int)$p['id'], 200) as $a)
+            $tl[] = ['d' => substr((string)$a['occurred_at'], 0, 19), 'i' => (($a['kind'] ?? '') === 'DELETED' ? '🗑' : '•'),
+                     'k' => (defined('ACT_KINDS') ? (ACT_KINDS[$a['kind']] ?? $a['kind']) : $a['kind']),
+                     't' => (string)$a['subject'], 'b' => trim((string)($a['body'] ?? ''))];
     usort($tl, fn($a,$b) => strcmp((string)$b['d'], (string)$a['d']));
   ?>
   <div class="timeline">
-    <?php foreach ($tl as $ev): ?><div class="tl-item"><span class="tl-icon"><?= $ev['i'] ?></span><span class="tl-date"><?= fdate($ev['d']) ?></span><span class="tl-text"><?= e($ev['t']) ?></span></div><?php endforeach; ?>
+    <?php foreach ($tl as $ev): ?><div class="tl-item"><span class="tl-icon"><?= $ev['i'] ?></span><span class="tl-date"><?= fdate(substr((string)$ev['d'], 0, 10)) ?></span><span class="tl-text"><?php if (!empty($ev['k'])): ?><span class="pill p-mut" style="font-size:10.5px"><?= e($ev['k']) ?></span> <?php endif; ?><?= e($ev['t']) ?><?php if (!empty($ev['b'])): ?><span class="muted" style="display:block;font-size:12.5px"><?= e(mb_substr($ev['b'], 0, 160)) ?></span><?php endif; ?></span></div><?php endforeach; ?>
   </div>
+  <?php if (function_exists('c360_timeline')): ?><p class="muted" style="font-size:12.5px;margin-top:8px">The same events as Customer 360 → "What has happened". <a href="/activities?partner=<?= (int)$p['id'] ?>">All activity →</a></p><?php endif; ?>
 <?php endif; ?>
 </div>
