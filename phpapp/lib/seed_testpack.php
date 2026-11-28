@@ -246,6 +246,11 @@ function tp_remove() {
     $del('inspectors', 'id', $insp);
     foreach (['partner_contracts', 'partner_addresses', 'partner_contacts', 'partner_notes', 'partner_registrations', 'partner_relationships',
               'vendor_profiles', 'vendor_status_events', 'site_doc_requirements', 'activities'] as $t) $del($t, 'partner_id', $partners);
+    //  What a tester adds to the pack's own claims and people (OV-08 "Mark paid", OP-08 an ID
+    //  document) is cleared with them — by the claim / person, not only by the pack's own row ids.
+    $vch = tp_tracked('vouchers');
+    foreach (['voucher_entries', 'voucher_approval_log'] as $t) $del($t, 'voucher_id', $vch);
+    if ($insp) try { $n += $pdo->exec("DELETE FROM person_documents WHERE person_kind='INSPECTOR' AND person_id IN (" . $ids($insp) . ")"); } catch (Throwable $e) {}
     // Anything else the ledger holds (contracts on a reused client, single rows …).
     foreach (array_reverse(tp_ledger(), true) as $table => $rows) {
         if (in_array($table, ['jobs', 'calls', 'inspectors', 'business_partners'], true)) continue;
