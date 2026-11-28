@@ -24,7 +24,7 @@
 //  DO NOT EDIT — regenerate with:  php tools/make_deploy_check.php
 // ============================================================================
 
-$RELEASE = 'v2026.11.7 · 177a4915 · 2026-11-28 08:39 UTC · 755 files';
+$RELEASE = 'v2026.11.8 · 1f4f80ca · 2026-11-28 09:32 UTC · 755 files';
 $EXPECT  = [
     'api.php' => ['s'=>2282,'h'=>'1b2ca28973254f89'],
     'config.local.sample.php' => ['s'=>3110,'h'=>'bb24c4fcbeb55c85'],
@@ -120,7 +120,7 @@ $EXPECT  = [
     'lib/cpanel.php' => ['s'=>8181,'h'=>'9322634c72aed841'],
     'lib/crm.php' => ['s'=>432634,'h'=>'d27829d62723fe1f'],
     'lib/crmdash.php' => ['s'=>16422,'h'=>'de837130694d1ec0'],
-    'lib/custid.php' => ['s'=>51438,'h'=>'e1e83510bd1bda3f'],
+    'lib/custid.php' => ['s'=>52460,'h'=>'4d72d130176098ef'],
     'lib/customer360.php' => ['s'=>26920,'h'=>'f842e50ea1d66ed8'],
     'lib/customforms.php' => ['s'=>12896,'h'=>'a60a82554280a959'],
     'lib/cvp.php' => ['s'=>73775,'h'=>'809b497cd0223a3b'],
@@ -196,7 +196,7 @@ $EXPECT  = [
     'lib/platform_mail.php' => ['s'=>22419,'h'=>'95ffd0e9fea3845d'],
     'lib/portal.php' => ['s'=>132773,'h'=>'037527c042694ece'],
     'lib/position.php' => ['s'=>19441,'h'=>'a0a9d1a9e6a9b10c'],
-    'lib/preflight.php' => ['s'=>5451,'h'=>'d4827cba96edb748'],
+    'lib/preflight.php' => ['s'=>5451,'h'=>'d8e8a2deb3f54b3e'],
     'lib/pricing_admin.php' => ['s'=>16307,'h'=>'d7af986c89fc5cfc'],
     'lib/projcosting.php' => ['s'=>152535,'h'=>'7bc5ef6b81df76da'],
     'lib/pwreset.php' => ['s'=>9509,'h'=>'50675e1d291df7b0'],
@@ -324,7 +324,7 @@ $EXPECT  = [
     'tools/trace-thread.php' => ['s'=>4962,'h'=>'cb20d74d1a6eb46e'],
     'views/admin.php' => ['s'=>1090,'h'=>'aeb34e3396fd4ac5'],
     'views/dashboard.php' => ['s'=>50097,'h'=>'33e6c607801a7924'],
-    'views/detail.php' => ['s'=>38123,'h'=>'5591b9d816a9ae7d'],
+    'views/detail.php' => ['s'=>39816,'h'=>'b2c65aa7af002f13'],
     'views/forgot_password.php' => ['s'=>2716,'h'=>'c041f8176182b36c'],
     'views/form.php' => ['s'=>28045,'h'=>'d811f37bbfaa2250'],
     'views/layout_bottom.php' => ['s'=>2427,'h'=>'6fb9daa3ea4b7bb2'],
