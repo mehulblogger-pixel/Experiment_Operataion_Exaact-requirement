@@ -233,6 +233,27 @@ try {
     $src = (string) file_get_contents(dirname(__DIR__) . '/views/ops/receipt_form.php');
     t_ok(strpos($src, 'Filled in from the branch that raised this customer') !== false && strpos($src, "'/receipt-new?partner='") !== false,
          'the form says where the branch came from, and choosing the customer fills it in');
+    t_section('Money received — tick the invoice it pays, matched on Save (owner, 28 Nov)');
+    $pdo->prepare("INSERT INTO invoices (invoice_no, partner_id, office_id, status, total, invoice_date) VALUES (?,?,?,'ISSUED',118000,?)")->execute(['RBP/' . $f['tag'], $rb, $f['mum'], date('Y-m-d')]);
+    $ia = (int) $pdo->lastInsertId(); $made['inv'][] = $ia;
+    $pdo->prepare("INSERT INTO invoices (invoice_no, partner_id, office_id, status, total, invoice_date) VALUES (?,?,?,'ISSUED',59000,?)")->execute(['RBQ/' . $f['tag'], $rb, $f['mum'], date('Y-m-d')]);
+    $ib = (int) $pdo->lastInsertId(); $made['inv'][] = $ib;
+    $res = bbv_route('receipt-new', 'POST', $f['master'], 0, ['partner_id' => $rb, 'office_id' => $f['mum'], 'receipt_date' => date('Y-m-d'), 'mode' => 'NEFT',
+        'amount' => '106200', 'tds_amount' => '11800', 'pick' => [$ia => '1'], 'cash' => [$ia => '106200', $ib => '500'], 'tds' => [$ia => '11800']]);
+    $rcid = (int) ops_val("SELECT id FROM receipts WHERE partner_id=? ORDER BY id DESC LIMIT 1", [$rb]); if ($rcid) $made['rc'][] = $rcid;
+    t_ok($rcid > 0, 'the receipt is recorded');
+    t_eq(round((float) ops_val("SELECT COALESCE(SUM(amount),0) FROM receipt_allocations WHERE receipt_id=? AND invoice_id=?", [$rcid, $ia]), 2), 118000.0,
+         'the ticked invoice gets ₹1,06,200 cash + ₹11,800 TDS on Save — no second step');
+    t_eq((int) ops_val("SELECT COUNT(*) FROM receipt_allocations WHERE receipt_id=? AND invoice_id=?", [$rcid, $ib]), 0, 'an amount typed on an UNticked invoice is not booked');
+    t_ok(strpos(implode(' ', (array) ($res['flash'] ?? [])) . json_encode($res), 'Matched') !== false, 'the message says what was matched');
+    $src = (string) file_get_contents(dirname(__DIR__) . '/views/ops/receipt_form.php');
+    t_ok(strpos($src, 'Book this money against') !== false && strpos($src, 'name="pick[') !== false, 'the form lists the unpaid invoices with a tick box each');
+    putenv('BBV_RAW=1');
+    $pg = bbv_route('receipt-new', 'GET', $f['master'], 0, [], ['partner' => $rb, 'invoice' => $ib]);
+    $h = (string) ($pg['html'] ?? '');
+    t_ok(strpos($h, 'Book this money against') !== false && strpos($h, 'RBQ/' . $f['tag']) !== false, 'the page draws the unpaid invoices of the chosen customer');
+    t_ok(preg_match('~name="pick\[' . $ib . '\]" value="1"[^>]*checked~', $h) === 1, 'opened from an invoice (?invoice=), that invoice is already ticked');
+    putenv('BBV_RAW');
 } finally {
     bbv_as($f['master']);
     putenv('BBV_RAW'); unset($_GET['who']);

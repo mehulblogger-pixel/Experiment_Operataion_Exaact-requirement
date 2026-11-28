@@ -31,20 +31,32 @@
     <div class="ff-wide"><label>Notes</label><input class="form-control" name="notes" maxlength="500"></div>
   </div>
 
+  <?php // Owner, 28 Nov 2026: "there must be option to select the invoice number against which the
+        // money received is to be booked". Tick the invoices here and the money is matched on Save —
+        // the same matching as the next screen (books_allocate_report), so the same checks apply.
+        $preInv = (int)($_GET['invoice'] ?? 0); ?>
   <?php if ($open): ?>
-    <h3 style="margin:18px 0 8px">What this customer currently owes</h3>
-    <table class="dt">
-      <caption class="sr-only">Open invoices</caption>
-      <thead><tr><th scope="col">Invoice</th><th scope="col">Date</th><th scope="col">Due</th><th scope="col" class="num">Outstanding</th></tr></thead>
+    <h3 style="margin:18px 0 4px">Book this money against</h3>
+    <p class="muted" style="margin:0 0 8px;font-size:12.5px">Tick the invoice(s) it pays — the amount fills in (change it if the customer paid part). Put the TDS on the invoice it was deducted from. Leave all unticked to match it on the next screen.</p>
+    <div style="overflow-x:auto">
+    <table class="dt" id="rc-book">
+      <caption class="sr-only">Unpaid invoices of this customer</caption>
+      <thead><tr><th scope="col">Book</th><th scope="col">Invoice</th><th scope="col">Date</th><th scope="col">Due</th><th scope="col" class="num">Outstanding</th><th scope="col" class="num">Cash booked</th><th scope="col" class="num">TDS booked</th></tr></thead>
       <tbody>
-      <?php $tot=0; foreach ($open as $o): $tot += (float)$o['outstanding']; ?>
-        <tr><td><?= e($o['invoice_no']) ?></td><td><?= e(fdate($o['invoice_date'])) ?></td>
+      <?php $tot=0; foreach ($open as $o): $tot += (float)$o['outstanding']; $oid = (int)$o['id']; ?>
+        <tr data-out="<?= e(number_format((float)$o['outstanding'], 2, '.', '')) ?>">
+            <td><input type="checkbox" name="pick[<?= $oid ?>]" value="1" aria-label="Book against <?= e($o['invoice_no']) ?>" <?= $preInv === $oid ? 'checked' : '' ?>></td>
+            <td><?= e($o['invoice_no']) ?></td><td><?= e(fdate($o['invoice_date'])) ?></td>
             <td><?= $o['due_date'] ? e(fdate($o['due_date'])) : '—' ?></td>
-            <td class="num"><?= e(fmoney($o['outstanding'])) ?></td></tr>
+            <td class="num"><?= e(fmoney($o['outstanding'])) ?></td>
+            <td class="num"><input class="form-control" style="max-width:130px;margin-left:auto" type="number" step="0.01" min="0" name="cash[<?= $oid ?>]" aria-label="Cash booked on <?= e($o['invoice_no']) ?>"></td>
+            <td class="num"><input class="form-control" style="max-width:120px;margin-left:auto" type="number" step="0.01" min="0" name="tds[<?= $oid ?>]" aria-label="TDS booked on <?= e($o['invoice_no']) ?>"></td></tr>
       <?php endforeach; ?>
-        <tr><td colspan="3"><b>Total</b></td><td class="num"><b><?= e(fmoney($tot)) ?></b></td></tr>
+        <tr><td colspan="4"><b>Total owed</b></td><td class="num"><b><?= e(fmoney($tot)) ?></b></td><td class="num" id="rc-bk-cash">—</td><td class="num" id="rc-bk-tds">—</td></tr>
       </tbody>
-    </table>
+    </table></div>
+  <?php elseif ($partner): ?>
+    <p class="muted" style="margin-top:14px">This customer has no unpaid invoice — the money is recorded and can be matched later.</p>
   <?php endif; ?>
 
   <?php // Form Designer — render any field this company added, and apply their
@@ -53,6 +65,23 @@
   <button class="btn" style="margin-top:14px">Record it</button>
   <a class="btn secondary" href="/receipts" style="margin-left:8px">Cancel</a>
 </form>
-<script>(function(){ var s=document.getElementById('rc-partner'); if(!s) return;
-  s.addEventListener('change', function(){ if (s.value) window.location = '/receipt-new?partner=' + encodeURIComponent(s.value); });
+<script>(function(){ var s=document.getElementById('rc-partner');
+  if (s) s.addEventListener('change', function(){ if (s.value) window.location = '/receipt-new?partner=' + encodeURIComponent(s.value); });
+  var t=document.getElementById('rc-book'); if(!t) return;
+  var amt=document.querySelector('input[name="amount"]'), tds=document.querySelector('input[name="tds_amount"]');
+  var num=function(v){ v=parseFloat(v); return isNaN(v)?0:v; };
+  function sum(k){ var x=0; t.querySelectorAll('input[name^="'+k+'["]').forEach(function(i){ x+=num(i.value); }); return x; }
+  function totals(){ var c=document.getElementById('rc-bk-cash'), d=document.getElementById('rc-bk-tds');
+    if(c) c.textContent = sum('cash') ? sum('cash').toFixed(2) : '—'; if(d) d.textContent = sum('tds') ? sum('tds').toFixed(2) : '—'; }
+  function fill(row){ var out=num(row.getAttribute('data-out')), c=row.querySelector('input[name^="cash["]'), d=row.querySelector('input[name^="tds["]');
+    if (c.value !== '') return;
+    var left = num(amt && amt.value) + num(tds && tds.value) - sum('cash') - sum('tds');
+    var v = Math.max(0, Math.min(out, left > 0 ? left : out)); c.value = v ? v.toFixed(2) : ''; }
+  t.querySelectorAll('tbody tr[data-out]').forEach(function(row){
+    var cb=row.querySelector('input[type=checkbox]');
+    cb.addEventListener('change', function(){ if (cb.checked) fill(row); else row.querySelectorAll('input[type=number]').forEach(function(i){ i.value=''; }); totals(); });
+    row.querySelectorAll('input[type=number]').forEach(function(i){ i.addEventListener('input', function(){ if (i.value !== '') cb.checked = true; totals(); }); });
+    if (cb.checked) fill(row);
+  });
+  totals();
 })();</script>

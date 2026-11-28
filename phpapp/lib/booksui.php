@@ -387,7 +387,16 @@ function ops_books($route, $method) {
             $r = books_receipt_create($_POST);
             if (!empty($r['err'])) { flash($r['err'], 'error'); redirect_back('/receipts'); }
             if (function_exists('custom_save')) custom_save('receipt', (int)$r['id'], $_POST);
-            flash('Receipt ' . $r['no'] . ' recorded. Now say which invoices it settles.');
+            //  Owner, 28 Nov 2026: the invoices ticked on this form are matched now — the same matching
+            //  (and the same checks) as the next screen; whatever is not matched stays on the receipt.
+            $rows = [];
+            foreach (['cash', 'tds'] as $k)
+                foreach ((array)($_POST[$k] ?? []) as $invId => $amt)
+                    if (!empty($_POST['pick'][$invId]) && trim((string)$amt) !== '' && (float)$amt > 0) $rows[(int)$invId][$k] = $amt;
+            if ($rows) {
+                $rep = books_allocate_report((int)$r['id'], $rows);
+                flash('Receipt ' . $r['no'] . ' recorded. ' . $rep['text'], ['ok' => 'success', 'part' => 'warning', 'none' => 'error'][$rep['tone']]);
+            } else flash('Receipt ' . $r['no'] . ' recorded. Now say which invoices it settles.');
             redirect('/receipt?id=' . $r['id']);
         }
         $pid = (int)($_GET['partner'] ?? 0);
