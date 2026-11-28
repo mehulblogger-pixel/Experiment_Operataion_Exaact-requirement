@@ -1472,23 +1472,29 @@ function ops_opportunities($route, $method) {
         // typed and show the error ON the form — never redirect the entry away and
         // lose everything they filled in.
         $prefill = $_GET;
-        $formErr = '';
+        $formErr = ''; $picks = [];
         if ($method === 'POST') {
             //  DEF-15 (owner, 21 Nov 2026): a deal's win % follows its stage — a typed one is
             //  not taken (no form shows it). Items 6/7: the lead form's value and date checks,
             //  and the business unit from the person's own units.
             $post = $_POST; unset($post['probability']);
-            $r = ($fe = opp_form_err($post)) !== '' ? ['err' => $fe]
-               : (($se = opp_sbu_err($post['sbu'] ?? '')) !== '' ? ['err' => $se] : opp_create($post));
+            //  Owner, 28 Nov 2026: a typed "who it is for" that is a customer of ours attaches the
+            //  deal to that customer (one exact match); two or more are asked about here, once.
+            $lk = function_exists('sales_link_typed') ? sales_link_typed($post, 'partner_id', 'partner_name') : [];
+            $r = !empty($lk['many']) ? ['err' => 'More than one customer on file is called “' . trim((string) ($_POST['partner_name'] ?? '')) . '” — pick which one below, or say it is a new company.']
+               : (($fe = opp_form_err($post)) !== '' ? ['err' => $fe]
+               : (($se = opp_sbu_err($post['sbu'] ?? '')) !== '' ? ['err' => $se] : opp_create($post)));
             if (empty($r['err'])) {
-                flash(T('opportunity') . ' ' . $r['ref'] . ' opened.');
+                if (function_exists('sales_link_note')) sales_link_note('OPPORTUNITY', (int) $r['id'], $lk);
+                flash(T('opportunity') . ' ' . $r['ref'] . ' opened.' . (!empty($lk['note']) ? ' ' . $lk['note'] : ''));
                 redirect('/opportunity?id=' . $r['id']);
             }
-            $prefill = $_POST;
+            $prefill = $post; unset($prefill['use_partner'], $prefill['new_company']);
             $formErr = $r['err'];
+            $picks = $lk['many'] ?? [];
         }
         view('ops/opportunity_form', [
-            'pipelines' => pipelines_all('OPPORTUNITY'), 'prefill' => $prefill, 'form_err' => $formErr,
+            'pipelines' => pipelines_all('OPPORTUNITY'), 'prefill' => $prefill, 'form_err' => $formErr, 'picks' => $picks,
             'sbus' => opp_sbu_options(),
             'stagesByPipe' => array_map(fn($pl) => pipeline_stages((int)$pl['id']), array_column(pipelines_all('OPPORTUNITY') ?: [], null, 'id')),
             'offices' => array_values(array_filter(ops_all("SELECT id, name FROM offices WHERE is_active=1 ORDER BY name") ?: [], fn($of) => !function_exists('scope_office_allows') || scope_office_allows((int)$of['id']))),

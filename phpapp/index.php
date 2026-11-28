@@ -1657,6 +1657,23 @@ if ($route === 'gstin-who') {
     exit;
 }
 
+// Owner, 28 Nov 2026 — "is this name a customer of ours?", asked as a lead, deal or
+// enquiry name is typed. Read-only; POST with the page's token; only for people who may
+// add a lead, deal or enquiry (they already see this client list in those forms); the
+// person's own office scope; returns code, name and town — no more.
+if ($route === 'customer-match') {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    if ($method !== 'POST' || !function_exists('partner_match_can') || !partner_match_can()) {
+        http_response_code(403); echo json_encode(['matches' => [], 'denied' => true]); exit;
+    }
+    if ((int) ($_POST['id'] ?? 0) > 0) { echo json_encode(['customer' => partner_match_by_id((int) $_POST['id'])], JSON_UNESCAPED_UNICODE); exit; }
+    $mm = partner_name_matches((string) ($_POST['name'] ?? ''), 5);
+    $rows = array_merge(array_map(fn($m) => $m + ['exact' => true], $mm['exact']), array_map(fn($m) => $m + ['exact' => false], $mm['close']));
+    echo json_encode(['matches' => array_slice($rows, 0, 5)], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 // D1 — move an existing branch company (same PAN) under its main customer as a
 // billing location. Preview on GET; only a person pressing the button, with a
 // reason, does it. The same people who may merge duplicate records.

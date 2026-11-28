@@ -379,6 +379,89 @@ function custid_lookup_can() {
     return false;
 }
 /**
+ * Customer match by NAME (owner, 28 Nov 2026): "when the name is typed and it matches
+ * any of our existing customers it shall show while typing that this customer exists,
+ * select it" and "when the customer is matched or selected the lead, deal, enquiry is
+ * attached to that customer".
+ *
+ * Only ACTIVE clients the person may see (the same office scope as the client lists on
+ * the lead / deal / enquiry forms — partner_office_sql), so nothing new is shown.
+ * exact = the same name once company-form words and punctuation are left out
+ * (normalize_name: "Testline Pumps" = "Testline Pumps Pvt Ltd"); close = the typed name
+ * begins a customer's name or one of its words (what is offered while typing).
+ * Returns ['exact' => [...], 'close' => [...]], each row {id, code, name, city}.
+ */
+function partner_name_matches($name, $limit = 5) {
+    $out = ['exact' => [], 'close' => []];
+    $norm = normalize_name((string) $name);
+    if (strlen($norm) < 3) return $out;
+    $first = explode(' ', $norm)[0];
+    $like = '%' . $first . '%';
+    try {
+        $rows = ops_all("SELECT id, code, legal_name, display_name FROM business_partners
+                          WHERE is_client=1 AND COALESCE(status,'ACTIVE')='ACTIVE' AND " . partner_office_sql() . "
+                            AND (LOWER(legal_name) LIKE ? OR LOWER(COALESCE(display_name,'')) LIKE ?)
+                          ORDER BY legal_name LIMIT 200", [$like, $like]) ?: [];
+    } catch (Throwable $e) { return $out; }
+    foreach ($rows as $r) {
+        $names = array_values(array_unique(array_filter([normalize_name((string) $r['legal_name']), normalize_name((string) ($r['display_name'] ?? ''))])));
+        $kind = '';
+        foreach ($names as $n) if ($n === $norm) { $kind = 'exact'; break; }
+        if ($kind === '') foreach ($names as $n)
+            if (strpos($n, $norm) === 0 || strpos(' ' . $n, ' ' . $norm) !== false) { $kind = 'close'; break; }
+        if ($kind === '' || count($out[$kind]) >= $limit) continue;
+        $out[$kind][] = ['id' => (int) $r['id'], 'code' => (string) ($r['code'] ?? ''),
+                         'name' => (string) (($r['display_name'] ?? '') !== '' ? $r['display_name'] : $r['legal_name']), 'city' => ''];
+    }
+    foreach (['exact', 'close'] as $k) foreach ($out[$k] as $i => $m) $out[$k][$i]['city'] = partner_match_city($m['id']);
+    return $out;
+}
+/** The town a customer is told apart by — its head office, else its first address. */
+function partner_match_city($partnerId) {
+    $a = function_exists('custid_head_office_address') ? custid_head_office_address((int) $partnerId) : null;
+    if (!$a) { try { $a = ops_one("SELECT city FROM partner_addresses WHERE partner_id=? AND COALESCE(city,'')<>'' ORDER BY id LIMIT 1", [(int) $partnerId]); } catch (Throwable $e) { $a = null; } }
+    return trim((string) ($a['city'] ?? ''));
+}
+/** One customer as the person sees it: "CL-0012 Testline Pumps Pvt Ltd (Vadodara)". */
+function partner_match_words(array $m) {
+    return trim($m['code'] . ' ' . $m['name']) . ($m['city'] !== '' ? ' (' . $m['city'] . ')' : '');
+}
+/** A customer by id, in the same shape — only one the person may see (else null). */
+function partner_match_by_id($id) {
+    try {
+        $r = ops_one("SELECT id, code, legal_name, display_name FROM business_partners WHERE id=? AND is_client=1 AND " . partner_office_sql(), [(int) $id]);
+    } catch (Throwable $e) { $r = null; }
+    if (!$r) return null;
+    return ['id' => (int) $r['id'], 'code' => (string) ($r['code'] ?? ''),
+            'name' => (string) (($r['display_name'] ?? '') !== '' ? $r['display_name'] : $r['legal_name']), 'city' => partner_match_city((int) $r['id'])];
+}
+/**
+ * The one decision every form makes on Save, for a TYPED name with no customer picked:
+ *   ['linked' => row]  — exactly one customer has that name: attach the record to it;
+ *   ['many'  => rows]  — two or more do: ask once, on the form, which (or "a new company");
+ *   []                 — none, or the person said "it is a new company": keep the typed name.
+ * A customer picked with "Use this customer" ($useId) is taken as picked.
+ */
+function partner_resolve_typed($typed, $useId = 0, $newCompany = false) {
+    if ((int) $useId > 0 && ($m = partner_match_by_id((int) $useId))) return ['linked' => $m, 'picked' => true];
+    if ($newCompany || trim((string) $typed) === '') return [];
+    $mm = partner_name_matches($typed, 6);
+    if (count($mm['exact']) === 1) return ['linked' => $mm['exact'][0]];
+    if (count($mm['exact']) > 1) return ['many' => $mm['exact']];
+    return [];
+}
+/** Who may ask "is this name a customer of ours?" while typing: those who may add a lead,
+ *  a deal or an enquiry — they already see the client list in those forms. No new right. */
+function partner_match_can() {
+    if (!function_exists('current_user') || !current_user()) return false;
+    if (is_master()) return true;
+    if (function_exists('leads_can_edit') && leads_can_edit()) return true;
+    if (function_exists('opp_can_edit') && opp_can_edit()) return true;
+    if (function_exists('crm_inquiry_can_write') && crm_inquiry_can_write()) return true;
+    return false;
+}
+
+/**
  * The answer, as you type — no more than the Save refusal already names (the code and
  * the name). ['kind' => 'GSTIN' | 'PAN' | 'NONE' | 'BAD', 'text' => …]. $excludeId is
  * the record being edited (its own GSTIN and PAN are no clash).

@@ -144,7 +144,16 @@ function sx_lead_save(array $b, $confirm) {
     $phone = trim((string) ($b['contact_phone'] ?? ''));
     //  D4 (owner, 21 Nov 2026): the quick lead needs a mobile — 10 digits.
     if (($mp = function_exists('sales_mobile_problem') ? sales_mobile_problem($phone, true) : '') !== '') return ['err' => $mp];
-    if (!$confirm && ($d = sx_lead_dupes($company, $phone))) return ['dupes' => $d];
+    //  Owner, 28 Nov 2026: the customer picked with "Use this customer" — or the one customer
+    //  whose name this is — is the lead's customer; two or more with that name are asked about
+    //  here, once. The duplicate list then leaves that customer out (it is the one we mean).
+    $lk = function_exists('sales_link_typed') ? sales_link_typed($b, 'partner_id', 'company_name') : [];
+    if (!empty($lk['many'])) return ['many' => $lk['many']];
+    $pid = (int) ($b['partner_id'] ?? 0);
+    if ($pid) $company = trim((string) ($b['company_name'] ?? '')) ?: $company;
+    if (!$confirm && ($d = function_exists('lead_form_dupes')
+            ? lead_form_dupes(['company_name' => $company, 'contact_phone' => $phone, 'partner_id' => (string) $pid])
+            : sx_lead_dupes($company, $phone))) return ['dupes' => $d, 'partner_id' => $pid];
     $u = current_user();
     $officeId = (int) ($b['office_id'] ?? 0) ?: (int) ($u['home_office_id'] ?? 0);
     if ($officeId && function_exists('scope_allows') && !scope_allows($officeId)) $officeId = (int) ($u['home_office_id'] ?? 0);
@@ -160,14 +169,15 @@ function sx_lead_save(array $b, $confirm) {
     if ($next !== '' && $next < date('Y-m-d')) return ['err' => 'The first follow-up cannot be in the past.'];
     if ($next === '') $next = sx_add_working_days(1, $officeId);
     $r = lead_create([
-        'company_name' => $company, 'contact_name' => trim((string) ($b['contact_name'] ?? '')), 'contact_phone' => $phone,
+        'company_name' => $company, 'partner_id' => $pid ?: '', 'contact_name' => trim((string) ($b['contact_name'] ?? '')), 'contact_phone' => $phone,
         'contact_email' => trim((string) ($b['contact_email'] ?? '')), 'source' => (string) ($b['source'] ?? ''),
         'value' => max(0, (float) str_replace(',', '', (string) ($b['value'] ?? 0))), 'office_id' => $officeId ?: '',
         'owner_user_id' => $owner ?: '', 'next_action_on' => $next,
         'next_action' => trim((string) ($b['next_action'] ?? '')) ?: 'First call',
     ]);
     if (!empty($r['err'])) return ['err' => $r['err']];
-    return ['ok' => true, 'id' => (int) $r['id'], 'ref' => (string) ($r['ref'] ?? ''), 'owner' => $owner, 'next' => $next];
+    if (function_exists('sales_link_note')) sales_link_note('LEAD', (int) $r['id'], $lk);
+    return ['ok' => true, 'id' => (int) $r['id'], 'ref' => (string) ($r['ref'] ?? ''), 'owner' => $owner, 'next' => $next, 'note' => (string) ($lk['note'] ?? '')];
 }
 
 // ---- Log activity --------------------------------------------------------------
@@ -608,21 +618,24 @@ function ops_sales_more($route, $method) {
             //  add them (owner, 21 Nov 2026), so this quick form refuses them too.
             ops_require(leads_can_edit() && (!function_exists('leads_works_leads') || leads_works_leads()),
                 'Adding a lead needs the right to add leads. You can open and download the leads of your branch, but not add one.');
-            $old = []; $dupes = []; $err = '';
+            $old = []; $dupes = []; $err = ''; $picks = [];
             if ($method === 'POST') {
                 $r = sx_lead_save($_POST, !empty($_POST['confirm']));
                 if (!empty($r['ok'])) {
                     [$fn, $fsk] = function_exists('lead_attach_uploads') ? lead_attach_uploads((int) $r['id'], $_FILES['files'] ?? null, (string) ($_POST['file_kind'] ?? 'REQUIREMENT'), '') : [0, []];
                     $who = $r['owner'] && (int) $r['owner'] !== (int) (current_user()['id'] ?? 0) ? ' It is with ' . user_name(ops_one("SELECT * FROM users WHERE id=?", [$r['owner']])) . '.' : '';
-                    flash('Lead ' . $r['ref'] . ' saved.' . $who . ' First follow-up ' . fdate($r['next']) . '.'
+                    flash('Lead ' . $r['ref'] . ' saved.' . (!empty($r['note']) ? ' ' . $r['note'] : '') . $who . ' First follow-up ' . fdate($r['next']) . '.'
                         . ($fn ? ' ' . $fn . ' file(s) attached.' : '') . ($fsk ? ' Not attached: ' . implode(', ', $fsk) . '.' : ''), $fsk ? 'warning' : 'success');
                     redirect(!empty($_POST['another']) ? '/sales-lead' : '/lead?id=' . $r['id']);
                 }
-                $old = $_POST; $dupes = $r['dupes'] ?? []; $err = $r['err'] ?? '';
+                $old = $_POST; $dupes = $r['dupes'] ?? []; $err = $r['err'] ?? ''; $picks = $r['many'] ?? [];
+                if (!empty($r['partner_id'])) $old['partner_id'] = (int) $r['partner_id'];   // kept for "Save anyway"
+                unset($old['use_partner']);
+                if ($picks) $err = 'More than one customer on file is called “' . trim((string) ($_POST['company_name'] ?? '')) . '” — pick which one below, or say it is a new company.';
                 if (!empty($_FILES['files']['name'][0])) $err = trim($err . ' Choose the file(s) again — a browser never keeps a chosen file when the page comes back.');
             }
             $u = current_user();
-            view('ops/sx_lead', ['old' => $old, 'dupes' => $dupes, 'err' => $err,
+            view('ops/sx_lead', ['old' => $old, 'dupes' => $dupes, 'err' => $err, 'picks' => $picks,
                 'sources' => lk_options_or('lead_source', LEAD_SOURCES), 'offices' => function_exists('offices_list') ? array_values(array_filter(offices_list(), fn($o) => !function_exists('scope_allows') || scope_allows((int) $o['id']))) : [],
                 'myOffice' => (int) ($u['home_office_id'] ?? 0), 'people' => sx_can_see_all() ? sx_target_people() : [],
                 'next' => sx_add_working_days(1, (int) ($u['home_office_id'] ?? 0))]);

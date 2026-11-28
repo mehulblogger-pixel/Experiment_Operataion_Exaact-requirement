@@ -52,7 +52,7 @@ $right = '<div class="sxw-ctl"><a class="sxw-bt" href="/sales-lead">' . rec_icon
           // or mis-spelled — the same client picker the quotation screen uses. ?>
     <div class="ff ff-wide ff-req"><label for="lead-partner">Company or person <a href="#" class="addlink" data-qa="client" data-target="select[name='partner_id']">+ Add new</a></label>
       <div class="pair-2">
-        <select class="form-control searchable" name="partner_id" id="lead-partner">
+        <select class="form-control searchable" name="partner_id" id="lead-partner" data-cust-chip>
           <option value="">— pick a company on the master —</option>
           <?php foreach (($clients ?? []) as $cl): ?>
             <option value="<?= (int)$cl['id'] ?>" <?= $val('partner_id') === (string)$cl['id'] ? 'selected' : '' ?>>
@@ -60,8 +60,10 @@ $right = '<div class="sxw-ctl"><a class="sxw-bt" href="/sales-lead">' . rec_icon
           <?php endforeach; ?>
         </select>
         <input class="form-control" name="company_name" id="lead-company" maxlength="200"
-               value="<?= e($val('company_name')) ?>" placeholder="…or type a new company / person's name">
+               value="<?= e($val('company_name')) ?>" placeholder="…or type a new company / person's name"
+               data-cust-match="#lead-partner" autocomplete="off">
       </div>
+      <?php $pickList = $picks ?? []; include __DIR__ . '/_customer_picks.php'; ?>
       <div class="ff-help">Already a <?= e(Tl('client')) ?>? Pick them on the left — their main contact fills in. Someone new — a company or a person — type the name on the right.</div>
     </div>
     <div class="ff"><label for="lf-cn">Contact name</label>

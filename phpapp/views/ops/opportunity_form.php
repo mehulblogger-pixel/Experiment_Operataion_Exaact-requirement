@@ -42,7 +42,7 @@ $selPipe = (int)($prefill['pipeline_id'] ?? 0) ?: (int)($pipelines[0]['id'] ?? 0
         <?php foreach ($pipelines as $p): ?><option value="<?= (int)$p['id'] ?>" <?= ((int)($prefill['pipeline_id'] ?? 0) === (int)$p['id']) ? 'selected' : '' ?>><?= e($p['name']) ?></option><?php endforeach; ?>
       </select></div>
     <div class="ff"><label>Customer <span class="muted" style="font-size:12px">— on the master</span> <?php if (!function_exists('partner_can_add') || partner_can_add()): ?><a href="#" class="addlink" data-qa="client" data-target="select[name='partner_id']">+ Add new</a><?php endif; ?></label>
-      <select name="partner_id" class="form-control searchable">
+      <select name="partner_id" id="of-partner" class="form-control searchable" data-cust-chip>
         <option value="">— not on the master yet —</option>
         <?php foreach ($clients as $cl): ?>
           <option value="<?= (int)$cl['id'] ?>" <?= ((int)($prefill['partner_id'] ?? 0) === (int)$cl['id']) ? 'selected' : '' ?>><?= e($cl['display_name'] ?: $cl['legal_name']) ?></option>
@@ -50,7 +50,8 @@ $selPipe = (int)($prefill['pipeline_id'] ?? 0) ?: (int)($pipelines[0]['id'] ?? 0
       </select></div>
     <div class="ff"><label>…or who it is for <span class="muted" style="font-size:12px">— a name only</span></label>
       <input class="form-control" name="partner_name" maxlength="200" value="<?= e($prefill['partner_name'] ?? '') ?>"
-             placeholder="Company name, if they are not a customer yet">
+             placeholder="Company name, if they are not a customer yet" data-cust-match="#of-partner" data-cust-clear="1" autocomplete="off">
+      <?php $pickList = $picks ?? []; include __DIR__ . '/_customer_picks.php'; ?>
       <?php //  DEF-16 (owner, 21 Nov 2026): this said a name-only deal cannot be quoted — it can, since 13 Nov 2026. ?>
       <span class="ff-help">A deal with only a typed name can still be quoted; the <?= e(Tl('quote')) ?> goes out in their name, and they are added to the master when they accept it. Link the customer when they confirm.</span></div>
     <?php //  DEF-15 — the business unit: the units this person's data scope covers. ?>

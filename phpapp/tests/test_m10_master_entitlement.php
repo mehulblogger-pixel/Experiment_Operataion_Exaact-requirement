@@ -250,6 +250,11 @@ $BASELINE = [
     // a client (CORE, section E) or turn a lead / deal / won quotation into a customer. The
     // answer names no more than that refusal. Same answer for a master as custid_can_edit().
     'custid_lookup_can',
+    // Owner, 28 Nov 2026. partner_match_can() answers "is this typed name a customer of ours?"
+    // for exactly the people who may add a lead, a deal or an enquiry — they already see this
+    // client list (their own office scope) in those forms. Category B: asked only on Sales
+    // forms behind the Sales licence. Same answer for a master as before (is_master()).
+    'partner_match_can',
 ];
 $unclassified = array_values(array_diff($open, $BASELINE));
 t_ok(!$unclassified,

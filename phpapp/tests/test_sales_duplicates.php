@@ -79,9 +79,16 @@ $drive($BDM, 'quote-status', 'POST', ['id' => $q3], ['to' => 'ACCEPTED']);
 t_eq([$row($q3)['status'], (int) $row($q3)['client_id']], ['ACCEPTED', $acme], 'an exactly matching name is still linked without asking');
 
 // ---- a typed enquiry name is warned about --------------------------------------------------
-$r = $drive($ME, 'inquiry-new', 'POST', [], ['client_name' => 'ACME VALVES PVT. LTD.', 'contact_name' => 'Ravi', 'contact_email' => 'r@example.test',
-                                             'sbu' => 'TPI', 'subject' => 'Inspection']);
-t_ok(strpos($said($r), 'similar name is already on file') !== false, 'an enquiry typed for a near-match is saved with a warning naming the customer on file: ' . $said($r));
+$enq = ['client_name' => 'ACME VALVES PVT. LTD.', 'contact_name' => 'Ravi', 'contact_email' => 'r@example.test', 'sbu' => 'TPI', 'subject' => 'Inspection'];
+//  Owner, 28 Nov 2026: a typed name that IS a customer's name (Pvt Ltd / punctuation left out) is
+//  attached to that customer — no "similar name" warning. Here two customers carry it (Acme Valves
+//  Pvt Ltd, and Acme Valves Ltd. made above as "a different company"), so the form asks once which.
+$n0 = (int) ops_val("SELECT COUNT(*) FROM crm_inquiries WHERE client_name LIKE 'Acme Valves%' OR client_name LIKE 'ACME VALVES%'");
+$r = $drive($ME, 'inquiry-new', 'POST', [], $enq, ['Use this customer', 'It is a new company']);
+t_eq((int) ops_val("SELECT COUNT(*) FROM crm_inquiries WHERE client_name LIKE 'Acme Valves%' OR client_name LIKE 'ACME VALVES%'"), $n0, 'an enquiry typed with a name two customers carry is not saved yet');
+t_ok(!empty($r['has']['Use this customer']) && !empty($r['has']['It is a new company']), 'the enquiry form asks which customer is meant, or "It is a new company"');
+$r = $drive($ME, 'inquiry-new', 'POST', [], $enq + ['use_partner' => $acme]);
+t_eq((int) ops_val("SELECT client_id FROM crm_inquiries ORDER BY id DESC LIMIT 1"), $acme, '"Use this customer" saves the enquiry on Acme Valves Pvt Ltd');
 
 // ---- two people converting one lead at the same moment ----------------------------------------
 t_as_admin();

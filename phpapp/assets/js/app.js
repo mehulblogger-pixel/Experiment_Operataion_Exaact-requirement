@@ -2381,3 +2381,120 @@
     });
   });
 })();
+
+// ---- Customer match as you type, and the ✓ of the chosen customer (owner, 28 Nov 2026) ----
+//  "If in quick lead when the name is typed and it matched to any of our existing customer it
+//  shall show while typing itself that this customer exist, select it. Else is ok." A box with
+//  data-cust-match="<selector of the form's customer field>" asks /customer-match (read-only,
+//  the person's own client list) and offers "Use this customer"; the chosen one shows as
+//  "✓ CL-0012 · Testline Pumps Pvt Ltd  change". A select with data-cust-chip shows the ✓ too.
+(function () {
+  function post(params, cb) {
+    if (!window.fetch) return;
+    var body = new URLSearchParams();
+    Object.keys(params).forEach(function (k) { body.append(k, params[k]); });
+    var m = document.querySelector('meta[name="csrf-token"]'); if (m) body.append('_csrf', m.getAttribute('content') || '');
+    fetch('/customer-match', { method: 'POST', body: body, credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+      .then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { if (j) cb(j); }).catch(function () {});
+  }
+  function anchorOf(field) {   // where the ✓ goes: after the searchable wrapper, else after the box
+    var p = field.parentNode;
+    return (p && p.className === 'ss-wrap') ? p : field;
+  }
+  function chipFor(field) {
+    var a = anchorOf(field), c = a.nextElementSibling;
+    if (c && c.classList && c.classList.contains('cm-chip')) return c;
+    c = document.createElement('div'); c.className = 'cm-chip'; c.hidden = true; c.setAttribute('role', 'status');
+    a.parentNode.insertBefore(c, a.nextSibling);
+    return c;
+  }
+  function showChip(field, m) {
+    var c = chipFor(field);
+    c.textContent = '';
+    if (!m) { c.hidden = true; return; }
+    var t = document.createElement('span'); t.className = 'cm-ok'; t.textContent = '✓ ' + (m.code ? m.code + ' · ' : '') + m.name;
+    var x = document.createElement('a'); x.href = '#'; x.className = 'cm-change'; x.textContent = 'change';
+    x.addEventListener('click', function (ev) { ev.preventDefault(); setField(field, null); });
+    c.appendChild(t); c.appendChild(document.createTextNode(' ')); c.appendChild(x); c.hidden = false;
+  }
+  function setField(field, m) {
+    if (field.tagName === 'SELECT') {
+      if (m) {
+        var found = false;
+        Array.prototype.forEach.call(field.options, function (o) { if (String(o.value) === String(m.id)) found = true; });
+        if (!found) { var op = document.createElement('option'); op.value = m.id; op.textContent = m.name; field.appendChild(op); }
+      }
+      field._cmPicked = m || null;
+      field.value = m ? String(m.id) : '';
+      if (field.dataset.enh === '1' && field.parentNode && field.parentNode.className === 'ss-wrap') {
+        var inp = field.parentNode.querySelector('input.form-control'); if (inp) inp.value = m ? m.name : '';
+      }
+      field.dispatchEvent(new Event('change', { bubbles: true }));
+    } else {
+      field._cmPicked = m || null;
+      field.value = m ? String(m.id) : '';
+    }
+    showChip(field, m);
+  }
+  function hintFor(box) {
+    var h = box.nextElementSibling;
+    if (h && h.classList && h.classList.contains('cm-hint')) return h;
+    h = document.createElement('div'); h.className = 'cm-hint'; h.hidden = true; h.setAttribute('aria-live', 'polite');
+    box.parentNode.insertBefore(h, box.nextSibling);
+    return h;
+  }
+  function wire(box) {
+    var field = document.querySelector(box.getAttribute('data-cust-match'));
+    if (!field) return;
+    var hint = hintFor(box), timer = null, seq = 0;
+    box.addEventListener('input', function () {
+      //  The quick lead keeps the customer in a hidden field: typing another name lets it go.
+      if (field.tagName !== 'SELECT' && field.value && field._cmPicked && (box.value || '').trim() !== field._cmPicked.name) setField(field, null);
+      clearTimeout(timer);
+      var v = (box.value || '').trim();
+      if (v.length < 3 || field.value) { hint.hidden = true; hint.textContent = ''; return; }
+      var my = ++seq;
+      timer = setTimeout(function () {
+        post({ name: v }, function (j) {
+          if (my !== seq) return;
+          var rows = (j && j.matches) || [];
+          hint.textContent = '';
+          if (!rows.length) { hint.hidden = true; return; }
+          rows.slice(0, 3).forEach(function (m) {
+            var row = document.createElement('div'); row.className = 'cm-row';
+            var b = document.createElement('b'); b.textContent = m.name;
+            row.appendChild(b);
+            row.appendChild(document.createTextNode(' (' + [m.code, m.city].filter(Boolean).join(', ') + ') is already a customer — '));
+            var u = document.createElement('button'); u.type = 'button'; u.className = 'btn small'; u.textContent = 'Use this customer';
+            u.addEventListener('click', function () {
+              setField(field, m);
+              if (box.hasAttribute('data-cust-clear')) box.value = ''; else box.value = m.name;
+              hint.hidden = true; hint.textContent = '';
+            });
+            row.appendChild(u); hint.appendChild(row);
+          });
+          hint.hidden = false;
+        });
+      }, 350);
+    });
+  }
+  function chipOnChange(sel) {
+    function refresh() {
+      if (!sel.value) { sel._cmPicked = null; showChip(sel, null); return; }
+      if (sel._cmPicked && String(sel._cmPicked.id) === String(sel.value)) { showChip(sel, sel._cmPicked); return; }
+      post({ id: sel.value }, function (j) { if (j && j.customer && String(j.customer.id) === String(sel.value)) { sel._cmPicked = j.customer; showChip(sel, j.customer); } });
+    }
+    sel.addEventListener('change', refresh);
+    if (sel.value) refresh();
+  }
+  function init() {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-cust-match]'), wire);
+    Array.prototype.forEach.call(document.querySelectorAll('select[data-cust-chip]'), chipOnChange);
+    //  The quick lead's hidden customer, kept on a page that came back (e.g. "Save anyway").
+    Array.prototype.forEach.call(document.querySelectorAll('[data-cust-match]'), function (box) {
+      var f = document.querySelector(box.getAttribute('data-cust-match'));
+      if (f && f.tagName !== 'SELECT' && f.value) post({ id: f.value }, function (j) { if (j && j.customer) { f._cmPicked = j.customer; showChip(f, j.customer); } });
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();

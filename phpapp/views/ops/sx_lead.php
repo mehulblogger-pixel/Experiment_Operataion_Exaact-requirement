@@ -24,7 +24,12 @@ $right = '<div class="sxw-ctl"><a class="sxw-bt" href="/lead-new" id="sl-full" t
     <?php endif; ?>
     <section class="rec-card">
       <div class="form-grid">
-        <div class="ff ff-wide"><label for="sl_co">Company or person *</label><input id="sl_co" class="form-control" name="company_name" required autofocus value="<?= $v('company_name') ?>" placeholder="e.g. Shree Engineering Works"></div>
+        <?php //  Owner, 28 Nov 2026: a name that is one of our customers is said while typing —
+              //  "Use this customer" links the lead to it (partner_id), and a ✓ shows which. ?>
+        <div class="ff ff-wide"><label for="sl_co">Company or person *</label><input id="sl_co" class="form-control" name="company_name" required autofocus value="<?= $v('company_name') ?>" placeholder="e.g. Shree Engineering Works"
+               data-cust-match="#sl_pid" autocomplete="off">
+          <input type="hidden" name="partner_id" id="sl_pid" value="<?= (int) ($old['partner_id'] ?? 0) ?: '' ?>">
+          <?php $pickList = $picks ?? []; include __DIR__ . '/_customer_picks.php'; ?></div>
         <div class="ff"><label for="sl_ph">Mobile</label><input id="sl_ph" class="form-control" name="contact_phone" inputmode="tel" value="<?= $v('contact_phone') ?>" placeholder="98250 12345"><div class="ff-help">At least 10 digits. Used for WhatsApp and Call from Today.</div></div>
         <div class="ff"><label for="sl_src">Where did it come from?</label><select id="sl_src" class="form-control" name="source"><option value="">—</option>
           <?php foreach ($sources as $k => $lab): ?><option value="<?= e($k) ?>"<?= (string) ($old['source'] ?? '') === (string) $k ? ' selected' : '' ?>><?= e($lab) ?></option><?php endforeach; ?></select></div>

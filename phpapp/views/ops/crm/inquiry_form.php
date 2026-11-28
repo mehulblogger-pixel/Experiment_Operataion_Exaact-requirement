@@ -46,11 +46,12 @@ $right = '<div class="sxw-ctl">'
   <?php $step(1, ucfirst(Tl('client')) . ' and contact', 'A ' . Tl('client') . ' on hold or blocked is refused, with the reason.'); ?>
   <div class="form-grid">
     <div class="ff"><label><?= e(ucfirst(Tl('client'))) ?> * <?php if (!function_exists('partner_can_add') || partner_can_add()): ?><a href="#" class="addlink" data-qa="client" data-target="select[name='client_id']">+ Add new</a><?php endif; ?></label>
-      <select class="form-control searchable" name="client_id"><option value="">— pick or type below —</option>
+      <select class="form-control searchable" name="client_id" id="inq-client" data-cust-chip><option value="">— pick or type below —</option>
         <?php foreach ($clients as $cl): ?><option value="<?= (int)$cl['id'] ?>" <?= (string)($inq['client_id'] ?? '') === (string)$cl['id'] ? 'selected' : '' ?>><?= e($cl['display_name'] ?: $cl['legal_name']) ?></option><?php endforeach; ?>
       </select></div>
-    <div class="ff"><label>…or <?= e(Tl('client')) ?> name (if not yet registered)</label><input class="form-control" name="client_name" value="<?= e($inq['client_name'] ?? '') ?>">
-      <div class="ff-help">A similar name gets a warning, never a block.</div></div>
+    <div class="ff"><label>…or <?= e(Tl('client')) ?> name (if not yet registered)</label><input class="form-control" name="client_name" value="<?= e($inq['client_name'] ?? '') ?>" data-cust-match="#inq-client" data-cust-clear="1" autocomplete="off">
+      <div class="ff-help">A name that is one of our <?= e(Tlp('client')) ?> is offered as you type — and attached to it on Save.</div>
+      <?php $pickList = $picks ?? []; include __DIR__ . '/../_customer_picks.php'; ?></div>
     <?php //  Owner, 13 Nov 2026 (SAL test, step 4): a received date in the future "must show a warning sign
           //  and shall not be recorded". The browser stops at today; the warning says why; the server refuses. ?>
     <div class="ff"><label for="inq-recv">Received date</label><input class="form-control" type="date" id="inq-recv" name="received_date" max="<?= e(date('Y-m-d')) ?>" value="<?= e($inq['received_date'] ?? date('Y-m-d')) ?>" aria-describedby="inq-recv-warn">

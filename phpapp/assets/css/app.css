@@ -2308,3 +2308,11 @@ button.sxw-ib{cursor:pointer;font-family:inherit}
 @media (max-width:620px){.ox-row{grid-template-columns:minmax(0,1fr) auto}.ox-row .s{grid-column:1/2}.ox-row .a{grid-column:1/3}}
 /* Phone bottom bar: the Punch button (lib/areas.php area_bn_punch) — the same punch bar at the top of the page does the work. */
 .botnav .bn[data-punch] span{color:var(--brand-ink)}
+
+/* Customer match as you type, and the chosen customer's ✓ (owner, 28 Nov 2026). */
+.cm-hint{margin:6px 0 0;padding:8px 10px;border:1px solid var(--line,#d8dde6);border-left:3px solid var(--accent,#2563eb);border-radius:8px;background:var(--panel,#f7f9fc);font-size:13px}
+.cm-hint .cm-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:2px 0}
+.cm-chip{margin:6px 0 0;font-size:13px}
+.cm-chip .cm-ok{display:inline-block;padding:3px 8px;border-radius:999px;background:#e7f6ec;color:#17643a;font-weight:600}
+.cm-chip .cm-change{margin-left:6px;font-size:12.5px}
+@media (max-width:560px){ .cm-hint .cm-row .btn{width:100%} }

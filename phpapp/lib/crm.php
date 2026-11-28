@@ -2401,6 +2401,17 @@ function ops_crm_inquiries($route, $method) {
                 flash('That ' . Tl('inquiry') . ' was already saved — here it is.', 'warning');
                 redirect('/inquiry?id=' . (int)$_SESSION['inquiry_form_once'][$once]);
             }
+            //  Owner, 28 Nov 2026: a new enquiry whose typed customer name is one of ours is
+            //  attached to that customer (one exact match); two or more are asked about here, once.
+            $lk = !$inq && function_exists('sales_link_typed') ? sales_link_typed($b, 'client_id', 'client_name') : [];
+            if (!empty($lk['many'])) {
+                view('ops/crm/inquiry_form', ['inq' => $b, 'picks' => $lk['many'],
+                    'error' => 'More than one ' . Tl('client') . ' on file is called “' . trim((string) ($b['client_name'] ?? '')) . '” — pick which one below, or say it is a new company.',
+                    'clients' => clients_list(), 'sbuOpts' => lk_options_or('sbu', OPS_SBUS),
+                    'sourceOpts' => INQUIRY_SOURCES, 'statusOpts' => crm_inquiry_status_opts(),
+                    'users' => ops_all("SELECT id, first_name, last_name, username FROM users WHERE is_active=1 ORDER BY first_name, username")]);
+                return;
+            }
             $cid = ($b['client_id'] ?? '') !== '' ? (int)$b['client_id'] : null;
             // D-12 — no new enquiry for a customer who is blocked.
             if ($cid && !$inq && ($tb = partner_trade_block($cid)) !== '') { flash($tb, 'error'); redirect('/inquiry-new'); }
@@ -2493,7 +2504,8 @@ function ops_crm_inquiries($route, $method) {
                 if ($once !== '') $_SESSION['inquiry_form_once'][$once] = $newId;
                 if (function_exists('ads_queue_inquiry')) ads_queue_inquiry($newId, 'Enquiry raised');
                 $addedC = $vals[0] ? crm_inquiry_add_contact((int)$vals[0], (string)$vals[2], (string)$vals[3], (string)$vals[4], (string)$no, $newId) : false;
-                flash("$no created. You can now raise a quotation against it." . ($addedC ? ' ' . $vals[2] . ' is now also on the ' . Tl('client') . "'s contacts." : ''));
+                if (function_exists('sales_link_note')) sales_link_note('INQUIRY', $newId, $lk);
+                flash("$no created." . (!empty($lk['note']) ? ' ' . $lk['note'] : '') . " You can now raise a quotation against it." . ($addedC ? ' ' . $vals[2] . ' is now also on the ' . Tl('client') . "'s contacts." : ''));
                 redirect('/inquiry?id=' . $newId);
             }
         }

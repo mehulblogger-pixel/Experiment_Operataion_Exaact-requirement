@@ -724,13 +724,40 @@ function lead_form_dupes(array $b) {
     if ($company === '' && $phone === '') return [];
     $out = sx_lead_dupes($company, $phone, $pid);
     if ($pid) {
-        $out = array_values(array_filter($out, fn($d) => strpos((string)$d['url'], '/partner?id=' . $pid) === false));
+        //  Owner, 28 Nov 2026: a customer has been CHOSEN — another customer of the same name
+        //  is no duplicate of this lead (the person already said which one is meant).
+        $out = array_values(array_filter($out, fn($d) => strpos((string)$d['url'], '/partner?id=') === false));
         foreach (leads_try(fn() => ops_all("SELECT id, ref, company_name FROM leads WHERE status='OPEN' AND partner_id=? LIMIT 3", [$pid]), []) ?: [] as $l) {
             $u = '/lead?id=' . (int)$l['id'];
             if (!array_filter($out, fn($d) => $d['url'] === $u)) $out[] = ['text' => 'An open lead for this ' . Tl('client') . ': ' . $l['ref'] . ' — ' . $l['company_name'], 'url' => $u];
         }
     }
     return array_slice($out, 0, 6);
+}
+
+//  Owner, 28 Nov 2026 — ONE step for the lead, deal and enquiry forms: a customer picked
+//  with "Use this customer" ($b['use_partner']) is the customer; a typed name that is
+//  exactly one customer's name is attached to it; two or more customers with that name
+//  are asked about once, on the form ('many'); "It is a new company" ($b['new_company'])
+//  keeps the typed name. $b is changed in place: its customer field gets the id.
+function sales_link_typed(array &$b, $idKey, $nameKey) {
+    if (!function_exists('partner_resolve_typed')) return [];
+    $use = (int) ($b['use_partner'] ?? 0);
+    if ((int) ($b[$idKey] ?? 0) > 0 && !$use) return [];
+    $r = partner_resolve_typed((string) ($b[$nameKey] ?? ''), $use, !empty($b['new_company']));
+    if (!empty($r['linked'])) {
+        $m = $r['linked'];
+        $b[$idKey] = (string) $m['id'];
+        $b[$nameKey] = $m['name'];
+        $r['note'] = empty($r['picked']) ? 'Linked to ' . partner_match_words($m) . ' (same name).' : '';
+    }
+    return $r;
+}
+//  The History line for an automatic link (the person picked nothing; the name matched).
+function sales_link_note($kind, $id, array $lk) {
+    if (empty($lk['linked']) || !empty($lk['picked']) || !function_exists('act_log') || $id <= 0) return;
+    try { act_log($kind, (int) $id, 'SYSTEM', 'Linked to ' . partner_match_words($lk['linked']) . ' — the name typed is that customer\'s name.', ['auto' => 1, 'partner_id' => (int) $lk['linked']['id']]); }
+    catch (Throwable $e) {}
 }
 
 function lead_create(array $b) {
@@ -1857,6 +1884,14 @@ function ops_leads($route, $method) {
             if ($mp === '' && trim((string) ($_POST['contact_phone'] ?? '')) === '' && trim((string) ($_POST['contact_email'] ?? '')) === '')
                 $mp = 'Give a mobile or an e-mail — a lead nobody can reach cannot be followed up.';
             if ($mp !== '') { form_stash('lead-new', $_POST); flash($mp . $fileAgain, 'error'); redirect('/lead-new'); }
+            //  Owner, 28 Nov 2026: a typed name that is a customer of ours is attached to that
+            //  customer — one exact match at once; two or more: asked here, once.
+            $lk = sales_link_typed($_POST, 'partner_id', 'company_name');
+            if (!empty($lk['many'])) {
+                form_stash('lead-new', $_POST + ['_many' => '1']);
+                flash('More than one customer on file is called “' . trim((string) $_POST['company_name']) . '” — pick which one at the top, or say it is a new company.' . $fileAgain, 'warning');
+                redirect('/lead-new');
+            }
             //  Backend item 1 — the quick lead's duplicate check, on save too. Nothing
             //  is saved; the form comes back with the matches and "Save anyway".
             if (empty($_POST['confirm']) && trim((string)($_POST['company_name'] ?? '')) . (string)($_POST['partner_id'] ?? '') !== '' && lead_form_dupes($_POST)) {
@@ -1867,7 +1902,8 @@ function ops_leads($route, $method) {
             $r = lead_create($_POST);
             if (!empty($r['err'])) { form_stash('lead-new', $_POST); flash($r['err'] . $fileAgain, 'error'); redirect('/lead-new'); }
             [$fn, $fsk] = lead_attach_uploads((int)$r['id'], $_FILES['files'] ?? null, (string)($_POST['file_kind'] ?? 'REQUIREMENT'), (string)($_POST['file_note'] ?? ''));
-            flash('Lead ' . $r['ref'] . ' created.' . ($fn ? ' ' . $fn . ' file(s) attached.' : '') . ($fsk ? ' Not attached: ' . implode(', ', $fsk) . '.' : ''), $fsk ? 'warning' : 'success');
+            sales_link_note('LEAD', (int) $r['id'], $lk);
+            flash('Lead ' . $r['ref'] . ' created.' . (!empty($lk['note']) ? ' ' . $lk['note'] : '') . ($fn ? ' ' . $fn . ' file(s) attached.' : '') . ($fsk ? ' Not attached: ' . implode(', ', $fsk) . '.' : ''), $fsk ? 'warning' : 'success');
             redirect('/lead?id=' . $r['id']);
         }
         //  While typing (backend item 1): the form asks this same address for the
@@ -1884,8 +1920,11 @@ function ops_leads($route, $method) {
         //  After a save that found matches: the list again, and "Save anyway".
         $dupes = (form_is_retry() && form_old('_dupcheck', '') === '1')
             ? lead_form_dupes(['company_name' => form_old('company_name', ''), 'contact_phone' => form_old('contact_phone', ''), 'partner_id' => form_old('partner_id', '')]) : [];
+        //  Owner, 28 Nov 2026: two or more customers with the typed name — which one?
+        $picks = (form_is_retry() && form_old('_many', '') === '1')
+            ? (partner_resolve_typed(form_old('company_name', ''))['many'] ?? []) : [];
         view('ops/lead_form', [
-            'pipelines' => pipelines_all(), 'dup' => $dup, 'prefill' => $_GET, 'dupes' => $dupes,
+            'pipelines' => pipelines_all(), 'dup' => $dup, 'prefill' => $_GET, 'dupes' => $dupes, 'picks' => $picks,
             'sbus' => lead_sbu_options(),
             // The client master, so a company we already know is picked, not
             // re-typed. Individuals and brand-new companies are still typed.
